@@ -32,7 +32,11 @@ from rapyer.utils.annotation import (
     field_with_flag,
     DYNAMIC_CLASS_DOC,
 )
-from rapyer.utils.fields import get_all_pydantic_annotation, is_redis_field
+from rapyer.utils.fields import (
+    get_all_pydantic_annotation,
+    is_redis_field,
+    is_type_dumpable,
+)
 from rapyer.utils.redis import acquire_lock, update_keys_in_pipeline
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
@@ -209,7 +213,10 @@ class AtomicRedisModel(BaseModel):
         for attr_name, attr_type in cls.__annotations__.items():
             if not is_redis_field(attr_name, attr_type):
                 continue
-            if original_annotations[attr_name] == attr_type:
+            # If the annotation has not changed - it indicate this type is not redis supported
+            has_new_annotation = original_annotations[attr_name] == attr_type
+            cant_be_dumped = not is_type_dumpable(attr_type)
+            if has_new_annotation and cant_be_dumped:
                 serializer, validator = make_pickle_field_serializer(attr_name)
                 setattr(cls, serializer.__name__, serializer)
                 setattr(cls, validator.__name__, validator)

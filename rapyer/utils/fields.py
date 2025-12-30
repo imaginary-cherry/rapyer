@@ -1,6 +1,6 @@
 from typing import get_origin, ClassVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
 from pydantic.fields import FieldInfo
 
 
@@ -62,3 +62,12 @@ def is_redis_field(field_name, field_annotation):
         or field_name.endswith("_")
         or get_origin(field_annotation) is ClassVar
     )
+
+
+def is_type_dumpable(typ: type) -> bool:
+    return False
+    try:
+        TypeAdapter(typ).json_schema()
+        return True
+    except Exception:
+        return False
