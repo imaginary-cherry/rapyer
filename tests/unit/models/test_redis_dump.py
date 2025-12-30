@@ -180,3 +180,7 @@ def test_redis_dump_all_types(model_instance, expected_types):
         assert isinstance(
             result[key], expected_type
         ), f"Key '{key}' has wrong type: expected {expected_type}, got {type(result[key])}"
+
+
+# TODO - add flag to force no pickle
+# TODO - add flag to force pickle
