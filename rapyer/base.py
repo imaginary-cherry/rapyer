@@ -558,7 +558,7 @@ async def ainsert(*models: Unpack[AtomicRedisModel]) -> list[AtomicRedisModel]:
 @contextlib.asynccontextmanager
 async def alock_from_key(
     key: str, action: str = "default", save_at_end: bool = False
-) -> AbstractAsyncContextManager[AtomicRedisModel]:
+) -> AbstractAsyncContextManager[AtomicRedisModel | None]:
     async with acquire_lock(AtomicRedisModel.Meta.redis, f"{key}/{action}"):
         try:
             redis_model = await aget(key)
