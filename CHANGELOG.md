@@ -10,6 +10,10 @@
 ### 🐛 Fixed
 - **rapyer.get**: Fix a bug in the rapyer.get() function.
 - **Context Manager Annotations**: Fixed type annotations for context managers to properly reflect their return types.
+- **RedisBytes Pipeline**: Fixed bug in RedisBytes when used within pipeline context.
+
+### 🛠️ Technical Improvements
+- **Test Coverage**: Added tests for full coverage.
 
 ## [1.1.3]
 Reupload of 1.1.2 
