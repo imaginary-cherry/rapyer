@@ -34,8 +34,6 @@ class RedisList(list, GenericRedisType[T]):
 
     def __iadd__(self, other):
         self.extend(other)
-        if self.pipeline and other:
-            self.pipeline.json().arrappend(self.key, self.json_path, *other)
         return self
 
     def append(self, __object):
