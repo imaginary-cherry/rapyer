@@ -372,9 +372,7 @@ async def test_afind_with_datetime_filtering_sanity(redis_client):
 
 
 @pytest.mark.asyncio
-async def test_afind_with_ne_expression_numeric_sanity(
-    create_index_for_ne, inserted_models_for_ne
-):
+async def test_afind_with_ne_expression_numeric_sanity(create_indices, inserted_test_models):
     # Arrange
     IndexTestModel.init_class()
 
@@ -382,17 +380,16 @@ async def test_afind_with_ne_expression_numeric_sanity(
     found_models = await IndexTestModel.afind(IndexTestModel.age != 30)
 
     # Assert
-    assert len(found_models) == 2
+    assert len(found_models) == 3
     found_ages = {m.age for m in found_models}
     assert 30 not in found_ages
     assert 25 in found_ages
     assert 35 in found_ages
+    assert 40 in found_ages
 
 
 @pytest.mark.asyncio
-async def test_afind_with_ne_expression_string_sanity(
-    create_index_for_ne, inserted_models_for_ne
-):
+async def test_afind_with_ne_expression_string_sanity(create_indices, inserted_test_models):
     # Arrange
     IndexTestModel.init_class()
 
@@ -410,7 +407,7 @@ async def test_afind_with_ne_expression_string_sanity(
 
 @pytest.mark.asyncio
 async def test_afind_with_ne_expression_combined_with_and_sanity(
-    create_index_for_ne, inserted_models_for_ne
+    create_indices, inserted_test_models
 ):
     # Arrange
     IndexTestModel.init_class()
@@ -419,14 +416,16 @@ async def test_afind_with_ne_expression_combined_with_and_sanity(
     expression = (IndexTestModel.age != 30) & (IndexTestModel.name != "Alice")
     found_models = await IndexTestModel.afind(expression)
 
-    # Assert - Should only find Charlie (age 35, not Alice)
-    assert len(found_models) == 1
-    assert found_models[0].name == "Charlie"
+    # Assert - Should find Charlie (35) and David (40), both not age 30 and not Alice
+    assert len(found_models) == 2
+    found_names = {m.name for m in found_models}
+    assert "Charlie" in found_names
+    assert "David" in found_names
 
 
 @pytest.mark.asyncio
 async def test_afind_with_ne_expression_combined_with_or_sanity(
-    create_index_for_ne, inserted_models_for_ne
+    create_indices, inserted_test_models
 ):
     # Arrange
     IndexTestModel.init_class()
@@ -441,7 +440,7 @@ async def test_afind_with_ne_expression_combined_with_or_sanity(
 
 @pytest.mark.asyncio
 async def test_afind_returns_empty_list_when_no_docs_match_expression_edge_case(
-    create_index_for_afind,
+    create_indices,
 ):
     # Arrange - Insert models with ages 25, 30, 35
     models = [
