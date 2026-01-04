@@ -1,6 +1,8 @@
 from typing import Any
 
 from pydantic import TypeAdapter
+
+from rapyer.errors import BadFilterError
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME
 
 
@@ -26,7 +28,9 @@ class ExpressionField(Expression):
         self._adapter = TypeAdapter(field_type)
 
     def create_filter(self) -> str:
-        return f"@{self.field_name}:*"
+        raise BadFilterError(
+            "You must use an operator to filter an expression in redis"
+        )
 
     def serialize_value(self, value: Any) -> Any:
         return self._adapter.dump_python(
