@@ -15,6 +15,8 @@ def update_keys_in_pipeline(pipeline, redis_key: str, **kwargs):
         pipeline.json().set(redis_key, json_path, value)
 
 
-async def refresh_ttl_if_needed(redis_client: Redis, key: str, ttl: int | None) -> None:
-    if ttl is not None:
+async def refresh_ttl_if_needed(
+    redis_client: Redis, key: str, ttl: int | None, refresh_ttl: bool = True
+) -> None:
+    if ttl is not None and refresh_ttl:
         await redis_client.expire(key, ttl)

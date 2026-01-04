@@ -1,7 +1,8 @@
 import redis.asyncio as redis_async
-from rapyer.base import REDIS_MODELS
 from redis import ResponseError
 from redis.asyncio.client import Redis
+
+from rapyer.base import REDIS_MODELS
 
 
 async def init_rapyer(

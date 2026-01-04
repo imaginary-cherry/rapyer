@@ -70,6 +70,8 @@ from tests.models.simple_types import (
     UserModelWithoutTTL,
     TaskModel,
     NoneTestModel,
+    TTLRefreshTestModel,
+    TTLRefreshDisabledModel,
 )
 
 # Specialized types
@@ -132,6 +134,8 @@ async def real_redis_client(redis_client):
         UserModelWithoutTTL,
         TaskModel,
         NoneTestModel,
+        TTLRefreshTestModel,
+        TTLRefreshDisabledModel,
         # Functionality types
         LockSaveTestModel,
         LockUpdateTestModel,

@@ -141,7 +141,9 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         result = await self.client.json().set(
             self.key, self.json_field_path(key), serialized_value[key]
         )
-        await refresh_ttl_if_needed(self.client, self.key, self.Meta.ttl)
+        await refresh_ttl_if_needed(
+            self.client, self.key, self.Meta.ttl, self.Meta.refresh_ttl
+        )
         return result
 
     async def adel_item(self, key):
@@ -161,7 +163,9 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
             async with self.redis.pipeline() as pipeline:
                 update_keys_in_pipeline(pipeline, self.key, **redis_params)
                 await pipeline.execute()
-            await refresh_ttl_if_needed(self.redis, self.key, self.Meta.ttl)
+            await refresh_ttl_if_needed(
+                self.redis, self.key, self.Meta.ttl, self.Meta.refresh_ttl
+            )
 
     async def apop(self, key, default=None):
         # Execute the script atomically
@@ -198,7 +202,9 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         self.clear()
         # Clear Redis dict
         result = await self.client.json().set(self.key, self.json_path, {})
-        await refresh_ttl_if_needed(self.client, self.key, self.Meta.ttl)
+        await refresh_ttl_if_needed(
+            self.client, self.key, self.Meta.ttl, self.Meta.refresh_ttl
+        )
         return result
 
     def clone(self):

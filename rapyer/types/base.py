@@ -94,7 +94,9 @@ class RedisType(ABC):
         result = self._adapter.validate_python(
             redis_value, context={REDIS_DUMP_FLAG_NAME: True}
         )
-        await refresh_ttl_if_needed(self.client, self.key, self.Meta.ttl)
+        await refresh_ttl_if_needed(
+            self.client, self.key, self.Meta.ttl, self.Meta.refresh_ttl
+        )
         return result
 
     @abc.abstractmethod

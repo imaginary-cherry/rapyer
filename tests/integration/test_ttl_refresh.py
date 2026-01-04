@@ -1,34 +1,12 @@
 import asyncio
 
 import pytest
-import pytest_asyncio
-from pydantic import Field
 
-from rapyer.base import AtomicRedisModel, RedisConfig
-from rapyer.types import RedisInt, RedisList, RedisDict, RedisFloat
-
-
-class ModelWithTTL(AtomicRedisModel):
-    name: str = "test"
-    age: RedisInt = 25
-    score: RedisFloat = 0.0
-    tags: RedisList[str] = Field(default_factory=list)
-    settings: RedisDict[str, str] = Field(default_factory=dict)
-
-    Meta = RedisConfig(ttl=5)
-
-
-class ModelWithoutTTL(AtomicRedisModel):
-    name: str = "test"
-    age: int = 25
-
-
-@pytest_asyncio.fixture(autouse=True)
-async def configure_test_models_with_redis(real_redis_client):
-    # Configure the test models to use the test Redis client
-    ModelWithTTL.Meta.redis = real_redis_client
-    ModelWithoutTTL.Meta.redis = real_redis_client
-    yield
+from tests.models.simple_types import (
+    TTLRefreshTestModel as ModelWithTTL,
+    UserModelWithoutTTL as ModelWithoutTTL,
+    TTLRefreshDisabledModel as ModelWithTTLNoRefresh,
+)
 
 
 @pytest.mark.asyncio
@@ -310,3 +288,65 @@ async def test_ttl_refresh_maintains_original_ttl_value__sanity(real_redis_clien
     assert refreshed_ttl > initial_ttl
     assert refreshed_ttl <= 5
     assert refreshed_ttl > 4  # Should be close to 5
+
+
+@pytest.mark.asyncio
+async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_aget__sanity(
+    real_redis_client,
+):
+    # Arrange
+    model = ModelWithTTLNoRefresh(name="nancy", age=65)
+    await model.asave()
+
+    # Let some time pass
+    await asyncio.sleep(1)
+
+    # Act
+    loaded_model = await ModelWithTTLNoRefresh.aget(model.key)
+
+    # Assert
+    ttl = await real_redis_client.ttl(model.key)
+    assert ttl <= 4  # Should NOT be refreshed, so should be around 4 or less
+    assert ttl > 0  # But still has TTL
+    assert loaded_model.name == "nancy"
+
+
+@pytest.mark.asyncio
+async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_aload__sanity(
+    real_redis_client,
+):
+    # Arrange
+    model = ModelWithTTLNoRefresh(name="oliver", age=70)
+    await model.asave()
+
+    # Let some time pass
+    await asyncio.sleep(1)
+
+    # Act
+    await model.aload()
+
+    # Assert
+    ttl = await real_redis_client.ttl(model.key)
+    assert ttl <= 4  # Should NOT be refreshed
+    assert ttl > 0  # But still has TTL
+
+
+@pytest.mark.asyncio
+async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_type_operation__sanity(
+    real_redis_client,
+):
+    # Arrange
+    model = ModelWithTTLNoRefresh(name="paul", age=75, tags=["tag1"])
+    await model.asave()
+
+    # Let some time pass
+    await asyncio.sleep(1)
+
+    # Act - perform multiple operations
+    await model.age.aincrease(5)
+    await model.tags.aappend("tag2")
+
+    # Assert
+    ttl = await real_redis_client.ttl(model.key)
+    assert ttl <= 4  # Should NOT be refreshed
+    assert ttl > 0  # But still has TTL

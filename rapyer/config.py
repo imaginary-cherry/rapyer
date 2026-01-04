@@ -21,3 +21,4 @@ class RedisConfig:
     )
     redis_type: dict[type, type] = dataclasses.field(default_factory=create_all_types)
     ttl: int | None = None
+    refresh_ttl: bool = True  # Enable TTL refresh on read/write operations by default

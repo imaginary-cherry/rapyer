@@ -3,9 +3,9 @@ from typing import TypeVar, TYPE_CHECKING
 
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, SerializationInfo
-from rapyer.types.base import GenericRedisType, RedisType, REDIS_DUMP_FLAG_NAME
 from typing_extensions import TypeAlias
 
+from rapyer.types.base import GenericRedisType, RedisType, REDIS_DUMP_FLAG_NAME
 from rapyer.utils.redis import refresh_ttl_if_needed
 
 T = TypeVar("T")
@@ -76,7 +76,9 @@ class RedisList(list, GenericRedisType[T]):
             await self.redis.json().arrappend(
                 self.key, self.json_path, *serialized_object
             )
-            await refresh_ttl_if_needed(self.redis, self.key, self.Meta.ttl)
+            await refresh_ttl_if_needed(
+                self.redis, self.key, self.Meta.ttl, self.Meta.refresh_ttl
+            )
 
     async def aextend(self, __iterable):
         items = list(__iterable)
@@ -93,7 +95,9 @@ class RedisList(list, GenericRedisType[T]):
                 self.json_path,
                 *serialized_items,
             )
-            await refresh_ttl_if_needed(self.redis, self.key, self.Meta.ttl)
+            await refresh_ttl_if_needed(
+                self.redis, self.key, self.Meta.ttl, self.Meta.refresh_ttl
+            )
 
     async def apop(self, index=-1):
         if self:
@@ -131,7 +135,9 @@ class RedisList(list, GenericRedisType[T]):
         # Clear Redis list
         if not self.pipeline:
             await self.client.json().set(self.key, self.json_path, [])
-            await refresh_ttl_if_needed(self.client, self.key, self.Meta.ttl)
+            await refresh_ttl_if_needed(
+                self.client, self.key, self.Meta.ttl, self.Meta.refresh_ttl
+            )
 
     def clone(self):
         return [v.clone() if isinstance(v, RedisType) else v for v in self]

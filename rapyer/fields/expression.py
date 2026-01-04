@@ -1,6 +1,7 @@
 from typing import Any
 
 from pydantic import TypeAdapter
+
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME
 
 

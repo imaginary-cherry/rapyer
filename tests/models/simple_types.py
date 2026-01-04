@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import Field
 from rapyer.base import AtomicRedisModel, RedisConfig
-from rapyer.types import RedisFloat, RedisDatetimeTimestamp
+from rapyer.types import RedisFloat, RedisDatetimeTimestamp, RedisInt, RedisList, RedisDict
 from tests.models.common import TaskStatus, Priority
 
 
@@ -77,3 +77,23 @@ class NoneTestModel(AtomicRedisModel):
     optional_bytes: bytes | None = None
     optional_list: list[str] | None = None
     optional_dict: dict[str, str] | None = None
+
+
+class TTLRefreshTestModel(AtomicRedisModel):
+    """Model for testing TTL refresh functionality"""
+    name: str = "test"
+    age: RedisInt = 25
+    score: RedisFloat = 0.0
+    tags: RedisList[str] = Field(default_factory=list)
+    settings: RedisDict[str, str] = Field(default_factory=dict)
+
+    Meta = RedisConfig(ttl=5)
+
+
+class TTLRefreshDisabledModel(AtomicRedisModel):
+    """Model for testing with TTL refresh disabled"""
+    name: str = "test"
+    age: RedisInt = 25
+    tags: RedisList[str] = Field(default_factory=list)
+
+    Meta = RedisConfig(ttl=5, refresh_ttl=False)
