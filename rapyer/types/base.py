@@ -68,7 +68,7 @@ class RedisType(ABC):
         f"save function is deprecated and will become sync function in rapyer 1.2.0, use asave() instead"
     )
     async def save(self):
-        return await self.asave()
+        return await self.asave()  # pragma: no cover
 
     async def asave(self) -> Self:
         model_dump = self._adapter.dump_python(
@@ -83,7 +83,7 @@ class RedisType(ABC):
         "load function is deprecated and will be removed in rapyer 1.2.0, use aload() instead"
     )
     async def load(self):
-        return await self.aload()
+        return await self.aload()  # pragma: no cover
 
     async def aload(self):
         redis_value = await self.client.json().get(self.key, self.field_path)
