@@ -8,6 +8,7 @@ from tests.models.index_types import (
     PersonModel,
     AddressModel,
 )
+from tests.models.simple_types import StrModel
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -242,3 +243,16 @@ async def test_index_override_false_preserves_existing_index(
     assert (
         "age" not in current_fields
     ), "Model field 'age' was added despite override_old_idx=False"
+
+
+@pytest.mark.asyncio
+async def test_acreate_index_with_no_index_fields_sanity(redis_client):
+    # Arrange
+    StrModel.Meta.redis = redis_client
+
+    # Act
+    await StrModel.acreate_index()
+
+    # Assert
+    index_list = await redis_client.execute_command("FT._LIST")
+    assert StrModel.index_name() not in index_list
