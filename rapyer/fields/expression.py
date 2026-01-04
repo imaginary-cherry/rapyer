@@ -6,7 +6,9 @@ from rapyer.types.base import REDIS_DUMP_FLAG_NAME
 
 class Expression:
     def create_filter(self) -> str:
-        raise NotImplementedError("Subclasses must implement create_filter")
+        raise NotImplementedError(  # pragma: no cover
+            "Subclasses must implement create_filter"  # pragma: no cover
+        )  # pragma: no cover
 
     def __and__(self, other: "Expression") -> "AndExpression":
         return AndExpression(self, other)

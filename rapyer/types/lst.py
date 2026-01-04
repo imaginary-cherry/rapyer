@@ -161,4 +161,4 @@ class RedisList(list, GenericRedisType[T]):
 
 
 if TYPE_CHECKING:
-    RedisList: TypeAlias = RedisList[T] | list[T]
+    RedisList: TypeAlias = RedisList[T] | list[T]  # pragma: no cover

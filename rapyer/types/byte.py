@@ -52,4 +52,4 @@ class RedisBytes(bytes, RedisType):
 
 
 if TYPE_CHECKING:
-    RedisBytes: TypeAlias = RedisBytes | bytes
+    RedisBytes: TypeAlias = RedisBytes | bytes  # pragma: no cover
