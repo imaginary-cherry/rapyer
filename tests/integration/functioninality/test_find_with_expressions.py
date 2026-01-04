@@ -2,6 +2,8 @@ from datetime import datetime, timedelta
 
 import pytest
 import pytest_asyncio
+
+from rapyer.errors import BadFilterError
 from tests.models.index_types import (
     IndexTestModel,
     BaseIndexModel,
@@ -372,7 +374,9 @@ async def test_afind_with_datetime_filtering_sanity(redis_client):
 
 
 @pytest.mark.asyncio
-async def test_afind_with_ne_expression_numeric_sanity(create_indices, inserted_test_models):
+async def test_afind_with_ne_expression_numeric_sanity(
+    create_indices, inserted_test_models
+):
     # Arrange
     IndexTestModel.init_class()
 
@@ -389,7 +393,9 @@ async def test_afind_with_ne_expression_numeric_sanity(create_indices, inserted_
 
 
 @pytest.mark.asyncio
-async def test_afind_with_ne_expression_string_sanity(create_indices, inserted_test_models):
+async def test_afind_with_ne_expression_string_sanity(
+    create_indices, inserted_test_models
+):
     # Arrange
     IndexTestModel.init_class()
 
@@ -456,3 +462,10 @@ async def test_afind_returns_empty_list_when_no_docs_match_expression_edge_case(
 
     # Assert - Should return empty list
     assert found_models == []
+
+
+@pytest.mark.asyncio
+async def test_expression_field_create_filter_raises_bad_filter_error_sanity():
+    # Act & Assert
+    with pytest.raises(BadFilterError):
+        await IndexTestModel.afind(IndexTestModel.name)
