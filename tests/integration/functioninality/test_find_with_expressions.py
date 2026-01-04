@@ -369,3 +369,91 @@ async def test_afind_with_datetime_filtering_sanity(redis_client):
 
     # Cleanup
     await UserIndexModel.adelete_index()
+
+
+@pytest.mark.asyncio
+async def test_afind_with_ne_expression_numeric_sanity(
+    create_index_for_ne, inserted_models_for_ne
+):
+    # Arrange
+    IndexTestModel.init_class()
+
+    # Act
+    found_models = await IndexTestModel.afind(IndexTestModel.age != 30)
+
+    # Assert
+    assert len(found_models) == 2
+    found_ages = {m.age for m in found_models}
+    assert 30 not in found_ages
+    assert 25 in found_ages
+    assert 35 in found_ages
+
+
+@pytest.mark.asyncio
+async def test_afind_with_ne_expression_string_sanity(
+    create_index_for_ne, inserted_models_for_ne
+):
+    # Arrange
+    IndexTestModel.init_class()
+
+    # Act
+    found_models = await IndexTestModel.afind(IndexTestModel.name != "Alice")
+
+    # Assert
+    assert len(found_models) == 3
+    found_names = {m.name for m in found_models}
+    assert "Alice" not in found_names
+    assert "Bob" in found_names
+    assert "Charlie" in found_names
+    assert "David" in found_names
+
+
+@pytest.mark.asyncio
+async def test_afind_with_ne_expression_combined_with_and_sanity(
+    create_index_for_ne, inserted_models_for_ne
+):
+    # Arrange
+    IndexTestModel.init_class()
+
+    # Act - Find people who are not 30 and not Alice
+    expression = (IndexTestModel.age != 30) & (IndexTestModel.name != "Alice")
+    found_models = await IndexTestModel.afind(expression)
+
+    # Assert - Should only find Charlie (age 35, not Alice)
+    assert len(found_models) == 1
+    assert found_models[0].name == "Charlie"
+
+
+@pytest.mark.asyncio
+async def test_afind_with_ne_expression_combined_with_or_sanity(
+    create_index_for_ne, inserted_models_for_ne
+):
+    # Arrange
+    IndexTestModel.init_class()
+
+    # Act - Find people who are not 30 OR not named Charlie
+    expression = (IndexTestModel.age != 30) | (IndexTestModel.name != "Charlie")
+    found_models = await IndexTestModel.afind(expression)
+
+    # Assert - All 4 match (Alice: 25 not 30; Bob: not Charlie; Charlie: not 30; David: not Charlie)
+    assert len(found_models) == 4
+
+
+@pytest.mark.asyncio
+async def test_afind_returns_empty_list_when_no_docs_match_expression_edge_case(
+    create_index_for_afind,
+):
+    # Arrange - Insert models with ages 25, 30, 35
+    models = [
+        IndexTestModel(name="Alice", age=25, description="Engineer"),
+        IndexTestModel(name="Bob", age=30, description="Manager"),
+        IndexTestModel(name="Charlie", age=35, description="Designer"),
+    ]
+    await IndexTestModel.ainsert(*models)
+    IndexTestModel.init_class()
+
+    # Act - Search for models with age > 100 (none exist)
+    found_models = await IndexTestModel.afind(IndexTestModel.age > 100)
+
+    # Assert - Should return empty list
+    assert found_models == []
