@@ -14,7 +14,9 @@ class RedisBytes(bytes, RedisType):
     def __iadd__(self, other):
         new_value = self + other
         if self.pipeline:
-            self.pipeline.json().set(self.key, self.json_path, new_value)
+            self.pipeline.json().set(
+                self.key, self.json_path, self.serialize_unknown(new_value)
+            )
         return self.__class__(new_value)
 
     @classmethod
