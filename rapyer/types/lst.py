@@ -26,6 +26,9 @@ class RedisList(list, GenericRedisType[T]):
         new_val = self.create_new_values([key], [value])[0]
         return new_val
 
+    def sub_field_path(self, key: str):
+        return f"{self.field_path}[{key}]"
+
     def __setitem__(self, key, value):
         if self.pipeline:
             self.pipeline.json().set(self.key, self.json_field_path(key), value)
