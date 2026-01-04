@@ -10,17 +10,17 @@ DYNAMIC_CLASS_DOC = "___dynamic_class___"
 class TypeConverter(ABC):
     @abc.abstractmethod
     def is_type_support(self, type_to_check: type) -> bool:
-        pass
+        pass  # pragma: no cover
 
     @abc.abstractmethod
     def convert_flat_type(self, type_to_convert: type) -> type:
-        pass
+        pass  # pragma: no cover
 
     @abc.abstractmethod
     def covert_generic_type(
         self, type_to_covert: type, generic_values: tuple[type]
     ) -> type:
-        pass
+        pass  # pragma: no cover
 
 
 def replace_to_redis_types_in_annotation(

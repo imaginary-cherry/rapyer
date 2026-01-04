@@ -95,7 +95,7 @@ class RedisType(ABC):
 
     @abc.abstractmethod
     def clone(self):
-        pass
+        pass  # pragma: no cover
 
     @classmethod
     def redis_schema(cls, field_name: str):
@@ -134,22 +134,22 @@ class GenericRedisType(RedisType, Generic[T], ABC):
 
     @abc.abstractmethod
     def iterate_items(self):
-        pass
+        pass  # pragma: no cover
 
     @classmethod
     @abc.abstractmethod
     def full_serializer(cls, value, info: SerializationInfo):
-        pass
+        pass  # pragma: no cover
 
     @classmethod
     @abc.abstractmethod
     def full_deserializer(cls, value, info: ValidationInfo):
-        pass
+        pass  # pragma: no cover
 
     @classmethod
     @abc.abstractmethod
     def schema_for_unknown(cls):
-        pass
+        pass  # pragma: no cover
 
     @classmethod
     def __get_pydantic_core_schema__(
