@@ -1,7 +1,7 @@
 from unittest.mock import Mock, patch, AsyncMock
 
 import pytest
-from rapyer.init import init_rapyer
+from rapyer.init import init_rapyer, teardown_rapyer
 from redis.asyncio.client import Redis
 from tests.models.collection_types import IntListModel, ProductListModel, StrListModel
 from tests.models.simple_types import (
@@ -117,3 +117,17 @@ async def test_init_rapyer_override_existing_redis_and_ttl_sanity(
     assert UserModelWithTTL.Meta.ttl == new_ttl
     assert TaskModel.Meta.redis is mock_redis_client
     assert TaskModel.Meta.ttl == new_ttl
+
+
+@pytest.mark.asyncio
+async def test_teardown_rapyer_calls_aclose_once_per_unique_client_sanity():
+    # Arrange
+    mock_redis = AsyncMock(spec=Redis)
+    UserModelWithTTL.Meta.redis = mock_redis
+    TaskModel.Meta.redis = mock_redis
+
+    # Act
+    await teardown_rapyer()
+
+    # Assert
+    mock_redis.aclose.assert_called_once()
