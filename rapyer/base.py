@@ -34,7 +34,7 @@ from rapyer.utils.annotation import (
     DYNAMIC_CLASS_DOC,
 )
 from rapyer.utils.fields import get_all_pydantic_annotation, is_redis_field
-from rapyer.utils.redis import acquire_lock, update_keys_in_pipeline
+from rapyer.utils.redis import acquire_lock, update_keys_in_pipeline, refresh_ttl_if_needed
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 
@@ -298,6 +298,7 @@ class AtomicRedisModel(BaseModel):
         async with self.Meta.redis.pipeline() as pipe:
             update_keys_in_pipeline(pipe, self.key, **json_path_kwargs)
             await pipe.execute()
+        await refresh_ttl_if_needed(self.Meta.redis, self.key, self.Meta.ttl)
 
     @classmethod
     @deprecated(
@@ -317,6 +318,7 @@ class AtomicRedisModel(BaseModel):
 
         instance = cls.model_validate(model_dump, context={REDIS_DUMP_FLAG_NAME: True})
         instance.key = key
+        await refresh_ttl_if_needed(cls.Meta.redis, key, cls.Meta.ttl)
         return instance
 
     @deprecated(
@@ -333,6 +335,7 @@ class AtomicRedisModel(BaseModel):
         instance = self.__class__(**model_dump)
         instance._pk = self._pk
         instance._base_model_link = self._base_model_link
+        await refresh_ttl_if_needed(self.Meta.redis, self.key, self.Meta.ttl)
         return instance
 
     @classmethod
@@ -486,6 +489,7 @@ class AtomicRedisModel(BaseModel):
             _context_xx_pipe.set(ignore_if_deleted)
             yield redis_model
             await pipe.execute()
+            await refresh_ttl_if_needed(self.Meta.redis, self.key, self.Meta.ttl)
             _context_var.set(None)
             _context_xx_pipe.set(False)
 

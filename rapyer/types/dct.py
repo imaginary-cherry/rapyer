@@ -1,7 +1,9 @@
 from typing import TypeVar, Generic, get_args, Any, TypeAlias, TYPE_CHECKING
 
 from pydantic_core import core_schema
+
 from rapyer.types.base import GenericRedisType, RedisType, REDIS_DUMP_FLAG_NAME
+from rapyer.utils.redis import refresh_ttl_if_needed
 from rapyer.utils.redis import update_keys_in_pipeline
 
 T = TypeVar("T")
@@ -136,9 +138,11 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         serialized_value = self._adapter.dump_python(
             {key: value}, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
         )
-        return await self.client.json().set(
+        result = await self.client.json().set(
             self.key, self.json_field_path(key), serialized_value[key]
         )
+        await refresh_ttl_if_needed(self.client, self.key, self.Meta.ttl)
+        return result
 
     async def adel_item(self, key):
         super().__delitem__(key)
@@ -157,6 +161,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
             async with self.redis.pipeline() as pipeline:
                 update_keys_in_pipeline(pipeline, self.key, **redis_params)
                 await pipeline.execute()
+            await refresh_ttl_if_needed(self.redis, self.key, self.Meta.ttl)
 
     async def apop(self, key, default=None):
         # Execute the script atomically
@@ -192,7 +197,9 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
     async def aclear(self):
         self.clear()
         # Clear Redis dict
-        return await self.client.json().set(self.key, self.json_path, {})
+        result = await self.client.json().set(self.key, self.json_path, {})
+        await refresh_ttl_if_needed(self.client, self.key, self.Meta.ttl)
+        return result
 
     def clone(self):
         return {

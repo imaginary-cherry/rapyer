@@ -7,10 +7,12 @@ from typing import get_args, Any, TypeVar, Generic
 from pydantic import GetCoreSchemaHandler, TypeAdapter
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, CoreSchema, SerializationInfo
+from redis.commands.search.field import TextField
+
 from rapyer.context import _context_var
 from rapyer.typing_support import Self
 from rapyer.typing_support import deprecated
-from redis.commands.search.field import TextField
+from rapyer.utils.redis import refresh_ttl_if_needed
 
 REDIS_DUMP_FLAG_NAME = "__rapyer_dumped__"
 
@@ -89,9 +91,11 @@ class RedisType(ABC):
         redis_value = await self.client.json().get(self.key, self.field_path)
         if redis_value is None:
             return None
-        return self._adapter.validate_python(
+        result = self._adapter.validate_python(
             redis_value, context={REDIS_DUMP_FLAG_NAME: True}
         )
+        await refresh_ttl_if_needed(self.client, self.key, self.Meta.ttl)
+        return result
 
     @abc.abstractmethod
     def clone(self):
