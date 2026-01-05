@@ -13,6 +13,7 @@
 - **RedisBytes Pipeline**: Fixed bug in RedisBytes when used within pipeline context.
 - **RedisList Pipeline**: Fixed bug in RedisList when used within pipeline context.
 - **afind Nested Fields**: Fixed `afind` to support filtering on nested fields (e.g., `afind(User.parent.age > 20)`).
+- **Key and Index Type Checking**: Fixed type checking support for `Key[T]` and `Index[T]` annotations. IDEs now correctly recognize `Index[str]` as `str` instead of `_IndexType[str]`.
 
 ### 🛠️ Technical Improvements
 - **Test Coverage**: Added tests for full coverage.
