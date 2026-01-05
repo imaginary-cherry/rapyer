@@ -436,7 +436,9 @@ class AtomicRedisModel(BaseModel):
     async def lock_from_key(
         cls, key: str, action: str = "default", save_at_end: bool = False
     ) -> AbstractAsyncContextManager[Self]:
-        async with cls.alock_from_key(key, action, save_at_end) as redis_model:  # pragma: no cover
+        async with cls.alock_from_key(  # pragma: no cover
+            key, action, save_at_end  # pragma: no cover
+        ) as redis_model:  # pragma: no cover
             yield redis_model  # pragma: no cover
 
     @classmethod
@@ -457,7 +459,9 @@ class AtomicRedisModel(BaseModel):
     async def lock(
         self, action: str = "default", save_at_end: bool = False
     ) -> AbstractAsyncContextManager[Self]:
-        async with self.alock_from_key(self.key, action, save_at_end) as redis_model:  # pragma: no cover
+        async with self.alock_from_key(  # pragma: no cover
+            self.key, action, save_at_end  # pragma: no cover
+        ) as redis_model:  # pragma: no cover
             yield redis_model  # pragma: no cover
 
     @contextlib.asynccontextmanager
@@ -478,7 +482,9 @@ class AtomicRedisModel(BaseModel):
     async def pipeline(
         self, ignore_if_deleted: bool = False
     ) -> AbstractAsyncContextManager[Self]:
-        async with self.apipeline(ignore_if_deleted=ignore_if_deleted) as redis_model:  # pragma: no cover
+        async with self.apipeline(  # pragma: no cover
+            ignore_if_deleted=ignore_if_deleted  # pragma: no cover
+        ) as redis_model:  # pragma: no cover
             yield redis_model  # pragma: no cover
 
     @contextlib.asynccontextmanager
