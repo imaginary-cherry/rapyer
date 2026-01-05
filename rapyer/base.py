@@ -227,7 +227,7 @@ class AtomicRedisModel(BaseModel):
     def create_expressions(cls, base_path: str = "") -> dict[str, Expression]:
         expressions = {}
         for field_name, field_info in cls.model_fields.items():
-            full_field_name = f"{base_path}.{field_name}" if base_path else field_name
+            full_field_name = rf"{base_path}\.{field_name}" if base_path else field_name
             field_type = field_info.annotation
             if issubclass(field_type, AtomicRedisModel):
                 expressions[field_name] = AtomicField(
