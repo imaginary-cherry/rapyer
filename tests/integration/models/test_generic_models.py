@@ -210,7 +210,7 @@ async def test_composite_generic_model__save_and_get__check_data_persisted():
     loaded_model = await CompositeGenericModel.aget(model.key)
 
     # Assert
-    assert loaded_model == base_field
+    assert loaded_model == model
     assert loaded_model.base_field.value == "test_value"
     assert loaded_model.base_field.label == "test_label"
     assert loaded_model.atomic_field.items == [1, 2, 3]
