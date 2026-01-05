@@ -222,7 +222,7 @@ class AtomicRedisModel(BaseModel):
 
         # Update the redis model list for initialization
         # Skip dynamically created classes from type conversion
-        if cls.__doc__ != DYNAMIC_CLASS_DOC:
+        if cls.__doc__ != DYNAMIC_CLASS_DOC and cls.Meta.init_with_rapyer:
             REDIS_MODELS.append(cls)
 
     @classmethod
