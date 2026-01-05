@@ -119,9 +119,12 @@ class AtomicRedisModel(BaseModel):
 
             # Check if real_type is a class before using issubclass
             if not isinstance(real_type, type):
-                raise UnsupportedIndexedFieldError(
-                    f"Field {field_name} is type {real_type}, and not supported for indexing"
-                )
+                if field_with_flag(field_info, IndexAnnotation):
+                    raise UnsupportedIndexedFieldError(
+                        f"Field {field_name} is type {real_type}, and not supported for indexing"
+                    )
+                else:
+                    continue
 
             full_redis_name = f"{redis_name}.{field_name}" if redis_name else field_name
             if issubclass(real_type, AtomicRedisModel):
