@@ -12,6 +12,7 @@
 - **Context Manager Annotations**: Fixed type annotations for context managers to properly reflect their return types.
 - **RedisBytes Pipeline**: Fixed bug in RedisBytes when used within pipeline context.
 - **RedisList Pipeline**: Fixed bug in RedisList when used within pipeline context.
+- **afind Nested Fields**: Fixed `afind` to support filtering on nested fields (e.g., `afind(User.parent.age > 20)`).
 
 ### 🛠️ Technical Improvements
 - **Test Coverage**: Added tests for full coverage.
