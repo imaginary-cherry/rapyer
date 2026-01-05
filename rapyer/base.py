@@ -16,10 +16,13 @@ from pydantic import (
     field_validator,
 )
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
+from redis.commands.search.index_definition import IndexDefinition, IndexType
+from redis.commands.search.query import Query
+
 from rapyer.config import RedisConfig
 from rapyer.context import _context_var, _context_xx_pipe
 from rapyer.errors.base import KeyNotFound
-from rapyer.fields.expression import ExpressionField
+from rapyer.fields.expression import ExpressionField, AtomicField, Expression
 from rapyer.fields.index import IndexAnnotation
 from rapyer.fields.key import KeyAnnotation
 from rapyer.links import REDIS_SUPPORTED_LINK
@@ -35,8 +38,6 @@ from rapyer.utils.annotation import (
 )
 from rapyer.utils.fields import get_all_pydantic_annotation, is_redis_field
 from rapyer.utils.redis import acquire_lock, update_keys_in_pipeline
-from redis.commands.search.index_definition import IndexDefinition, IndexType
-from redis.commands.search.query import Query
 
 
 def make_pickle_field_serializer(field: str):
@@ -107,7 +108,7 @@ class AtomicRedisModel(BaseModel):
         return f"${field_path}" if field_path else "$"
 
     @classmethod
-    def redis_schema(cls):
+    def redis_schema(cls, redis_name: str = ""):
         fields = []
 
         for field_name, field_info in cls.model_fields.items():
@@ -120,13 +121,14 @@ class AtomicRedisModel(BaseModel):
 
             # Check if real_type is a class before using issubclass
             if isinstance(real_type, type):
+                full_redis_name = (
+                    f"{redis_name}.{field_name}" if redis_name else field_name
+                )
                 if issubclass(real_type, AtomicRedisModel):
-                    sub_fields = real_type.redis_schema()
-                    for sub_field in sub_fields:
-                        sub_field.name = f"{field_name}.{sub_field.name}"
-                        fields.append(sub_field)
+                    sub_fields = real_type.redis_schema(full_redis_name)
+                    fields.extend(sub_fields)
                 elif issubclass(real_type, RedisType):
-                    field_schema = real_type.redis_schema(field_name)
+                    field_schema = real_type.redis_schema(full_redis_name)
                     fields.append(field_schema)
                 else:
                     raise RuntimeError(
@@ -222,10 +224,23 @@ class AtomicRedisModel(BaseModel):
             REDIS_MODELS.append(cls)
 
     @classmethod
-    def init_class(cls):
+    def create_expressions(cls, base_path: str = "") -> dict[str, Expression]:
+        expressions = {}
         for field_name, field_info in cls.model_fields.items():
+            full_field_name = f"{base_path}.{field_name}" if base_path else field_name
             field_type = field_info.annotation
-            setattr(cls, field_name, ExpressionField(field_name, field_type))
+            if issubclass(field_type, AtomicRedisModel):
+                expressions[field_name] = AtomicField(
+                    field_name, **field_type.create_expressions(full_field_name)
+                )
+            else:
+                expressions[field_name] = ExpressionField(full_field_name, field_type)
+        return expressions
+
+    @classmethod
+    def init_class(cls):
+        for field_name, field_expression in cls.create_expressions().items():
+            setattr(cls, field_name, field_expression)
 
     def is_inner_model(self) -> bool:
         return bool(self.field_name)
