@@ -496,7 +496,7 @@ class AtomicRedisModel(BaseModel):
                     k: redis_model.__dict__[k] for k in redis_model.model_fields_set
                 }
                 self.__dict__.update(unset_fields)
-            except (TypeError, IndexError):
+            except (TypeError, KeyNotFound):
                 if ignore_if_deleted:
                     redis_model = self
                 else:
