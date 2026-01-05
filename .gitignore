@@ -106,6 +106,7 @@ venv.bak/
 
 # mkdocs documentation
 /site
+docs/roadmap.md  # Generated from GitHub issues during CI/CD
 
 # mypy
 .mypy_cache/
@@ -125,5 +126,5 @@ future-work
 .claude
 git-flow-plus.config
 CLAUDE.md
-scripts/
+/scripts/
 .jbeval

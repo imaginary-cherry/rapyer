@@ -1,0 +1,96 @@
+name: Roadmap Feature
+description: Propose a new feature for the Rapyer roadmap
+title: "[Roadmap] "
+labels: ["roadmap", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing a new feature for the Rapyer roadmap! This will automatically appear in the documentation roadmap.
+
+  - type: input
+    id: goal
+    attributes:
+      label: Feature Goal
+      description: What is the high-level goal or category for this feature?
+      placeholder: e.g., "Bulk Operations Support", "Advanced Querying", "Performance Optimization"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe what this feature should do and why it's valuable
+      placeholder: |
+        **Goal**: Enable efficient bulk operations for multiple models
+
+        This feature would allow users to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Implementation Tasks
+      description: Break down the feature into specific tasks (optional)
+      placeholder: |
+        - [ ] Task 1
+        - [ ] Task 2
+        - [ ] Task 3
+      value: |
+        - [ ]
+    validations:
+      required: false
+
+  - type: textarea
+    id: example
+    attributes:
+      label: Example Usage
+      description: Show example code of how this feature would be used
+      placeholder: |
+        ```python
+        # Example of how the feature would work
+        users = [User(name=f"user{i}") for i in range(100)]
+        await User.bulk_insert(users)
+        ```
+      render: python
+    validations:
+      required: false
+
+  - type: textarea
+    id: benefits
+    attributes:
+      label: Benefits
+      description: What are the key benefits of this feature?
+      placeholder: |
+        - Better performance for large datasets
+        - Reduced Redis round trips
+        - Improved developer experience
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature?
+      options:
+        - Low
+        - Medium
+        - High
+        - Critical
+      default: 1
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Confirmation
+      description: By submitting this issue, I confirm that
+      options:
+        - label: I have searched existing issues to ensure this isn't a duplicate
+          required: true
+        - label: This feature aligns with Rapyer's goals and scope
+          required: true

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://imaginary-cherry.github.io/rapyer/
+    about: Check out our documentation for guides and API reference
+  - name: Discussions
+    url: https://github.com/imaginary-cherry/rapyer/discussions
+    about: Ask questions and discuss ideas with the community
