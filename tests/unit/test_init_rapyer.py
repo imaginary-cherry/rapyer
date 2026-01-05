@@ -1,8 +1,9 @@
 from unittest.mock import Mock, patch, AsyncMock
 
 import pytest
-from rapyer.init import init_rapyer, teardown_rapyer
 from redis.asyncio.client import Redis
+
+from rapyer.init import init_rapyer, teardown_rapyer
 from tests.models.collection_types import IntListModel, ProductListModel, StrListModel
 from tests.models.simple_types import (
     NoneTestModel,

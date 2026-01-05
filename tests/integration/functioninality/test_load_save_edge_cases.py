@@ -1,8 +1,6 @@
 import pytest
-import pytest_asyncio
 
 from rapyer.errors.base import KeyNotFound
-from tests.models.index_types import IndexTestModel
 from tests.models.simple_types import UserModelWithTTL
 
 

@@ -13,7 +13,9 @@ from rapyer.types.datetime import RedisDatetime
         [2000, 6, 15, 0, 0, 0],
     ],
 )
-def test_redis_datetime_new_with_year_args_sanity(year, month, day, hour, minute, second):
+def test_redis_datetime_new_with_year_args_sanity(
+    year, month, day, hour, minute, second
+):
     # Arrange & Act
     result = RedisDatetime(year, month, day, hour, minute, second)
 

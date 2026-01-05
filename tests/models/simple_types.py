@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from pydantic import Field
+
 from rapyer.base import AtomicRedisModel, RedisConfig
 from rapyer.types import RedisFloat, RedisDatetimeTimestamp
 from tests.models.common import TaskStatus, Priority

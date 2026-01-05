@@ -66,7 +66,9 @@ async def test_redis_int_imul_with_pipeline_sanity(initial_value, operand, expec
         [25, 4, 6],
     ],
 )
-async def test_redis_int_ifloordiv_with_pipeline_sanity(initial_value, operand, expected):
+async def test_redis_int_ifloordiv_with_pipeline_sanity(
+    initial_value, operand, expected
+):
     # Arrange
     model = ComprehensiveTestModel(counter=initial_value)
     await model.asave()

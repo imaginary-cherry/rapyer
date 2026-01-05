@@ -1,6 +1,7 @@
 import os
 
 import pytest_asyncio
+
 import rapyer
 
 # Collection types
@@ -50,6 +51,9 @@ from tests.models.functionality_types import (
     AllTypesModel,
 )
 
+# Index types
+from tests.models.index_types import ParentWithIndexModel, ChildWithParentModel
+
 # Inheritance types
 from tests.models.inheritance_types import BaseUserModel, AdminUserModel
 
@@ -74,9 +78,6 @@ from tests.models.simple_types import (
 
 # Specialized types
 from tests.models.specialized import UserModel
-
-# Index types
-from tests.models.index_types import ParentWithIndexModel, ChildWithParentModel
 
 
 @pytest_asyncio.fixture
