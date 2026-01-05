@@ -1,17 +1,17 @@
-# Why I Built Rapyer: A Redis ORM That Doesn't Hate You
+# Why I Built Rapyer: A Redis ORM That Handles Concurrency
 
-I've been working with Redis in Python for years, and I kept running into the same annoying problem: **race conditions**.
+I've been working with Redis in Python for a few years, and I kept running into the same problem: **race conditions**.
 
-You know the drill. You build something with Redis. Works great on your laptop. Deploy it. Suddenly users are seeing weird bugs because two requests modified the same data at the exact same time. Now you're Googling "redis lua scripts" at 2am trying to figure out how to make a simple counter increment atomically.
+You know the situation. You build something with Redis. Works fine on your laptop. Deploy it. Then you notice bugs because two requests modified the same data simultaneously. Now you're looking up Lua scripts trying to figure out how to make a counter increment atomically.
 
 There had to be a better way.
 
 ## The Problem
 
-Let's say you're building a URL shortener (classic example, I know). You want to track clicks. Simple, right?
+Let's say you're building a URL shortener. You want to track clicks. Seems straightforward:
 
 ```python
-# Seems fine...
+# Looks fine...
 url_data = await redis.get(f"url:{code}")
 clicks = url_data['clicks']
 clicks += 1
@@ -19,9 +19,9 @@ url_data['clicks'] = clicks
 await redis.set(f"url:{code}", url_data)
 ```
 
-**Plot twist**: If two people click at the same time, you just lost a click. Both read `clicks=5`, both write `clicks=6`. One click vanished into the void.
+But if two people click at the same time, you lose a click. Both read `clicks=5`, both write `clicks=6`. One click disappears.
 
-The "correct" solution? Manual locks, transactions, Lua scripts, and a bunch of boilerplate that makes you question your life choices.
+The usual solution involves manual locks, transactions, Lua scripts, and boilerplate that makes simple operations complicated.
 
 ## What I Wanted
 
@@ -29,20 +29,20 @@ I wanted to write this instead:
 
 ```python
 url = await ShortURL.aget(code)
-await url.clicks.set(url.clicks + 1)
+await url.clicks.aincrease(1)
 ```
 
-And have it **just work**. No locks. No transactions. No Lua. Just atomic by default.
+And have it just work. No locks. No transactions. No Lua. Atomic by default.
 
 So I built Rapyer.
 
 ## What is Rapyer?
 
-Rapyer (Redis Atomic Pydantic Engine Reactor) is a Redis ORM that treats concurrency as a first-class feature, not an afterthought.
+Rapyer (Redis Atomic Pydantic Engine Reactor) is a Redis ORM that treats concurrency as a first-class feature.
 
-It's built on Pydantic v2, so you get full type safety. It uses async/await. And most importantly: **operations are atomic by default**.
+It's built on Pydantic v2 for type safety. It uses async/await. And operations are atomic by default.
 
-Here's a real example:
+Here's a basic example:
 
 ```python
 from rapyer import AtomicRedisModel
@@ -57,8 +57,8 @@ class User(AtomicRedisModel):
 user = User(name="Alice", score=100)
 await user.asave()
 
-# These are ATOMIC - no race conditions!
-await user.score.set(user.score + 10)
+# These are ATOMIC - no race conditions
+await user.score.aincrease(10)
 await user.tags.aappend("winner")
 
 # Load from Redis
@@ -101,11 +101,11 @@ async def create_short_url(long_url: str) -> ShortURL:
     return url
 
 async def track_click(code: str) -> str:
-    """Track a click - RACE CONDITION SAFE!"""
+    """Track a click - race condition safe"""
     url = await ShortURL.aget(code)
 
-    # Both of these are atomic
-    await url.clicks.set(url.clicks + 1)
+    # Both operations are atomic
+    await url.clicks.aincrease(1)
     await url.recent_clicks.aappend(datetime.now())
 
     return str(url.original_url)
@@ -117,7 +117,7 @@ async def main():
     short = await create_short_url("https://github.com/imaginary-cherry/rapyer")
     print(f"Created: /{short.short_code}")
 
-    # Simulate 100 CONCURRENT clicks
+    # Simulate 100 concurrent clicks
     await asyncio.gather(*[
         track_click(short.short_code)
         for _ in range(100)
@@ -125,52 +125,52 @@ async def main():
 
     # Check the count
     url = await ShortURL.aget(short.short_code)
-    print(f"Clicks: {url.clicks}")  # Will be exactly 100!
+    print(f"Clicks: {url.clicks}")  # Exactly 100
 
 asyncio.run(main())
 ```
 
-Run this. You'll get exactly 100 clicks counted, even though they all happened concurrently. That's the magic of atomic operations.
+Run this and you'll get exactly 100 clicks counted, even with concurrent execution.
 
-## How It Works (The Interesting Parts)
+## How It Works
 
 ### Atomic Operations
 
-Under the hood, Rapyer uses Lua scripts for atomic operations. But you never see them:
+Rapyer uses Lua scripts for atomic operations, but you don't see them:
 
 ```python
-# This becomes a Lua script that runs atomically on Redis
-await user.score.set(user.score + 10)
+# Atomic increment
+await user.score.aincrease(10)
 
-# So does this
+# Atomic list append
 await user.tags.aappend("new-tag")
 
-# And this
+# Atomic dict update
 await user.metadata.aupdate(status="active", level=5)
 ```
 
 ### Lock Context Manager
 
-For complex multi-field updates, there's a lock context:
+For complex multi-field updates:
 
 ```python
 async with user.alock("profile_update") as locked_user:
     locked_user.score += 100
     locked_user.level = "pro"
     locked_user.updated_at = datetime.now()
-    # Everything saves atomically when the context exits
+    # Saves atomically on exit
 ```
 
 ### Pipeline Operations
 
-Need to batch operations? There's a pipeline context:
+For batching operations:
 
 ```python
 async with user.apipeline() as p:
-    await p.score.set(100)
+    p.score += 100
     await p.tags.aappend("verified")
     await p.metadata.aupdate(status="active")
-    # Executes as one atomic transaction
+    # Executes as one transaction
 ```
 
 ### Universal Type Support
@@ -192,51 +192,51 @@ class Role(Enum):
 
 class User(AtomicRedisModel):
     name: str
-    preferences: Preferences = Preferences("dark", True)  # Auto-serialized
-    role: Role = Role.USER  # Enums work
-    scores: List[int] = []  # Native Redis operations
+    preferences: Preferences = Preferences("dark", True)
+    role: Role = Role.USER
+    scores: List[int] = []
 ```
 
-## Why Not Use [Other ORM]?
+## Why Not Use Other ORMs?
 
-**Redis OM**: Great library! But you have to choose between `HashModel` (limited types) and `JsonModel` (different API). And atomic operations? You're on your own.
+**Redis OM**: Good library, but you choose between `HashModel` (limited types) and `JsonModel` (different API). Atomic operations are manual.
 
-**pydantic-redis**: Solid Pydantic integration, but it's basically a wrapper around redis-py. You're still writing manual transaction code.
+**pydantic-redis**: Solid Pydantic integration, but it's a thin wrapper around redis-py. You still write transaction code manually.
 
-**Rapyer**: Atomic by default. Any type works. One consistent API. That's it.
+**Rapyer**: Atomic by default. Any type works. One consistent API.
 
 ## Quick Comparison
 
-| Thing You Want | Rapyer | Others |
-|----------------|--------|--------|
-| Atomic operations | ✅ Built-in | ❌ DIY |
-| Lock management | ✅ Context manager | ❌ Manual |
+| Feature | Rapyer | Others |
+|---------|--------|--------|
+| Atomic operations | ✅ Built-in | ❌ Manual |
+| Lock management | ✅ Context manager | ❌ DIY |
 | Any Python type | ✅ Yes | ⚠️ Depends |
-| Race condition safe | ✅ By default | ❌ Your problem |
+| Race condition safe | ✅ By default | ❌ Your responsibility |
 | Pydantic v2 | ✅ Full support | ⚠️ Varies |
 
 ## Real-World Use Cases
 
-**E-commerce**: Prevent overselling with atomic inventory decrements
+**E-commerce**: Atomic inventory decrements prevent overselling
 
-**Analytics**: Track clicks/views accurately under heavy load
+**Analytics**: Accurate click/view tracking under load
 
-**Gaming**: Update player scores and leaderboards without race conditions
+**Gaming**: Score updates and leaderboards without race conditions
 
 **Caching**: Store complex objects with automatic serialization
 
 **Rate Limiting**: Atomic counters for API throttling
 
-**Session Management**: Store user sessions with type safety
+**Sessions**: Store user sessions with type safety
 
-## Getting Started (60 seconds)
+## Getting Started
 
 Install:
 ```bash
 pip install rapyer
 ```
 
-You need Redis with JSON support. Use Redis Stack:
+You need Redis with JSON support (Redis Stack):
 ```bash
 docker run -d -p 6379:6379 redis/redis-stack-server:latest
 ```
@@ -256,42 +256,40 @@ async def main():
     await counter.asave()
 
     # Atomic increment
-    await counter.value.set(counter.value + 1)
+    await counter.value.aincrease(1)
 
     print(f"Counter: {counter.value}")
 
 asyncio.run(main())
 ```
 
-That's it. You're up and running.
-
 ## Performance
 
-It's fast. Rapyer uses:
+Rapyer uses:
 - Native Redis JSON operations
 - Server-side Lua scripts (minimal network overhead)
 - Connection pooling
 - Async I/O throughout
 
-In practice, it handles thousands of concurrent operations without breaking a sweat. The URL shortener example? We've tested it with 10,000 concurrent clicks. All counted correctly.
+It handles thousands of concurrent operations without issues. The URL shortener example works correctly with 10,000 concurrent clicks.
 
-## What I Learned Building This
+## What I Learned
 
-**1. Concurrency is hard**
-Race conditions are subtle. They don't show up in tests. They appear in production at 3am.
+**Concurrency is subtle**
+Race conditions don't show up in tests. They appear in production.
 
-**2. Abstractions matter**
-Hiding Lua scripts behind a clean API makes a huge difference in developer experience.
+**Abstractions matter**
+Hiding Lua scripts behind a clean API improves developer experience significantly.
 
-**3. Type safety is worth it**
+**Type safety helps**
 Catching errors before they hit Redis saves debugging time.
 
-**4. Atomic by default is the right choice**
+**Atomic by default is right**
 You shouldn't have to opt-in to correctness.
 
 ## Try It
 
-The full URL shortener example is on GitHub in the `examples/` directory. Clone it, run it, break it. See how it handles concurrent load.
+The full URL shortener example is on GitHub in `examples/url-shortener/`:
 
 ```bash
 git clone https://github.com/imaginary-cherry/rapyer
@@ -302,35 +300,31 @@ python main.py
 
 ## Documentation
 
-Full docs are at [imaginary-cherry.github.io/rapyer](https://imaginary-cherry.github.io/rapyer/)
+Full docs at [imaginary-cherry.github.io/rapyer](https://imaginary-cherry.github.io/rapyer/)
 
-Topics covered:
+Topics:
 - Installation and setup
 - Model creation and fields
 - Atomic operations guide
 - Lock and pipeline patterns
-- Type system deep dive
+- Type system details
 - API reference
 
 ## Contributing
 
-Found a bug? Want a feature? PRs welcome!
-
-GitHub: [github.com/imaginary-cherry/rapyer](https://github.com/imaginary-cherry/rapyer)
+Found a bug? Want a feature? PRs welcome at [github.com/imaginary-cherry/rapyer](https://github.com/imaginary-cherry/rapyer)
 
 ## Final Thoughts
 
-I built Rapyer because I was tired of fighting Redis race conditions. I wanted to write clean code and have it just work.
+I built Rapyer because I was tired of fighting Redis race conditions. I wanted clean code that just works.
 
-If you've ever:
-- Lost data to race conditions
-- Written manual Redis locks
-- Debugged weird concurrency bugs
-- Wished Redis ORMs "just handled this"
+If you've dealt with:
+- Data loss from race conditions
+- Manual Redis locks
+- Concurrency bugs
+- ORMs that don't handle this
 
 Give Rapyer a try.
-
-It might save you a few 2am debugging sessions.
 
 ---
 
@@ -338,8 +332,8 @@ It might save you a few 2am debugging sessions.
 **Docs**: [imaginary-cherry.github.io/rapyer](https://imaginary-cherry.github.io/rapyer/)
 **GitHub**: [github.com/imaginary-cherry/rapyer](https://github.com/imaginary-cherry/rapyer)
 
-⭐ Star it if you find it useful!
+⭐ Star it if you find it useful
 
 ---
 
-*Questions? Comments? Drop them below or open an issue on GitHub. Happy to help!*
+*Questions? Drop them below or open an issue on GitHub.*

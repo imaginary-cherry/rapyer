@@ -82,10 +82,9 @@ class URLShortener:
         """
         Track a click on shortened URL.
 
-        THIS METHOD IS RACE-CONDITION SAFE!
-
-        Even if 1000 users click simultaneously, every click will
-        be counted correctly thanks to Rapyer's atomic operations.
+        This method is race-condition safe - even if 1000 users click
+        simultaneously, every click will be counted correctly thanks
+        to Rapyer's atomic operations.
 
         Args:
             short_code: The short code to track
@@ -99,7 +98,7 @@ class URLShortener:
 
             # ATOMIC INCREMENT - No race conditions!
             # This uses Redis Lua scripts internally for atomicity
-            await url.click_count.set(url.click_count + 1)
+            await url.click_count.aincrease(1)
 
             # ATOMIC APPEND - Thread-safe list operation
             await url.last_clicks.aappend(datetime.now())
