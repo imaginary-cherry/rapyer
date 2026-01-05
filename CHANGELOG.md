@@ -8,6 +8,7 @@
 - **Redis Locking Mechanism**: Now using formal Redis lock for more persistent and reliable locking mechanism.
 
 ### 🐛 Fixed
+- **apipeline KeyNotFound**: Fixed `apipeline` for cases where model doesn't exists in redis.
 - **rapyer.get**: Fix a bug in the rapyer.get() function.
 - **Context Manager Annotations**: Fixed type annotations for context managers to properly reflect their return types.
 - **RedisBytes Pipeline**: Fixed bug in RedisBytes when used within pipeline context.
