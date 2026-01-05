@@ -1,0 +1,8 @@
+# URL Shortener Example - Dependencies
+
+# Core dependency
+rapyer>=1.1.3
+
+# Included with rapyer, but listed explicitly for clarity
+redis[async]>=6.0.0
+pydantic>=2.11.0
