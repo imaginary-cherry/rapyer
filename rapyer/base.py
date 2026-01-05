@@ -113,10 +113,6 @@ class AtomicRedisModel(BaseModel):
 
         for field_name, field_info in cls.model_fields.items():
             real_type = field_info.annotation
-            # Check this is a field in the db (not private or class..)
-            if not is_redis_field(field_name, real_type):
-                continue
-
             # Check if real_type is a class before using issubclass
             if not isinstance(real_type, type):
                 if field_with_flag(field_info, IndexAnnotation):
