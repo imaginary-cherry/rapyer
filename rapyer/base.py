@@ -127,7 +127,7 @@ class AtomicRedisModel(BaseModel):
                 real_type: type[AtomicRedisModel]
                 sub_fields = real_type.redis_schema(full_redis_name)
                 fields.extend(sub_fields)
-            elif field_with_flag(field_info, IndexAnnotation):
+            elif not field_with_flag(field_info, IndexAnnotation):
                 continue
             elif issubclass(real_type, RedisType):
                 field_schema = real_type.redis_schema(full_redis_name)
