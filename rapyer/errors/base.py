@@ -20,3 +20,7 @@ class BadFilterError(FindError):
     """Raised when a filter is invalid."""
 
     pass
+
+
+class UnsupportedFilterFieldError(FindError):
+    pass
