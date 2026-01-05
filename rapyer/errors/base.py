@@ -22,5 +22,5 @@ class BadFilterError(FindError):
     pass
 
 
-class UnsupportedFilterFieldError(FindError):
+class UnsupportedIndexedFieldError(FindError):
     pass

@@ -21,7 +21,7 @@ from redis.commands.search.query import Query
 
 from rapyer.config import RedisConfig
 from rapyer.context import _context_var, _context_xx_pipe
-from rapyer.errors.base import KeyNotFound, UnsupportedFilterFieldError
+from rapyer.errors.base import KeyNotFound, UnsupportedIndexedFieldError
 from rapyer.fields.expression import ExpressionField, AtomicField, Expression
 from rapyer.fields.index import IndexAnnotation
 from rapyer.fields.key import KeyAnnotation
@@ -119,7 +119,7 @@ class AtomicRedisModel(BaseModel):
 
             # Check if real_type is a class before using issubclass
             if not isinstance(real_type, type):
-                raise UnsupportedFilterFieldError(
+                raise UnsupportedIndexedFieldError(
                     f"Field {field_name} is type {real_type}, and not supported for indexing"
                 )
 
@@ -134,7 +134,7 @@ class AtomicRedisModel(BaseModel):
                 field_schema = real_type.redis_schema(full_redis_name)
                 fields.append(field_schema)
             else:
-                raise UnsupportedFilterFieldError(
+                raise UnsupportedIndexedFieldError(
                     f"Indexed field {field_name} must be redis-supported to be indexed, see {REDIS_SUPPORTED_LINK}"
                 )
 
