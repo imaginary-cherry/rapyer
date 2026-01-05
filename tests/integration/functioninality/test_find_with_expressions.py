@@ -3,12 +3,13 @@ from datetime import datetime, timedelta
 import pytest
 import pytest_asyncio
 
-from rapyer.errors import BadFilterError
+from rapyer.errors import BadFilterError, UnsupportedFilterFieldError
 from tests.models.index_types import (
     IndexTestModel,
     BaseIndexModel,
     UserIndexModel,
     ProductIndexModel,
+    UnsupportedIndexModel,
 )
 
 
@@ -469,3 +470,10 @@ async def test_expression_field_create_filter_raises_bad_filter_error_sanity():
     # Act & Assert
     with pytest.raises(BadFilterError):
         await IndexTestModel.afind(IndexTestModel.name)
+
+
+@pytest.mark.asyncio
+async def test_acreate_index_raises_unsupported_filter_field_error_for_unsupported_type_sanity():
+    # Act & Assert
+    with pytest.raises(UnsupportedFilterFieldError):
+        await UnsupportedIndexModel.acreate_index()

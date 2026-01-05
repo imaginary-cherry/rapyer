@@ -50,3 +50,8 @@ class ChildWithParentModel(AtomicRedisModel):
     name: Index[str]
     dad: ParentWithIndexModel
     birth_date: Index[datetime]
+
+
+class UnsupportedIndexModel(AtomicRedisModel):
+    name: str
+    data: Index[set]
