@@ -116,29 +116,27 @@ class AtomicRedisModel(BaseModel):
             if not is_redis_field(field_name, real_type):
                 continue
 
+            # Check if real_type is a class before using issubclass
+            if not isinstance(real_type, type):
+                raise UnsupportedFilterFieldError(
+                    f"Field {field_name} is type {real_type}, and not supported for indexing"
+                )
+
             is_atomic = issubclass(real_type, AtomicRedisModel)
             if not (field_with_flag(field_info, IndexAnnotation) or is_atomic):
                 continue
 
-            # Check if real_type is a class before using issubclass
-            if isinstance(real_type, type):
-                full_redis_name = (
-                    f"{redis_name}.{field_name}" if redis_name else field_name
-                )
-                if is_atomic:
-                    real_type: type[AtomicRedisModel]
-                    sub_fields = real_type.redis_schema(full_redis_name)
-                    fields.extend(sub_fields)
-                elif issubclass(real_type, RedisType):
-                    field_schema = real_type.redis_schema(full_redis_name)
-                    fields.append(field_schema)
-                else:
-                    raise UnsupportedFilterFieldError(
-                        f"Indexed field {field_name} must be redis-supported to be indexed, see {REDIS_SUPPORTED_LINK}"
-                    )
+            full_redis_name = f"{redis_name}.{field_name}" if redis_name else field_name
+            if is_atomic:
+                real_type: type[AtomicRedisModel]
+                sub_fields = real_type.redis_schema(full_redis_name)
+                fields.extend(sub_fields)
+            elif issubclass(real_type, RedisType):
+                field_schema = real_type.redis_schema(full_redis_name)
+                fields.append(field_schema)
             else:
                 raise UnsupportedFilterFieldError(
-                    f"Indexed field {field_name} must be a simple redis-supported type, see {REDIS_SUPPORTED_LINK}"
+                    f"Indexed field {field_name} must be redis-supported to be indexed, see {REDIS_SUPPORTED_LINK}"
                 )
 
         return fields
