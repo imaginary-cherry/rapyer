@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 
 from rapyer import AtomicRedisModel
 from rapyer.fields import Index, Key
@@ -55,3 +56,13 @@ class ChildWithParentModel(AtomicRedisModel):
 class UnsupportedIndexModel(AtomicRedisModel):
     name: str
     data: Index[set]
+
+
+class UnsupportedGenericIndexModel(AtomicRedisModel):
+    name: str
+    tags: Index[list[str]]
+
+
+class UnsupportedOptionalIndexModel(AtomicRedisModel):
+    name: str
+    count: Index[Optional[int]]

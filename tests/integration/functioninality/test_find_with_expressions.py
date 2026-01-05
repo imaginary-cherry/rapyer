@@ -3,15 +3,12 @@ from datetime import datetime, timedelta
 import pytest
 import pytest_asyncio
 
-from rapyer.errors import BadFilterError, UnsupportedIndexedFieldError
+from rapyer.errors import BadFilterError
 from tests.models.index_types import (
     IndexTestModel,
     BaseIndexModel,
     UserIndexModel,
     ProductIndexModel,
-    UnsupportedIndexModel,
-    UnsupportedGenericIndexModel,
-    UnsupportedOptionalIndexModel,
 )
 
 
