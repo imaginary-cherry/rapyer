@@ -122,15 +122,13 @@ class AtomicRedisModel(BaseModel):
                     f"Field {field_name} is type {real_type}, and not supported for indexing"
                 )
 
-            is_atomic = issubclass(real_type, AtomicRedisModel)
-            if not (field_with_flag(field_info, IndexAnnotation) or is_atomic):
-                continue
-
             full_redis_name = f"{redis_name}.{field_name}" if redis_name else field_name
-            if is_atomic:
+            if issubclass(real_type, AtomicRedisModel):
                 real_type: type[AtomicRedisModel]
                 sub_fields = real_type.redis_schema(full_redis_name)
                 fields.extend(sub_fields)
+            elif field_with_flag(field_info, IndexAnnotation):
+                continue
             elif issubclass(real_type, RedisType):
                 field_schema = real_type.redis_schema(full_redis_name)
                 fields.append(field_schema)
