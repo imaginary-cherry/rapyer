@@ -75,6 +75,9 @@ from tests.models.simple_types import (
 # Specialized types
 from tests.models.specialized import UserModel
 
+# Index types
+from tests.models.index_types import ParentWithIndexModel, ChildWithParentModel
+
 
 @pytest_asyncio.fixture
 async def redis_client():
@@ -152,6 +155,9 @@ async def real_redis_client(redis_client):
         # Common types with key annotations
         UserWithKeyModel,
         EventWithDatetimeKeyModel,
+        # Index types
+        ParentWithIndexModel,
+        ChildWithParentModel,
     ]
 
     # Configure Redis client for all models
