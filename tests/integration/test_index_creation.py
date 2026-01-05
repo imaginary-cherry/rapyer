@@ -1,7 +1,7 @@
 import pytest
 import pytest_asyncio
 
-from rapyer import init_rapyer
+from rapyer import init_rapyer, AtomicRedisModel
 from tests.models.index_types import (
     IndexTestModel,
     UserIndexModel,
@@ -72,7 +72,10 @@ async def clean_test_indexes(redis_client):
     ],
 )
 async def test_basic_index_creation(
-    redis_client, model, expected_indexed_fields, expected_non_indexed_fields
+    redis_client,
+    model: AtomicRedisModel,
+    expected_indexed_fields,
+    expected_non_indexed_fields,
 ):
     # Arrange & Act
     await init_rapyer(redis=redis_client)
