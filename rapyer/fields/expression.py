@@ -1,9 +1,10 @@
-from typing import Any, Unpack
+from typing import Any
 
 from pydantic import TypeAdapter
 
 from rapyer.errors import BadFilterError
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME
+from rapyer.typing_support import Unpack
 
 
 class Expression:
