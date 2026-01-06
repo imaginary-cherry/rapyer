@@ -74,7 +74,7 @@ def replace_to_redis_types_in_annotation(
             # If we don't support the origin, just use the original annotation
             origin = annotation
         return origin
-    return annotation
+    return annotation  # pragma: no cover - There is no way to reach this line
 
 
 def has_annotation(field: Any, annotation_type: Any) -> bool:
