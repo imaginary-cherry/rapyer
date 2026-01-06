@@ -55,7 +55,7 @@ from tests.models.functionality_types import (
 from tests.models.index_types import ParentWithIndexModel, ChildWithParentModel
 
 # Inheritance types
-from tests.models.inheritance_types import BaseUserModel, AdminUserModel
+from tests.models.inheritance_types import BaseUserModel, AdminUserModel, DiamondChildModel
 
 # Pickle types
 from tests.models.pickle_types import ModelWithUnserializableFields
@@ -148,6 +148,7 @@ async def real_redis_client(redis_client):
         # Inheritance types
         BaseUserModel,
         AdminUserModel,
+        DiamondChildModel,
         # Complex types
         OuterModel,
         InnerRedisModel,

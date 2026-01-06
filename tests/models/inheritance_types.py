@@ -67,3 +67,23 @@ class StrictMixedInheritanceModel(AtomicRedisModel):
         self.__dict__["non_pydantic_field"] = "should_not_persist"
         self.__dict__["another_field"] = 999
         self.__dict__["temp_data"] = {"key": "value"}
+
+
+class SharedMixin(BaseModel):
+    mixin_field: str = "mixin_default"
+    mixin_count: int = 0
+
+
+class DiamondParent1(SharedMixin):
+    parent1_field: str = "parent1_default"
+    parent1_score: int = 100
+
+
+class DiamondParent2(SharedMixin):
+    parent2_field: str = "parent2_default"
+    parent2_score: float = 50.5
+
+
+class DiamondChildModel(AtomicRedisModel, DiamondParent1, DiamondParent2):
+    child_field: str = "child_default"
+    child_tags: list[str] = Field(default_factory=list)
