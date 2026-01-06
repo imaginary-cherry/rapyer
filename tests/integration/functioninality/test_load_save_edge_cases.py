@@ -29,7 +29,7 @@ async def test_aload_raises_key_not_found_when_key_missing_edge_case():
 
 
 @pytest.mark.asyncio
-async def test_aload_raises_key_not_found_after_delete_edge_case(real_redis_client):
+async def test_aload_raises_key_not_found_edge_case(real_redis_client):
     # Arrange
     model = UserModelWithTTL(name="Charlie", age=35)
 
