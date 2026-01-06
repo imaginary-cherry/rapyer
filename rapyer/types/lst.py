@@ -98,10 +98,6 @@ class RedisList(list, GenericRedisType[T]):
             self.pop(index)
         arrpop = await self.redis.json().arrpop(self.key, self.json_path, index)
 
-        # Handle empty list case
-        if arrpop is None or (isinstance(arrpop, list) and len(arrpop) == 0):
-            return None
-
         # Handle case where arrpop returns [None] for an empty list
         if arrpop[0] is None:
             return None
