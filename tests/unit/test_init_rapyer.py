@@ -1,9 +1,12 @@
 from unittest.mock import Mock, patch, AsyncMock
 
 import pytest
-from rapyer.init import init_rapyer
+from redis import ResponseError
 from redis.asyncio.client import Redis
+
+from rapyer.init import init_rapyer, teardown_rapyer
 from tests.models.collection_types import IntListModel, ProductListModel, StrListModel
+from tests.models.index_types import IndexTestModel
 from tests.models.simple_types import (
     NoneTestModel,
     TaskModel,
@@ -117,3 +120,33 @@ async def test_init_rapyer_override_existing_redis_and_ttl_sanity(
     assert UserModelWithTTL.Meta.ttl == new_ttl
     assert TaskModel.Meta.redis is mock_redis_client
     assert TaskModel.Meta.ttl == new_ttl
+
+
+@pytest.mark.asyncio
+async def test_teardown_rapyer_calls_aclose_once_per_unique_client_sanity():
+    # Arrange
+    mock_redis = AsyncMock(spec=Redis)
+    UserModelWithTTL.Meta.redis = mock_redis
+    TaskModel.Meta.redis = mock_redis
+
+    # Act
+    await teardown_rapyer()
+
+    # Assert
+    mock_redis.aclose.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_init_rapyer_raises_response_error_when_acreate_index_fails_with_override_error():
+    # Arrange
+    mock_redis = AsyncMock(spec=Redis)
+    mock_redis.ft.return_value.dropindex = AsyncMock()
+
+    with patch.object(
+        IndexTestModel,
+        "acreate_index",
+        AsyncMock(side_effect=ResponseError("Index error")),
+    ):
+        # Act & Assert
+        with pytest.raises(ResponseError):
+            await init_rapyer(mock_redis, override_old_idx=True)

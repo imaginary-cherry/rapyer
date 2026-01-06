@@ -1,6 +1,7 @@
 import pytest
 
 from tests.models.functionality_types import AllTypesModel
+from tests.models.simple_types import FloatModel
 
 
 class TestPipelineStringField:
@@ -366,6 +367,132 @@ class TestPipelineBoolField:
         assert (
             final_model.bool_field is False
         )  # Assignment without save() doesn't persist
+
+
+class TestPipelineFloatField:
+    @pytest.mark.asyncio
+    async def test_addition_changes_preserved_during_pipeline_committed_after_sanity(
+        self,
+    ):
+        # Arrange
+        model = FloatModel(value=10.5)
+        await model.asave()
+
+        # Act
+        async with model.apipeline() as redis_model:
+            redis_model.value += 5.25
+
+            # Assert - changes not visible in Redis during pipeline
+            loaded_during_pipeline = await FloatModel.aget(model.key)
+            assert loaded_during_pipeline.value == 10.5
+
+        # Assert - changes committed after pipeline
+        final_model = await FloatModel.aget(model.key)
+        assert final_model.value == 15.75
+
+    @pytest.mark.asyncio
+    async def test_subtraction_changes_preserved_during_pipeline_committed_after_sanity(
+        self,
+    ):
+        # Arrange
+        model = FloatModel(value=20.0)
+        await model.asave()
+
+        # Act
+        async with model.apipeline() as redis_model:
+            redis_model.value -= 7.5
+
+            # Assert - changes not visible in Redis during pipeline
+            loaded_during_pipeline = await FloatModel.aget(model.key)
+            assert loaded_during_pipeline.value == 20.0
+
+        # Assert - changes committed after pipeline
+        final_model = await FloatModel.aget(model.key)
+        assert final_model.value == 12.5
+
+    @pytest.mark.asyncio
+    async def test_multiplication_changes_preserved_during_pipeline_committed_after_sanity(
+        self,
+    ):
+        # Arrange
+        model = FloatModel(value=5.0)
+        await model.asave()
+
+        # Act
+        async with model.apipeline() as redis_model:
+            redis_model.value *= 3.0
+
+            # Assert - changes not visible in Redis during pipeline
+            loaded_during_pipeline = await FloatModel.aget(model.key)
+            assert loaded_during_pipeline.value == 5.0
+
+        # Assert - changes committed after pipeline
+        final_model = await FloatModel.aget(model.key)
+        assert final_model.value == 15.0
+
+    @pytest.mark.asyncio
+    async def test_division_changes_preserved_during_pipeline_committed_after_sanity(
+        self,
+    ):
+        # Arrange
+        model = FloatModel(value=100.0)
+        await model.asave()
+
+        # Act
+        async with model.apipeline() as redis_model:
+            redis_model.value /= 4.0
+
+            # Assert - changes not visible in Redis during pipeline
+            loaded_during_pipeline = await FloatModel.aget(model.key)
+            assert loaded_during_pipeline.value == 100.0
+
+        # Assert - changes committed after pipeline
+        final_model = await FloatModel.aget(model.key)
+        assert final_model.value == 25.0
+
+    @pytest.mark.asyncio
+    async def test_aincrease_changes_preserved_during_pipeline_committed_after_sanity(
+        self,
+    ):
+        # Arrange
+        model = FloatModel(value=50.0)
+        await model.asave()
+
+        # Act
+        async with model.apipeline() as redis_model:
+            await redis_model.value.aincrease(10.5)
+
+            # Assert - changes not visible in Redis during pipeline
+            loaded_during_pipeline = await FloatModel.aget(model.key)
+            assert loaded_during_pipeline.value == 50.0
+
+        # Assert - changes committed after pipeline
+        final_model = await FloatModel.aget(model.key)
+        assert final_model.value == 60.5
+
+    @pytest.mark.asyncio
+    async def test_multiple_operations_changes_preserved_during_pipeline_committed_after_edge_case(
+        self,
+    ):
+        # Arrange
+        model = FloatModel(value=100.0)
+        await model.asave()
+
+        # Act
+        async with model.apipeline() as redis_model:
+            redis_model.value += 50.0
+            redis_model.value -= 25.0
+            redis_model.value *= 2.0
+            redis_model.value /= 5.0
+
+            # Assert - changes not visible in Redis during pipeline
+            loaded_during_pipeline = await FloatModel.aget(model.key)
+            assert loaded_during_pipeline.value == 100.0
+
+        # Assert - all accumulated changes committed after pipeline
+        # (100 + 50 - 25) * 2 / 5 = 125 * 2 / 5 = 250 / 5 = 50
+        final_model = await FloatModel.aget(model.key)
+        assert final_model.value == 50.0
 
 
 class TestPipelineCrossType:

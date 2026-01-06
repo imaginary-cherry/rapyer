@@ -3,8 +3,9 @@ from typing import TypeVar, TYPE_CHECKING
 
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, SerializationInfo
-from rapyer.types.base import GenericRedisType, RedisType, REDIS_DUMP_FLAG_NAME
 from typing_extensions import TypeAlias
+
+from rapyer.types.base import GenericRedisType, RedisType, REDIS_DUMP_FLAG_NAME
 
 T = TypeVar("T")
 
@@ -26,6 +27,9 @@ class RedisList(list, GenericRedisType[T]):
         new_val = self.create_new_values([key], [value])[0]
         return new_val
 
+    def sub_field_path(self, key: str):
+        return f"{self.field_path}[{key}]"
+
     def __setitem__(self, key, value):
         if self.pipeline:
             self.pipeline.json().set(self.key, self.json_field_path(key), value)
@@ -34,8 +38,6 @@ class RedisList(list, GenericRedisType[T]):
 
     def __iadd__(self, other):
         self.extend(other)
-        if self.pipeline and other:
-            self.pipeline.json().arrappend(self.key, self.json_path, *other)
         return self
 
     def append(self, __object):
@@ -96,10 +98,6 @@ class RedisList(list, GenericRedisType[T]):
             self.pop(index)
         arrpop = await self.redis.json().arrpop(self.key, self.json_path, index)
 
-        # Handle empty list case
-        if arrpop is None or (isinstance(arrpop, list) and len(arrpop) == 0):
-            return None
-
         # Handle case where arrpop returns [None] for an empty list
         if arrpop[0] is None:
             return None
@@ -144,16 +142,13 @@ class RedisList(list, GenericRedisType[T]):
         ]
 
     @classmethod
-    def full_deserializer(cls, value, info: ValidationInfo):
+    def full_deserializer(cls, value: list, info: ValidationInfo):
         ctx = info.context or {}
         is_redis_data = ctx.get(REDIS_DUMP_FLAG_NAME)
 
-        if isinstance(value, list):
-            return [
-                cls.deserialize_unknown(item) if is_redis_data else item
-                for item in value
-            ]
-        return value
+        return [
+            cls.deserialize_unknown(item) if is_redis_data else item for item in value
+        ]
 
     @classmethod
     def schema_for_unknown(cls):
@@ -161,4 +156,4 @@ class RedisList(list, GenericRedisType[T]):
 
 
 if TYPE_CHECKING:
-    RedisList: TypeAlias = RedisList[T] | list[T]
+    RedisList: TypeAlias = RedisList[T] | list[T]  # pragma: no cover

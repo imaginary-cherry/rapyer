@@ -2,6 +2,7 @@ from typing import Any
 
 from pydantic import GetCoreSchemaHandler, BaseModel, ConfigDict
 from pydantic_core import core_schema
+
 from rapyer.base import AtomicRedisModel
 
 

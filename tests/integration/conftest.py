@@ -1,6 +1,7 @@
 import os
 
 import pytest_asyncio
+
 import rapyer
 
 # Collection types
@@ -50,8 +51,15 @@ from tests.models.functionality_types import (
     AllTypesModel,
 )
 
+# Index types
+from tests.models.index_types import ParentWithIndexModel, ChildWithParentModel
+
 # Inheritance types
-from tests.models.inheritance_types import BaseUserModel, AdminUserModel
+from tests.models.inheritance_types import (
+    BaseUserModel,
+    AdminUserModel,
+    DiamondChildModel,
+)
 
 # Pickle types
 from tests.models.pickle_types import ModelWithUnserializableFields
@@ -144,6 +152,7 @@ async def real_redis_client(redis_client):
         # Inheritance types
         BaseUserModel,
         AdminUserModel,
+        DiamondChildModel,
         # Complex types
         OuterModel,
         InnerRedisModel,
@@ -152,6 +161,9 @@ async def real_redis_client(redis_client):
         # Common types with key annotations
         UserWithKeyModel,
         EventWithDatetimeKeyModel,
+        # Index types
+        ParentWithIndexModel,
+        ChildWithParentModel,
     ]
 
     # Configure Redis client for all models

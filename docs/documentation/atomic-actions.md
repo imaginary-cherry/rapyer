@@ -48,6 +48,9 @@ The pipeline context manager supports atomic operations for all Redis types:
 - **Integer operations**: Direct assignment, arithmetic operations
 - **Bytes operations**: Direct assignment and modification
 
+!!! warning "Inplace Operators and Concurrency"
+    When using inplace operators like `+=`, `-=`, `*=`, etc. inside a pipeline, the data sent to Redis is computed as the current value in the Python process plus the new value. This means that if another process modifies the same field between when you entered the pipeline and when it executes, your operation will override those changes. For truly atomic increments/decrements that respect concurrent modifications, consider using the lock context manager instead.
+
 ### Real-World Examples
 
 #### User Score and Achievement System
