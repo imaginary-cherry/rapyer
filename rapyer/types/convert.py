@@ -28,9 +28,6 @@ class RedisConverter(TypeConverter):
         return type_to_check in self.supported_types
 
     def convert_flat_type(self, type_to_convert: type) -> type:
-        if type_to_convert is Any:
-            return Any
-
         from rapyer.base import AtomicRedisModel
 
         if safe_issubclass(type_to_convert, AtomicRedisModel):
