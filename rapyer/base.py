@@ -37,6 +37,7 @@ from rapyer.utils.annotation import (
     DYNAMIC_CLASS_DOC,
 )
 from rapyer.utils.fields import get_all_pydantic_annotation, is_redis_field
+from rapyer.utils.pythonic import safe_issubclass
 from rapyer.utils.redis import acquire_lock, update_keys_in_pipeline
 
 
@@ -227,7 +228,7 @@ class AtomicRedisModel(BaseModel):
         for field_name, field_info in cls.model_fields.items():
             full_field_name = rf"{base_path}\.{field_name}" if base_path else field_name
             field_type = field_info.annotation
-            if issubclass(field_type, AtomicRedisModel):
+            if safe_issubclass(field_type, AtomicRedisModel):
                 expressions[field_name] = AtomicField(
                     field_name, **field_type.create_expressions(full_field_name)
                 )
