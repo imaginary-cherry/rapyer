@@ -72,5 +72,5 @@ class RedisDatetimeTimestamp(RedisDatetime):
 
 
 if TYPE_CHECKING:
-    RedisDatetime = RedisDatetime | datetime
-    RedisDatetimeTimestamp = RedisDatetimeTimestamp | datetime
+    RedisDatetime = RedisDatetime | datetime  # pragma: no cover
+    RedisDatetimeTimestamp = RedisDatetimeTimestamp | datetime  # pragma: no cover

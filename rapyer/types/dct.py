@@ -226,15 +226,13 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         }
 
     @classmethod
-    def full_deserializer(cls, value, info: core_schema.ValidationInfo):
+    def full_deserializer(cls, value: dict, info: core_schema.ValidationInfo):
         ctx = info.context or {}
         should_serialize_redis = ctx.get(REDIS_DUMP_FLAG_NAME)
-        if isinstance(value, dict):
-            return {
-                key: cls.deserialize_unknown(item) if should_serialize_redis else item
-                for key, item in value.items()
-            }
-        return value
+        return {
+            key: cls.deserialize_unknown(item) if should_serialize_redis else item
+            for key, item in value.items()
+        }
 
     @classmethod
     def schema_for_unknown(cls):
@@ -242,4 +240,4 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
 
 
 if TYPE_CHECKING:
-    RedisDict: TypeAlias = RedisDict[T] | dict[str, T]
+    RedisDict: TypeAlias = RedisDict[T] | dict[str, T]  # pragma: no cover

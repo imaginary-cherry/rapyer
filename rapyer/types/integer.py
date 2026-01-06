@@ -68,4 +68,4 @@ class RedisInt(int, RedisType):
 
 
 if TYPE_CHECKING:
-    RedisInt: TypeAlias = RedisInt | int
+    RedisInt: TypeAlias = RedisInt | int  # pragma: no cover

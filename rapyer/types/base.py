@@ -70,7 +70,7 @@ class RedisType(ABC):
         f"save function is deprecated and will become sync function in rapyer 1.2.0, use asave() instead"
     )
     async def save(self):
-        return await self.asave()
+        return await self.asave()  # pragma: no cover
 
     async def asave(self) -> Self:
         model_dump = self._adapter.dump_python(
@@ -85,7 +85,7 @@ class RedisType(ABC):
         "load function is deprecated and will be removed in rapyer 1.2.0, use aload() instead"
     )
     async def load(self):
-        return await self.aload()
+        return await self.aload()  # pragma: no cover
 
     async def aload(self):
         redis_value = await self.client.json().get(self.key, self.field_path)
@@ -101,7 +101,7 @@ class RedisType(ABC):
 
     @abc.abstractmethod
     def clone(self):
-        pass
+        pass  # pragma: no cover
 
     @classmethod
     def redis_schema(cls, field_name: str):
@@ -140,22 +140,22 @@ class GenericRedisType(RedisType, Generic[T], ABC):
 
     @abc.abstractmethod
     def iterate_items(self):
-        pass
+        pass  # pragma: no cover
 
     @classmethod
     @abc.abstractmethod
     def full_serializer(cls, value, info: SerializationInfo):
-        pass
+        pass  # pragma: no cover
 
     @classmethod
     @abc.abstractmethod
     def full_deserializer(cls, value, info: ValidationInfo):
-        pass
+        pass  # pragma: no cover
 
     @classmethod
     @abc.abstractmethod
     def schema_for_unknown(cls):
-        pass
+        pass  # pragma: no cover
 
     @classmethod
     def __get_pydantic_core_schema__(

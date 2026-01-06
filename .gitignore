@@ -122,8 +122,6 @@ dmypy.json
 # Dynaconf secrets
 .secrets.*
 future-work
-.claude
 git-flow-plus.config
-CLAUDE.md
 /scripts/
 .jbeval

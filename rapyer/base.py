@@ -5,7 +5,7 @@ import functools
 import pickle
 import uuid
 from contextlib import AbstractAsyncContextManager
-from typing import ClassVar, Any
+from typing import ClassVar, Any, get_origin
 
 from pydantic import (
     BaseModel,
@@ -21,8 +21,8 @@ from redis.commands.search.query import Query
 
 from rapyer.config import RedisConfig
 from rapyer.context import _context_var, _context_xx_pipe
-from rapyer.errors.base import KeyNotFound
-from rapyer.fields.expression import ExpressionField
+from rapyer.errors.base import KeyNotFound, UnsupportedIndexedFieldError
+from rapyer.fields.expression import ExpressionField, AtomicField, Expression
 from rapyer.fields.index import IndexAnnotation
 from rapyer.fields.key import KeyAnnotation
 from rapyer.links import REDIS_SUPPORTED_LINK
@@ -37,6 +37,7 @@ from rapyer.utils.annotation import (
     DYNAMIC_CLASS_DOC,
 )
 from rapyer.utils.fields import get_all_pydantic_annotation, is_redis_field
+from rapyer.utils.pythonic import safe_issubclass
 from rapyer.utils.redis import (
     acquire_lock,
     update_keys_in_pipeline,
@@ -112,34 +113,33 @@ class AtomicRedisModel(BaseModel):
         return f"${field_path}" if field_path else "$"
 
     @classmethod
-    def redis_schema(cls):
+    def redis_schema(cls, redis_name: str = ""):
         fields = []
 
         for field_name, field_info in cls.model_fields.items():
             real_type = field_info.annotation
-            if not is_redis_field(field_name, real_type):
-                continue
-
-            if not field_with_flag(field_info, IndexAnnotation):
-                continue
-
             # Check if real_type is a class before using issubclass
-            if isinstance(real_type, type):
-                if issubclass(real_type, AtomicRedisModel):
-                    sub_fields = real_type.redis_schema()
-                    for sub_field in sub_fields:
-                        sub_field.name = f"{field_name}.{sub_field.name}"
-                        fields.append(sub_field)
-                elif issubclass(real_type, RedisType):
-                    field_schema = real_type.redis_schema(field_name)
-                    fields.append(field_schema)
-                else:
-                    raise RuntimeError(
-                        f"Indexed field {field_name} must be redis-supported to be indexed, see {REDIS_SUPPORTED_LINK}"
+            if get_origin(real_type) is not None or not isinstance(real_type, type):
+                if field_with_flag(field_info, IndexAnnotation):
+                    raise UnsupportedIndexedFieldError(
+                        f"Field {field_name} is type {real_type}, and not supported for indexing"
                     )
+                else:
+                    continue
+
+            full_redis_name = f"{redis_name}.{field_name}" if redis_name else field_name
+            if issubclass(real_type, AtomicRedisModel):
+                real_type: type[AtomicRedisModel]
+                sub_fields = real_type.redis_schema(full_redis_name)
+                fields.extend(sub_fields)
+            elif not field_with_flag(field_info, IndexAnnotation):
+                continue
+            elif issubclass(real_type, RedisType):
+                field_schema = real_type.redis_schema(full_redis_name)
+                fields.append(field_schema)
             else:
-                raise RuntimeError(
-                    f"Indexed field {field_name} must be a simple redis-supported type, see {REDIS_SUPPORTED_LINK}"
+                raise UnsupportedIndexedFieldError(
+                    f"Indexed field {field_name} must be redis-supported to be indexed, see {REDIS_SUPPORTED_LINK}"
                 )
 
         return fields
@@ -223,14 +223,27 @@ class AtomicRedisModel(BaseModel):
 
         # Update the redis model list for initialization
         # Skip dynamically created classes from type conversion
-        if cls.__doc__ != DYNAMIC_CLASS_DOC:
+        if cls.__doc__ != DYNAMIC_CLASS_DOC and cls.Meta.init_with_rapyer:
             REDIS_MODELS.append(cls)
 
     @classmethod
-    def init_class(cls):
+    def create_expressions(cls, base_path: str = "") -> dict[str, Expression]:
+        expressions = {}
         for field_name, field_info in cls.model_fields.items():
+            full_field_name = rf"{base_path}\.{field_name}" if base_path else field_name
             field_type = field_info.annotation
-            setattr(cls, field_name, ExpressionField(field_name, field_type))
+            if safe_issubclass(field_type, AtomicRedisModel):
+                expressions[field_name] = AtomicField(
+                    field_name, **field_type.create_expressions(full_field_name)
+                )
+            else:
+                expressions[field_name] = ExpressionField(full_field_name, field_type)
+        return expressions
+
+    @classmethod
+    def init_class(cls):
+        for field_name, field_expression in cls.create_expressions().items():
+            setattr(cls, field_name, field_expression)
 
     def is_inner_model(self) -> bool:
         return bool(self.field_name)
@@ -239,7 +252,7 @@ class AtomicRedisModel(BaseModel):
         f"save function is deprecated and will become sync function in rapyer 1.2.0, use asave() instead"
     )
     async def save(self):
-        return await self.asave()
+        return await self.asave()  # pragma: no cover
 
     async def asave(self) -> Self:
         model_dump = self.redis_dump()
@@ -258,7 +271,7 @@ class AtomicRedisModel(BaseModel):
         "duplicate function is deprecated and will be removed in rapyer 1.2.0, use aduplicate instead"
     )
     async def duplicate(self) -> Self:
-        return await self.aduplicate()
+        return await self.aduplicate()  # pragma: no cover
 
     async def aduplicate(self) -> Self:
         if self.is_inner_model():
@@ -272,7 +285,7 @@ class AtomicRedisModel(BaseModel):
         "duplicate_many function is deprecated and will be removed in rapyer 1.2.0, use aduplicate_many instead"
     )
     async def duplicate_many(self, num: int) -> list[Self]:
-        return await self.aduplicate_many(num)
+        return await self.aduplicate_many(num)  # pragma: no cover
 
     async def aduplicate_many(self, num: int) -> list[Self]:
         if self.is_inner_model():
@@ -312,7 +325,7 @@ class AtomicRedisModel(BaseModel):
         "get() classmethod is deprecated and will be removed in rapyer 1.2.0, use aget instead"
     )
     async def get(cls, key: str) -> Self:
-        return await cls.aget(key)
+        return await cls.aget(key)  # pragma: no cover
 
     @classmethod
     async def aget(cls, key: str) -> Self:
@@ -334,7 +347,7 @@ class AtomicRedisModel(BaseModel):
         "load function is deprecated and will be removed in rapyer 1.2.0, use aload() instead"
     )
     async def load(self):
-        return await self.aload()
+        return await self.aload()  # pragma: no cover
 
     async def aload(self) -> Self:
         model_dump = await self.Meta.redis.json().get(self.key, self.json_path)
@@ -403,7 +416,7 @@ class AtomicRedisModel(BaseModel):
         "function delete is deprecated and will be removed in rapyer 1.2.0, use adelete instead"
     )
     async def delete_by_key(cls, key: str) -> bool:
-        return await cls.adelete_by_key(key)
+        return await cls.adelete_by_key(key)  # pragma: no cover
 
     @classmethod
     async def adelete_by_key(cls, key: str) -> bool:
@@ -414,7 +427,7 @@ class AtomicRedisModel(BaseModel):
         "function delete is deprecated and will be removed in rapyer 1.2.0, use adelete instead"
     )
     async def delete(self):
-        return await self.adelete()
+        return await self.adelete()  # pragma: no cover
 
     async def adelete(self):
         if self.is_inner_model():
@@ -435,8 +448,10 @@ class AtomicRedisModel(BaseModel):
     async def lock_from_key(
         cls, key: str, action: str = "default", save_at_end: bool = False
     ) -> AbstractAsyncContextManager[Self]:
-        async with cls.alock_from_key(key, action, save_at_end) as redis_model:
-            yield redis_model
+        async with cls.alock_from_key(  # pragma: no cover
+            key, action, save_at_end  # pragma: no cover
+        ) as redis_model:  # pragma: no cover
+            yield redis_model  # pragma: no cover
 
     @classmethod
     @contextlib.asynccontextmanager
@@ -456,8 +471,10 @@ class AtomicRedisModel(BaseModel):
     async def lock(
         self, action: str = "default", save_at_end: bool = False
     ) -> AbstractAsyncContextManager[Self]:
-        async with self.alock_from_key(self.key, action, save_at_end) as redis_model:
-            yield redis_model
+        async with self.alock_from_key(  # pragma: no cover
+            self.key, action, save_at_end  # pragma: no cover
+        ) as redis_model:  # pragma: no cover
+            yield redis_model  # pragma: no cover
 
     @contextlib.asynccontextmanager
     async def alock(
@@ -477,8 +494,10 @@ class AtomicRedisModel(BaseModel):
     async def pipeline(
         self, ignore_if_deleted: bool = False
     ) -> AbstractAsyncContextManager[Self]:
-        async with self.apipeline(ignore_if_deleted=ignore_if_deleted) as redis_model:
-            yield redis_model
+        async with self.apipeline(  # pragma: no cover
+            ignore_if_deleted=ignore_if_deleted  # pragma: no cover
+        ) as redis_model:  # pragma: no cover
+            yield redis_model  # pragma: no cover
 
     @contextlib.asynccontextmanager
     async def apipeline(
@@ -491,7 +510,7 @@ class AtomicRedisModel(BaseModel):
                     k: redis_model.__dict__[k] for k in redis_model.model_fields_set
                 }
                 self.__dict__.update(unset_fields)
-            except (TypeError, IndexError):
+            except (TypeError, KeyNotFound):
                 if ignore_if_deleted:
                     redis_model = self
                 else:
@@ -548,7 +567,7 @@ REDIS_MODELS: list[type[AtomicRedisModel]] = []
     "get function is deprecated and will be removed in rapyer 1.2.0, use aget instead"
 )
 async def get(redis_key: str) -> AtomicRedisModel:
-    return await aget(redis_key)
+    return await aget(redis_key)  # pragma: no cover
 
 
 async def aget(redis_key: str) -> AtomicRedisModel:
@@ -575,7 +594,7 @@ async def ainsert(*models: Unpack[AtomicRedisModel]) -> list[AtomicRedisModel]:
 @contextlib.asynccontextmanager
 async def alock_from_key(
     key: str, action: str = "default", save_at_end: bool = False
-) -> AbstractAsyncContextManager[AtomicRedisModel]:
+) -> AbstractAsyncContextManager[AtomicRedisModel | None]:
     async with acquire_lock(AtomicRedisModel.Meta.redis, f"{key}/{action}"):
         try:
             redis_model = await aget(key)

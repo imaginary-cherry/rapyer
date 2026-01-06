@@ -1,7 +1,8 @@
 from datetime import datetime
 
 import pytest
-from tests.models.inheritance_types import AdminUserModel, UserRole
+
+from tests.models.inheritance_types import AdminUserModel, UserRole, DiamondChildModel
 
 
 @pytest.mark.asyncio
@@ -136,3 +137,25 @@ async def test_inheritance_models__admin_model_operations__redis_actions_both_pa
     await admin.access_codes.aappend(9999)
     loaded_admin = await AdminUserModel.aget(admin.key)
     assert 9999 in loaded_admin.access_codes
+
+
+@pytest.mark.asyncio
+async def test_diamond_inheritance__explicit_values__save_load_verify_sanity():
+    # Arrange
+    instance = DiamondChildModel(
+        mixin_field="custom_mixin",
+        mixin_count=42,
+        parent1_field="custom_parent1",
+        parent1_score=200,
+        parent2_field="custom_parent2",
+        parent2_score=99.9,
+        child_field="custom_child",
+        child_tags=["tag1", "tag2"],
+    )
+
+    # Act
+    await instance.asave()
+    loaded_instance = await DiamondChildModel.aget(instance.key)
+
+    # Assert
+    assert loaded_instance == instance

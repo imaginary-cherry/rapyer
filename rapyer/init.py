@@ -37,6 +37,8 @@ async def init_rapyer(
 
 
 async def teardown_rapyer():
+    closed_clients = set()
     for model in REDIS_MODELS:
-        if model.Meta.ttl is not None:
+        if id(model.Meta.redis) not in closed_clients:
+            closed_clients.add(id(model.Meta.redis))
             await model.Meta.redis.aclose()
