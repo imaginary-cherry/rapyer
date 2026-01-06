@@ -143,7 +143,9 @@ async def test_init_rapyer_raises_response_error_when_acreate_index_fails_with_o
     mock_redis.ft.return_value.dropindex = AsyncMock()
 
     with patch.object(
-        IndexTestModel, "acreate_index", AsyncMock(side_effect=ResponseError("Index error"))
+        IndexTestModel,
+        "acreate_index",
+        AsyncMock(side_effect=ResponseError("Index error")),
     ):
         # Act & Assert
         with pytest.raises(ResponseError):

@@ -55,7 +55,11 @@ from tests.models.functionality_types import (
 from tests.models.index_types import ParentWithIndexModel, ChildWithParentModel
 
 # Inheritance types
-from tests.models.inheritance_types import BaseUserModel, AdminUserModel, DiamondChildModel
+from tests.models.inheritance_types import (
+    BaseUserModel,
+    AdminUserModel,
+    DiamondChildModel,
+)
 
 # Pickle types
 from tests.models.pickle_types import ModelWithUnserializableFields
