@@ -3,7 +3,6 @@ from redis import ResponseError
 
 from rapyer.types.lst import RedisList
 from tests.models.collection_types import ComprehensiveTestModel
-from tests.models.simple_types import NoneTestModel
 
 
 @pytest.mark.asyncio
