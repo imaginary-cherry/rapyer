@@ -78,9 +78,6 @@ def replace_to_redis_types_in_annotation(
 
 
 def has_annotation(field: Any, annotation_type: Any) -> bool:
-    if field is annotation_type:
-        return True
-
     origin = get_origin(field)
     if origin is Annotated:
         args = get_args(field)
