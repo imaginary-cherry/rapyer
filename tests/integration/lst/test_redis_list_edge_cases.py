@@ -1,7 +1,9 @@
 import pytest
+from redis import ResponseError
 
 from rapyer.types.lst import RedisList
 from tests.models.collection_types import ComprehensiveTestModel
+from tests.models.simple_types import NoneTestModel
 
 
 @pytest.mark.asyncio
@@ -32,6 +34,16 @@ async def test_redis_list_apop_returns_none_after_emptying_list_edge_case():
 
     # Assert
     assert second_pop is None
+
+
+@pytest.mark.asyncio
+async def test_redis_list_apop_on_unsaved_model_raises_error_edge_case():
+    # Arrange - model NOT saved to Redis
+    model = ComprehensiveTestModel(tags=["item"])
+
+    # Act & Assert - apop on non-existent Redis key should raise RuntimeError
+    with pytest.raises(ResponseError):
+        await model.tags.apop()
 
 
 def test_redis_list_clone_returns_native_list_sanity():
