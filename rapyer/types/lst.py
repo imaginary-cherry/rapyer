@@ -146,16 +146,13 @@ class RedisList(list, GenericRedisType[T]):
         ]
 
     @classmethod
-    def full_deserializer(cls, value, info: ValidationInfo):
+    def full_deserializer(cls, value: list, info: ValidationInfo):
         ctx = info.context or {}
         is_redis_data = ctx.get(REDIS_DUMP_FLAG_NAME)
 
-        if isinstance(value, list):
-            return [
-                cls.deserialize_unknown(item) if is_redis_data else item
-                for item in value
-            ]
-        return value
+        return [
+            cls.deserialize_unknown(item) if is_redis_data else item for item in value
+        ]
 
     @classmethod
     def schema_for_unknown(cls):
