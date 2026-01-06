@@ -25,8 +25,8 @@ class Expression:
 class AtomicField(Expression):
     def __init__(self, field_name: str, **sub_fields: Unpack[Expression]):
         self.field_name = field_name
-        for field_name, sub_field in sub_fields.items():
-            setattr(self, field_name, sub_field)
+        for sub_field_name, sub_field in sub_fields.items():
+            setattr(self, sub_field_name, sub_field)
 
 
 class ExpressionField(Expression):
