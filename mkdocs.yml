@@ -55,7 +55,6 @@ nav:
     - AtomicRedisModel: api/atomic-redis-model.md
     - Redis Types: api/redis-types.md
     - Rapyer: api/rapyer-functions.md
-  - Roadmap: roadmap.md
   - Changelog: changelog.md
 
 markdown_extensions:
