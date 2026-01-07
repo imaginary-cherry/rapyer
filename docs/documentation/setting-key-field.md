@@ -1,9 +1,6 @@
-# Special Fields
+# Key Field
 
-Rapyer provides special field annotations that modify how your models interact with Redis. These fields give you additional control over model behavior, though they should be used carefully and only when necessary.
-
-## Key Field
-
+Rapyer provides special field annotations that modify how your models interact with Redis. These fields give you additional control over model behavior.
 The `Key` field annotation allows you to specify a custom field to act as the primary key instead of Rapyer's automatically generated primary key. When you use a `Key` field, it overrides the value of the model's `pk` property. This is useful when you have meaningful identifiers like user IDs, email addresses, or timestamps that should serve as unique identifiers.
 
 **⚠️ Warning**: Using custom key fields is usually not recommended. The automatic primary key generation is optimized for Redis operations and handles uniqueness automatically. Only use custom keys when you have a specific business requirement for meaningful identifiers.

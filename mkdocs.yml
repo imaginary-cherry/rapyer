@@ -50,7 +50,7 @@ nav:
     - Initialization: documentation/initialization.md
     - Redis Types: documentation/redis-types.md
     - Atomic Actions: documentation/atomic-actions.md
-    - Special Fields: documentation/special-fields.md
+    - Key adjustment: documentation/setting-key-field.md
   - API Reference:
     - AtomicRedisModel: api/atomic-redis-model.md
     - Redis Types: api/redis-types.md
