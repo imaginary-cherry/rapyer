@@ -11,7 +11,7 @@ from tests.models.simple_types import (
     UserModelWithoutTTL as ModelWithoutTTL,
     TTLRefreshDisabledModel as ModelWithTTLNoRefresh,
 )
-from tests.conftest import ttl_test_for
+from tests.conftest import ttl_no_refresh_test_for, ttl_test_for
 
 SLEEP_BEFORE_REFRESH = 0.5
 SLEEP_FOR_TTL_DECREASE = 2
@@ -310,6 +310,7 @@ async def test_ttl_refresh_maintains_original_ttl_value__sanity(real_redis_clien
     assert refreshed_ttl > TTL_TEST_SECONDS - 1
 
 
+@ttl_no_refresh_test_for(AtomicRedisModel.aget)
 @pytest.mark.asyncio
 async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_aget__sanity(
     real_redis_client,
@@ -331,6 +332,7 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_aget__sanity(
     assert loaded_model.name == "nancy"
 
 
+@ttl_no_refresh_test_for(AtomicRedisModel.aload)
 @pytest.mark.asyncio
 async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_aload__sanity(
     real_redis_client,
@@ -351,6 +353,8 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_aload__sanity(
     assert ttl > 0  # But still has TTL
 
 
+@ttl_no_refresh_test_for(RedisInt.aincrease)
+@ttl_no_refresh_test_for(RedisList.aappend)
 @pytest.mark.asyncio
 async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_type_operation__sanity(
     real_redis_client,

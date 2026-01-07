@@ -7,7 +7,7 @@ import tests.integration.test_ttl_refresh  # noqa: F401 - triggers decorator reg
 from rapyer.base import AtomicRedisModel
 from rapyer.types import RedisInt
 from rapyer.types.base import RedisType
-from tests.conftest import TTL_TESTED_METHODS
+from tests.conftest import TTL_NO_REFRESH_TESTED_METHODS, TTL_TESTED_METHODS
 
 EXCLUDED_METHODS = [
     # Deprecated methods
@@ -92,5 +92,21 @@ def test_method_has_ttl_test_coverage(class_name, method_name):
     assert has_coverage, (
         f"Method {class_name}.{method_name} needs a TTL test.\n"
         f"Add @ttl_test_for({class_name}.{method_name}) to a test in test_ttl_refresh.py\n"
+        f"Or add to EXCLUDED_FROM_TTL_TEST with justification."
+    )
+
+
+@pytest.mark.parametrize(["class_name", "method_name"], collect_all_methods())
+def test_method_has_ttl_no_refresh_test_coverage(class_name, method_name):
+    # Arrange
+    expected_entry = (class_name, method_name)
+
+    # Act
+    has_coverage = expected_entry in TTL_NO_REFRESH_TESTED_METHODS
+
+    # Assert
+    assert has_coverage, (
+        f"Method {class_name}.{method_name} needs a TTL no-refresh test.\n"
+        f"Add @ttl_no_refresh_test_for({class_name}.{method_name}) to a test in test_ttl_refresh.py\n"
         f"Or add to EXCLUDED_FROM_TTL_TEST with justification."
     )
