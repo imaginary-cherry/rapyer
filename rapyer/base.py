@@ -18,6 +18,7 @@ from pydantic import (
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
+from typing_extensions import deprecated
 
 from rapyer.config import RedisConfig
 from rapyer.context import _context_var, _context_xx_pipe
@@ -29,7 +30,6 @@ from rapyer.links import REDIS_SUPPORTED_LINK
 from rapyer.types.base import RedisType, REDIS_DUMP_FLAG_NAME
 from rapyer.types.convert import RedisConverter
 from rapyer.typing_support import Self, Unpack
-from rapyer.typing_support import deprecated
 from rapyer.utils.annotation import (
     replace_to_redis_types_in_annotation,
     has_annotation,
@@ -38,7 +38,11 @@ from rapyer.utils.annotation import (
 )
 from rapyer.utils.fields import get_all_pydantic_annotation, is_redis_field
 from rapyer.utils.pythonic import safe_issubclass
-from rapyer.utils.redis import acquire_lock, update_keys_in_pipeline
+from rapyer.utils.redis import (
+    acquire_lock,
+    update_keys_in_pipeline,
+    refresh_ttl_if_needed,
+)
 
 
 def make_pickle_field_serializer(field: str):
@@ -254,7 +258,8 @@ class AtomicRedisModel(BaseModel):
         model_dump = self.redis_dump()
         await self.Meta.redis.json().set(self.key, self.json_path, model_dump)
         if self.Meta.ttl is not None:
-            await self.Meta.redis.expire(self.key, self.Meta.ttl)
+            nx = not self.Meta.refresh_ttl
+            await self.Meta.redis.expire(self.key, self.Meta.ttl, nx=nx)
         return self
 
     def redis_dump(self):
@@ -312,6 +317,9 @@ class AtomicRedisModel(BaseModel):
         async with self.Meta.redis.pipeline() as pipe:
             update_keys_in_pipeline(pipe, self.key, **json_path_kwargs)
             await pipe.execute()
+        await refresh_ttl_if_needed(
+            self.Meta.redis, self.key, self.Meta.ttl, self.Meta.refresh_ttl
+        )
 
     @classmethod
     @deprecated(
@@ -331,6 +339,9 @@ class AtomicRedisModel(BaseModel):
 
         instance = cls.model_validate(model_dump, context={REDIS_DUMP_FLAG_NAME: True})
         instance.key = key
+        await refresh_ttl_if_needed(
+            cls.Meta.redis, key, cls.Meta.ttl, cls.Meta.refresh_ttl
+        )
         return instance
 
     @deprecated(
@@ -347,6 +358,9 @@ class AtomicRedisModel(BaseModel):
         instance = self.__class__(**model_dump)
         instance._pk = self._pk
         instance._base_model_link = self._base_model_link
+        await refresh_ttl_if_needed(
+            self.Meta.redis, self.key, self.Meta.ttl, self.Meta.refresh_ttl
+        )
         return instance
 
     @classmethod
@@ -380,6 +394,12 @@ class AtomicRedisModel(BaseModel):
             # Fetch the actual documents
             models = await cls.Meta.redis.json().mget(keys=keys, path="$")
 
+        if cls.Meta.ttl is not None and cls.Meta.refresh_ttl:
+            async with cls.Meta.redis.pipeline() as pipe:
+                for key in keys:
+                    pipe.expire(key, cls.Meta.ttl)
+                await pipe.execute()
+
         instances = []
         for model, key in zip(models, keys):
             model = cls.model_validate(model[0], context={REDIS_DUMP_FLAG_NAME: True})
@@ -396,6 +416,8 @@ class AtomicRedisModel(BaseModel):
         async with cls.Meta.redis.pipeline() as pipe:
             for model in models:
                 pipe.json().set(model.key, model.json_path, model.redis_dump())
+                if cls.Meta.ttl is not None:
+                    pipe.expire(model.key, cls.Meta.ttl)
             await pipe.execute()
 
     @classmethod
@@ -506,6 +528,9 @@ class AtomicRedisModel(BaseModel):
             _context_xx_pipe.set(ignore_if_deleted)
             yield redis_model
             await pipe.execute()
+            await refresh_ttl_if_needed(
+                self.Meta.redis, self.key, self.Meta.ttl, self.Meta.refresh_ttl
+            )
             _context_var.set(None)
             _context_xx_pipe.set(False)
 

@@ -123,5 +123,6 @@ dmypy.json
 .secrets.*
 future-work
 git-flow-plus.config
-scripts/
+/scripts/
 .jbeval
+.claude/

@@ -77,11 +77,11 @@ class Counter(AtomicRedisModel):
 
 ### Available Operations
 
-| Operation     | Method | Description |
-|---------------|---------|-------------|
-| **save**      | `await counter.count.asave()` | Save field value to Redis |
-| **load**      | `await counter.count.aload()` | Load field value from Redis (returns value, doesn't update model) |
-| **aincrease** | `await counter.count.increase(5)` | Atomically increment by amount (default: 1) |
+| Operation     | Method                             | Description |
+|---------------|------------------------------------|-------------|
+| **save**      | `await counter.count.asave()`      | Save field value to Redis |
+| **load**      | `await counter.count.aload()`      | Load field value from Redis (returns value, doesn't update model) |
+| **aincrease** | `await counter.count.aincrease(5)` | Atomically increment by amount (default: 1) |
 
 !!! warning "Non-mutating Operation"
     The `increase()` method returns the new value from Redis but **does not update the local instance**. You need to reload the model or field to see the updated value locally.
