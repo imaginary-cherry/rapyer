@@ -151,8 +151,8 @@ post = BlogPost(title="My Blog Post")
 await post.asave()
 
 # Atomic increment operations
-await post.views.increase()        # Increment views by 1
-await post.likes.increase(5)       # Increment likes by 5
+await post.views.aincrease()        # Increment views by 1
+await post.likes.aincrease(5)       # Increment likes by 5
 
 # Standard integer operations
 total_engagement = post.views + post.likes

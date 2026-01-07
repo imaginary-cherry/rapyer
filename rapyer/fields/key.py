@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Annotated, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Annotated, Any, Generic, TypeAlias, TypeVar
 
 
 @dataclasses.dataclass(frozen=True)
@@ -20,5 +20,8 @@ class _KeyType(Generic[T]):
         return Annotated[item, KeyAnnotation()]
 
 
-# Create the Key callable that works both as a function and generic type
 Key = _KeyType
+
+
+if TYPE_CHECKING:
+    Key: TypeAlias = Annotated[T, KeyAnnotation()]  # pragma: no cover

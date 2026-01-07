@@ -1,6 +1,6 @@
 import dataclasses
 from datetime import datetime
-from typing import Annotated, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Annotated, Any, Generic, TypeAlias, TypeVar
 
 from rapyer.types.datetime import RedisDatetimeTimestamp
 
@@ -33,3 +33,7 @@ class _IndexType(Generic[T]):
 
 
 Index = _IndexType
+
+
+if TYPE_CHECKING:
+    Index: TypeAlias = Annotated[T, IndexAnnotation()]  # pragma: no cover

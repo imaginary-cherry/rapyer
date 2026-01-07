@@ -43,8 +43,10 @@ theme:
 nav:
   - Overview: index.md
   - Installation: installation.md
+  - Roadmap: roadmap.md
   - Documentation:
     - Defining a Model: documentation/defining-models.md
+    - Model Lifecycle: documentation/model-lifecycle.md
     - CRUD Operations: documentation/crud-operations.md
     - Initialization: documentation/initialization.md
     - Redis Types: documentation/redis-types.md
@@ -54,7 +56,6 @@ nav:
     - AtomicRedisModel: api/atomic-redis-model.md
     - Redis Types: api/redis-types.md
     - Rapyer: api/rapyer-functions.md
-  - Roadmap: roadmap.md
   - Changelog: changelog.md
 
 markdown_extensions:

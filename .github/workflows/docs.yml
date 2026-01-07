@@ -2,13 +2,19 @@ name: Deploy Documentation
 
 on:
   push:
-    branches: 
+    branches:
       - main
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
       - 'README.md'
       - '.github/workflows/docs.yml'
+      - '.github/scripts/generate_roadmap.py'
+  issues:
+    types: [opened, edited, closed, reopened, milestoned, demilestoned]
+  milestone:
+    types: [created, edited, deleted]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -38,7 +44,14 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install mkdocs mkdocs-material
-          
+
+      - name: Generate roadmap from issues
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          OUTPUT_PATH: docs/roadmap.md
+        run: python .github/scripts/generate_roadmap.py
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
         with:

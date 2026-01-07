@@ -300,9 +300,7 @@ class User(AtomicRedisModel):
     name: str
     age: int
     
-    class Meta:
-        redis = redis_client
-        ttl = 3600  # Expire after 1 hour
+    Meta = RedisConfig(redis=redis_client, ttl=3600)  # Expire after 1 hour
 ```
 
 ### Special Behaviors
