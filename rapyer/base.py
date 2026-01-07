@@ -258,7 +258,8 @@ class AtomicRedisModel(BaseModel):
         model_dump = self.redis_dump()
         await self.Meta.redis.json().set(self.key, self.json_path, model_dump)
         if self.Meta.ttl is not None:
-            await self.Meta.redis.expire(self.key, self.Meta.ttl)
+            nx = not self.Meta.refresh_ttl
+            await self.Meta.redis.expire(self.key, self.Meta.ttl, nx=nx)
         return self
 
     def redis_dump(self):
