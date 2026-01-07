@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import pytest
+
 from rapyer.base import AtomicRedisModel
 from rapyer.types.base import RedisType
 from rapyer.types.byte import RedisBytes
@@ -169,3 +170,18 @@ async def test_model_creation__check_private_and_class_fields_not_converted_to_r
     assert hasattr(TestModel, "class_field")
     assert not isinstance(TestModel.class_field, RedisType)
     assert TestModel.class_field == 42
+
+
+@pytest.mark.asyncio
+async def test_model_equality__atomic_model_vs_non_base_model__returns_false():
+    # Arrange
+    class ModelA(AtomicRedisModel):
+        name: str = ""
+
+    model_a = ModelA(name="asdf")
+
+    # Act
+    result = model_a == "asdf"
+
+    # Assert
+    assert result is False
