@@ -43,6 +43,7 @@ theme:
 nav:
   - Overview: index.md
   - Installation: installation.md
+  - Roadmap: roadmap.md
   - Documentation:
     - Defining a Model: documentation/defining-models.md
     - Model Lifecycle: documentation/model-lifecycle.md
