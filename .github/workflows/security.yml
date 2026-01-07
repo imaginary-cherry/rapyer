@@ -126,6 +126,8 @@ jobs:
 
   secrets-scan:
     name: Secrets Detection
+    environment:
+      name: security
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -136,6 +138,7 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
   summary:
     name: Security Summary
