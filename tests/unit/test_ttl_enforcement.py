@@ -5,16 +5,31 @@ import pytest
 
 import tests.integration.test_ttl_refresh  # noqa: F401 - triggers decorator registration
 from rapyer.base import AtomicRedisModel
+from rapyer.types import RedisList, RedisInt
 from rapyer.types.base import RedisType
 from tests.conftest import TTL_TESTED_METHODS
 
 EXCLUDED_METHODS = [
+    # Deprecated methods
+    AtomicRedisModel.delete,
+    AtomicRedisModel.delete_by_key,
+    AtomicRedisModel.duplicate,
+    AtomicRedisModel.save,
+    AtomicRedisModel.get,
+    AtomicRedisModel.load,
+    AtomicRedisModel.lock_from_key,
+    AtomicRedisModel.lock,
+    AtomicRedisModel.pipeline,
+    RedisType.save,
+    RedisType.load,
+    RedisInt.increase,
     # Delete operations - key/item is removed
     AtomicRedisModel.adelete,
     AtomicRedisModel.adelete_by_key,
     AtomicRedisModel.adelete_many,
     # Methods that create NEW keys (get their own TTL via asave)
     AtomicRedisModel.aduplicate,
+    AtomicRedisModel.duplicate_many,
     AtomicRedisModel.aduplicate_many,
     # Delegating methods (call other methods that handle TTL)
     AtomicRedisModel.afind,
