@@ -2,7 +2,6 @@
 import json
 import os
 import urllib.request
-from collections import defaultdict
 from datetime import datetime
 
 
@@ -55,7 +54,9 @@ def generate_roadmap_markdown(milestones_data):
         lines.append(f"*{progress}*")
         lines.append("")
 
-        for issue in sorted(issues, key=lambda x: (x["state"] == "closed", x["number"])):
+        for issue in sorted(
+            issues, key=lambda x: (x["state"] == "closed", x["number"])
+        ):
             checkbox = "[x]" if issue["state"] == "closed" else "[ ]"
             title = issue["title"]
             url = issue["html_url"]
@@ -81,12 +82,14 @@ def main():
         issues = fetch_issues_for_milestone(owner, repo, milestone["number"], token)
         issues = [i for i in issues if "pull_request" not in i]
 
-        milestones_data.append({
-            "title": milestone["title"],
-            "description": milestone.get("description", ""),
-            "state": milestone["state"],
-            "issues": issues,
-        })
+        milestones_data.append(
+            {
+                "title": milestone["title"],
+                "description": milestone.get("description", ""),
+                "state": milestone["state"],
+                "issues": issues,
+            }
+        )
 
     markdown = generate_roadmap_markdown(milestones_data)
     markdown = markdown.replace("{repo}", repository)
