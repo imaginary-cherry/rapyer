@@ -100,16 +100,3 @@ User.Meta.redis = redis_client    # Redis client instance
 User.Meta.ttl = 3600             # Time-to-live in seconds (optional)
 ```
 
-### TTL (Time To Live)
-
-Set automatic expiration for your models:
-
-```python
-class Session(AtomicRedisModel):
-    user_id: str
-    data: dict = {}
-
-# Sessions expire after 30 minutes
-Session.Meta.redis = redis_client
-Session.Meta.ttl = 1800  # 30 minutes in seconds
-```
