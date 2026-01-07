@@ -559,3 +559,292 @@ async def test_ttl_refresh_on_afind__sanity(real_redis_client):
     assert ttl2 > TTL_TEST_SECONDS - 2
     assert ttl2 <= TTL_TEST_SECONDS
     assert len(found_models) == 2
+
+
+@ttl_no_refresh_test_for(AtomicRedisModel.afind)
+@pytest.mark.asyncio
+async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_afind__sanity(
+    real_redis_client,
+):
+    # Arrange
+    model1 = ModelWithTTLNoRefresh(name="amy", age=25)
+    model2 = ModelWithTTLNoRefresh(name="ben", age=30)
+    await model1.asave()
+    await model2.asave()
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
+
+    # Act
+    await ModelWithTTLNoRefresh.afind()
+
+    # Assert
+    ttl1 = await real_redis_client.ttl(model1.key)
+    ttl2 = await real_redis_client.ttl(model2.key)
+    assert ttl1 <= TTL_TEST_SECONDS - 1
+    assert ttl1 > 0
+    assert ttl2 <= TTL_TEST_SECONDS - 1
+    assert ttl2 > 0
+
+
+@ttl_no_refresh_test_for(AtomicRedisModel.ainsert)
+@pytest.mark.asyncio
+async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_ainsert__sanity(
+    real_redis_client,
+):
+    # Arrange
+    model = ModelWithTTLNoRefresh(name="carl", age=35)
+
+    # Act
+    await ModelWithTTLNoRefresh.ainsert(model)
+
+    # Assert
+    ttl = await real_redis_client.ttl(model.key)
+    assert ttl <= TTL_TEST_SECONDS
+    assert ttl > 0
+
+
+@ttl_no_refresh_test_for(AtomicRedisModel.asave)
+@pytest.mark.asyncio
+async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_asave__sanity(
+    real_redis_client,
+):
+    # Arrange
+    model = ModelWithTTLNoRefresh(name="dana", age=40)
+    await model.asave()
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
+
+    # Act
+    model.name = "dana_updated"
+    await model.asave()
+
+    # Assert
+    ttl = await real_redis_client.ttl(model.key)
+    assert ttl <= TTL_TEST_SECONDS - 1
+    assert ttl > 0
+
+
+@ttl_no_refresh_test_for(AtomicRedisModel.aupdate)
+@pytest.mark.asyncio
+async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_aupdate__sanity(
+    real_redis_client,
+):
+    # Arrange
+    model = ModelWithTTLNoRefresh(name="evan", age=45)
+    await model.asave()
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
+
+    # Act
+    await model.aupdate(name="evan_updated")
+
+    # Assert
+    ttl = await real_redis_client.ttl(model.key)
+    assert ttl <= TTL_TEST_SECONDS - 1
+    assert ttl > 0
+
+
+@ttl_no_refresh_test_for(RedisDict.aclear)
+@pytest.mark.asyncio
+async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_dict_aclear__sanity(
+    real_redis_client,
+):
+    # Arrange
+    model = ModelWithTTLNoRefresh(name="fay", settings={"key1": "value1"})
+    await model.asave()
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
+
+    # Act
+    await model.settings.aclear()
+
+    # Assert
+    ttl = await real_redis_client.ttl(model.key)
+    assert ttl <= TTL_TEST_SECONDS - 1
+    assert ttl > 0
+
+
+@ttl_no_refresh_test_for(RedisDict.adel_item)
+@pytest.mark.asyncio
+async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_dict_adel_item__sanity(
+    real_redis_client,
+):
+    # Arrange
+    model = ModelWithTTLNoRefresh(name="gus", settings={"key1": "value1", "key2": "value2"})
+    await model.asave()
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
+
+    # Act
+    await model.settings.adel_item("key1")
+
+    # Assert
+    ttl = await real_redis_client.ttl(model.key)
+    assert ttl <= TTL_TEST_SECONDS - 1
+    assert ttl > 0
+
+
+@ttl_no_refresh_test_for(RedisDict.apop)
+@pytest.mark.asyncio
+async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_dict_apop__sanity(
+    real_redis_client,
+):
+    # Arrange
+    model = ModelWithTTLNoRefresh(name="hal", settings={"key1": "value1", "key2": "value2"})
+    await model.asave()
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
+
+    # Act
+    await model.settings.apop("key1")
+
+    # Assert
+    ttl = await real_redis_client.ttl(model.key)
+    assert ttl <= TTL_TEST_SECONDS - 1
+    assert ttl > 0
+
+
+@ttl_no_refresh_test_for(RedisDict.apopitem)
+@pytest.mark.asyncio
+async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_dict_apopitem__sanity(
+    real_redis_client,
+):
+    # Arrange
+    model = ModelWithTTLNoRefresh(name="ivy", settings={"key1": "value1"})
+    await model.asave()
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
+
+    # Act
+    await model.settings.apopitem()
+
+    # Assert
+    ttl = await real_redis_client.ttl(model.key)
+    assert ttl <= TTL_TEST_SECONDS - 1
+    assert ttl > 0
+
+
+@ttl_no_refresh_test_for(RedisDict.aset_item)
+@pytest.mark.asyncio
+async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_dict_aset_item__sanity(
+    real_redis_client,
+):
+    # Arrange
+    model = ModelWithTTLNoRefresh(name="jake", settings={"key1": "value1"})
+    await model.asave()
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
+
+    # Act
+    await model.settings.aset_item("key2", "value2")
+
+    # Assert
+    ttl = await real_redis_client.ttl(model.key)
+    assert ttl <= TTL_TEST_SECONDS - 1
+    assert ttl > 0
+
+
+@ttl_no_refresh_test_for(RedisDict.aupdate)
+@pytest.mark.asyncio
+async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_dict_aupdate__sanity(
+    real_redis_client,
+):
+    # Arrange
+    model = ModelWithTTLNoRefresh(name="kate", settings={"key1": "value1"})
+    await model.asave()
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
+
+    # Act
+    await model.settings.aupdate(key2="value2", key3="value3")
+
+    # Assert
+    ttl = await real_redis_client.ttl(model.key)
+    assert ttl <= TTL_TEST_SECONDS - 1
+    assert ttl > 0
+
+
+@ttl_no_refresh_test_for(RedisFloat.aincrease)
+@pytest.mark.asyncio
+async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_float_aincrease__sanity(
+    real_redis_client,
+):
+    # Arrange
+    model = ModelWithTTLNoRefresh(name="leo", score=10.5)
+    await model.asave()
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
+
+    # Act
+    await model.score.aincrease(2.5)
+
+    # Assert
+    ttl = await real_redis_client.ttl(model.key)
+    assert ttl <= TTL_TEST_SECONDS - 1
+    assert ttl > 0
+
+
+@ttl_no_refresh_test_for(RedisList.aclear)
+@pytest.mark.asyncio
+async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_list_aclear__sanity(
+    real_redis_client,
+):
+    # Arrange
+    model = ModelWithTTLNoRefresh(name="mia", tags=["tag1", "tag2"])
+    await model.asave()
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
+
+    # Act
+    await model.tags.aclear()
+
+    # Assert
+    ttl = await real_redis_client.ttl(model.key)
+    assert ttl <= TTL_TEST_SECONDS - 1
+    assert ttl > 0
+
+
+@ttl_no_refresh_test_for(RedisList.aextend)
+@pytest.mark.asyncio
+async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_list_aextend__sanity(
+    real_redis_client,
+):
+    # Arrange
+    model = ModelWithTTLNoRefresh(name="nate", tags=["tag1"])
+    await model.asave()
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
+
+    # Act
+    await model.tags.aextend(["tag2", "tag3"])
+
+    # Assert
+    ttl = await real_redis_client.ttl(model.key)
+    assert ttl <= TTL_TEST_SECONDS - 1
+    assert ttl > 0
+
+
+@ttl_no_refresh_test_for(RedisList.ainsert)
+@pytest.mark.asyncio
+async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_list_ainsert__sanity(
+    real_redis_client,
+):
+    # Arrange
+    model = ModelWithTTLNoRefresh(name="olive", tags=["tag1", "tag3"])
+    await model.asave()
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
+
+    # Act
+    await model.tags.ainsert(1, "tag2")
+
+    # Assert
+    ttl = await real_redis_client.ttl(model.key)
+    assert ttl <= TTL_TEST_SECONDS - 1
+    assert ttl > 0
+
+
+@ttl_no_refresh_test_for(RedisList.apop)
+@pytest.mark.asyncio
+async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_list_apop__sanity(
+    real_redis_client,
+):
+    # Arrange
+    model = ModelWithTTLNoRefresh(name="pete", tags=["tag1", "tag2", "tag3"])
+    await model.asave()
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
+
+    # Act
+    await model.tags.apop()
+
+    # Assert
+    ttl = await real_redis_client.ttl(model.key)
+    assert ttl <= TTL_TEST_SECONDS - 1
+    assert ttl > 0
