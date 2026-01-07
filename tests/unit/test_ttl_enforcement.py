@@ -13,6 +13,9 @@ EXCLUDED_METHODS = [
     AtomicRedisModel.adelete,
     AtomicRedisModel.adelete_by_key,
     AtomicRedisModel.adelete_many,
+    # Methods that create NEW keys (get their own TTL via asave)
+    AtomicRedisModel.aduplicate,
+    AtomicRedisModel.aduplicate_many,
     # Delegating methods (call other methods that handle TTL)
     AtomicRedisModel.afind,
     AtomicRedisModel.afind_keys,
@@ -74,6 +77,6 @@ def test_method_has_ttl_test_coverage(class_name, method_name):
     # Assert
     assert has_coverage, (
         f"Method {class_name}.{method_name} needs a TTL test.\n"
-        f"Add @tests_ttl_for({class_name}.{method_name}) to a test in test_ttl_refresh.py\n"
+        f"Add @ttl_test_for({class_name}.{method_name}) to a test in test_ttl_refresh.py\n"
         f"Or add to EXCLUDED_FROM_TTL_TEST with justification."
     )
