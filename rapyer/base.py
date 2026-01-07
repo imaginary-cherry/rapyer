@@ -409,6 +409,8 @@ class AtomicRedisModel(BaseModel):
         async with cls.Meta.redis.pipeline() as pipe:
             for model in models:
                 pipe.json().set(model.key, model.json_path, model.redis_dump())
+                if cls.Meta.ttl is not None:
+                    pipe.expire(model.key, cls.Meta.ttl)
             await pipe.execute()
 
     @classmethod

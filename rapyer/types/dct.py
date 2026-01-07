@@ -148,7 +148,11 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
 
     async def adel_item(self, key):
         super().__delitem__(key)
-        return await self.client.json().delete(self.key, self.json_field_path(key))
+        result = await self.client.json().delete(self.key, self.json_field_path(key))
+        await refresh_ttl_if_needed(
+            self.client, self.key, self.Meta.ttl, self.Meta.refresh_ttl
+        )
+        return result
 
     async def aupdate(self, **kwargs):
         self.update(**kwargs)
@@ -172,6 +176,9 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         result = await self.client.eval(POP_SCRIPT, 1, self.key, self.json_path, key)
         # Key exists in Redis, pop from local dict (it should exist there too)
         super().pop(key, None)
+        await refresh_ttl_if_needed(
+            self.client, self.key, self.Meta.ttl, self.Meta.refresh_ttl
+        )
 
         if result is None:
             # Key doesn't exist in Redis
@@ -184,6 +191,9 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
     async def apopitem(self):
         # Execute the script atomically
         result = await self.client.eval(POPITEM_SCRIPT, 1, self.key, self.json_path)
+        await refresh_ttl_if_needed(
+            self.client, self.key, self.Meta.ttl, self.Meta.refresh_ttl
+        )
 
         if result is not None:
             redis_key, redis_value = result

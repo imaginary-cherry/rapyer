@@ -10,10 +10,10 @@ from tests.models.simple_types import (
     UserModelWithoutTTL as ModelWithoutTTL,
     TTLRefreshDisabledModel as ModelWithTTLNoRefresh,
 )
-from tests.conftest import tests_ttl_for
+from tests.conftest import ttl_test_for
 
 
-@tests_ttl_for(AtomicRedisModel.aget)
+@ttl_test_for(AtomicRedisModel.aget)
 @pytest.mark.asyncio
 async def test_ttl_refresh_on_aget__sanity(real_redis_client):
     # Arrange
@@ -33,7 +33,7 @@ async def test_ttl_refresh_on_aget__sanity(real_redis_client):
     assert loaded_model.name == "john"
 
 
-@tests_ttl_for(AtomicRedisModel.aload)
+@ttl_test_for(AtomicRedisModel.aload)
 @pytest.mark.asyncio
 async def test_ttl_refresh_on_aload__sanity(real_redis_client):
     # Arrange
@@ -52,7 +52,7 @@ async def test_ttl_refresh_on_aload__sanity(real_redis_client):
     assert ttl <= 5
 
 
-@tests_ttl_for(AtomicRedisModel.aupdate)
+@ttl_test_for(AtomicRedisModel.aupdate)
 @pytest.mark.asyncio
 async def test_ttl_refresh_on_aupdate__sanity(real_redis_client):
     # Arrange
@@ -91,7 +91,7 @@ async def test_ttl_refresh_on_pipeline_execute__sanity(real_redis_client):
     assert ttl <= 5
 
 
-@tests_ttl_for(RedisInt.aincrease)
+@ttl_test_for(RedisInt.aincrease)
 @pytest.mark.asyncio
 async def test_ttl_refresh_on_redis_int_aincrease__sanity(real_redis_client):
     # Arrange
@@ -110,7 +110,7 @@ async def test_ttl_refresh_on_redis_int_aincrease__sanity(real_redis_client):
     assert ttl <= 5
 
 
-@tests_ttl_for(RedisFloat.aincrease)
+@ttl_test_for(RedisFloat.aincrease)
 @pytest.mark.asyncio
 async def test_ttl_refresh_on_redis_float_aincrease__sanity(real_redis_client):
     # Arrange
@@ -130,7 +130,7 @@ async def test_ttl_refresh_on_redis_float_aincrease__sanity(real_redis_client):
     assert new_score == 13.0  # aincrease returns the new value
 
 
-@tests_ttl_for(RedisList.aappend)
+@ttl_test_for(RedisList.aappend)
 @pytest.mark.asyncio
 async def test_ttl_refresh_on_redis_list_append__sanity(real_redis_client):
     # Arrange
@@ -150,7 +150,7 @@ async def test_ttl_refresh_on_redis_list_append__sanity(real_redis_client):
     assert model.tags == ["tag1", "tag2"]
 
 
-@tests_ttl_for(RedisList.aextend)
+@ttl_test_for(RedisList.aextend)
 @pytest.mark.asyncio
 async def test_ttl_refresh_on_redis_list_extend__sanity(real_redis_client):
     # Arrange
@@ -170,7 +170,7 @@ async def test_ttl_refresh_on_redis_list_extend__sanity(real_redis_client):
     assert set(model.tags) == {"tag1", "tag2", "tag3"}
 
 
-@tests_ttl_for(RedisList.aclear)
+@ttl_test_for(RedisList.aclear)
 @pytest.mark.asyncio
 async def test_ttl_refresh_on_redis_list_clear__sanity(real_redis_client):
     # Arrange
@@ -190,7 +190,7 @@ async def test_ttl_refresh_on_redis_list_clear__sanity(real_redis_client):
     assert model.tags == []
 
 
-@tests_ttl_for(RedisDict.aset_item)
+@ttl_test_for(RedisDict.aset_item)
 @pytest.mark.asyncio
 async def test_ttl_refresh_on_redis_dict_setitem__sanity(real_redis_client):
     # Arrange
@@ -210,7 +210,7 @@ async def test_ttl_refresh_on_redis_dict_setitem__sanity(real_redis_client):
     assert model.settings == {"key1": "value1", "key2": "value2"}
 
 
-@tests_ttl_for(RedisDict.aupdate)
+@ttl_test_for(RedisDict.aupdate)
 @pytest.mark.asyncio
 async def test_ttl_refresh_on_redis_dict_update__sanity(real_redis_client):
     # Arrange
@@ -230,7 +230,7 @@ async def test_ttl_refresh_on_redis_dict_update__sanity(real_redis_client):
     assert model.settings == {"key1": "value1", "key2": "value2", "key3": "value3"}
 
 
-@tests_ttl_for(RedisDict.aclear)
+@ttl_test_for(RedisDict.aclear)
 @pytest.mark.asyncio
 async def test_ttl_refresh_on_redis_dict_clear__sanity(real_redis_client):
     # Arrange
@@ -250,7 +250,7 @@ async def test_ttl_refresh_on_redis_dict_clear__sanity(real_redis_client):
     assert model.settings == {}
 
 
-@tests_ttl_for(RedisType.aload)
+@ttl_test_for(RedisType.aload)
 @pytest.mark.asyncio
 async def test_ttl_refresh_on_redis_type_aload__sanity(real_redis_client):
     # Arrange
@@ -368,7 +368,7 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_type_operation_
     assert ttl > 0  # But still has TTL
 
 
-@tests_ttl_for(RedisType.asave)
+@ttl_test_for(RedisType.asave)
 @pytest.mark.asyncio
 async def test_ttl_refresh_on_redis_type_asave__sanity(real_redis_client):
     # Arrange
@@ -390,7 +390,7 @@ async def test_ttl_refresh_on_redis_type_asave__sanity(real_redis_client):
     assert loaded_age == 85
 
 
-@tests_ttl_for(AtomicRedisModel.asave)
+@ttl_test_for(AtomicRedisModel.asave)
 @pytest.mark.asyncio
 async def test_ttl_refresh_on_model_asave__sanity(real_redis_client):
     # Arrange
@@ -410,7 +410,7 @@ async def test_ttl_refresh_on_model_asave__sanity(real_redis_client):
     assert ttl <= 5
 
 
-@tests_ttl_for(RedisList.ainsert)
+@ttl_test_for(RedisList.ainsert)
 @pytest.mark.asyncio
 async def test_ttl_refresh_on_redis_list_ainsert__sanity(real_redis_client):
     # Arrange
@@ -428,3 +428,103 @@ async def test_ttl_refresh_on_redis_list_ainsert__sanity(real_redis_client):
     assert ttl > 3  # Should be close to 5 since TTL was refreshed
     assert ttl <= 5
     assert model.tags == ["tag1", "tag2", "tag3"]
+
+
+@ttl_test_for(AtomicRedisModel.ainsert)
+@pytest.mark.asyncio
+async def test_ttl_on_model_ainsert__sanity(real_redis_client):
+    # Arrange
+    model1 = ModelWithTTL(name="tom", age=25)
+    model2 = ModelWithTTL(name="tim", age=30)
+
+    # Act
+    await ModelWithTTL.ainsert(model1, model2)
+
+    # Assert
+    ttl1 = await real_redis_client.ttl(model1.key)
+    ttl2 = await real_redis_client.ttl(model2.key)
+    assert ttl1 > 3  # Should be close to 5 since TTL was set
+    assert ttl1 <= 5
+    assert ttl2 > 3
+    assert ttl2 <= 5
+
+
+@ttl_test_for(RedisDict.adel_item)
+@pytest.mark.asyncio
+async def test_ttl_refresh_on_redis_dict_adel_item__sanity(real_redis_client):
+    # Arrange
+    model = ModelWithTTL(name="uma", settings={"key1": "value1", "key2": "value2"})
+    await model.asave()
+
+    # Let some time pass
+    await asyncio.sleep(1)
+
+    # Act
+    await model.settings.adel_item("key1")
+
+    # Assert
+    ttl = await real_redis_client.ttl(model.key)
+    assert ttl > 3  # Should be close to 5 since TTL was refreshed
+    assert ttl <= 5
+    assert model.settings == {"key2": "value2"}
+
+
+@ttl_test_for(RedisDict.apop)
+@pytest.mark.asyncio
+async def test_ttl_refresh_on_redis_dict_apop__sanity(real_redis_client):
+    # Arrange
+    model = ModelWithTTL(name="vera", settings={"key1": "value1", "key2": "value2"})
+    await model.asave()
+
+    # Let some time pass
+    await asyncio.sleep(1)
+
+    # Act
+    popped_value = await model.settings.apop("key1")
+
+    # Assert
+    ttl = await real_redis_client.ttl(model.key)
+    assert ttl > 3  # Should be close to 5 since TTL was refreshed
+    assert ttl <= 5
+    assert popped_value == "value1"
+
+
+@ttl_test_for(RedisDict.apopitem)
+@pytest.mark.asyncio
+async def test_ttl_refresh_on_redis_dict_apopitem__sanity(real_redis_client):
+    # Arrange
+    model = ModelWithTTL(name="walt", settings={"key1": "value1"})
+    await model.asave()
+
+    # Let some time pass
+    await asyncio.sleep(1)
+
+    # Act
+    popped_value = await model.settings.apopitem()
+
+    # Assert
+    ttl = await real_redis_client.ttl(model.key)
+    assert ttl > 3  # Should be close to 5 since TTL was refreshed
+    assert ttl <= 5
+    assert popped_value == "value1"
+
+
+@ttl_test_for(RedisList.apop)
+@pytest.mark.asyncio
+async def test_ttl_refresh_on_redis_list_apop__sanity(real_redis_client):
+    # Arrange
+    model = ModelWithTTL(name="xena", tags=["tag1", "tag2", "tag3"])
+    await model.asave()
+
+    # Let some time pass
+    await asyncio.sleep(1)
+
+    # Act
+    popped_value = await model.tags.apop()
+
+    # Assert
+    ttl = await real_redis_client.ttl(model.key)
+    assert ttl > 3  # Should be close to 5 since TTL was refreshed
+    assert ttl <= 5
+    assert popped_value == "tag3"
+    assert model.tags == ["tag1", "tag2"]

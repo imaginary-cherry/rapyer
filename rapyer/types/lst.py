@@ -77,6 +77,9 @@ class RedisList(list, GenericRedisType[T]):
             await self.redis.json().arrappend(
                 self.key, self.json_path, *serialized_object
             )
+            await refresh_ttl_if_needed(
+                self.redis, self.key, self.Meta.ttl, self.Meta.refresh_ttl
+            )
 
     async def aextend(self, __iterable):
         items = list(__iterable)
@@ -101,6 +104,9 @@ class RedisList(list, GenericRedisType[T]):
         if self:
             self.pop(index)
         arrpop = await self.redis.json().arrpop(self.key, self.json_path, index)
+        await refresh_ttl_if_needed(
+            self.redis, self.key, self.Meta.ttl, self.Meta.refresh_ttl
+        )
 
         # Handle case where arrpop returns [None] for an empty list
         if arrpop[0] is None:
@@ -120,6 +126,9 @@ class RedisList(list, GenericRedisType[T]):
             )
             await self.redis.json().arrinsert(
                 self.key, self.json_path, index, *serialized_object
+            )
+            await refresh_ttl_if_needed(
+                self.redis, self.key, self.Meta.ttl, self.Meta.refresh_ttl
             )
 
     async def aclear(self):
