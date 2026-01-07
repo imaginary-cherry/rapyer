@@ -101,6 +101,8 @@ class TTLRefreshTestModel(AtomicRedisModel):
 class TTLRefreshDisabledModel(AtomicRedisModel):
     name: str = "test"
     age: RedisInt = 25
+    score: RedisFloat = 0.0
     tags: RedisList[str] = Field(default_factory=list)
+    settings: RedisDict[str, str] = Field(default_factory=dict)
 
     Meta = RedisConfig(ttl=TTL_TEST_SECONDS, refresh_ttl=False)
