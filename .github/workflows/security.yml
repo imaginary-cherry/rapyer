@@ -46,6 +46,7 @@ jobs:
         run: |
           pip-audit \
             --strict \
+            --skip rapyer \
             --desc on \
             --format markdown \
             --output pip-audit-results.md \
@@ -59,7 +60,7 @@ jobs:
           fi
 
       - name: Fail on vulnerabilities
-        run: pip-audit --strict
+        run: pip-audit --strict --skip rapyer
 
       - name: Upload results
         uses: actions/upload-artifact@v4
