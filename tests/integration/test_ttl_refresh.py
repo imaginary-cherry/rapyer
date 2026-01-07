@@ -6,11 +6,15 @@ from rapyer import AtomicRedisModel
 from rapyer.types import RedisDict, RedisFloat, RedisInt, RedisList
 from rapyer.types.base import RedisType
 from tests.models.simple_types import (
+    TTL_TEST_SECONDS,
     TTLRefreshTestModel as ModelWithTTL,
     UserModelWithoutTTL as ModelWithoutTTL,
     TTLRefreshDisabledModel as ModelWithTTLNoRefresh,
 )
 from tests.conftest import ttl_test_for
+
+SLEEP_BEFORE_REFRESH = 0.5
+SLEEP_FOR_TTL_DECREASE = 2
 
 
 @ttl_test_for(AtomicRedisModel.aget)
@@ -21,15 +25,15 @@ async def test_ttl_refresh_on_aget__sanity(real_redis_client):
     await model.asave()
 
     # Let some time pass
-    await asyncio.sleep(1)
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act
     loaded_model = await ModelWithTTL.aget(model.key)
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert ttl > 3  # Should be close to 5 since TTL was refreshed
-    assert ttl <= 5
+    assert ttl > TTL_TEST_SECONDS - 2
+    assert ttl <= TTL_TEST_SECONDS
     assert loaded_model.name == "john"
 
 
@@ -41,15 +45,15 @@ async def test_ttl_refresh_on_aload__sanity(real_redis_client):
     await model.asave()
 
     # Let some time pass
-    await asyncio.sleep(1)
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act
     await model.aload()
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert ttl > 3  # Should be close to 5 since TTL was refreshed
-    assert ttl <= 5
+    assert ttl > TTL_TEST_SECONDS - 2
+    assert ttl <= TTL_TEST_SECONDS
 
 
 @ttl_test_for(AtomicRedisModel.aupdate)
@@ -60,15 +64,15 @@ async def test_ttl_refresh_on_aupdate__sanity(real_redis_client):
     await model.asave()
 
     # Let some time pass
-    await asyncio.sleep(1)
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act
     await model.aupdate(name="robert")
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert ttl > 3  # Should be close to 5 since TTL was refreshed
-    assert ttl <= 5
+    assert ttl > TTL_TEST_SECONDS - 2
+    assert ttl <= TTL_TEST_SECONDS
     assert model.name == "robert"
 
 
@@ -79,7 +83,7 @@ async def test_ttl_refresh_on_pipeline_execute__sanity(real_redis_client):
     await model.asave()
 
     # Let some time pass
-    await asyncio.sleep(1)
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act
     async with model.apipeline():
@@ -87,8 +91,8 @@ async def test_ttl_refresh_on_pipeline_execute__sanity(real_redis_client):
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert ttl > 3  # Should be close to 5 since TTL was refreshed
-    assert ttl <= 5
+    assert ttl > TTL_TEST_SECONDS - 2
+    assert ttl <= TTL_TEST_SECONDS
 
 
 @ttl_test_for(RedisInt.aincrease)
@@ -99,15 +103,15 @@ async def test_ttl_refresh_on_redis_int_aincrease__sanity(real_redis_client):
     await model.asave()
 
     # Let some time pass
-    await asyncio.sleep(1)
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act
     await model.age.aincrease(5)
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert ttl > 3  # Should be close to 5 since TTL was refreshed
-    assert ttl <= 5
+    assert ttl > TTL_TEST_SECONDS - 2
+    assert ttl <= TTL_TEST_SECONDS
 
 
 @ttl_test_for(RedisFloat.aincrease)
@@ -118,15 +122,15 @@ async def test_ttl_refresh_on_redis_float_aincrease__sanity(real_redis_client):
     await model.asave()
 
     # Let some time pass
-    await asyncio.sleep(1)
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act
     new_score = await model.score.aincrease(2.5)
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert ttl > 3  # Should be close to 5 since TTL was refreshed
-    assert ttl <= 5
+    assert ttl > TTL_TEST_SECONDS - 2
+    assert ttl <= TTL_TEST_SECONDS
     assert new_score == 13.0  # aincrease returns the new value
 
 
@@ -138,15 +142,15 @@ async def test_ttl_refresh_on_redis_list_append__sanity(real_redis_client):
     await model.asave()
 
     # Let some time pass
-    await asyncio.sleep(1)
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act
     await model.tags.aappend("tag2")
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert ttl > 3  # Should be close to 5 since TTL was refreshed
-    assert ttl <= 5
+    assert ttl > TTL_TEST_SECONDS - 2
+    assert ttl <= TTL_TEST_SECONDS
     assert model.tags == ["tag1", "tag2"]
 
 
@@ -158,15 +162,15 @@ async def test_ttl_refresh_on_redis_list_extend__sanity(real_redis_client):
     await model.asave()
 
     # Let some time pass
-    await asyncio.sleep(1)
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act
     await model.tags.aextend(["tag2", "tag3"])
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert ttl > 3  # Should be close to 5 since TTL was refreshed
-    assert ttl <= 5
+    assert ttl > TTL_TEST_SECONDS - 2
+    assert ttl <= TTL_TEST_SECONDS
     assert set(model.tags) == {"tag1", "tag2", "tag3"}
 
 
@@ -178,15 +182,15 @@ async def test_ttl_refresh_on_redis_list_clear__sanity(real_redis_client):
     await model.asave()
 
     # Let some time pass
-    await asyncio.sleep(1)
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act
     await model.tags.aclear()
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert ttl > 3  # Should be close to 5 since TTL was refreshed
-    assert ttl <= 5
+    assert ttl > TTL_TEST_SECONDS - 2
+    assert ttl <= TTL_TEST_SECONDS
     assert model.tags == []
 
 
@@ -198,15 +202,15 @@ async def test_ttl_refresh_on_redis_dict_setitem__sanity(real_redis_client):
     await model.asave()
 
     # Let some time pass
-    await asyncio.sleep(1)
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act
     await model.settings.aset_item("key2", "value2")
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert ttl > 3  # Should be close to 5 since TTL was refreshed
-    assert ttl <= 5
+    assert ttl > TTL_TEST_SECONDS - 2
+    assert ttl <= TTL_TEST_SECONDS
     assert model.settings == {"key1": "value1", "key2": "value2"}
 
 
@@ -218,15 +222,15 @@ async def test_ttl_refresh_on_redis_dict_update__sanity(real_redis_client):
     await model.asave()
 
     # Let some time pass
-    await asyncio.sleep(1)
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act
     await model.settings.aupdate(key2="value2", key3="value3")
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert ttl > 3  # Should be close to 5 since TTL was refreshed
-    assert ttl <= 5
+    assert ttl > TTL_TEST_SECONDS - 2
+    assert ttl <= TTL_TEST_SECONDS
     assert model.settings == {"key1": "value1", "key2": "value2", "key3": "value3"}
 
 
@@ -238,15 +242,15 @@ async def test_ttl_refresh_on_redis_dict_clear__sanity(real_redis_client):
     await model.asave()
 
     # Let some time pass
-    await asyncio.sleep(1)
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act
     await model.settings.aclear()
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert ttl > 3  # Should be close to 5 since TTL was refreshed
-    assert ttl <= 5
+    assert ttl > TTL_TEST_SECONDS - 2
+    assert ttl <= TTL_TEST_SECONDS
     assert model.settings == {}
 
 
@@ -258,15 +262,15 @@ async def test_ttl_refresh_on_redis_type_aload__sanity(real_redis_client):
     await model.asave()
 
     # Let some time pass
-    await asyncio.sleep(1)
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act
     loaded_age = await model.age.aload()
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert ttl > 3  # Should be close to 5 since TTL was refreshed
-    assert ttl <= 5
+    assert ttl > TTL_TEST_SECONDS - 2
+    assert ttl <= TTL_TEST_SECONDS
     assert loaded_age == 50
 
 
@@ -292,18 +296,18 @@ async def test_ttl_refresh_maintains_original_ttl_value__sanity(real_redis_clien
     await model.asave()
 
     # Wait to let TTL decrease
-    await asyncio.sleep(2)
+    await asyncio.sleep(SLEEP_FOR_TTL_DECREASE)
     initial_ttl = await real_redis_client.ttl(model.key)
-    assert initial_ttl <= 3  # Should be around 3 seconds left
+    assert initial_ttl <= TTL_TEST_SECONDS - SLEEP_FOR_TTL_DECREASE
 
     # Act - refresh TTL
     await model.aload()
 
-    # Assert - TTL should be reset to original value (5)
+    # Assert - TTL should be reset to original value
     refreshed_ttl = await real_redis_client.ttl(model.key)
     assert refreshed_ttl > initial_ttl
-    assert refreshed_ttl <= 5
-    assert refreshed_ttl > 4  # Should be close to 5
+    assert refreshed_ttl <= TTL_TEST_SECONDS
+    assert refreshed_ttl > TTL_TEST_SECONDS - 1
 
 
 @pytest.mark.asyncio
@@ -315,14 +319,14 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_aget__sanity(
     await model.asave()
 
     # Let some time pass
-    await asyncio.sleep(1)
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act
     loaded_model = await ModelWithTTLNoRefresh.aget(model.key)
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert ttl <= 4  # Should NOT be refreshed, so should be around 4 or less
+    assert ttl <= TTL_TEST_SECONDS - 1  # Should NOT be refreshed
     assert ttl > 0  # But still has TTL
     assert loaded_model.name == "nancy"
 
@@ -336,14 +340,14 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_aload__sanity(
     await model.asave()
 
     # Let some time pass
-    await asyncio.sleep(1)
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act
     await model.aload()
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert ttl <= 4  # Should NOT be refreshed
+    assert ttl <= TTL_TEST_SECONDS - 1  # Should NOT be refreshed
     assert ttl > 0  # But still has TTL
 
 
@@ -356,7 +360,7 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_type_operation_
     await model.asave()
 
     # Let some time pass
-    await asyncio.sleep(1)
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act - perform multiple operations
     await model.age.aincrease(5)
@@ -364,7 +368,7 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_type_operation_
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert ttl <= 4  # Should NOT be refreshed
+    assert ttl <= TTL_TEST_SECONDS - 1  # Should NOT be refreshed
     assert ttl > 0  # But still has TTL
 
 
@@ -376,7 +380,7 @@ async def test_ttl_refresh_on_redis_type_asave__sanity(real_redis_client):
     await model.asave()
 
     # Let some time pass
-    await asyncio.sleep(1)
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act
     model.age = 85
@@ -384,8 +388,8 @@ async def test_ttl_refresh_on_redis_type_asave__sanity(real_redis_client):
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert ttl > 3  # Should be close to 5 since TTL was refreshed
-    assert ttl <= 5
+    assert ttl > TTL_TEST_SECONDS - 2
+    assert ttl <= TTL_TEST_SECONDS
     loaded_age = await model.age.aload()
     assert loaded_age == 85
 
@@ -398,7 +402,7 @@ async def test_ttl_refresh_on_model_asave__sanity(real_redis_client):
     await model.asave()
 
     # Let some time pass
-    await asyncio.sleep(1)
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act
     model.name = "rachel_updated"
@@ -406,8 +410,8 @@ async def test_ttl_refresh_on_model_asave__sanity(real_redis_client):
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert ttl > 3  # Should be close to 5 since TTL was refreshed
-    assert ttl <= 5
+    assert ttl > TTL_TEST_SECONDS - 2
+    assert ttl <= TTL_TEST_SECONDS
 
 
 @ttl_test_for(RedisList.ainsert)
@@ -418,15 +422,15 @@ async def test_ttl_refresh_on_redis_list_ainsert__sanity(real_redis_client):
     await model.asave()
 
     # Let some time pass
-    await asyncio.sleep(1)
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act
     await model.tags.ainsert(1, "tag2")
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert ttl > 3  # Should be close to 5 since TTL was refreshed
-    assert ttl <= 5
+    assert ttl > TTL_TEST_SECONDS - 2
+    assert ttl <= TTL_TEST_SECONDS
     assert model.tags == ["tag1", "tag2", "tag3"]
 
 
@@ -443,10 +447,10 @@ async def test_ttl_on_model_ainsert__sanity(real_redis_client):
     # Assert
     ttl1 = await real_redis_client.ttl(model1.key)
     ttl2 = await real_redis_client.ttl(model2.key)
-    assert ttl1 > 3  # Should be close to 5 since TTL was set
-    assert ttl1 <= 5
-    assert ttl2 > 3
-    assert ttl2 <= 5
+    assert ttl1 > TTL_TEST_SECONDS - 2
+    assert ttl1 <= TTL_TEST_SECONDS
+    assert ttl2 > TTL_TEST_SECONDS - 2
+    assert ttl2 <= TTL_TEST_SECONDS
 
 
 @ttl_test_for(RedisDict.adel_item)
@@ -457,15 +461,15 @@ async def test_ttl_refresh_on_redis_dict_adel_item__sanity(real_redis_client):
     await model.asave()
 
     # Let some time pass
-    await asyncio.sleep(1)
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act
     await model.settings.adel_item("key1")
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert ttl > 3  # Should be close to 5 since TTL was refreshed
-    assert ttl <= 5
+    assert ttl > TTL_TEST_SECONDS - 2
+    assert ttl <= TTL_TEST_SECONDS
     assert model.settings == {"key2": "value2"}
 
 
@@ -477,15 +481,15 @@ async def test_ttl_refresh_on_redis_dict_apop__sanity(real_redis_client):
     await model.asave()
 
     # Let some time pass
-    await asyncio.sleep(1)
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act
     popped_value = await model.settings.apop("key1")
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert ttl > 3  # Should be close to 5 since TTL was refreshed
-    assert ttl <= 5
+    assert ttl > TTL_TEST_SECONDS - 2
+    assert ttl <= TTL_TEST_SECONDS
     assert popped_value == "value1"
 
 
@@ -497,15 +501,15 @@ async def test_ttl_refresh_on_redis_dict_apopitem__sanity(real_redis_client):
     await model.asave()
 
     # Let some time pass
-    await asyncio.sleep(1)
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act
     popped_value = await model.settings.apopitem()
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert ttl > 3  # Should be close to 5 since TTL was refreshed
-    assert ttl <= 5
+    assert ttl > TTL_TEST_SECONDS - 2
+    assert ttl <= TTL_TEST_SECONDS
     assert popped_value == "value1"
 
 
@@ -517,14 +521,14 @@ async def test_ttl_refresh_on_redis_list_apop__sanity(real_redis_client):
     await model.asave()
 
     # Let some time pass
-    await asyncio.sleep(1)
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act
     popped_value = await model.tags.apop()
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert ttl > 3  # Should be close to 5 since TTL was refreshed
-    assert ttl <= 5
+    assert ttl > TTL_TEST_SECONDS - 2
+    assert ttl <= TTL_TEST_SECONDS
     assert popped_value == "tag3"
     assert model.tags == ["tag1", "tag2"]
