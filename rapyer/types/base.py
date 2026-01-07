@@ -78,7 +78,8 @@ class RedisType(ABC):
         )
         await self.client.json().set(self.key, self.json_path, model_dump)
         if self.Meta.ttl is not None:
-            await self.client.expire(self.key, self.Meta.ttl)
+            nx = not self.Meta.refresh_ttl
+            await self.client.expire(self.key, self.Meta.ttl, nx=nx)
         return self
 
     @deprecated(
