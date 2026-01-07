@@ -393,6 +393,12 @@ class AtomicRedisModel(BaseModel):
             # Fetch the actual documents
             models = await cls.Meta.redis.json().mget(keys=keys, path="$")
 
+        if cls.Meta.ttl is not None and cls.Meta.refresh_ttl:
+            async with cls.Meta.redis.pipeline() as pipe:
+                for key in keys:
+                    pipe.expire(key, cls.Meta.ttl)
+                await pipe.execute()
+
         instances = []
         for model, key in zip(models, keys):
             model = cls.model_validate(model[0], context={REDIS_DUMP_FLAG_NAME: True})
