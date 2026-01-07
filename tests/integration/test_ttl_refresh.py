@@ -350,3 +350,24 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_type_operation_
     ttl = await real_redis_client.ttl(model.key)
     assert ttl <= 4  # Should NOT be refreshed
     assert ttl > 0  # But still has TTL
+
+
+@pytest.mark.asyncio
+async def test_ttl_refresh_on_redis_type_asave__sanity(real_redis_client):
+    # Arrange
+    model = ModelWithTTL(name="quinn", age=80)
+    await model.asave()
+
+    # Let some time pass
+    await asyncio.sleep(1)
+
+    # Act
+    model.age = 85
+    await model.age.asave()
+
+    # Assert
+    ttl = await real_redis_client.ttl(model.key)
+    assert ttl > 3  # Should be close to 5 since TTL was refreshed
+    assert ttl <= 5
+    loaded_age = await model.age.aload()
+    assert loaded_age == 85
