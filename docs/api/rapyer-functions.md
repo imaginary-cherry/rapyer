@@ -165,6 +165,119 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+## alock_from_key()
+
+```python
+async def alock_from_key(
+    key: str, action: str = "default", save_at_end: bool = False
+) -> AbstractAsyncContextManager[AtomicRedisModel | None]
+```
+
+Creates a lock context manager for any Redis model by its key, without needing to know the specific model class.
+
+### Parameters
+
+- **key** (`str`): The Redis key of the model to lock
+- **action** (`str`, optional): The operation name for the lock. Default is "default". Different operation names allow concurrent execution on the same model instance
+- **save_at_end** (`bool`, optional): If True, automatically saves the model when the context exits. Default is False
+
+### Description
+
+The global `alock_from_key()` function provides a way to create locks on Redis models without knowing their specific class. This is particularly useful when:
+
+1. Working with keys from different or unknown model types
+2. Building generic utilities that operate on any model
+3. The model class is not imported in the current module
+4. You need graceful handling of non-existent keys
+
+Unlike the class-specific `Model.alock_from_key()` method, this global function:
+- Automatically discovers the correct model type from the key
+- Returns `None` if the key doesn't exist (instead of raising KeyNotFound)
+- Works with any AtomicRedisModel subclass
+
+### Example
+
+```python
+import asyncio
+import rapyer
+from rapyer import AtomicRedisModel, alock_from_key
+
+
+class User(AtomicRedisModel):
+    name: str
+    balance: int = 0
+
+
+class Product(AtomicRedisModel):
+    name: str
+    stock: int = 0
+
+
+async def generic_update(key: str, operation: str):
+    # Works with any model type
+    async with alock_from_key(key, operation, save_at_end=True) as model:
+        if model is None:
+            print(f"Key not found: {key}")
+            return
+        
+        # Check what type of model we're working with
+        if hasattr(model, 'balance'):
+            model.balance += 100
+            print(f"Updated balance for {model.name}")
+        elif hasattr(model, 'stock'):
+            model.stock -= 1
+            print(f"Reduced stock for {model.name}")
+        # Model is automatically saved when context exits due to save_at_end=True
+
+
+async def cross_model_transaction(user_key: str, product_key: str):
+    # Lock multiple models of different types
+    async with alock_from_key(user_key, "purchase") as user:
+        async with alock_from_key(product_key, "purchase") as product:
+            if not user or not product:
+                raise ValueError("User or product not found")
+            
+            # Both models are locked and can be modified atomically
+            if user.balance >= 50 and product.stock > 0:
+                user.balance -= 50
+                product.stock -= 1
+                print(f"{user.name} purchased {product.name}")
+            else:
+                print("Insufficient balance or out of stock")
+            # Changes are saved when contexts exit
+
+
+async def main():
+    # Create and save models
+    user = User(name="Alice", balance=100)
+    product = Product(name="Book", stock=10)
+    await user.asave()
+    await product.asave()
+    
+    # Use generic update function with different model types
+    await generic_update(user.key, "credit")
+    await generic_update(product.key, "restock")
+    
+    # Perform cross-model transaction
+    await cross_model_transaction(user.key, product.key)
+    
+    # Try with non-existent key
+    await generic_update("NonExistentModel:12345", "test")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Comparison with Class Method
+
+| Feature | `rapyer.alock_from_key()` (Global) | `Model.alock_from_key()` (Class Method) |
+|---------|-------------------------------------|------------------------------------------|
+| Model type knowledge | Not required | Required |
+| Non-existent keys | Returns None | Raises KeyNotFound |
+| Type hints | Generic AtomicRedisModel | Specific model type |
+| Use case | Generic utilities, unknown types | Type-safe operations |
+
 ## find_redis_models()
 
 ```python

@@ -264,6 +264,175 @@ tags = user.tags.sync_get_all()
 
 **Benefits**: Support for synchronous codebases, easier integration with existing sync applications, consistent API patterns between async and sync operations
 
+## Foreign Key Support
+
+**Goal**: Implement foreign key relationships between models with automatic relation management and cascading operations
+
+### Tasks
+
+#### Core Foreign Key Implementation
+- [ ] **Foreign Key Field Type**: Create a field type that stores references to other model instances by ID
+- [ ] **Relationship Metadata**: Store relationship type (one-to-one, one-to-many, many-to-many)
+- [ ] **Lazy Loading**: Support lazy loading of foreign key models to optimize performance
+- [ ] **Eager Loading**: Support eager loading with prefetch for performance optimization
+
+#### Model Extraction and Loading
+- [ ] **Basic FK Loading**: Load model with foreign key ID only
+- [ ] **Single-Level Loading**: Load model with immediate relations (depth=1)
+- [ ] **Multi-Level Loading**: Load model with nested relations (depth=N)
+- [ ] **Full Graph Loading**: Load entire relation graph (depth=-1)
+- [ ] **Selective Loading**: Load only specified relations (include parameter)
+- [ ] **Batch Extraction**: Bulk load multiple models with their relations
+- [ ] **Circular Reference Detection**: Prevent infinite loops in self-referential models
+- [ ] **Max Circular Iterations**: Configurable limit for circular reference traversal
+
+#### Duplication Operations
+- [ ] **Simple Duplicate**: Duplicate single model without relations
+- [ ] **Full Cascade Duplicate**: Duplicate model with all related models
+- [ ] **Selective Duplicate**: Duplicate model with specified relations only
+- [ ] **Duplicate with Remapping**: Use existing relations instead of duplicating
+- [ ] **Duplicate ID Generation**: Generate new unique IDs for duplicated models
+- [ ] **Duplicate Transaction Safety**: Ensure atomic duplication operations
+
+#### TTL Management
+- [ ] **Single Model TTL**: Extend TTL for individual model
+- [ ] **Full Cascade TTL**: Extend TTL for model and all relations
+- [ ] **Selective TTL Extension**: Extend TTL for specific relations only
+- [ ] **Variable TTL Values**: Different TTL values for different relation types
+- [ ] **TTL Inheritance**: Child models inherit parent TTL settings
+- [ ] **TTL Update Events**: Trigger events when TTL is extended
+
+#### Deletion Strategies
+- [ ] **Hard Delete**: Remove model and all related models
+- [ ] **Soft Delete (Nullify)**: Set foreign keys to None in related models
+- [ ] **Restrict Delete**: Prevent deletion if relations exist
+- [ ] **Mixed Strategy Delete**: Different strategies for different relation types
+- [ ] **Orphan Cleanup**: Remove orphaned models after parent deletion
+- [ ] **Delete Transaction Safety**: Ensure atomic deletion operations
+
+### Example Usage
+```python
+class Author(AtomicRedisModel):
+    name: str
+    email: str
+    biography: str
+
+class Book(AtomicRedisModel):
+    title: str
+    isbn: str
+    author: ForeignKey[Author]  # Stores author ID as foreign key
+    publisher: ForeignKey['Publisher', lazy=True]  # Lazy loading
+    reviews: List[ForeignKey['Review']]
+
+class Publisher(AtomicRedisModel):
+    name: str
+    books: List[ForeignKey[Book]]  # One-to-many relationship
+
+class Review(AtomicRedisModel):
+    rating: int
+    comment: str
+    book: ForeignKey[Book]
+    reviewer: ForeignKey['User']
+
+# 1. EXTRACT - Recursive model loading with depth control
+book = await Book.get("book:123")  # Only loads book data
+book = await Book.get("book:123", depth=1)  # Loads book + direct relations (author, publisher)
+book = await Book.get("book:123", depth=2)  # Loads book + relations + their relations
+book = await Book.get("book:123", depth=-1)  # Loads entire graph (be careful with circular refs)
+
+# Extract specific relations
+book = await Book.get("book:123", include=['author', 'reviews'])  # Only load specified relations
+books = await Book.extract_with_relations(["book:1", "book:2"], depth=2)  # Batch extraction
+
+# 2. DUPLICATE - Copy model with all its relations
+# Simple duplicate
+new_book = await book.duplicate()  # Duplicates only the book
+
+# Cascade duplicate with all relations
+new_book = await book.duplicate(cascade=True)  # Creates new instances of book, author, publisher, reviews
+
+# Selective duplicate
+new_book = await book.duplicate(cascade=['reviews'])  # Duplicate book and its reviews only
+
+# Duplicate with relation remapping
+new_book = await book.duplicate(
+    cascade=True,
+    remap={'author': existing_author_id}  # Use existing author instead of duplicating
+)
+
+# 3. EXTENDED TTL - Propagate TTL to related models
+# Extend TTL for single model
+await book.extend_ttl(3600)  # Only extends book's TTL
+
+# Cascade TTL extension to all relations
+await book.extend_ttl(3600, cascade=True)  # Extends TTL for book, author, publisher, reviews
+
+# Selective TTL extension
+await book.extend_ttl(3600, cascade=['author', 'publisher'])  # Only extend specific relations
+
+# TTL with different values for relations
+await book.extend_ttl(3600, cascade_ttl={
+    'author': 7200,  # Author gets 2 hours
+    'reviews': 1800  # Reviews get 30 minutes
+})
+
+# 4. DELETE - Cascading deletion strategies
+# Hard delete - removes everything
+await author.delete(cascade='delete')  # Deletes author and all their books
+
+# Nullify - sets foreign keys to None
+await author.delete(cascade='nullify')  # Books remain but author field becomes None
+
+# Restrict - prevents deletion if relations exist
+await author.delete(cascade='restrict')  # Raises error if author has books
+
+# Mixed strategies
+await author.delete(cascade={
+    'books': 'nullify',  # Books remain without author
+    'profile': 'delete'  # Profile is deleted
+})
+
+# 5. UPDATE - Cascading updates
+# Update with validation
+await book.update_cascade(
+    {'status': 'out_of_print'},
+    cascade_updates={
+        'reviews': {'active': False},  # Deactivate all reviews
+        'publisher': {'last_update': datetime.now()}
+    }
+)
+
+# 6. VALIDATION - Ensure referential integrity
+# Validate all foreign keys exist
+await book.validate_relations()  # Raises if any FK points to non-existent model
+
+# Auto-cleanup broken references
+await book.cleanup_relations()  # Removes/nullifies broken FK references
+
+# 7. BULK OPERATIONS - Efficient batch processing
+# Bulk load with relations
+books = await Book.bulk_get_with_relations(
+    ["book:1", "book:2", "book:3"],
+    depth=2
+)
+
+# Bulk cascade delete
+await Author.bulk_delete(
+    ["author:1", "author:2"],
+    cascade='nullify'
+)
+
+# 8. CIRCULAR REFERENCE HANDLING
+class User(AtomicRedisModel):
+    name: str
+    friends: List[ForeignKey['User']]  # Self-referential
+    
+# Automatically detects and handles circular references
+user = await User.get("user:1", depth=-1, max_circular=2)  # Stops after 2 circular iterations
+```
+
+**Benefits**: Simplified relationship management, automatic loading of related data, consistent TTL across related models, efficient cascading operations
+
 ## Multi-Environment Support
 
 **Goal**: Enable separate database environments with easy switching and context management

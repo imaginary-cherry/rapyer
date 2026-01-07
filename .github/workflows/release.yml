@@ -9,7 +9,6 @@ jobs:
   create-github-release:
     environment:
       name: create-release
-    if: github.event.base_ref == 'refs/heads/main'
     runs-on: ubuntu-22.04
     permissions:
       contents: write  # Required for creating releases
