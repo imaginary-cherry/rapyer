@@ -18,6 +18,7 @@ from pydantic import (
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
+from typing_extensions import deprecated
 
 from rapyer.config import RedisConfig
 from rapyer.context import _context_var, _context_xx_pipe
@@ -29,7 +30,6 @@ from rapyer.links import REDIS_SUPPORTED_LINK
 from rapyer.types.base import RedisType, REDIS_DUMP_FLAG_NAME
 from rapyer.types.convert import RedisConverter
 from rapyer.typing_support import Self, Unpack
-from rapyer.typing_support import deprecated
 from rapyer.utils.annotation import (
     replace_to_redis_types_in_annotation,
     has_annotation,
