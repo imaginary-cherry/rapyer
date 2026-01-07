@@ -3,6 +3,7 @@
 ## [1.1.4]
 ### ✨ Added
 - **Global alock_from_key Function**: Added `rapyer.alock_from_key()` function to create locks without needing a model instance. This allows locking by key directly for operations that don't require the model class.
+- **Model TTL Extension on Redis Actions**: Models now automatically extend their TTL when performing Redis actions, keeping frequently accessed models alive longer.
 
 ### 🔧 Improved
 - **Redis Locking Mechanism**: Now using formal Redis lock for more persistent and reliable locking mechanism.
