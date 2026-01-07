@@ -125,3 +125,4 @@ future-work
 git-flow-plus.config
 /scripts/
 .jbeval
+.claude/
