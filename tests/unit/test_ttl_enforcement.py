@@ -5,7 +5,7 @@ import pytest
 
 import tests.integration.test_ttl_refresh  # noqa: F401 - triggers decorator registration
 from rapyer.base import AtomicRedisModel
-from rapyer.types import RedisList, RedisInt
+from rapyer.types import RedisInt
 from rapyer.types.base import RedisType
 from tests.conftest import TTL_TESTED_METHODS
 
