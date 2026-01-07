@@ -32,8 +32,10 @@ jobs:
 
       - name: Install tools
         run: |
-          python -m pip install --upgrade pip
-          pip install pip-audit poetry
+          python -m pip install --upgrade pip pipx
+          pip install pip-audit
+          pipx install poetry
+          pipx inject poetry poetry-plugin-export
 
       - name: Export and audit dependencies
         run: |
