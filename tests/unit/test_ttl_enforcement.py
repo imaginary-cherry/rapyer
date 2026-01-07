@@ -32,7 +32,6 @@ EXCLUDED_METHODS = [
     AtomicRedisModel.duplicate_many,
     AtomicRedisModel.aduplicate_many,
     # Delegating methods (call other methods that handle TTL)
-    AtomicRedisModel.afind,
     AtomicRedisModel.afind_keys,
     AtomicRedisModel.acreate_index,
     AtomicRedisModel.adelete_index,
