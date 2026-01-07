@@ -532,3 +532,26 @@ async def test_ttl_refresh_on_redis_list_apop__sanity(real_redis_client):
     assert ttl <= TTL_TEST_SECONDS
     assert popped_value == "tag3"
     assert model.tags == ["tag1", "tag2"]
+
+
+@ttl_test_for(AtomicRedisModel.afind)
+@pytest.mark.asyncio
+async def test_ttl_refresh_on_afind__sanity(real_redis_client):
+    # Arrange
+    model1 = ModelWithTTL(name="yara", age=25)
+    model2 = ModelWithTTL(name="zach", age=30)
+    await model1.asave()
+    await model2.asave()
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
+
+    # Act
+    found_models = await ModelWithTTL.afind()
+
+    # Assert
+    ttl1 = await real_redis_client.ttl(model1.key)
+    ttl2 = await real_redis_client.ttl(model2.key)
+    assert ttl1 > TTL_TEST_SECONDS - 2
+    assert ttl1 <= TTL_TEST_SECONDS
+    assert ttl2 > TTL_TEST_SECONDS - 2
+    assert ttl2 <= TTL_TEST_SECONDS
+    assert len(found_models) == 2
