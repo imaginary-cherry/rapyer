@@ -51,6 +51,7 @@ nav:
     - Redis Types: documentation/redis-types.md
     - Atomic Actions: documentation/atomic-actions.md
     - Key adjustment: documentation/setting-key-field.md
+    - Indexing Fields: documentation/indexing-fields.md
   - API Reference:
     - AtomicRedisModel: api/atomic-redis-model.md
     - Redis Types: api/redis-types.md
