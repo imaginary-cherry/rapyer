@@ -12,7 +12,7 @@ from rapyer import AtomicRedisModel
 from rapyer.fields import Key
 
 class User(AtomicRedisModel):
-    user_id: Key(str)  # This field will be used as the primary key
+    user_id: Key[str]  # This field will be used as the primary key
     name: str
     email: str
     age: int = 25
@@ -41,7 +41,7 @@ class Event(AtomicRedisModel):
 from rapyer.fields import Key
 
 class User(AtomicRedisModel):
-    email: Key(str)  # Email serves as the unique identifier
+    email: Key[str]  # Email serves as the unique identifier
     name: str
     age: int
     preferences: dict = {}
@@ -58,7 +58,7 @@ from datetime import datetime
 from rapyer.fields import Key
 
 class LogEntry(AtomicRedisModel):
-    timestamp: Key(datetime)
+    timestamp: Key[datetime]
     level: str
     message: str
     source: str
@@ -79,7 +79,7 @@ await log.asave()  # Stored with timestamp as the Redis key
 from rapyer.fields import Key
 
 class Product(AtomicRedisModel):
-    sku: Key(str)  # Product SKU as primary key
+    sku: Key[str]  # Product SKU as primary key
     name: str
     price: float
     category: str
@@ -103,12 +103,12 @@ Ensure your custom key field values are guaranteed to be unique across all insta
 ```python
 # ✅ Good: Emails are naturally unique
 class User(AtomicRedisModel):
-    email: Key(str)  # Safe choice
+    email: Key[str]  # Safe choice
     name: str
 
 # ⚠️ Risky: Names might not be unique
 class User(AtomicRedisModel):
-    name: Key(str)    # Could cause conflicts!
+    name: Key[str]    # Could cause conflicts!
     email: str
 ```
 
@@ -147,7 +147,7 @@ class User(AtomicRedisModel):
 
 # After: Adding custom key (existing records keep auto-generated keys)
 class User(AtomicRedisModel):
-    email: Key(str)  # New records will use email as key
+    email: Key[str]  # New records will use email as key
     name: str
 ```
 
