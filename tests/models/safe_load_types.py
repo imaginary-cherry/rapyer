@@ -29,3 +29,21 @@ class ModelWithSafeLoadAllConfig(AtomicRedisModel):
     type_field_1: Optional[type] = Field(default=None)
     type_field_2: Optional[Type[Any]] = Field(default=None)
     normal_field: str = Field(default="default")
+
+
+class ModelWithSafeLoadListOfAny(AtomicRedisModel):
+    Meta = RedisConfig(safe_load_all=True)
+    items: list[Any] = Field(default_factory=list)
+
+
+class ModelWithSafeLoadDictOfAny(AtomicRedisModel):
+    Meta = RedisConfig(safe_load_all=True)
+    data: dict[str, Any] = Field(default_factory=dict)
+
+
+class ModelWithUnsafeListOfAny(AtomicRedisModel):
+    items: list[Any] = Field(default_factory=list)
+
+
+class ModelWithUnsafeDictOfAny(AtomicRedisModel):
+    data: dict[str, Any] = Field(default_factory=dict)

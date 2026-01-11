@@ -5,6 +5,10 @@ from tests.models.safe_load_types import (
     ModelWithMultipleSafeLoadFields,
     ModelWithMixedFields,
     ModelWithSafeLoadAllConfig,
+    ModelWithSafeLoadListOfAny,
+    ModelWithSafeLoadDictOfAny,
+    ModelWithUnsafeListOfAny,
+    ModelWithUnsafeDictOfAny,
 )
 
 
@@ -152,3 +156,71 @@ async def test_safe_load_all_config_multiple_corrupted_tracks_all_failures():
     assert loaded.normal_field == "test"
     assert "type_field_1" in loaded.failed_fields
     assert "type_field_2" in loaded.failed_fields
+
+
+@pytest.mark.asyncio
+async def test_safe_load_list_item_corrupted_returns_none_for_item():
+    # Arrange
+    model = ModelWithSafeLoadListOfAny(items=["string", 42, True])
+    await model.asave()
+
+    # Corrupt the first list item in Redis
+    redis = model.Meta.redis
+    await redis.json().set(model.key, "$.items[0]", "corrupted_base64_data")
+
+    # Act
+    loaded = await ModelWithSafeLoadListOfAny.aget(model.key)
+
+    # Assert
+    assert loaded.items[0] is None
+    assert loaded.items[1] == 42
+    assert loaded.items[2] is True
+
+
+@pytest.mark.asyncio
+async def test_safe_load_dict_value_corrupted_returns_none_for_key():
+    # Arrange
+    model = ModelWithSafeLoadDictOfAny(data={"key1": "value1", "key2": 42, "key3": True})
+    await model.asave()
+
+    # Corrupt one dict value in Redis
+    redis = model.Meta.redis
+    await redis.json().set(model.key, "$.data.key1", "corrupted_base64_data")
+
+    # Act
+    loaded = await ModelWithSafeLoadDictOfAny.aget(model.key)
+
+    # Assert
+    assert loaded.data["key1"] is None
+    assert loaded.data["key2"] == 42
+    assert loaded.data["key3"] is True
+
+
+@pytest.mark.asyncio
+async def test_unsafe_list_item_corrupted_raises_error():
+    # Arrange
+    model = ModelWithUnsafeListOfAny(items=["string", 42, True])
+    await model.asave()
+
+    # Corrupt the first list item in Redis
+    redis = model.Meta.redis
+    await redis.json().set(model.key, "$.items[0]", "corrupted_base64_data")
+
+    # Act & Assert - aload() doesn't set FAILED_FIELDS_KEY context, so raises
+    with pytest.raises(Exception):
+        await model.items.aload()
+
+
+@pytest.mark.asyncio
+async def test_unsafe_dict_value_corrupted_raises_error():
+    # Arrange
+    model = ModelWithUnsafeDictOfAny(data={"key1": "value1", "key2": 42})
+    await model.asave()
+
+    # Corrupt one dict value in Redis
+    redis = model.Meta.redis
+    await redis.json().set(model.key, "$.data.key1", "corrupted_base64_data")
+
+    # Act & Assert - aload() doesn't set FAILED_FIELDS_KEY context, so raises
+    with pytest.raises(Exception):
+        await model.data.aload()
