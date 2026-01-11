@@ -15,6 +15,7 @@ from rapyer.typing_support import Self
 from rapyer.utils.redis import refresh_ttl_if_needed
 
 REDIS_DUMP_FLAG_NAME = "__rapyer_dumped__"
+FAILED_FIELDS_KEY = "__rapyer_failed_fields__"
 
 
 class RedisType(ABC):
