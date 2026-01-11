@@ -24,4 +24,4 @@ SafeLoad = _SafeLoadType
 
 
 if TYPE_CHECKING:
-    SafeLoad: TypeAlias = Annotated[T, SafeLoadAnnotation()]
+    SafeLoad: TypeAlias = Annotated[T, SafeLoadAnnotation()]  # pragma: no cover
