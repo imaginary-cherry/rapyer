@@ -2,7 +2,6 @@ from datetime import datetime
 
 import pytest
 from pydantic import TypeAdapter
-
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME
 from tests.models.unit_types import DatetimeTimestampModel
 

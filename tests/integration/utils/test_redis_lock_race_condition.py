@@ -4,9 +4,8 @@ from datetime import datetime
 from typing import List, Optional
 
 import pytest
-from redis.asyncio import Redis
-
 from rapyer.utils.redis import acquire_lock
+from redis.asyncio import Redis
 
 
 @dataclass

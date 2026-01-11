@@ -17,10 +17,6 @@ from pydantic import (
     field_validator,
 )
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
-from redis.commands.search.index_definition import IndexDefinition, IndexType
-from redis.commands.search.query import Query
-from typing_extensions import deprecated
-
 from rapyer.config import RedisConfig
 from rapyer.context import _context_var, _context_xx_pipe
 from rapyer.errors.base import KeyNotFound, UnsupportedIndexedFieldError
@@ -45,6 +41,9 @@ from rapyer.utils.redis import (
     update_keys_in_pipeline,
     refresh_ttl_if_needed,
 )
+from redis.commands.search.index_definition import IndexDefinition, IndexType
+from redis.commands.search.query import Query
+from typing_extensions import deprecated
 
 logger = logging.getLogger("rapyer")
 

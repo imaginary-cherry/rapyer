@@ -1,7 +1,6 @@
 from typing import Annotated, get_args, get_origin
 
 import pytest
-
 from rapyer.fields.safe_load import SafeLoad, SafeLoadAnnotation
 
 

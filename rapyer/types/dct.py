@@ -2,8 +2,12 @@ import logging
 from typing import TypeVar, Generic, get_args, Any, TypeAlias, TYPE_CHECKING
 
 from pydantic_core import core_schema
-
-from rapyer.types.base import GenericRedisType, RedisType, REDIS_DUMP_FLAG_NAME, FAILED_FIELDS_KEY
+from rapyer.types.base import (
+    GenericRedisType,
+    RedisType,
+    REDIS_DUMP_FLAG_NAME,
+    FAILED_FIELDS_KEY,
+)
 from rapyer.utils.redis import refresh_ttl_if_needed
 from rapyer.utils.redis import update_keys_in_pipeline
 
@@ -253,7 +257,9 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
                 result[key] = cls.deserialize_unknown(item)
             except Exception as e:
                 if failed_fields is not None:
-                    logger.warning(f"SafeLoad: Failed to deserialize dict key '{key}': {e}")
+                    logger.warning(
+                        f"SafeLoad: Failed to deserialize dict key '{key}': {e}"
+                    )
                     result[key] = None
                 else:
                     raise

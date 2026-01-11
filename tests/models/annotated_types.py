@@ -1,7 +1,6 @@
 from typing import Annotated
 
 from pydantic import Field, field_validator, model_validator, BaseModel
-
 from rapyer.base import AtomicRedisModel
 
 

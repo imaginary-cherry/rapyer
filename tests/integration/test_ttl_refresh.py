@@ -1,17 +1,16 @@
 import asyncio
 
 import pytest
-
 from rapyer import AtomicRedisModel
 from rapyer.types import RedisDict, RedisFloat, RedisInt, RedisList
 from rapyer.types.base import RedisType
+from tests.conftest import ttl_no_refresh_test_for, ttl_test_for
 from tests.models.simple_types import (
     TTL_TEST_SECONDS,
     TTLRefreshTestModel as ModelWithTTL,
     UserModelWithoutTTL as ModelWithoutTTL,
     TTLRefreshDisabledModel as ModelWithTTLNoRefresh,
 )
-from tests.conftest import ttl_no_refresh_test_for, ttl_test_for
 
 SLEEP_BEFORE_REFRESH = 0.5
 SLEEP_FOR_TTL_DECREASE = 2

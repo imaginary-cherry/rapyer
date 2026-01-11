@@ -4,10 +4,14 @@ from typing import TypeVar, TYPE_CHECKING
 
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, SerializationInfo
-from typing_extensions import TypeAlias
-
-from rapyer.types.base import GenericRedisType, RedisType, REDIS_DUMP_FLAG_NAME, FAILED_FIELDS_KEY
+from rapyer.types.base import (
+    GenericRedisType,
+    RedisType,
+    REDIS_DUMP_FLAG_NAME,
+    FAILED_FIELDS_KEY,
+)
 from rapyer.utils.redis import refresh_ttl_if_needed
+from typing_extensions import TypeAlias
 
 logger = logging.getLogger("rapyer")
 
@@ -175,7 +179,9 @@ class RedisList(list, GenericRedisType[T]):
                 result.append(cls.deserialize_unknown(item))
             except Exception as e:
                 if failed_fields is not None:
-                    logger.warning(f"SafeLoad: Failed to deserialize list item at index {idx}: {e}")
+                    logger.warning(
+                        f"SafeLoad: Failed to deserialize list item at index {idx}: {e}"
+                    )
                     result.append(None)
                 else:
                     raise

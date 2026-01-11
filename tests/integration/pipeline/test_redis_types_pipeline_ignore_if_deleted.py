@@ -1,7 +1,6 @@
 from datetime import datetime
 
 import pytest
-
 from tests.models.functionality_types import AllTypesModel, MyTestEnum
 
 pytest.skip("Skipping this test file temporarily", allow_module_level=True)

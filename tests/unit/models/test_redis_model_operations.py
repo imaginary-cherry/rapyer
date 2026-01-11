@@ -1,7 +1,6 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from rapyer import AtomicRedisModel
 from rapyer.types.base import RedisType
 from rapyer.types.dct import RedisDict
