@@ -180,7 +180,9 @@ async def test_safe_load_list_item_corrupted_returns_none_for_item():
 @pytest.mark.asyncio
 async def test_safe_load_dict_value_corrupted_returns_none_for_key():
     # Arrange
-    model = ModelWithSafeLoadDictOfAny(data={"key1": "value1", "key2": 42, "key3": True})
+    model = ModelWithSafeLoadDictOfAny(
+        data={"key1": "value1", "key2": 42, "key3": True}
+    )
     await model.asave()
 
     # Corrupt one dict value in Redis
