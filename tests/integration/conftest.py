@@ -69,6 +69,7 @@ from tests.models.safe_load_types import (
     ModelWithSafeLoadField,
     ModelWithMultipleSafeLoadFields,
     ModelWithMixedFields,
+    ModelWithSafeLoadAllConfig,
 )
 
 # Simple types
@@ -164,6 +165,7 @@ async def real_redis_client(redis_client):
         ModelWithSafeLoadField,
         ModelWithMultipleSafeLoadFields,
         ModelWithMixedFields,
+        ModelWithSafeLoadAllConfig,
         # Inheritance types
         BaseUserModel,
         AdminUserModel,
