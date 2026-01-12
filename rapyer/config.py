@@ -22,7 +22,7 @@ class RedisConfig:
     redis_type: dict[type, type] = dataclasses.field(default_factory=create_all_types)
     ttl: int | None = None
     init_with_rapyer: bool = True
-    refresh_ttl: bool = True  # Enable TTL refresh on read/write operations by default
-    safe_load_all: bool = (
-        False  # If True, all non-Redis-supported fields are treated as SafeLoad
-    )
+    # Enable TTL refresh on read/write operations by default
+    refresh_ttl: bool = True
+    # If True, all non-Redis-supported fields are treated as SafeLoad
+    safe_load_all: bool = False
