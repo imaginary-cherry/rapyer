@@ -318,6 +318,76 @@ async def test_aload_with_multiple_corrupted_safe_fields_succeeds():
 
 
 @pytest.mark.asyncio
+async def test_aload_with_corrupted_safe_list_item_succeeds():
+    # Arrange
+    model = ModelWithSafeLoadListOfAny(items=["string", 42, True])
+    await model.asave()
+
+    # Corrupt the first list item in Redis
+    redis = model.Meta.redis
+    await redis.json().set(model.key, "$.items[0]", "corrupted_base64_data")
+
+    # Act
+    loaded = await model.aload()
+
+    # Assert
+    assert loaded.items[0] is None
+    assert loaded.items[1] == 42
+    assert loaded.items[2] is True
+
+
+@pytest.mark.asyncio
+async def test_aload_with_corrupted_unsafe_list_item_raises_error():
+    # Arrange
+    model = ModelWithUnsafeListOfAny(items=["string", 42, True])
+    await model.asave()
+
+    # Corrupt the first list item in Redis
+    redis = model.Meta.redis
+    await redis.json().set(model.key, "$.items[0]", "corrupted_base64_data")
+
+    # Act & Assert
+    with pytest.raises(CantSerializeRedisValueError):
+        await model.aload()
+
+
+@pytest.mark.asyncio
+async def test_aload_with_corrupted_safe_dict_value_succeeds():
+    # Arrange
+    model = ModelWithSafeLoadDictOfAny(
+        data={"key1": "value1", "key2": 42, "key3": True}
+    )
+    await model.asave()
+
+    # Corrupt one dict value in Redis
+    redis = model.Meta.redis
+    await redis.json().set(model.key, "$.data.key1", "corrupted_base64_data")
+
+    # Act
+    loaded = await model.aload()
+
+    # Assert
+    assert loaded.data["key1"] is None
+    assert loaded.data["key2"] == 42
+    assert loaded.data["key3"] is True
+
+
+@pytest.mark.asyncio
+async def test_aload_with_corrupted_unsafe_dict_value_raises_error():
+    # Arrange
+    model = ModelWithUnsafeDictOfAny(data={"key1": "value1", "key2": 42})
+    await model.asave()
+
+    # Corrupt one dict value in Redis
+    redis = model.Meta.redis
+    await redis.json().set(model.key, "$.data.key1", "corrupted_base64_data")
+
+    # Act & Assert
+    with pytest.raises(CantSerializeRedisValueError):
+        await model.aload()
+
+
+@pytest.mark.asyncio
 async def test_afind_with_corrupted_safe_field_succeeds():
     # Arrange
     model1 = ModelWithMultipleSafeLoadFields(
