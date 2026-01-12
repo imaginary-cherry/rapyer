@@ -1,9 +1,10 @@
 from typing import TypeAlias, TYPE_CHECKING
 
-from rapyer.types.base import RedisType
-from rapyer.utils.redis import refresh_ttl_if_needed
 from redis.commands.search.field import NumericField
 from typing_extensions import deprecated
+
+from rapyer.types.base import RedisType
+from rapyer.utils.redis import refresh_ttl_if_needed
 
 
 class RedisInt(int, RedisType):

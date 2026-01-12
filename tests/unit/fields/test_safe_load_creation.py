@@ -1,8 +1,12 @@
 from typing import Annotated, get_args, get_origin
 
 import pytest
+
 from rapyer.fields.safe_load import SafeLoad, SafeLoadAnnotation
-from tests.models.safe_load_types import ModelWithMixedListFields, ModelWithMixedDictFields
+from tests.models.safe_load_types import (
+    ModelWithMixedListFields,
+    ModelWithMixedDictFields,
+)
 
 
 def test_safe_load_without_args_returns_safe_load_annotation_sanity():

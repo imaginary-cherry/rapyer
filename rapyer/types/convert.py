@@ -1,13 +1,19 @@
 from typing import get_origin
 
 from pydantic import BaseModel, PrivateAttr, TypeAdapter
+
 from rapyer.types.base import RedisType
 from rapyer.utils.annotation import TypeConverter, DYNAMIC_CLASS_DOC
 from rapyer.utils.pythonic import safe_issubclass
 
 
 class RedisConverter(TypeConverter):
-    def __init__(self, supported_types: dict[type, type], field_name: str, safe_load: bool = False):
+    def __init__(
+        self,
+        supported_types: dict[type, type],
+        field_name: str,
+        safe_load: bool = False,
+    ):
         self.supported_types = supported_types
         self.field_name = field_name
         self.safe_load = safe_load
