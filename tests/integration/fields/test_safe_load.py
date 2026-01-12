@@ -210,7 +210,7 @@ async def test_unsafe_list_item_corrupted_raises_error():
 
     # Act & Assert - aload() doesn't set FAILED_FIELDS_KEY context, so raises
     with pytest.raises(Exception):
-        await model.items.aload()
+        await ModelWithUnsafeListOfAny.aget(model.key)
 
 
 @pytest.mark.asyncio
@@ -225,4 +225,4 @@ async def test_unsafe_dict_value_corrupted_raises_error():
 
     # Act & Assert - aload() doesn't set FAILED_FIELDS_KEY context, so raises
     with pytest.raises(Exception):
-        await model.data.aload()
+        await ModelWithUnsafeDictOfAny.aget(model.key)
