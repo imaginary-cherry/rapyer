@@ -19,7 +19,11 @@ from pydantic import (
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
 from rapyer.config import RedisConfig
 from rapyer.context import _context_var, _context_xx_pipe
-from rapyer.errors.base import KeyNotFound, UnsupportedIndexedFieldError
+from rapyer.errors.base import (
+    KeyNotFound,
+    UnsupportedIndexedFieldError,
+    CantSerializeRedisValueError,
+)
 from rapyer.fields.expression import ExpressionField, AtomicField, Expression
 from rapyer.fields.index import IndexAnnotation
 from rapyer.fields.key import KeyAnnotation
@@ -76,7 +80,7 @@ def make_pickle_field_serializer(field: str, safe_load: bool = False):
                         f"SafeLoad: Failed to deserialize field '{field}': {e}"
                     )
                     return None
-                raise
+                raise CantSerializeRedisValueError() from e
         return v
 
     pickle_field_validator.__name__ = f"__deserialize_{field}"
@@ -225,8 +229,9 @@ class AtomicRedisModel(BaseModel):
                 RedisConverter(
                     cls.Meta.redis_type,
                     f".{field_name}",
-                    safe_load=field_name in cls._safe_load_fields or cls.Meta.safe_load_all
-                )
+                    safe_load=field_name in cls._safe_load_fields
+                    or cls.Meta.safe_load_all,
+                ),
             )
             for field_name, annotation in original_annotations.items()
             if is_redis_field(field_name, annotation)

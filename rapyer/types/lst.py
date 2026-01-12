@@ -4,6 +4,8 @@ from typing import TypeVar, TYPE_CHECKING
 
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, SerializationInfo
+
+from rapyer.errors.base import CantSerializeRedisValueError
 from rapyer.types.base import (
     GenericRedisType,
     RedisType,
@@ -182,7 +184,7 @@ class RedisList(list, GenericRedisType[T]):
                     )
                     result.append(None)
                 else:
-                    raise
+                    raise CantSerializeRedisValueError() from e
         return result
 
     @classmethod

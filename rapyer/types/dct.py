@@ -2,6 +2,8 @@ import logging
 from typing import TypeVar, Generic, get_args, Any, TypeAlias, TYPE_CHECKING
 
 from pydantic_core import core_schema
+
+from rapyer.errors.base import CantSerializeRedisValueError
 from rapyer.types.base import (
     GenericRedisType,
     RedisType,
@@ -260,7 +262,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
                     )
                     result[key] = None
                 else:
-                    raise
+                    raise CantSerializeRedisValueError() from e
         return result
 
     @classmethod

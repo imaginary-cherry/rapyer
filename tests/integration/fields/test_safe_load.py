@@ -1,5 +1,6 @@
 import pytest
 
+from rapyer.errors.base import CantSerializeRedisValueError
 from tests.models.safe_load_types import (
     ModelWithSafeLoadField,
     ModelWithMultipleSafeLoadFields,
@@ -86,7 +87,7 @@ async def test_unsafe_field_corrupted_raises_error():
     await redis.json().set(model.key, "$.unsafe_field", "corrupted")
 
     # Act & Assert
-    with pytest.raises(Exception):
+    with pytest.raises(CantSerializeRedisValueError):
         await ModelWithMixedFields.aget(model.key)
 
 
@@ -213,8 +214,8 @@ async def test_unsafe_list_item_corrupted_raises_error():
     redis = model.Meta.redis
     await redis.json().set(model.key, "$.items[0]", "corrupted_base64_data")
 
-    # Act & Assert - aload() doesn't set FAILED_FIELDS_KEY context, so raises
-    with pytest.raises(Exception):
+    # Act & Assert
+    with pytest.raises(CantSerializeRedisValueError):
         await ModelWithUnsafeListOfAny.aget(model.key)
 
 
@@ -228,8 +229,8 @@ async def test_unsafe_dict_value_corrupted_raises_error():
     redis = model.Meta.redis
     await redis.json().set(model.key, "$.data.key1", "corrupted_base64_data")
 
-    # Act & Assert - aload() doesn't set FAILED_FIELDS_KEY context, so raises
-    with pytest.raises(Exception):
+    # Act & Assert
+    with pytest.raises(CantSerializeRedisValueError):
         await ModelWithUnsafeDictOfAny.aget(model.key)
 
 
