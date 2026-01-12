@@ -77,22 +77,3 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-  # Publish package
-  check-tests:
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Wait for test matrix to complete
-        uses: lewagon/wait-on-check-action@v1.3.4
-        with:
-          ref: ${{ github.ref }}
-          check-name: 'test-results'
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          wait-interval: 10
-
-      - name: Wait for lint to complete
-        uses: lewagon/wait-on-check-action@v1.3.4
-        with:
-          ref: ${{ github.ref }}
-          check-name: 'lint'
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          wait-interval: 10
