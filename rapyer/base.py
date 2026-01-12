@@ -237,9 +237,8 @@ class AtomicRedisModel(BaseModel):
             if not is_redis_field(attr_name, attr_type):
                 continue
             if original_annotations[attr_name] == attr_type:
-                is_safe_load = (
-                    attr_name in cls._safe_load_fields or cls.Meta.safe_load_all
-                )
+                is_field_marked_safe = attr_name in cls._safe_load_fields
+                is_safe_load = is_field_marked_safe or cls.Meta.safe_load_all
                 serializer, validator = make_pickle_field_serializer(
                     attr_name, safe_load=is_safe_load
                 )
