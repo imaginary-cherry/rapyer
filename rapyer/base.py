@@ -392,9 +392,11 @@ class AtomicRedisModel(BaseModel):
         if not model_dump:
             raise KeyNotFound(f"{self.key} is missing in redis")
         model_dump = model_dump[0]
-        instance = self.__class__(**model_dump)
+        context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
+        instance = self.__class__.model_validate(model_dump, context=context)
         instance._pk = self._pk
         instance._base_model_link = self._base_model_link
+        instance._failed_fields = context.get(FAILED_FIELDS_KEY, set())
         await refresh_ttl_if_needed(
             self.Meta.redis, self.key, self.Meta.ttl, self.Meta.refresh_ttl
         )

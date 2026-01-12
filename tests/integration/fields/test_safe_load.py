@@ -257,3 +257,112 @@ async def test_nested_safe_list_item_corrupted_returns_none_for_item():
     assert loaded.container.inner_redis.safe_data[0] is None
     assert loaded.container.inner_redis.safe_data[1] == 42
     assert loaded.container.inner_redis.safe_data[2] is True
+
+
+@pytest.mark.asyncio
+async def test_aload_with_corrupted_safe_field_succeeds():
+    # Arrange
+    model = ModelWithSafeLoadField(safe_type_field=str, normal_field="test")
+    await model.asave()
+
+    # Corrupt the safe field in Redis
+    redis = model.Meta.redis
+    await redis.json().set(model.key, "$.safe_type_field", "corrupted_base64_data")
+
+    # Act
+    loaded = await model.aload()
+
+    # Assert
+    assert loaded.safe_type_field is None
+    assert loaded.normal_field == "test"
+    assert "safe_type_field" in loaded.failed_fields
+
+
+@pytest.mark.asyncio
+async def test_aload_with_corrupted_unsafe_field_raises_error():
+    # Arrange
+    model = ModelWithMixedFields(safe_field=str, unsafe_field=int, normal_field="test")
+    await model.asave()
+
+    # Corrupt the unsafe field in Redis
+    redis = model.Meta.redis
+    await redis.json().set(model.key, "$.unsafe_field", "corrupted")
+
+    # Act & Assert
+    with pytest.raises(CantSerializeRedisValueError):
+        await model.aload()
+
+
+@pytest.mark.asyncio
+async def test_aload_with_multiple_corrupted_safe_fields_succeeds():
+    # Arrange
+    model = ModelWithMultipleSafeLoadFields(
+        safe_field_1=str, safe_field_2=int, normal_field="test"
+    )
+    await model.asave()
+
+    # Corrupt both safe fields in Redis
+    redis = model.Meta.redis
+    await redis.json().set(model.key, "$.safe_field_1", "corrupted1")
+    await redis.json().set(model.key, "$.safe_field_2", "corrupted2")
+
+    # Act
+    loaded = await model.aload()
+
+    # Assert
+    assert loaded.safe_field_1 is None
+    assert loaded.safe_field_2 is None
+    assert loaded.normal_field == "test"
+    assert "safe_field_1" in loaded.failed_fields
+    assert "safe_field_2" in loaded.failed_fields
+
+
+@pytest.mark.asyncio
+async def test_afind_with_corrupted_safe_field_succeeds():
+    # Arrange
+    model1 = ModelWithMultipleSafeLoadFields(
+        safe_field_1=str, safe_field_2=int, normal_field="test1"
+    )
+    model2 = ModelWithMultipleSafeLoadFields(
+        safe_field_1=float, safe_field_2=list, normal_field="test2"
+    )
+    await model1.asave()
+    await model2.asave()
+
+    # Corrupt the safe field in one model
+    redis = model1.Meta.redis
+    await redis.json().set(model1.key, "$.safe_field_1", "corrupted_base64_data")
+
+    # Act
+    loaded_models = await ModelWithMultipleSafeLoadFields.afind()
+
+    # Assert
+    assert len(loaded_models) == 2
+    loaded_by_key = {m.key: m for m in loaded_models}
+
+    corrupted_model = loaded_by_key[model1.key]
+    assert corrupted_model.safe_field_1 is None
+    assert corrupted_model.safe_field_2 is int
+    assert corrupted_model.normal_field == "test1"
+    assert "safe_field_1" in corrupted_model.failed_fields
+
+    valid_model = loaded_by_key[model2.key]
+    assert valid_model.safe_field_1 is float
+    assert valid_model.safe_field_2 is list
+    assert valid_model.normal_field == "test2"
+    assert len(valid_model.failed_fields) == 0
+
+
+@pytest.mark.asyncio
+async def test_afind_with_corrupted_unsafe_field_raises_error():
+    # Arrange
+    model = ModelWithMixedFields(safe_field=str, unsafe_field=int, normal_field="test")
+    await model.asave()
+
+    # Corrupt the unsafe field in Redis
+    redis = model.Meta.redis
+    await redis.json().set(model.key, "$.unsafe_field", "corrupted")
+
+    # Act & Assert
+    with pytest.raises(CantSerializeRedisValueError):
+        await ModelWithMixedFields.afind()
