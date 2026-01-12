@@ -6,7 +6,6 @@ from rapyer.types.base import (
     GenericRedisType,
     RedisType,
     REDIS_DUMP_FLAG_NAME,
-    FAILED_FIELDS_KEY,
 )
 from rapyer.utils.redis import refresh_ttl_if_needed
 from rapyer.utils.redis import update_keys_in_pipeline
@@ -246,7 +245,6 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
     def full_deserializer(cls, value: dict, info: core_schema.ValidationInfo):
         ctx = info.context or {}
         should_serialize_redis = ctx.get(REDIS_DUMP_FLAG_NAME)
-        failed_fields = ctx.get(FAILED_FIELDS_KEY)
 
         if not should_serialize_redis:
             return value
@@ -256,7 +254,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
             try:
                 result[key] = cls.deserialize_unknown(item)
             except Exception as e:
-                if failed_fields is not None:
+                if cls.safe_load:
                     logger.warning(
                         f"SafeLoad: Failed to deserialize dict key '{key}': {e}"
                     )

@@ -129,6 +129,8 @@ T = TypeVar("T")
 
 
 class GenericRedisType(RedisType, Generic[T], ABC):
+    safe_load: bool = False
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for key, val in self.iterate_items():

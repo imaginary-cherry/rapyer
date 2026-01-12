@@ -221,7 +221,12 @@ class AtomicRedisModel(BaseModel):
         original_annotations.update(new_annotation)
         new_annotations = {
             field_name: replace_to_redis_types_in_annotation(
-                annotation, RedisConverter(cls.Meta.redis_type, f".{field_name}")
+                annotation,
+                RedisConverter(
+                    cls.Meta.redis_type,
+                    f".{field_name}",
+                    safe_load=field_name in cls._safe_load_fields or cls.Meta.safe_load_all
+                )
             )
             for field_name, annotation in original_annotations.items()
             if is_redis_field(field_name, annotation)

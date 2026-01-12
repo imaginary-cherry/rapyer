@@ -8,7 +8,6 @@ from rapyer.types.base import (
     GenericRedisType,
     RedisType,
     REDIS_DUMP_FLAG_NAME,
-    FAILED_FIELDS_KEY,
 )
 from rapyer.utils.redis import refresh_ttl_if_needed
 from typing_extensions import TypeAlias
@@ -168,7 +167,6 @@ class RedisList(list, GenericRedisType[T]):
     def full_deserializer(cls, value: list, info: ValidationInfo):
         ctx = info.context or {}
         is_redis_data = ctx.get(REDIS_DUMP_FLAG_NAME)
-        failed_fields = ctx.get(FAILED_FIELDS_KEY)
 
         if not is_redis_data:
             return value
@@ -178,7 +176,7 @@ class RedisList(list, GenericRedisType[T]):
             try:
                 result.append(cls.deserialize_unknown(item))
             except Exception as e:
-                if failed_fields is not None:
+                if cls.safe_load:
                     logger.warning(
                         f"SafeLoad: Failed to deserialize list item at index {idx}: {e}"
                     )
