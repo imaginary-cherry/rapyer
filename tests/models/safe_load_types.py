@@ -47,3 +47,13 @@ class ModelWithUnsafeListOfAny(AtomicRedisModel):
 
 class ModelWithUnsafeDictOfAny(AtomicRedisModel):
     data: dict[str, Any] = Field(default_factory=dict)
+
+
+class ModelWithMixedListFields(AtomicRedisModel):
+    safe_list: SafeLoad[list[Any]] = Field(default_factory=list)
+    unsafe_list: list[Any] = Field(default_factory=list)
+
+
+class ModelWithMixedDictFields(AtomicRedisModel):
+    safe_dict: SafeLoad[dict[str, Any]] = Field(default_factory=dict)
+    unsafe_dict: dict[str, Any] = Field(default_factory=dict)

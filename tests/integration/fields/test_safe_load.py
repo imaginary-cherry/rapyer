@@ -10,6 +10,11 @@ from tests.models.safe_load_types import (
     ModelWithUnsafeListOfAny,
     ModelWithUnsafeDictOfAny,
 )
+from tests.models.complex_types import (
+    OuterModelWithRedisNested,
+    ContainerModel,
+    InnerRedisModel,
+)
 
 
 @pytest.mark.asyncio
@@ -226,3 +231,28 @@ async def test_unsafe_dict_value_corrupted_raises_error():
     # Act & Assert - aload() doesn't set FAILED_FIELDS_KEY context, so raises
     with pytest.raises(Exception):
         await ModelWithUnsafeDictOfAny.aget(model.key)
+
+
+@pytest.mark.asyncio
+async def test_nested_safe_list_item_corrupted_returns_none_for_item():
+    # Arrange
+    inner = InnerRedisModel(tags=["tag1"], counter=5, safe_data=["item1", 42, True])
+    container = ContainerModel(inner_redis=inner, description="test")
+    model = OuterModelWithRedisNested(container=container, outer_data=[1, 2, 3])
+    await model.asave()
+
+    # Corrupt the first item in the nested safe list
+    redis = model.Meta.redis
+    await redis.json().set(
+        model.key, "$.container.inner_redis.safe_data[0]", "corrupted_data"
+    )
+
+    # Act
+    loaded = await OuterModelWithRedisNested.aget(model.key)
+
+    # Assert
+    assert loaded.container.description == "test"
+    assert loaded.container.inner_redis.counter == 5
+    assert loaded.container.inner_redis.safe_data[0] is None
+    assert loaded.container.inner_redis.safe_data[1] == 42
+    assert loaded.container.inner_redis.safe_data[2] is True
