@@ -1,5 +1,40 @@
 # Changelog
 
+## [1.1.5]
+
+### ✨ Added
+
+- **SafeLoad Field Annotation**: Added `SafeLoad[T]` annotation for fields that should gracefully handle deserialization failures instead of raising exceptions.
+  - When a SafeLoad field fails to deserialize, it returns `None` and logs a warning instead of crashing
+  - Failed field names are tracked in the model's `failed_fields` property
+  - Example: `safe_type_field: SafeLoad[Optional[Type[str]]] = Field(default=None)`
+- **Model-Wide SafeLoad Configuration**: Added `safe_load_all` option to `RedisConfig` Meta class to treat all non-Redis-supported fields as SafeLoad fields.
+  - Example: `Meta = RedisConfig(safe_load_all=True)`
+
+
+## [1.1.4]
+### ✨ Added
+- **Global alock_from_key Function**: Added `rapyer.alock_from_key()` function to create locks without needing a model instance. This allows locking by key directly for operations that don't require the model class.
+- **Model TTL Extension on Redis Actions**: Models now automatically extend their TTL when performing Redis actions, keeping frequently accessed models alive longer.
+
+### 🔧 Improved
+- **Redis Locking Mechanism**: Now using formal Redis lock for more persistent and reliable locking mechanism.
+
+### 🐛 Fixed
+- **apipeline KeyNotFound**: Fixed `apipeline` for cases where model doesn't exists in redis.
+- **rapyer.get**: Fix a bug in the rapyer.get() function.
+- **Context Manager Annotations**: Fixed type annotations for context managers to properly reflect their return types.
+- **RedisBytes Pipeline**: Fixed bug in RedisBytes when used within pipeline context.
+- **RedisList Pipeline**: Fixed bug in RedisList when used within pipeline context.
+- **afind Nested Fields**: Fixed `afind` to support filtering on nested fields (e.g., `afind(User.parent.age > 20)`).
+- **Key and Index Type Checking**: Fixed type checking support for `Key[T]` and `Index[T]` annotations. IDEs now correctly recognize `Index[str]` as `str` instead of `_IndexType[str]`.
+
+### 🛠️ Technical Improvements
+- **Test Coverage**: Added tests for full coverage.
+
+## [1.1.3]
+Reupload of 1.1.2 
+
 ## [1.1.2]
 We yanked the 1.1.1 release due to a bug in the pipeline context manager.
 This is the fixed version.

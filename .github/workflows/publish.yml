@@ -15,6 +15,17 @@ jobs:
       name: coverage
     runs-on: ubuntu-22.04
 
+    services:
+      redis:
+        image: redis/redis-stack-server:latest
+        ports:
+          - 6370:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -23,24 +34,6 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Start Redis
-        run: |
-          cd tests/integration
-          docker compose -f docker-compose.redis.yml up -d
-
-      - name: Wait for Redis to be ready
-        run: |
-          echo "Waiting for Redis to be ready..."
-          for i in {1..30}; do
-            if docker exec $(docker ps -q --filter "name=redis") redis-cli ping > /dev/null 2>&1; then
-              echo "Redis is ready!"
-              exit 0
-            fi
-            echo "Waiting for Redis... ($i/30)"
-            sleep 2
-          done
-          exit 1
-
       - name: Install tox
         run: |
           python -m pip install --upgrade pip
@@ -48,12 +41,6 @@ jobs:
 
       - name: Run coverage
         run: tox -e coverage
-
-      - name: Stop Redis
-        if: always()
-        run: |
-          cd tests/integration
-          docker compose -f docker-compose.redis.yml down
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
@@ -67,10 +54,14 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       id-token: write  # Required for trusted publishing
-      contents: read
+      contents: write  # Required for creating tags
+    outputs:
+      version: ${{ steps.version.outputs.version }}
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for tagging
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -106,3 +97,21 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
+
+      - name: Extract version and create tag
+        id: version
+        run: |
+          VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION"
+          
+          # Check if tag already exists
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists, skipping tag creation"
+          else
+            git config user.name github-actions
+            git config user.email github-actions@github.com
+            git tag -a "v$VERSION" -m "Release v$VERSION"
+            git push origin "v$VERSION"
+            echo "Created and pushed tag v$VERSION"
+          fi

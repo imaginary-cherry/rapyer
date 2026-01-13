@@ -48,6 +48,9 @@ The pipeline context manager supports atomic operations for all Redis types:
 - **Integer operations**: Direct assignment, arithmetic operations
 - **Bytes operations**: Direct assignment and modification
 
+!!! warning "Inplace Operators and Concurrency"
+    When using inplace operators like `+=`, `-=`, `*=`, etc. inside a pipeline, the data sent to Redis is computed as the current value in the Python process plus the new value. This means that if another process modifies the same field between when you entered the pipeline and when it executes, your operation will override those changes. For truly atomic increments/decrements that respect concurrent modifications, consider using the lock context manager instead.
+
 ### Real-World Examples
 
 #### User Score and Achievement System
@@ -418,3 +421,58 @@ async with user.alock("score_update") as locked_user:
 ```
 
 The lock context manager provides the flexibility to perform any Python operations while ensuring data consistency and preventing race conditions through exclusive access control.
+
+## Global alock_from_key Function
+
+In addition to the class method `Model.alock_from_key()`, Rapyer provides a global `rapyer.alock_from_key()` function that allows you to create locks without needing to know the specific model class. This is particularly useful when working with keys from different model types or when the model class is not available in the current context.
+
+### Global Function Usage
+
+```python
+from rapyer import alock_from_key
+
+async def generic_lock_operation(redis_key: str):
+    # Lock any Redis key without knowing its model class
+    async with alock_from_key(redis_key, "operation") as model:
+        if model is not None:
+            # Model exists - work with it
+            # The model will be the correct type based on the key
+            model.some_field = "updated value"
+            # Changes saved automatically when context exits
+        else:
+            # Key doesn't exist in Redis
+            print(f"No model found for key: {redis_key}")
+```
+
+### Key Differences from Class Method
+
+The global `alock_from_key` function differs from the class method in a few important ways:
+
+1. **Model Discovery**: Automatically determines the correct model type from the key
+2. **Handles Missing Keys**: Returns `None` if the key doesn't exist (doesn't raise KeyNotFound)
+3. **Type Flexibility**: Works with any AtomicRedisModel subclass
+
+### Example: Cross-Model Operations
+
+```python
+from rapyer import alock_from_key
+
+async def transfer_ownership(old_owner_key: str, new_owner_key: str, asset_key: str):
+    # Lock multiple models of potentially different types
+    async with alock_from_key(old_owner_key, "transfer") as old_owner:
+        async with alock_from_key(new_owner_key, "transfer") as new_owner:
+            async with alock_from_key(asset_key, "transfer") as asset:
+                # Check all models exist
+                if not all([old_owner, new_owner, asset]):
+                    raise ValueError("One or more keys not found")
+                
+                # Perform transfer (models can be different types)
+                if hasattr(asset, 'owner_id'):
+                    asset.owner_id = new_owner.id
+                
+                if hasattr(old_owner, 'assets'):
+                    old_owner.assets.remove(asset_key)
+                
+                if hasattr(new_owner, 'assets'):
+                    new_owner.assets.append(asset_key)
+```

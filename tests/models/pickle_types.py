@@ -1,6 +1,7 @@
 from typing import Type, Any, Optional
 
 from pydantic import Field
+
 from rapyer.base import AtomicRedisModel
 
 
@@ -24,3 +25,7 @@ class ListPickableTypesModel(AtomicRedisModel):
     set_list: list[set[str]] = Field(default_factory=list)
     frozenset_list: list[frozenset[int]] = Field(default_factory=list)
     nested_list: list[list[type]] = Field(default_factory=list)
+
+
+class NonRedisDumpableModel(AtomicRedisModel):
+    set_field: set[str] = Field(default_factory=set)

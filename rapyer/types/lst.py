@@ -3,7 +3,13 @@ from typing import TypeVar, TYPE_CHECKING
 
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, SerializationInfo
-from rapyer.types.base import GenericRedisType, RedisType, REDIS_DUMP_FLAG_NAME
+from rapyer.types.base import (
+    GenericRedisType,
+    RedisType,
+    REDIS_DUMP_FLAG_NAME,
+    SKIP_SENTINEL,
+)
+from rapyer.utils.redis import refresh_ttl_if_needed
 from typing_extensions import TypeAlias
 
 T = TypeVar("T")
@@ -26,6 +32,9 @@ class RedisList(list, GenericRedisType[T]):
         new_val = self.create_new_values([key], [value])[0]
         return new_val
 
+    def sub_field_path(self, key: str):
+        return f"{self.field_path}[{key}]"
+
     def __setitem__(self, key, value):
         if self.pipeline:
             self.pipeline.json().set(self.key, self.json_field_path(key), value)
@@ -34,8 +43,6 @@ class RedisList(list, GenericRedisType[T]):
 
     def __iadd__(self, other):
         self.extend(other)
-        if self.pipeline and other:
-            self.pipeline.json().arrappend(self.key, self.json_path, *other)
         return self
 
     def append(self, __object):
@@ -74,6 +81,9 @@ class RedisList(list, GenericRedisType[T]):
             await self.redis.json().arrappend(
                 self.key, self.json_path, *serialized_object
             )
+            await refresh_ttl_if_needed(
+                self.redis, self.key, self.Meta.ttl, self.Meta.refresh_ttl
+            )
 
     async def aextend(self, __iterable):
         items = list(__iterable)
@@ -90,15 +100,17 @@ class RedisList(list, GenericRedisType[T]):
                 self.json_path,
                 *serialized_items,
             )
+            await refresh_ttl_if_needed(
+                self.redis, self.key, self.Meta.ttl, self.Meta.refresh_ttl
+            )
 
     async def apop(self, index=-1):
         if self:
             self.pop(index)
         arrpop = await self.redis.json().arrpop(self.key, self.json_path, index)
-
-        # Handle empty list case
-        if arrpop is None or (isinstance(arrpop, list) and len(arrpop) == 0):
-            return None
+        await refresh_ttl_if_needed(
+            self.redis, self.key, self.Meta.ttl, self.Meta.refresh_ttl
+        )
 
         # Handle case where arrpop returns [None] for an empty list
         if arrpop[0] is None:
@@ -119,6 +131,9 @@ class RedisList(list, GenericRedisType[T]):
             await self.redis.json().arrinsert(
                 self.key, self.json_path, index, *serialized_object
             )
+            await refresh_ttl_if_needed(
+                self.redis, self.key, self.Meta.ttl, self.Meta.refresh_ttl
+            )
 
     async def aclear(self):
         # Clear local list
@@ -127,6 +142,9 @@ class RedisList(list, GenericRedisType[T]):
         # Clear Redis list
         if not self.pipeline:
             await self.client.json().set(self.key, self.json_path, [])
+            await refresh_ttl_if_needed(
+                self.client, self.key, self.Meta.ttl, self.Meta.refresh_ttl
+            )
 
     def clone(self):
         return [v.clone() if isinstance(v, RedisType) else v for v in self]
@@ -144,16 +162,19 @@ class RedisList(list, GenericRedisType[T]):
         ]
 
     @classmethod
-    def full_deserializer(cls, value, info: ValidationInfo):
+    def full_deserializer(cls, value: list, info: ValidationInfo):
         ctx = info.context or {}
         is_redis_data = ctx.get(REDIS_DUMP_FLAG_NAME)
 
-        if isinstance(value, list):
-            return [
-                cls.deserialize_unknown(item) if is_redis_data else item
-                for item in value
-            ]
-        return value
+        if not is_redis_data:
+            return value
+
+        return [
+            deserialized
+            for idx, item in enumerate(value)
+            if (deserialized := cls.try_deserialize_item(item, f"index {idx}"))
+            is not SKIP_SENTINEL
+        ]
 
     @classmethod
     def schema_for_unknown(cls):
@@ -161,4 +182,4 @@ class RedisList(list, GenericRedisType[T]):
 
 
 if TYPE_CHECKING:
-    RedisList: TypeAlias = RedisList[T] | list[T]
+    RedisList: TypeAlias = RedisList[T] | list[T]  # pragma: no cover

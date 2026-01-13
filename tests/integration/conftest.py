@@ -1,6 +1,7 @@
 import os
 
 import pytest_asyncio
+
 import rapyer
 
 # Collection types
@@ -50,11 +51,30 @@ from tests.models.functionality_types import (
     AllTypesModel,
 )
 
+# Index types
+from tests.models.index_types import ParentWithIndexModel, ChildWithParentModel
+
 # Inheritance types
-from tests.models.inheritance_types import BaseUserModel, AdminUserModel
+from tests.models.inheritance_types import (
+    BaseUserModel,
+    AdminUserModel,
+    DiamondChildModel,
+)
 
 # Pickle types
 from tests.models.pickle_types import ModelWithUnserializableFields
+
+# SafeLoad types
+from tests.models.safe_load_types import (
+    ModelWithSafeLoadField,
+    ModelWithMultipleSafeLoadFields,
+    ModelWithMixedFields,
+    ModelWithSafeLoadAllConfig,
+    ModelWithSafeLoadListOfAny,
+    ModelWithSafeLoadDictOfAny,
+    ModelWithUnsafeListOfAny,
+    ModelWithUnsafeDictOfAny,
+)
 
 # Simple types
 from tests.models.simple_types import (
@@ -70,6 +90,8 @@ from tests.models.simple_types import (
     UserModelWithoutTTL,
     TaskModel,
     NoneTestModel,
+    TTLRefreshTestModel,
+    TTLRefreshDisabledModel,
 )
 
 # Specialized types
@@ -132,6 +154,8 @@ async def real_redis_client(redis_client):
         UserModelWithoutTTL,
         TaskModel,
         NoneTestModel,
+        TTLRefreshTestModel,
+        TTLRefreshDisabledModel,
         # Functionality types
         LockSaveTestModel,
         LockUpdateTestModel,
@@ -141,9 +165,19 @@ async def real_redis_client(redis_client):
         UserModel,
         # Pickle types
         ModelWithUnserializableFields,
+        # SafeLoad types
+        ModelWithSafeLoadField,
+        ModelWithMultipleSafeLoadFields,
+        ModelWithMixedFields,
+        ModelWithSafeLoadAllConfig,
+        ModelWithSafeLoadListOfAny,
+        ModelWithSafeLoadDictOfAny,
+        ModelWithUnsafeListOfAny,
+        ModelWithUnsafeDictOfAny,
         # Inheritance types
         BaseUserModel,
         AdminUserModel,
+        DiamondChildModel,
         # Complex types
         OuterModel,
         InnerRedisModel,
@@ -152,6 +186,9 @@ async def real_redis_client(redis_client):
         # Common types with key annotations
         UserWithKeyModel,
         EventWithDatetimeKeyModel,
+        # Index types
+        ParentWithIndexModel,
+        ChildWithParentModel,
     ]
 
     # Configure Redis client for all models

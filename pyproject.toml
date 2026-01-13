@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "rapyer"
-version = "1.1.2"
+version = "1.1.4"
 description = "Pydantic models with Redis as the backend"
 authors = [{name = "YedidyaHKfir", email = "yedidyakfir@gmail.com"}]
 readme = "README.md"

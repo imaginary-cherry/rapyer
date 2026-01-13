@@ -5,9 +5,38 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  validate-branch-target:
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Validate PR target branch
+      run: |
+        SOURCE_BRANCH="${{ github.head_ref }}"
+        TARGET_BRANCH="${{ github.base_ref }}"
+        
+        echo "Source branch: $SOURCE_BRANCH"
+        echo "Target branch: $TARGET_BRANCH"
+        
+        # Rule 1: Only develop branch can merge to main
+        if [[ "$TARGET_BRANCH" == "main" && "$SOURCE_BRANCH" != "develop" ]]; then
+          echo "❌ Error: Only 'develop' branch can merge to 'main'"
+          echo "Your branch '$SOURCE_BRANCH' cannot target 'main' directly"
+          echo "Please target 'develop' branch instead"
+          exit 1
+        fi
+        
+        echo "✅ Branch targeting rules validated successfully"
+
   lint:
     runs-on: ubuntu-22.04
+    needs: [validate-branch-target]
+    if: always() && (needs.validate-branch-target.result == 'success' || needs.validate-branch-target.result == 'skipped')
     
     steps:
     - uses: actions/checkout@v4
@@ -16,6 +45,14 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: "3.11"
+    
+    - name: Cache pip packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: pip-static-${{ runner.os }}-${{ hashFiles('**/pyproject.toml') }}
+        restore-keys: |
+          pip-static-${{ runner.os }}-
     
     - name: Install Poetry
       uses: snok/install-poetry@v1
@@ -43,10 +80,12 @@ jobs:
 
   mypy:
     runs-on: ubuntu-22.04
+    needs: [validate-branch-target]
+    if: always() && (needs.validate-branch-target.result == 'success' || needs.validate-branch-target.result == 'skipped')
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
-    
+
     steps:
     - uses: actions/checkout@v4
     
@@ -66,11 +105,25 @@ jobs:
 
   test:
     runs-on: ubuntu-22.04
+    needs: [validate-branch-target]
+    if: always() && (needs.validate-branch-target.result == 'success' || needs.validate-branch-target.result == 'skipped')
     strategy:
+      fail-fast: ${{ github.event_name == 'pull_request' }}
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
         redis-version: ["6.0", "6.1", "6.2", "6.3", "6.4"]
         pydantic-version: ["2.11", "2.12"]
+    
+    services:
+      redis:
+        image: redis/redis-stack-server:latest
+        ports:
+          - 6370:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     
     steps:
     - uses: actions/checkout@v4
@@ -80,23 +133,23 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
     
-    - name: Start Redis
-      run: |
-        cd tests/integration
-        docker compose -f docker-compose.redis.yml up -d
+    - name: Cache pip packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: pip-test-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('**/pyproject.toml') }}
+        restore-keys: |
+          pip-test-${{ runner.os }}-${{ matrix.python-version }}-
+          pip-test-${{ runner.os }}-
     
-    - name: Wait for Redis to be ready
-      run: |
-        echo "Waiting for Redis to be ready..."
-        for i in {1..30}; do
-          if docker exec $(docker ps -q --filter "name=redis") redis-cli ping > /dev/null 2>&1; then
-            echo "Redis is ready!"
-            exit 0
-          fi
-          echo "Waiting for Redis... ($i/30)"
-          sleep 2
-        done
-        exit 1
+    - name: Cache tox environments
+      uses: actions/cache@v3
+      with:
+        path: .tox
+        key: tox-${{ runner.os }}-py${{ matrix.python-version }}-redis${{ matrix.redis-version }}-pydantic${{ matrix.pydantic-version }}-${{ hashFiles('tox.ini', 'pyproject.toml') }}
+        restore-keys: |
+          tox-${{ runner.os }}-py${{ matrix.python-version }}-redis${{ matrix.redis-version }}-pydantic${{ matrix.pydantic-version }}-
+          tox-${{ runner.os }}-py${{ matrix.python-version }}-
     
     - name: Install tox and tox-gh-actions
       run: |
@@ -106,23 +159,20 @@ jobs:
     - name: Run tests with tox
       env:
         REDIS_DB: 0
-        TOX_OVERRIDE: "testenv:py${{ matrix.python-version }}-redis${{ matrix.redis-version }}-pydantic${{ matrix.pydantic-version }}"
       run: tox -e py$(echo "${{ matrix.python-version }}" | tr -d '.')-redis$(echo "${{ matrix.redis-version }}" | tr -d '.')-pydantic$(echo "${{ matrix.pydantic-version }}" | tr -d '.')
-    
-    - name: Stop Redis
-      if: always()
-      run: |
-        cd tests/integration
-        docker compose -f docker-compose.redis.yml down
 
 
   test-results:
     runs-on: ubuntu-22.04
-    needs: [lint, mypy, test]
+    needs: [validate-branch-target, lint, mypy, test]
     if: always()
     steps:
       - name: Check test results
         run: |
+          if [[ "${{ needs.validate-branch-target.result }}" == "failure" ]]; then
+            echo "Branch target validation failed"
+            exit 1
+          fi
           if [[ "${{ needs.lint.result }}" != "success" ]]; then
             echo "Lint job failed"
             exit 1

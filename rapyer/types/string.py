@@ -17,4 +17,4 @@ class RedisStr(str, RedisType):
 
 
 if TYPE_CHECKING:
-    RedisStr: TypeAlias = RedisStr | str
+    RedisStr: TypeAlias = RedisStr | str  # pragma: no cover
