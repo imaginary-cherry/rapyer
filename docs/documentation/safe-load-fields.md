@@ -64,4 +64,10 @@ async def load_plugin(plugin_id: str):
 - **Always use `Optional`** - the field can become `None` if loading fails
 - **Check `failed_fields`** - know when something went wrong
 - **Warnings are logged** - configure `logging.getLogger("rapyer")` to see them
-- **Works with collections** - `RedisList` and `RedisDict` replace failed items with `None`
+
+## Behavior Differences
+
+Safe loading behaves differently depending on the field type:
+
+- **Model fields** - when a field cannot be deserialized, it is set to `None` and tracked in `failed_fields`
+- **Collection fields (`RedisList`, `RedisDict`)** - items that cannot be deserialized are **skipped entirely** (not included in the result)
