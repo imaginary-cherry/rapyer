@@ -294,7 +294,7 @@ async def test_ttl_refresh_maintains_original_ttl_value__sanity(real_redis_clien
     refreshed_ttl = await real_redis_client.ttl(model.key)
     assert refreshed_ttl > initial_ttl
     assert refreshed_ttl <= TTL_TEST_SECONDS
-    assert refreshed_ttl > TTL_TEST_SECONDS - 1
+    assert refreshed_ttl > TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
 
 
 @ttl_no_refresh_test_for(AtomicRedisModel.aget)
@@ -314,7 +314,9 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_aget__sanity(
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert 0 < ttl <= TTL_TEST_SECONDS - 1  # Should NOT be refreshed, but still has TTL
+    assert (
+        0 < ttl <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
+    )  # Should NOT be refreshed, but still has TTL
     assert loaded_model.name == "nancy"
 
 
@@ -335,7 +337,9 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_aload__sanity(
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert 0 < ttl <= TTL_TEST_SECONDS - 1  # Should NOT be refreshed, but still has TTL
+    assert (
+        0 < ttl <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
+    )  # Should NOT be refreshed, but still has TTL
 
 
 @ttl_no_refresh_test_for(RedisInt.aincrease)
@@ -357,7 +361,9 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_type_operation_
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert 0 < ttl <= TTL_TEST_SECONDS - 1  # Should NOT be refreshed, but still has TTL
+    assert (
+        0 < ttl <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
+    )  # Should NOT be refreshed, but still has TTL
 
 
 @ttl_test_for(RedisType.asave)
@@ -552,8 +558,8 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_afind__sanity(
     # Assert
     ttl1 = await real_redis_client.ttl(model1.key)
     ttl2 = await real_redis_client.ttl(model2.key)
-    assert 0 < ttl1 <= TTL_TEST_SECONDS - 1
-    assert 0 < ttl2 <= TTL_TEST_SECONDS - 1
+    assert 0 < ttl1 <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
+    assert 0 < ttl2 <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
 
 
 @ttl_no_refresh_test_for(AtomicRedisModel.ainsert)
@@ -589,7 +595,7 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_asave__sanity(
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert 0 < ttl <= TTL_TEST_SECONDS - 1
+    assert 0 < ttl <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
 
 
 @ttl_no_refresh_test_for(AtomicRedisModel.aupdate)
@@ -607,7 +613,7 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_aupdate__sanity(
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert 0 < ttl <= TTL_TEST_SECONDS - 1
+    assert 0 < ttl <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
 
 
 @ttl_no_refresh_test_for(RedisDict.aclear)
@@ -625,7 +631,7 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_dict_aclear__sa
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert 0 < ttl <= TTL_TEST_SECONDS - 1
+    assert 0 < ttl <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
 
 
 @ttl_no_refresh_test_for(RedisDict.adel_item)
@@ -645,7 +651,7 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_dict_adel_item_
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert 0 < ttl <= TTL_TEST_SECONDS - 1
+    assert 0 < ttl <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
 
 
 @ttl_no_refresh_test_for(RedisDict.apop)
@@ -665,7 +671,7 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_dict_apop__sani
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert 0 < ttl <= TTL_TEST_SECONDS - 1
+    assert 0 < ttl <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
 
 
 @ttl_no_refresh_test_for(RedisDict.apopitem)
@@ -683,7 +689,7 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_dict_apopitem__
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert 0 < ttl <= TTL_TEST_SECONDS - 1
+    assert 0 < ttl <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
 
 
 @ttl_no_refresh_test_for(RedisDict.aset_item)
@@ -701,7 +707,7 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_dict_aset_item_
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert 0 < ttl <= TTL_TEST_SECONDS - 1
+    assert 0 < ttl <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
 
 
 @ttl_no_refresh_test_for(RedisDict.aupdate)
@@ -719,7 +725,7 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_dict_aupdate__s
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert 0 < ttl <= TTL_TEST_SECONDS - 1
+    assert 0 < ttl <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
 
 
 @ttl_no_refresh_test_for(RedisFloat.aincrease)
@@ -737,7 +743,7 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_float_aincrease
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert 0 < ttl <= TTL_TEST_SECONDS - 1
+    assert 0 < ttl <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
 
 
 @ttl_no_refresh_test_for(RedisList.aclear)
@@ -755,7 +761,7 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_list_aclear__sa
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert 0 < ttl <= TTL_TEST_SECONDS - 1
+    assert 0 < ttl <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
 
 
 @ttl_no_refresh_test_for(RedisList.aextend)
@@ -773,7 +779,7 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_list_aextend__s
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert 0 < ttl <= TTL_TEST_SECONDS - 1
+    assert 0 < ttl <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
 
 
 @ttl_no_refresh_test_for(RedisList.ainsert)
@@ -791,7 +797,7 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_list_ainsert__s
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert 0 < ttl <= TTL_TEST_SECONDS - 1
+    assert 0 < ttl <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
 
 
 @ttl_no_refresh_test_for(RedisList.apop)
@@ -809,4 +815,4 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_list_apop__sani
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert 0 < ttl <= TTL_TEST_SECONDS - 1
+    assert 0 < ttl <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
