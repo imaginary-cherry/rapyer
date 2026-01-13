@@ -180,7 +180,7 @@ class RedisList(list, GenericRedisType[T]):
             except Exception as e:
                 if cls.safe_load:
                     logger.warning(
-                        f"SafeLoad: Failed to deserialize list item at index {idx}: {e}"
+                        "SafeLoad: Failed to deserialize list item at index %s.", idx
                     )
                     result.append(None)
                 else:

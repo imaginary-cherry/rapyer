@@ -77,9 +77,7 @@ def make_pickle_field_serializer(field: str, safe_load: bool = False):
                 if safe_load:
                     failed_fields = ctx.setdefault(FAILED_FIELDS_KEY, set())
                     failed_fields.add(field)
-                    logger.warning(
-                        f"SafeLoad: Failed to deserialize field '{field}': {e}"
-                    )
+                    logger.warning("SafeLoad: Failed to deserialize field '%s'", field)
                     return None
                 raise CantSerializeRedisValueError() from e
         return v

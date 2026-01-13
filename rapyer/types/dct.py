@@ -257,9 +257,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
                 result[key] = cls.deserialize_unknown(item)
             except Exception as e:
                 if cls.safe_load:
-                    logger.warning(
-                        f"SafeLoad: Failed to deserialize dict key '{key}': {e}"
-                    )
+                    logger.warning("SafeLoad: Failed to deserialize dict key '%s'", key)
                     result[key] = None
                 else:
                     raise CantSerializeRedisValueError() from e
