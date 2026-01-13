@@ -24,3 +24,7 @@ class BadFilterError(FindError):
 
 class UnsupportedIndexedFieldError(FindError):
     pass
+
+
+class CantSerializeRedisValueError(RapyerError):
+    pass

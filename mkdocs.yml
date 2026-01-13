@@ -52,6 +52,7 @@ nav:
     - Atomic Actions: documentation/atomic-actions.md
     - Key adjustment: documentation/setting-key-field.md
     - Indexing Fields: documentation/indexing-fields.md
+    - Safe Loading: documentation/safe-load-fields.md
   - API Reference:
     - AtomicRedisModel: api/atomic-redis-model.md
     - Redis Types: api/redis-types.md

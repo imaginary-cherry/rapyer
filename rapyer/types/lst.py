@@ -3,10 +3,14 @@ from typing import TypeVar, TYPE_CHECKING
 
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, SerializationInfo
-from typing_extensions import TypeAlias
-
-from rapyer.types.base import GenericRedisType, RedisType, REDIS_DUMP_FLAG_NAME
+from rapyer.types.base import (
+    GenericRedisType,
+    RedisType,
+    REDIS_DUMP_FLAG_NAME,
+    SKIP_SENTINEL,
+)
 from rapyer.utils.redis import refresh_ttl_if_needed
+from typing_extensions import TypeAlias
 
 T = TypeVar("T")
 
@@ -162,8 +166,14 @@ class RedisList(list, GenericRedisType[T]):
         ctx = info.context or {}
         is_redis_data = ctx.get(REDIS_DUMP_FLAG_NAME)
 
+        if not is_redis_data:
+            return value
+
         return [
-            cls.deserialize_unknown(item) if is_redis_data else item for item in value
+            deserialized
+            for idx, item in enumerate(value)
+            if (deserialized := cls.try_deserialize_item(item, f"index {idx}"))
+            is not SKIP_SENTINEL
         ]
 
     @classmethod

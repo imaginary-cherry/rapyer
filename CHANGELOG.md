@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.5]
+
+### ✨ Added
+
+- **SafeLoad Field Annotation**: Added `SafeLoad[T]` annotation for fields that should gracefully handle deserialization failures instead of raising exceptions.
+  - When a SafeLoad field fails to deserialize, it returns `None` and logs a warning instead of crashing
+  - Failed field names are tracked in the model's `failed_fields` property
+  - Example: `safe_type_field: SafeLoad[Optional[Type[str]]] = Field(default=None)`
+- **Model-Wide SafeLoad Configuration**: Added `safe_load_all` option to `RedisConfig` Meta class to treat all non-Redis-supported fields as SafeLoad fields.
+  - Example: `Meta = RedisConfig(safe_load_all=True)`
+
+
 ## [1.1.4]
 ### ✨ Added
 - **Global alock_from_key Function**: Added `rapyer.alock_from_key()` function to create locks without needing a model instance. This allows locking by key directly for operations that don't require the model class.

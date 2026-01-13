@@ -64,6 +64,18 @@ from tests.models.inheritance_types import (
 # Pickle types
 from tests.models.pickle_types import ModelWithUnserializableFields
 
+# SafeLoad types
+from tests.models.safe_load_types import (
+    ModelWithSafeLoadField,
+    ModelWithMultipleSafeLoadFields,
+    ModelWithMixedFields,
+    ModelWithSafeLoadAllConfig,
+    ModelWithSafeLoadListOfAny,
+    ModelWithSafeLoadDictOfAny,
+    ModelWithUnsafeListOfAny,
+    ModelWithUnsafeDictOfAny,
+)
+
 # Simple types
 from tests.models.simple_types import (
     IntModel,
@@ -153,6 +165,15 @@ async def real_redis_client(redis_client):
         UserModel,
         # Pickle types
         ModelWithUnserializableFields,
+        # SafeLoad types
+        ModelWithSafeLoadField,
+        ModelWithMultipleSafeLoadFields,
+        ModelWithMixedFields,
+        ModelWithSafeLoadAllConfig,
+        ModelWithSafeLoadListOfAny,
+        ModelWithSafeLoadDictOfAny,
+        ModelWithUnsafeListOfAny,
+        ModelWithUnsafeDictOfAny,
         # Inheritance types
         BaseUserModel,
         AdminUserModel,
