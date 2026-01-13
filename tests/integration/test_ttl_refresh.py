@@ -13,7 +13,7 @@ from tests.models.simple_types import (
     TTLRefreshDisabledModel as ModelWithTTLNoRefresh,
 )
 
-SLEEP_BEFORE_REFRESH = 0.5
+SLEEP_BEFORE_REFRESH = 1
 SLEEP_FOR_TTL_DECREASE = 2
 
 
@@ -314,9 +314,8 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_aget__sanity(
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert (
-        0 < ttl <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
-    )  # Should NOT be refreshed, but still has TTL
+    # Should NOT be refreshed, but still has TTL
+    assert 0 < ttl <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
     assert loaded_model.name == "nancy"
 
 
@@ -337,9 +336,8 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_aload__sanity(
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert (
-        0 < ttl <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
-    )  # Should NOT be refreshed, but still has TTL
+    # Should NOT be refreshed, but still has TTL
+    assert 0 < ttl <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
 
 
 @ttl_no_refresh_test_for(RedisInt.aincrease)
@@ -361,9 +359,8 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_type_operation_
 
     # Assert
     ttl = await real_redis_client.ttl(model.key)
-    assert (
-        0 < ttl <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
-    )  # Should NOT be refreshed, but still has TTL
+    # Should NOT be refreshed, but still has TTL
+    assert 0 < ttl <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
 
 
 @ttl_test_for(RedisType.asave)
