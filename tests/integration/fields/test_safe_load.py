@@ -165,7 +165,7 @@ async def test_safe_load_all_config_multiple_corrupted_tracks_all_failures():
 
 
 @pytest.mark.asyncio
-async def test_safe_load_list_item_corrupted_returns_none_for_item():
+async def test_safe_load_list_item_corrupted_skips_item():
     # Arrange
     model = ModelWithSafeLoadListOfAny(items=["string", 42, True])
     await model.asave()
@@ -178,13 +178,13 @@ async def test_safe_load_list_item_corrupted_returns_none_for_item():
     loaded = await ModelWithSafeLoadListOfAny.aget(model.key)
 
     # Assert
-    assert loaded.items[0] is None
-    assert loaded.items[1] == 42
-    assert loaded.items[2] is True
+    assert len(loaded.items) == 2
+    assert loaded.items[0] == 42
+    assert loaded.items[1] is True
 
 
 @pytest.mark.asyncio
-async def test_safe_load_dict_value_corrupted_returns_none_for_key():
+async def test_safe_load_dict_value_corrupted_skips_key():
     # Arrange
     model = ModelWithSafeLoadDictOfAny(
         data={"key1": "value1", "key2": 42, "key3": True}
@@ -199,7 +199,8 @@ async def test_safe_load_dict_value_corrupted_returns_none_for_key():
     loaded = await ModelWithSafeLoadDictOfAny.aget(model.key)
 
     # Assert
-    assert loaded.data["key1"] is None
+    assert "key1" not in loaded.data
+    assert len(loaded.data) == 2
     assert loaded.data["key2"] == 42
     assert loaded.data["key3"] is True
 
@@ -235,7 +236,7 @@ async def test_unsafe_dict_value_corrupted_raises_error():
 
 
 @pytest.mark.asyncio
-async def test_nested_safe_list_item_corrupted_returns_none_for_item():
+async def test_nested_safe_list_item_corrupted_skips_item():
     # Arrange
     inner = InnerRedisModel(tags=["tag1"], counter=5, safe_data=["item1", 42, True])
     container = ContainerModel(inner_redis=inner, description="test")
@@ -254,9 +255,9 @@ async def test_nested_safe_list_item_corrupted_returns_none_for_item():
     # Assert
     assert loaded.container.description == "test"
     assert loaded.container.inner_redis.counter == 5
-    assert loaded.container.inner_redis.safe_data[0] is None
-    assert loaded.container.inner_redis.safe_data[1] == 42
-    assert loaded.container.inner_redis.safe_data[2] is True
+    assert len(loaded.container.inner_redis.safe_data) == 2
+    assert loaded.container.inner_redis.safe_data[0] == 42
+    assert loaded.container.inner_redis.safe_data[1] is True
 
 
 @pytest.mark.asyncio
@@ -318,7 +319,7 @@ async def test_aload_with_multiple_corrupted_safe_fields_succeeds():
 
 
 @pytest.mark.asyncio
-async def test_aload_with_corrupted_safe_list_item_succeeds():
+async def test_aload_with_corrupted_safe_list_item_skips_item():
     # Arrange
     model = ModelWithSafeLoadListOfAny(items=["string", 42, True])
     await model.asave()
@@ -331,9 +332,9 @@ async def test_aload_with_corrupted_safe_list_item_succeeds():
     loaded = await model.aload()
 
     # Assert
-    assert loaded.items[0] is None
-    assert loaded.items[1] == 42
-    assert loaded.items[2] is True
+    assert len(loaded.items) == 2
+    assert loaded.items[0] == 42
+    assert loaded.items[1] is True
 
 
 @pytest.mark.asyncio
@@ -352,7 +353,7 @@ async def test_aload_with_corrupted_unsafe_list_item_raises_error():
 
 
 @pytest.mark.asyncio
-async def test_aload_with_corrupted_safe_dict_value_succeeds():
+async def test_aload_with_corrupted_safe_dict_value_skips_key():
     # Arrange
     model = ModelWithSafeLoadDictOfAny(
         data={"key1": "value1", "key2": 42, "key3": True}
@@ -367,7 +368,8 @@ async def test_aload_with_corrupted_safe_dict_value_succeeds():
     loaded = await model.aload()
 
     # Assert
-    assert loaded.data["key1"] is None
+    assert "key1" not in loaded.data
+    assert len(loaded.data) == 2
     assert loaded.data["key2"] == 42
     assert loaded.data["key3"] is True
 

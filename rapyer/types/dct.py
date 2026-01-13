@@ -1,18 +1,14 @@
-import logging
 from typing import TypeVar, Generic, get_args, Any, TypeAlias, TYPE_CHECKING
 
 from pydantic_core import core_schema
-
-from rapyer.errors.base import CantSerializeRedisValueError
 from rapyer.types.base import (
     GenericRedisType,
     RedisType,
     REDIS_DUMP_FLAG_NAME,
+    SKIP_SENTINEL,
 )
 from rapyer.utils.redis import refresh_ttl_if_needed
 from rapyer.utils.redis import update_keys_in_pipeline
-
-logger = logging.getLogger("rapyer")
 
 T = TypeVar("T")
 
@@ -251,17 +247,12 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         if not should_serialize_redis:
             return value
 
-        result = {}
-        for key, item in value.items():
-            try:
-                result[key] = cls.deserialize_unknown(item)
-            except Exception as e:
-                if cls.safe_load:
-                    logger.warning("SafeLoad: Failed to deserialize dict key '%s'", key)
-                    result[key] = None
-                else:
-                    raise CantSerializeRedisValueError() from e
-        return result
+        return {
+            key: deserialized
+            for key, item in value.items()
+            if (deserialized := cls.try_deserialize_item(item, f"key '{key}'"))
+            is not SKIP_SENTINEL
+        }
 
     @classmethod
     def schema_for_unknown(cls):
