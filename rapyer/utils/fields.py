@@ -1,4 +1,4 @@
-from typing import get_origin, ClassVar
+from typing import get_origin, ClassVar, Any
 
 from pydantic import BaseModel, TypeAdapter
 from pydantic.fields import FieldInfo
@@ -64,10 +64,15 @@ def is_redis_field(field_name, field_annotation):
     )
 
 
-def is_type_dumpable(typ: type) -> bool:
-    return False
+def is_type_json_serializable(typ: type, test_value: Any = None) -> bool:
     try:
-        TypeAdapter(typ).json_schema()
+        adapter = TypeAdapter(typ)
+        if test_value is not None:
+            adapter.dump_python(test_value, mode="json")
+        else:
+            schema = adapter.json_schema()
+            if schema == {}:
+                return False
         return True
     except Exception:
         return False

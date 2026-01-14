@@ -17,10 +17,6 @@ from pydantic import (
     field_validator,
 )
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
-from redis.commands.search.index_definition import IndexDefinition, IndexType
-from redis.commands.search.query import Query
-from typing_extensions import deprecated
-
 from rapyer.config import RedisConfig
 from rapyer.context import _context_var, _context_xx_pipe
 from rapyer.errors.base import (
@@ -42,13 +38,20 @@ from rapyer.utils.annotation import (
     field_with_flag,
     DYNAMIC_CLASS_DOC,
 )
-from rapyer.utils.fields import get_all_pydantic_annotation, is_redis_field
+from rapyer.utils.fields import (
+    get_all_pydantic_annotation,
+    is_redis_field,
+    is_type_json_serializable,
+)
 from rapyer.utils.pythonic import safe_issubclass
 from rapyer.utils.redis import (
     acquire_lock,
     update_keys_in_pipeline,
     refresh_ttl_if_needed,
 )
+from redis.commands.search.index_definition import IndexDefinition, IndexType
+from redis.commands.search.query import Query
+from typing_extensions import deprecated
 
 logger = logging.getLogger("rapyer")
 
@@ -246,13 +249,20 @@ class AtomicRedisModel(BaseModel):
             if not is_redis_field(attr_name, attr_type):
                 continue
             if original_annotations[attr_name] == attr_type:
-                is_field_marked_safe = attr_name in cls._safe_load_fields
-                is_safe_load = is_field_marked_safe or cls.Meta.safe_load_all
-                serializer, validator = make_pickle_field_serializer(
-                    attr_name, safe_load=is_safe_load
+                can_json_serialize = False
+                default_value = cls.__dict__.get(attr_name, None)
+                can_json_serialize = is_type_json_serializable(
+                    attr_type, test_value=default_value
                 )
-                setattr(cls, serializer.__name__, serializer)
-                setattr(cls, validator.__name__, validator)
+
+                if not can_json_serialize:
+                    is_field_marked_safe = attr_name in cls._safe_load_fields
+                    is_safe_load = is_field_marked_safe or cls.Meta.safe_load_all
+                    serializer, validator = make_pickle_field_serializer(
+                        attr_name, safe_load=is_safe_load
+                    )
+                    setattr(cls, serializer.__name__, serializer)
+                    setattr(cls, validator.__name__, validator)
                 continue
 
         # Update the redis model list for initialization
