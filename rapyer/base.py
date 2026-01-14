@@ -270,7 +270,6 @@ class AtomicRedisModel(BaseModel):
             if not is_redis_field(attr_name, attr_type):
                 continue
             if original_annotations[attr_name] == attr_type:
-                can_json_serialize = False
                 default_value = cls.__dict__.get(attr_name, None)
                 can_json_serialize = is_type_json_serializable(
                     attr_type, test_value=default_value
