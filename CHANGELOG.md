@@ -11,6 +11,12 @@
 - **Model-Wide SafeLoad Configuration**: Added `safe_load_all` option to `RedisConfig` Meta class to treat all non-Redis-supported fields as SafeLoad fields.
   - Example: `Meta = RedisConfig(safe_load_all=True)`
 
+### 🛠️ Technical Improvements
+
+- **Smart Field Serialization**: Fields that can be JSON-serialized are now stored as native JSON instead of being pickled. This improves Redis data readability and interoperability with other systems.
+  - Pickle is only used for fields that cannot be JSON-serialized (e.g., `type` objects, custom classes)
+  - Backward compatible: existing pickled data is automatically detected and loaded correctly, We will remove the compatibility in version 1.2.0 
+
 
 ## [1.1.4]
 ### ✨ Added
