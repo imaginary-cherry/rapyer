@@ -1,6 +1,6 @@
 from typing import get_origin, ClassVar, Any
 
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel, TypeAdapter, PydanticUndefinedAnnotation
 from pydantic.fields import FieldInfo
 
 
@@ -68,7 +68,12 @@ def is_type_json_serializable(typ: type, test_value: Any = None) -> bool:
     try:
         adapter = TypeAdapter(typ)
         if isinstance(test_value, FieldInfo):
-            test_value = test_value.default
+            if test_value.default is not None:
+                test_value = test_value.default
+            elif test_value.default_factory is not None:
+                test_value = test_value.default_factory()
+            else:
+                return False
         if test_value is None:
             return False
         adapter.dump_python(test_value, mode="json")

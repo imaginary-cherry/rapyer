@@ -34,6 +34,10 @@ class ModelWithIntEnumDefault(AtomicRedisModel):
     name: str = "test"
 
 
+class ModelWithEnumCreatedByFactory(AtomicRedisModel):
+    status: PlainEnum = Field(default_factory=lambda: PlainEnum.A)
+
+
 class ModelWithStrEnumInList(AtomicRedisModel):
     statuses: list[StrStatus] = Field(default_factory=list)
     name: str = "test"
@@ -41,6 +45,15 @@ class ModelWithStrEnumInList(AtomicRedisModel):
 
 class ModelWithStrEnumInDict(AtomicRedisModel):
     status_map: dict[str, StrStatus] = {}
+    name: str = "test"
+
+
+class InnerModelWithEnum(BaseModel):
+    status: StrStatus = StrStatus.ACTIVE
+
+
+class ModelWithNestedEnum(AtomicRedisModel):
+    inner: InnerModelWithEnum = Field(default_factory=InnerModelWithEnum)
     name: str = "test"
 
 
