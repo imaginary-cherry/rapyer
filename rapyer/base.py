@@ -90,6 +90,27 @@ def make_pickle_field_serializer(field: str, safe_load: bool = False):
     return pickle_field_serializer, pickle_field_validator
 
 
+# TODO: Remove in next major version (2.0) - backward compatibility for pickled data
+# This validator handles loading old pickled data for fields that are now JSON-serializable.
+# In 2.0, remove this function and the validator registration in __init_subclass__.
+def make_backward_compat_validator(field: str):
+    @field_validator(field, mode="before")
+    def backward_compat_validator(v, info: ValidationInfo):
+        if v is None:
+            return v
+        ctx = info.context or {}
+        should_deserialize_redis = ctx.get(REDIS_DUMP_FLAG_NAME, False)
+        if should_deserialize_redis and isinstance(v, str):
+            try:
+                return pickle.loads(base64.b64decode(v))
+            except Exception:
+                pass
+        return v
+
+    backward_compat_validator.__name__ = f"__backward_compat_{field}"
+    return backward_compat_validator
+
+
 class AtomicRedisModel(BaseModel):
     _pk: str = PrivateAttr(default_factory=lambda: str(uuid.uuid4()))
     _base_model_link: Self | RedisType = PrivateAttr(default=None)
@@ -262,6 +283,10 @@ class AtomicRedisModel(BaseModel):
                         attr_name, safe_load=is_safe_load
                     )
                     setattr(cls, serializer.__name__, serializer)
+                    setattr(cls, validator.__name__, validator)
+                else:
+                    # TODO: Remove in 2.0 - backward compatibility for old pickled data
+                    validator = make_backward_compat_validator(attr_name)
                     setattr(cls, validator.__name__, validator)
                 continue
 
