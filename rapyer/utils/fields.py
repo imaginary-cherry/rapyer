@@ -1,7 +1,8 @@
 from typing import get_origin, ClassVar, Any
 
-from pydantic import BaseModel, TypeAdapter, PydanticUndefinedAnnotation
+from pydantic import BaseModel, TypeAdapter
 from pydantic.fields import FieldInfo
+from pydantic_core import PydanticUndefined
 
 
 def _collect_annotations_recursive(
@@ -68,9 +69,9 @@ def is_type_json_serializable(typ: type, test_value: Any = None) -> bool:
     try:
         adapter = TypeAdapter(typ)
         if isinstance(test_value, FieldInfo):
-            if test_value.default is not None:
+            if test_value.default is not PydanticUndefined:
                 test_value = test_value.default
-            elif test_value.default_factory is not None:
+            elif test_value.default_factory is not PydanticUndefined:
                 test_value = test_value.default_factory()
             else:
                 return False
