@@ -67,12 +67,11 @@ def is_redis_field(field_name, field_annotation):
 def is_type_json_serializable(typ: type, test_value: Any = None) -> bool:
     try:
         adapter = TypeAdapter(typ)
-        if test_value is not None:
-            adapter.dump_python(test_value, mode="json")
-        else:
-            schema = adapter.json_schema()
-            if schema == {}:
-                return False
+        if isinstance(test_value, FieldInfo):
+            test_value = test_value.default
+        if test_value is None:
+            return False
+        adapter.dump_python(test_value, mode="json")
         return True
     except Exception:
         return False
