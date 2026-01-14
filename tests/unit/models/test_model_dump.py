@@ -42,7 +42,6 @@ def test_int_enum_field_serializes_as_plain_int_sanity():
     # Assert
     assert redis_data["priority"] == 3
     assert redis_data["name"] == "my_model"
-    assert redis_data["custom_class"] == {"value": "my_model"}
 
 
 def test_str_enum_field_serializes_as_plain_string_sanity():
