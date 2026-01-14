@@ -1,9 +1,47 @@
+from enum import Enum
 from typing import Any
 
-from pydantic import GetCoreSchemaHandler, BaseModel, ConfigDict
+from pydantic import GetCoreSchemaHandler, BaseModel, ConfigDict, Field
 from pydantic_core import core_schema
 
 from rapyer.base import AtomicRedisModel
+
+
+class StrStatus(str, Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    PENDING = "pending"
+
+
+class IntPriority(int, Enum):
+    LOW = 1
+    MEDIUM = 2
+    HIGH = 3
+
+
+class PlainEnum(Enum):
+    A = "a"
+    B = "b"
+
+
+class ModelWithStrEnumDefault(AtomicRedisModel):
+    status: StrStatus = StrStatus.ACTIVE
+    name: str = "test"
+
+
+class ModelWithIntEnumDefault(AtomicRedisModel):
+    priority: IntPriority = Field(default=IntPriority.LOW)
+    name: str = "test"
+
+
+class ModelWithStrEnumInList(AtomicRedisModel):
+    statuses: list[StrStatus] = Field(default_factory=list)
+    name: str = "test"
+
+
+class ModelWithStrEnumInDict(AtomicRedisModel):
+    status_map: dict[str, StrStatus] = {}
+    name: str = "test"
 
 
 class CustomSerializableType:
