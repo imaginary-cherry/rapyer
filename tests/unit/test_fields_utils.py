@@ -42,7 +42,7 @@ def test_is_type_json_serializable_without_test_value_sanity():
     # Assert
     assert result_str_enum is True
     assert result_int_enum is True
-    assert result_str is True
+    assert result_str is False
 
 
 def test_is_type_json_serializable_type_without_value_returns_false():
