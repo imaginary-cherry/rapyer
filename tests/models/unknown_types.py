@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any
+from typing import Any, ClassVar
 
 from pydantic import GetCoreSchemaHandler, BaseModel, ConfigDict, Field
 from pydantic_core import core_schema
@@ -178,6 +178,6 @@ class ModelWithCustomTypes(AtomicRedisModel):
 
 
 class ModelWithPreferJsonDumpConfig(AtomicRedisModel):
-    Meta = RedisConfig(prefer_normal_json_dump=True)
+    Meta: ClassVar[RedisConfig] = RedisConfig(prefer_normal_json_dump=True)
     status: StrStatus = StrStatus.ACTIVE
     name: str = "test"
