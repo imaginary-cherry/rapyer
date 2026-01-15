@@ -4,6 +4,11 @@
 
 ### ✨ Added
 
+- **RedisList.remove_range()**: Added `remove_range(start, end)` method to `RedisList` for removing a range of items (like `del list[start:end]`).
+  - Works within pipeline context for atomic operations
+  - Supports negative indices (count from end)
+  - Uses Lua script internally for race-condition-free execution
+  - Example: `playlist.songs.remove_range(1, 3)` removes items at indices 1 and 2
 - **SafeLoad Field Annotation**: Added `SafeLoad[T]` annotation for fields that should gracefully handle deserialization failures instead of raising exceptions.
   - When a SafeLoad field fails to deserialize, it returns `None` and logs a warning instead of crashing
   - Failed field names are tracked in the model's `failed_fields` property
