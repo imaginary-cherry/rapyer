@@ -7,9 +7,12 @@ on:
       - develop
       - main
 
+permissions:
+  issues: write
+
 jobs:
   closeIssueOnPrMergeTrigger:
-
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
 
     steps:
@@ -17,3 +20,48 @@ jobs:
         uses: ldez/gha-mjolnir@v1.4.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract issue number from branch name and close
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branchName = context.payload.pull_request.head.ref;
+            console.log(`Branch name: ${branchName}`);
+
+            // Match issue number patterns like: feature/86-..., fix/123-..., 86-..., issue-86, etc.
+            const match = branchName.match(/(?:^|\/|-)(\d+)(?:-|$)/);
+
+            if (match) {
+              const issueNumber = parseInt(match[1]);
+              console.log(`Found issue number: ${issueNumber}`);
+
+              try {
+                // Check if issue exists and is open
+                const issue = await github.rest.issues.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber
+                });
+
+                if (issue.data.state === 'open') {
+                  await github.rest.issues.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issueNumber,
+                    state: 'closed',
+                    state_reason: 'completed'
+                  });
+                  console.log(`Closed issue #${issueNumber}`);
+                } else {
+                  console.log(`Issue #${issueNumber} is already closed`);
+                }
+              } catch (error) {
+                if (error.status === 404) {
+                  console.log(`Issue #${issueNumber} not found, skipping`);
+                } else {
+                  throw error;
+                }
+              }
+            } else {
+              console.log('No issue number found in branch name');
+            }

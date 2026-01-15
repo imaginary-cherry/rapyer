@@ -13,6 +13,10 @@ from tests.models.simple_types import (
     UserModelWithoutTTL,
     UserModelWithTTL,
 )
+from tests.models.unknown_types import (
+    ModelWithPreferJsonDumpConfig,
+    ModelWithStrEnumDefault,
+)
 
 
 @pytest.fixture
@@ -150,3 +154,37 @@ async def test_init_rapyer_raises_response_error_when_acreate_index_fails_with_o
         # Act & Assert
         with pytest.raises(ResponseError):
             await init_rapyer(mock_redis, override_old_idx=True)
+
+
+@pytest.mark.asyncio
+async def test_init_rapyer_with_prefer_normal_json_dump_overrides_all_models_sanity():
+    # Arrange
+    original_preconfigured = ModelWithPreferJsonDumpConfig.Meta.prefer_normal_json_dump
+    original_default = ModelWithStrEnumDefault.Meta.prefer_normal_json_dump
+
+    # Act
+    await init_rapyer(prefer_normal_json_dump=False)
+
+    # Assert
+    assert ModelWithPreferJsonDumpConfig.Meta.prefer_normal_json_dump is False
+    assert ModelWithStrEnumDefault.Meta.prefer_normal_json_dump is False
+    ModelWithPreferJsonDumpConfig.Meta.prefer_normal_json_dump = original_preconfigured
+    ModelWithStrEnumDefault.Meta.prefer_normal_json_dump = original_default
+
+
+@pytest.mark.asyncio
+async def test_init_rapyer_without_prefer_normal_json_dump_keeps_preconfigured_values_sanity():
+    # Arrange
+    original_preconfigured = ModelWithPreferJsonDumpConfig.Meta.prefer_normal_json_dump
+    original_default = ModelWithStrEnumDefault.Meta.prefer_normal_json_dump
+    ModelWithPreferJsonDumpConfig.Meta.prefer_normal_json_dump = True
+    ModelWithStrEnumDefault.Meta.prefer_normal_json_dump = False
+
+    # Act
+    await init_rapyer()
+
+    # Assert
+    assert ModelWithPreferJsonDumpConfig.Meta.prefer_normal_json_dump is True
+    assert ModelWithStrEnumDefault.Meta.prefer_normal_json_dump is False
+    ModelWithPreferJsonDumpConfig.Meta.prefer_normal_json_dump = original_preconfigured
+    ModelWithStrEnumDefault.Meta.prefer_normal_json_dump = original_default

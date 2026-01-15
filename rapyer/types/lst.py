@@ -3,6 +3,8 @@ from typing import TypeVar, TYPE_CHECKING
 
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, SerializationInfo
+from typing_extensions import TypeAlias
+
 from rapyer.types.base import (
     GenericRedisType,
     RedisType,
@@ -10,7 +12,6 @@ from rapyer.types.base import (
     SKIP_SENTINEL,
 )
 from rapyer.utils.redis import refresh_ttl_if_needed
-from typing_extensions import TypeAlias
 
 T = TypeVar("T")
 

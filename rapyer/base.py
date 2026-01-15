@@ -42,7 +42,11 @@ from rapyer.utils.annotation import (
     field_with_flag,
     DYNAMIC_CLASS_DOC,
 )
-from rapyer.utils.fields import get_all_pydantic_annotation, is_redis_field
+from rapyer.utils.fields import (
+    get_all_pydantic_annotation,
+    is_redis_field,
+    is_type_json_serializable,
+)
 from rapyer.utils.pythonic import safe_issubclass
 from rapyer.utils.redis import (
     acquire_lock,
@@ -53,26 +57,35 @@ from rapyer.utils.redis import (
 logger = logging.getLogger("rapyer")
 
 
-def make_pickle_field_serializer(field: str, safe_load: bool = False):
+def make_pickle_field_serializer(
+    field: str, safe_load: bool = False, can_json: bool = False
+):
     @field_serializer(field, when_used="json-unless-none")
-    def pickle_field_serializer(v, info: FieldSerializationInfo):
+    @classmethod
+    def pickle_field_serializer(cls, v, info: FieldSerializationInfo):
         ctx = info.context or {}
         should_serialize_redis = ctx.get(REDIS_DUMP_FLAG_NAME, False)
-        if should_serialize_redis:
+        # Skip pickling if field CAN be JSON serialized AND user prefers JSON dump
+        field_can_be_json = can_json and cls.Meta.prefer_normal_json_dump
+        if should_serialize_redis and not field_can_be_json:
             return base64.b64encode(pickle.dumps(v)).decode("utf-8")
         return v
 
     pickle_field_serializer.__name__ = f"__serialize_{field}"
 
     @field_validator(field, mode="before")
-    def pickle_field_validator(v, info: ValidationInfo):
+    @classmethod
+    def pickle_field_validator(cls, v, info: ValidationInfo):
         if v is None:
             return v
         ctx = info.context or {}
         should_serialize_redis = ctx.get(REDIS_DUMP_FLAG_NAME, False)
         if should_serialize_redis:
             try:
-                return pickle.loads(base64.b64decode(v))
+                field_can_be_json = can_json and cls.Meta.prefer_normal_json_dump
+                if should_serialize_redis and not field_can_be_json:
+                    return pickle.loads(base64.b64decode(v))
+                return v
             except Exception as e:
                 if safe_load:
                     failed_fields = ctx.setdefault(FAILED_FIELDS_KEY, set())
@@ -85,6 +98,25 @@ def make_pickle_field_serializer(field: str, safe_load: bool = False):
     pickle_field_validator.__name__ = f"__deserialize_{field}"
 
     return pickle_field_serializer, pickle_field_validator
+
+
+# TODO: Remove in next major version (2.0) - backward compatibility for pickled data
+# This validator handles loading old pickled data for fields that are now JSON-serializable.
+# In 2.0, remove this function and the validator registration in __init_subclass__.
+def make_backward_compat_validator(field: str):
+    @field_validator(field, mode="before")
+    def backward_compat_validator(v, info: ValidationInfo):
+        ctx = info.context or {}
+        should_deserialize_redis = ctx.get(REDIS_DUMP_FLAG_NAME, False)
+        if should_deserialize_redis and isinstance(v, str):
+            try:
+                return pickle.loads(base64.b64decode(v))
+            except Exception:
+                pass
+        return v
+
+    backward_compat_validator.__name__ = f"__backward_compat_{field}"
+    return backward_compat_validator
 
 
 class AtomicRedisModel(BaseModel):
@@ -246,13 +278,22 @@ class AtomicRedisModel(BaseModel):
             if not is_redis_field(attr_name, attr_type):
                 continue
             if original_annotations[attr_name] == attr_type:
-                is_field_marked_safe = attr_name in cls._safe_load_fields
-                is_safe_load = is_field_marked_safe or cls.Meta.safe_load_all
-                serializer, validator = make_pickle_field_serializer(
-                    attr_name, safe_load=is_safe_load
-                )
-                setattr(cls, serializer.__name__, serializer)
-                setattr(cls, validator.__name__, validator)
+                default_value = cls.__dict__.get(attr_name, None)
+                can_json = is_type_json_serializable(attr_type, default_value)
+                should_json_serialize = can_json and cls.Meta.prefer_normal_json_dump
+
+                if not should_json_serialize:
+                    is_field_marked_safe = attr_name in cls._safe_load_fields
+                    is_safe_load = is_field_marked_safe or cls.Meta.safe_load_all
+                    serializer, validator = make_pickle_field_serializer(
+                        attr_name, safe_load=is_safe_load, can_json=can_json
+                    )
+                    setattr(cls, serializer.__name__, serializer)
+                    setattr(cls, validator.__name__, validator)
+                else:
+                    # TODO: Remove in 2.0 - backward compatibility for old pickled data
+                    validator = make_backward_compat_validator(attr_name)
+                    setattr(cls, validator.__name__, validator)
                 continue
 
         # Update the redis model list for initialization

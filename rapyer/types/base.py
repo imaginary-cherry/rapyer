@@ -8,12 +8,13 @@ from typing import get_args, Any, TypeVar, Generic
 from pydantic import GetCoreSchemaHandler, TypeAdapter
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, CoreSchema, SerializationInfo
+from redis.commands.search.field import TextField
+from typing_extensions import deprecated
+
 from rapyer.context import _context_var
 from rapyer.errors.base import CantSerializeRedisValueError
 from rapyer.typing_support import Self
 from rapyer.utils.redis import refresh_ttl_if_needed
-from redis.commands.search.field import TextField
-from typing_extensions import deprecated
 
 logger = logging.getLogger("rapyer")
 

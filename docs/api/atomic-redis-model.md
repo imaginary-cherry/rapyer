@@ -305,9 +305,17 @@ async with user.apipeline() as pipeline_user:
 class User(AtomicRedisModel):
     name: str
     age: int
-    
+
     Meta = RedisConfig(redis=redis_client, ttl=3600)  # Expire after 1 hour
 ```
+
+**Available options:**
+
+- `redis` - Redis client instance
+- `ttl` - Time-to-live in seconds
+- `refresh_ttl` - Refresh TTL on read/write (default: `True`)
+- `safe_load_all` - Treat all non-Redis fields as SafeLoad (default: `False`)
+- `prefer_normal_json_dump` - Use JSON serialization for compatible fields instead of pickle (default: `False`)
 
 ### Special Behaviors
 
