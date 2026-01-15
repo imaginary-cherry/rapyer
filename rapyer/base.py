@@ -102,8 +102,6 @@ def make_pickle_field_serializer(
 def make_backward_compat_validator(field: str):
     @field_validator(field, mode="before")
     def backward_compat_validator(v, info: ValidationInfo):
-        if v is None:
-            return v
         ctx = info.context or {}
         should_deserialize_redis = ctx.get(REDIS_DUMP_FLAG_NAME, False)
         if should_deserialize_redis and isinstance(v, str):
