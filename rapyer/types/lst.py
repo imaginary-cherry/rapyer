@@ -115,7 +115,7 @@ class RedisList(list, GenericRedisType[T]):
             self.pipeline.eval(
                 REMOVE_RANGE_SCRIPT, 1, self.key, self.json_path, start, end
             )
-        del self[start:end]
+            del self[start:end]
 
     async def aappend(self, __object):
         self.append(__object)
