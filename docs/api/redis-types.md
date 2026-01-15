@@ -285,6 +285,30 @@ These methods work immediately in pipeline contexts and batch operations:
 #### `clear()`
 **Description:** Removes all items from list. In pipeline context, operation is batched.
 
+#### `remove_range(start, end)`
+**Parameters:**
+- `start` (int): Start index (inclusive). Supports negative indices.
+- `end` (int): End index (exclusive). Supports negative indices.
+**Description:** Removes items from index `start` to `end` (exclusive), similar to `del list[start:end]`. Only operates within a pipeline context - when called outside a pipeline, no changes are made to either the local list or Redis. Uses an atomic Lua script to avoid race conditions.
+
+**Index Handling:**
+- Negative indices count from the end (e.g., `-1` is the last element)
+- If `end` exceeds list length, it is trimmed to the list length
+- If `start` exceeds list length, no operation is performed
+
+```python
+playlist = Playlist(name="My Songs", songs=["a", "b", "c", "d", "e"])
+await playlist.asave()
+
+async with playlist.apipeline():
+    playlist.songs.remove_range(1, 3)  # Removes "b" and "c"
+    # Result: ["a", "d", "e"]
+
+# Negative indices
+async with playlist.apipeline():
+    playlist.songs.remove_range(-2, -1)  # Removes second-to-last item
+```
+
 #### `__setitem__(index, value)`
 **Parameters:**
 - `index` (int): Index to set
