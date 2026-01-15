@@ -36,7 +36,7 @@ def test_is_type_json_serializable_with_value_sanity(typ, test_value, expected):
     assert result == expected
 
 
-def test_is_type_json_serializable_without_test_value_sanity():
+def test_is_type_json_serializable_with_test_value_sanity():
     # Arrange & Act
     result_str_enum = is_type_json_serializable(StrStatus, StrStatus.ACTIVE)
     result_int_enum = is_type_json_serializable(IntPriority, IntPriority.LOW)
