@@ -30,14 +30,19 @@ local result = cjson.decode(arr_json)
 local arr = result[1]
 
 local new_arr = {}
-for i, v in ipairs(arr) do
-    local py_idx = i - 1
-    if py_idx < start_idx or py_idx >= end_idx then
-        new_arr[#new_arr + 1] = v
-    end
+local j = 1
+
+for i = 1, start_idx do
+    new_arr[j] = arr[i]
+    j = j + 1
 end
 
-local encoded = #new_arr == 0 and '[]' or cjson.encode(new_arr)
+for i = end_idx + 1, n do
+    new_arr[j] = arr[i]
+    j = j + 1
+end
+
+local encoded = j == 1 and '[]' or cjson.encode(new_arr)
 redis.call('JSON.SET', key, path, encoded)
 return true
 """
