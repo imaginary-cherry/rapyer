@@ -65,13 +65,17 @@ def is_redis_field(field_name, field_annotation):
     )
 
 
+def is_field_default_has_value(field_default):
+    return field_default is not PydanticUndefined and field_default is not None
+
+
 def is_type_json_serializable(typ: type, test_value: Any) -> bool:
     try:
         adapter = TypeAdapter(typ)
         if isinstance(test_value, FieldInfo):
-            if test_value.default is not PydanticUndefined:
+            if is_field_default_has_value(test_value.default):
                 test_value = test_value.default
-            elif test_value.default_factory is not PydanticUndefined:
+            elif is_field_default_has_value(test_value.default_factory):
                 test_value = test_value.default_factory()
             else:
                 return False
