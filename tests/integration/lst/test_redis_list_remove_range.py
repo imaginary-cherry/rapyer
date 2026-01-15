@@ -81,3 +81,80 @@ async def test_redis_list_remove_range_combined_with_other_ops_with_pipeline_san
     # Assert - All changes should be applied after pipeline
     final_model = await ComprehensiveTestModel.aget(model.key)
     assert final_model.tags == ["a", "d", "e", "f"]
+
+
+@pytest.mark.parametrize(
+    ["initial_tags", "start", "end", "expected_tags"],
+    [
+        [["a", "b", "c", "d", "e"], 3, 100, ["a", "b", "c"]],
+        [["a", "b", "c"], 1, 10, ["a"]],
+        [["a", "b"], 0, 999, []],
+    ],
+)
+@pytest.mark.asyncio
+async def test_redis_list_remove_range_end_over_len_with_pipeline_edge_case(
+    initial_tags, start, end, expected_tags
+):
+    # Arrange
+    model = ComprehensiveTestModel(tags=initial_tags)
+    await model.asave()
+
+    # Act
+    async with model.apipeline():
+        model.tags.remove_range(start, end)
+
+    # Assert - end should be trimmed to list length
+    final_model = await ComprehensiveTestModel.aget(model.key)
+    assert final_model.tags == expected_tags
+
+
+@pytest.mark.parametrize(
+    ["initial_tags", "start", "end"],
+    [
+        [["a", "b", "c"], 10, 20],
+        [["a", "b", "c"], 5, 100],
+        [["a", "b", "c"], 3, 5],
+    ],
+)
+@pytest.mark.asyncio
+async def test_redis_list_remove_range_start_over_len_with_pipeline_edge_case(
+    initial_tags, start, end
+):
+    # Arrange
+    model = ComprehensiveTestModel(tags=initial_tags)
+    await model.asave()
+
+    # Act
+    async with model.apipeline():
+        model.tags.remove_range(start, end)
+
+    # Assert - no operation should be done when start >= len
+    final_model = await ComprehensiveTestModel.aget(model.key)
+    assert final_model.tags == initial_tags
+
+
+@pytest.mark.parametrize(
+    ["initial_tags", "start", "end", "expected_tags"],
+    [
+        [["a", "b", "c", "d", "e"], -2, 5, ["a", "b", "c"]],
+        [["a", "b", "c", "d", "e"], 0, -1, ["e"]],
+        [["a", "b", "c", "d", "e"], 1, -1, ["a", "e"]],
+        [["a", "b", "c", "d", "e"], -3, -1, ["a", "b", "e"]],
+        [["a", "b", "c"], -1, 3, ["a", "b"]],
+    ],
+)
+@pytest.mark.asyncio
+async def test_redis_list_remove_range_negative_indices_with_pipeline_edge_case(
+    initial_tags, start, end, expected_tags
+):
+    # Arrange
+    model = ComprehensiveTestModel(tags=initial_tags)
+    await model.asave()
+
+    # Act
+    async with model.apipeline():
+        model.tags.remove_range(start, end)
+
+    # Assert - negative indices should count from end like Python
+    final_model = await ComprehensiveTestModel.aget(model.key)
+    assert final_model.tags == expected_tags
