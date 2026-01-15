@@ -3,6 +3,8 @@ from datetime import datetime
 import pytest
 import pytest_asyncio
 
+from rapyer.types.base import REDIS_DUMP_FLAG_NAME
+
 from tests.models.collection_types import (
     SimpleListModel,
     SimpleDictModel,
@@ -201,13 +203,18 @@ async def test_redis_dump_all_types_with_json_sanity(model_instance, expected_ty
 
     # Act
     result = model_instance.redis_dump()
+    loaded_model = model_instance.__class__.model_validate(
+        result, context={REDIS_DUMP_FLAG_NAME: True}
+    )
 
-    # Assert
+    # Assert - types are correct
     assert set(result.keys()) == set(expected_types.keys())
     for key, expected_type in expected_types.items():
         assert isinstance(
             result[key], expected_type
         ), f"Key '{key}' has wrong type: expected {expected_type}, got {type(result[key])}"
+    # Assert - loaded model equals original
+    assert loaded_model == model_instance
 
 
 def test_model_dump_with_unsupported_redis_types_sanity():
@@ -241,10 +248,14 @@ async def test_int_enum_field_serializes_as_plain_int_sanity():
 
     # Act
     redis_data = model.redis_dump()
+    loaded_model = ModelWithIntEnumDefault.model_validate(
+        redis_data, context={REDIS_DUMP_FLAG_NAME: True}
+    )
 
     # Assert
     assert redis_data["priority"] == 3
     assert redis_data["name"] == "my_model"
+    assert loaded_model == model
 
 
 @pytest.mark.asyncio
@@ -255,10 +266,14 @@ async def test_str_enum_field_serializes_as_plain_string_sanity():
 
     # Act
     redis_data = model.redis_dump()
+    loaded_model = ModelWithStrEnumDefault.model_validate(
+        redis_data, context={REDIS_DUMP_FLAG_NAME: True}
+    )
 
     # Assert
     assert redis_data["status"] == "inactive"
     assert redis_data["name"] == "my_model"
+    assert loaded_model == model
 
 
 @pytest.mark.asyncio
@@ -269,10 +284,14 @@ async def test_normal_dump_non_redis_fields__field_default_factory__sanity():
 
     # Act
     redis_data = model.redis_dump()
+    loaded_model = ModelWithStrEnumInList.model_validate(
+        redis_data, context={REDIS_DUMP_FLAG_NAME: True}
+    )
 
     # Assert
     assert redis_data["name"] == "my_model"
     assert redis_data["statuses"] == []
+    assert loaded_model == model
 
 
 @pytest.mark.asyncio
@@ -283,9 +302,13 @@ async def test_str_enum_in_list_field_serializes_as_plain_strings_sanity():
 
     # Act
     redis_data = model.redis_dump()
+    loaded_model = ModelWithEnumCreatedByFactory.model_validate(
+        redis_data, context={REDIS_DUMP_FLAG_NAME: True}
+    )
 
     # Assert
     assert redis_data["status"] == "a"
+    assert loaded_model == model
 
 
 @pytest.mark.asyncio
@@ -297,10 +320,14 @@ async def test_nested_model_with_enum_serializes_correctly_sanity():
 
     # Act
     redis_data = model.redis_dump()
+    loaded_model = ModelWithNestedEnum.model_validate(
+        redis_data, context={REDIS_DUMP_FLAG_NAME: True}
+    )
 
     # Assert
     assert redis_data["inner"]["status"] == "inactive"
     assert redis_data["name"] == "my_model"
+    assert loaded_model == model
 
 
 @pytest.mark.asyncio
@@ -311,10 +338,14 @@ async def test_inherited_enum_field_serializes_as_plain_string_sanity():
 
     # Act
     redis_data = model.redis_dump()
+    loaded_model = AdminUserModel.model_validate(
+        redis_data, context={REDIS_DUMP_FLAG_NAME: True}
+    )
 
     # Assert
     assert redis_data["role"] == "admin"
     assert redis_data["name"] == "admin_user"
+    assert loaded_model == model
 
 
 @pytest.mark.asyncio
@@ -325,10 +356,14 @@ async def test_non_redis_fields_serialize_as_plain_values_sanity():
 
     # Act
     redis_data = model.redis_dump()
+    loaded_model = StrModel.model_validate(
+        redis_data, context={REDIS_DUMP_FLAG_NAME: True}
+    )
 
     # Assert
     assert redis_data["name"] == "test_name"
     assert redis_data["description"] == "test_description"
+    assert loaded_model == model
 
 
 @pytest.mark.asyncio
@@ -349,6 +384,9 @@ async def test_non_redis_fields_in_nested_base_model_serialize_correctly_sanity(
 
     # Act
     redis_data = model.redis_dump()
+    loaded_model = OuterModel.model_validate(
+        redis_data, context={REDIS_DUMP_FLAG_NAME: True}
+    )
 
     # Assert
     assert redis_data["middle_model"]["inner_model"]["lst"] == ["item1", "item2"]
@@ -357,6 +395,7 @@ async def test_non_redis_fields_in_nested_base_model_serialize_correctly_sanity(
     assert redis_data["middle_model"]["metadata"] == {"key1": "value1", "key2": "value2"}
     assert redis_data["user_data"] == {"user_id": 123}
     assert redis_data["items"] == [1, 2, 3]
+    assert loaded_model == model
 
 
 @pytest.mark.asyncio
@@ -381,6 +420,9 @@ async def test_non_redis_fields_inherited_from_parent_serialize_correctly_sanity
 
     # Act
     redis_data = model.redis_dump()
+    loaded_model = AdminUserModel.model_validate(
+        redis_data, context={REDIS_DUMP_FLAG_NAME: True}
+    )
 
     # Assert - inherited fields from BaseUserModel
     assert redis_data["name"] == "admin_test"
@@ -399,6 +441,9 @@ async def test_non_redis_fields_inherited_from_parent_serialize_correctly_sanity
     assert redis_data["admin_notes"] == "Test admin notes"
     assert redis_data["access_codes"] == [1001, 1002, 1003]
 
+    # Assert - loaded model matches original
+    assert loaded_model == model
+
 
 @pytest.mark.asyncio
 async def test_redis_dump_with_per_model_prefer_json_dump_config_sanity():
@@ -407,7 +452,11 @@ async def test_redis_dump_with_per_model_prefer_json_dump_config_sanity():
 
     # Act
     redis_data = model.redis_dump()
+    loaded_model = ModelWithPreferJsonDumpConfig.model_validate(
+        redis_data, context={REDIS_DUMP_FLAG_NAME: True}
+    )
 
     # Assert
     assert redis_data["status"] == "inactive"
     assert redis_data["name"] == "my_model"
+    assert loaded_model == model
