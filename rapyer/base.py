@@ -73,14 +73,18 @@ def make_pickle_field_serializer(
     pickle_field_serializer.__name__ = f"__serialize_{field}"
 
     @field_validator(field, mode="before")
-    def pickle_field_validator(v, info: ValidationInfo):
+    @classmethod
+    def pickle_field_validator(cls, v, info: ValidationInfo):
         if v is None:
             return v
         ctx = info.context or {}
         should_serialize_redis = ctx.get(REDIS_DUMP_FLAG_NAME, False)
         if should_serialize_redis:
             try:
-                return pickle.loads(base64.b64decode(v))
+                field_can_be_json = can_json and cls.Meta.prefer_normal_json_dump
+                if should_serialize_redis and not field_can_be_json:
+                    return pickle.loads(base64.b64decode(v))
+                return v
             except Exception as e:
                 if safe_load:
                     failed_fields = ctx.setdefault(FAILED_FIELDS_KEY, set())
@@ -274,16 +278,14 @@ class AtomicRedisModel(BaseModel):
                 continue
             if original_annotations[attr_name] == attr_type:
                 default_value = cls.__dict__.get(attr_name, None)
-                can_json_serialize = (
-                    is_type_json_serializable(attr_type, default_value)
-                    and cls.Meta.prefer_normal_json_dump
-                )
+                can_json = is_type_json_serializable(attr_type, default_value)
+                should_json_serialize = can_json and cls.Meta.prefer_normal_json_dump
 
-                if not can_json_serialize:
+                if not should_json_serialize:
                     is_field_marked_safe = attr_name in cls._safe_load_fields
                     is_safe_load = is_field_marked_safe or cls.Meta.safe_load_all
                     serializer, validator = make_pickle_field_serializer(
-                        attr_name, safe_load=is_safe_load
+                        attr_name, safe_load=is_safe_load, can_json=can_json
                     )
                     setattr(cls, serializer.__name__, serializer)
                     setattr(cls, validator.__name__, validator)
