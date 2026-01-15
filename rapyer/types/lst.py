@@ -15,6 +15,33 @@ from rapyer.utils.redis import refresh_ttl_if_needed
 
 T = TypeVar("T")
 
+REMOVE_RANGE_SCRIPT = """
+local key = KEYS[1]
+local path = ARGV[1]
+local start_idx = tonumber(ARGV[2])
+local end_idx = tonumber(ARGV[3])
+
+local arr_json = redis.call('JSON.GET', key, path)
+if not arr_json or arr_json == 'null' then
+    return nil
+end
+
+local result = cjson.decode(arr_json)
+local arr = result[1]
+
+local new_arr = {}
+for i, v in ipairs(arr) do
+    local py_idx = i - 1
+    if py_idx < start_idx or py_idx >= end_idx then
+        new_arr[#new_arr + 1] = v
+    end
+end
+
+local encoded = #new_arr == 0 and '[]' or cjson.encode(new_arr)
+redis.call('JSON.SET', key, path, encoded)
+return true
+"""
+
 
 class RedisList(list, GenericRedisType[T]):
     original_type = list
@@ -70,6 +97,13 @@ class RedisList(list, GenericRedisType[T]):
         if self.pipeline:
             self.pipeline.json().set(self.key, self.json_path, [])
         return super().clear()
+
+    def remove_range(self, start: int, end: int):
+        if self.pipeline:
+            self.pipeline.eval(
+                REMOVE_RANGE_SCRIPT, 1, self.key, self.json_path, start, end
+            )
+        del self[start:end]
 
     async def aappend(self, __object):
         self.append(__object)
