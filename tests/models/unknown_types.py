@@ -5,6 +5,7 @@ from pydantic import GetCoreSchemaHandler, BaseModel, ConfigDict, Field
 from pydantic_core import core_schema
 
 from rapyer.base import AtomicRedisModel
+from rapyer.config import RedisConfig
 
 
 class StrStatus(str, Enum):
@@ -174,3 +175,9 @@ class ModelWithCustomTypes(AtomicRedisModel):
     simple_custom: CustomSerializableType
     complex_custom: ComplexCustomType
     pydantic_nested: NestedPydanticModel
+
+
+class ModelWithPreferJsonDumpConfig(AtomicRedisModel):
+    Meta = RedisConfig(prefer_normal_json_dump=True)
+    status: StrStatus = StrStatus.ACTIVE
+    name: str = "test"

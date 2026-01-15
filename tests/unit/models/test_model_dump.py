@@ -48,6 +48,7 @@ from tests.models.unknown_types import (
     InnerModelWithEnum,
     ModelWithNestedEnum,
     ModelWithEnumCreatedByFactory,
+    ModelWithPreferJsonDumpConfig,
 )
 
 
@@ -397,3 +398,16 @@ async def test_non_redis_fields_inherited_from_parent_serialize_correctly_sanity
     assert redis_data["is_super_admin"] is True
     assert redis_data["admin_notes"] == "Test admin notes"
     assert redis_data["access_codes"] == [1001, 1002, 1003]
+
+
+@pytest.mark.asyncio
+async def test_redis_dump_with_per_model_prefer_json_dump_config_sanity():
+    # Arrange
+    model = ModelWithPreferJsonDumpConfig(status=StrStatus.INACTIVE, name="my_model")
+
+    # Act
+    redis_data = model.redis_dump()
+
+    # Assert
+    assert redis_data["status"] == "inactive"
+    assert redis_data["name"] == "my_model"
