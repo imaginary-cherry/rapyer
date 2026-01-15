@@ -22,10 +22,6 @@ async def init_rapyer(
         if prefer_normal_json_dump is not None:
             model.Meta.prefer_normal_json_dump = prefer_normal_json_dump
 
-        # Swap serializers and rebuild if prefer_normal_json_dump is enabled
-        if model.Meta.prefer_normal_json_dump:
-            model.model_rebuild(force=True)
-
         # Initialize model fields
         model.init_class()
 
