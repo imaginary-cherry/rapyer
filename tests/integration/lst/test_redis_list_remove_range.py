@@ -158,3 +158,29 @@ async def test_redis_list_remove_range_negative_indices_with_pipeline_edge_case(
     # Assert - negative indices should count from end like Python
     final_model = await ComprehensiveTestModel.aget(model.key)
     assert final_model.tags == expected_tags
+
+
+@pytest.mark.parametrize(
+    ["initial_tags", "start", "end"],
+    [
+        [["a", "b", "c", "d", "e"], 1, 3],
+        [["a", "b", "c", "d", "e"], -2, 5],
+    ],
+)
+@pytest.mark.asyncio
+async def test_redis_list_remove_range_without_pipeline_no_changes_sanity(
+    initial_tags, start, end
+):
+    # Arrange
+    model = ComprehensiveTestModel(tags=initial_tags.copy())
+    await model.asave()
+
+    # Act - call remove_range outside of pipeline
+    model.tags.remove_range(start, end)
+
+    # Assert - local list should NOT be modified (no pipeline)
+    assert list(model.tags) == initial_tags
+
+    # Assert - Redis should NOT be modified (no pipeline to execute)
+    loaded_model = await ComprehensiveTestModel.aget(model.key)
+    assert loaded_model.tags == initial_tags
