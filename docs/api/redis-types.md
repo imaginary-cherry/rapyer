@@ -289,7 +289,8 @@ These methods work immediately in pipeline contexts and batch operations:
 **Parameters:**
 - `start` (int): Start index (inclusive). Supports negative indices.
 - `end` (int): End index (exclusive). Supports negative indices.
-**Description:** Removes items from index `start` to `end` (exclusive), similar to `del list[start:end]`. Only operates within a pipeline context - when called outside a pipeline, no changes are made to either the local list or Redis. Uses an atomic Lua script to avoid race conditions.
+**Description:** Removes items from index `start` to `end` (exclusive), similar to `del list[start:end]`. 
+This function has effect only within a pipeline context - when called outside a pipeline, no changes are made to either the local list or Redis. Uses an atomic Lua script to avoid race conditions.
 
 **Index Handling:**
 - Negative indices count from the end (e.g., `-1` is the last element)
