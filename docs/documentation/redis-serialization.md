@@ -26,7 +26,24 @@ With the default behavior, the `status` field is stored as a pickled value like 
 
 ## Enabling JSON Serialization
 
-To store JSON-serializable fields as readable values instead of pickled data, enable `prefer_normal_json_dump`:
+To store JSON-serializable fields as readable values instead of pickled data, enable `prefer_normal_json_dump`. There are two ways to do this:
+
+### Global Configuration
+
+Enable for all models via `init_rapyer`:
+
+```python
+from rapyer import init_rapyer
+
+await init_rapyer(
+    redis="redis://localhost:6379/0",
+    prefer_normal_json_dump=True
+)
+```
+
+### Per-Model Configuration
+
+Enable for a specific model via the `Meta` field:
 
 ```python
 from enum import Enum
@@ -44,7 +61,7 @@ class User(AtomicRedisModel):
     status: Status = Status.ACTIVE
 ```
 
-Now the `status` field is stored as `"active"` in Redis - readable and inspectable.
+With either configuration, the `status` field is stored as `"active"` in Redis - readable and inspectable.
 
 ## How It Works
 
