@@ -314,3 +314,86 @@ async def test_inherited_enum_field_serializes_as_plain_string_sanity():
     # Assert
     assert redis_data["role"] == "admin"
     assert redis_data["name"] == "admin_user"
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("prefer_json_dump")
+async def test_non_redis_fields_serialize_as_plain_values_sanity():
+    # Arrange
+    model = StrModel(name="test_name", description="test_description")
+
+    # Act
+    redis_data = model.redis_dump()
+
+    # Assert
+    assert redis_data["name"] == "test_name"
+    assert redis_data["description"] == "test_description"
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("prefer_json_dump")
+async def test_non_redis_fields_in_nested_base_model_serialize_correctly_sanity():
+    # Arrange
+    inner = InnerMostModel(lst=["item1", "item2"], counter=42)
+    middle = MiddleModel(
+        inner_model=inner,
+        tags=["tag1", "tag2"],
+        metadata={"key1": "value1", "key2": "value2"},
+    )
+    model = OuterModel(
+        middle_model=middle,
+        user_data={"user_id": 123},
+        items=[1, 2, 3],
+    )
+
+    # Act
+    redis_data = model.redis_dump()
+
+    # Assert
+    assert redis_data["middle_model"]["inner_model"]["lst"] == ["item1", "item2"]
+    assert redis_data["middle_model"]["inner_model"]["counter"] == 42
+    assert redis_data["middle_model"]["tags"] == ["tag1", "tag2"]
+    assert redis_data["middle_model"]["metadata"] == {"key1": "value1", "key2": "value2"}
+    assert redis_data["user_data"] == {"user_id": 123}
+    assert redis_data["items"] == [1, 2, 3]
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("prefer_json_dump")
+async def test_non_redis_fields_inherited_from_parent_serialize_correctly_sanity():
+    # Arrange
+    model = AdminUserModel(
+        name="admin_test",
+        email="admin@test.com",
+        age=30,
+        is_active=True,
+        tags=["admin", "superuser"],
+        role=UserRole.ADMIN,
+        admin_level=5,
+        permissions=["read", "write", "delete"],
+        managed_users={"user1": "John", "user2": "Jane"},
+        is_super_admin=True,
+        admin_notes="Test admin notes",
+        scores=[100, 200, 300],
+        access_codes=[1001, 1002, 1003],
+    )
+
+    # Act
+    redis_data = model.redis_dump()
+
+    # Assert - inherited fields from BaseUserModel
+    assert redis_data["name"] == "admin_test"
+    assert redis_data["email"] == "admin@test.com"
+    assert redis_data["age"] == 30
+    assert redis_data["is_active"] is True
+    assert redis_data["tags"] == ["admin", "superuser"]
+    assert redis_data["role"] == "admin"
+    assert redis_data["scores"] == [100, 200, 300]
+
+    # Assert - own fields from AdminUserModel
+    assert redis_data["admin_level"] == 5
+    assert redis_data["permissions"] == ["read", "write", "delete"]
+    assert redis_data["managed_users"] == {"user1": "John", "user2": "Jane"}
+    assert redis_data["is_super_admin"] is True
+    assert redis_data["admin_notes"] == "Test admin notes"
+    assert redis_data["access_codes"] == [1001, 1002, 1003]
