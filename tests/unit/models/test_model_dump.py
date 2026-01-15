@@ -53,15 +53,48 @@ from tests.models.unknown_types import (
 )
 
 
+PREFER_JSON_DUMP_MODELS = [
+    StrModel,
+    DirectRedisStringModel,
+    IntModel,
+    DirectRedisIntModel,
+    FloatModel,
+    BoolModel,
+    BytesModel,
+    DirectRedisBytesModel,
+    DatetimeModel,
+    DatetimeTimestampModel,
+    SimpleListModel,
+    DirectRedisListModel,
+    SimpleDictModel,
+    DirectRedisDictModel,
+    TaskModel,
+    MixedTypesModel,
+    MixedDirectRedisTypesModel,
+    NestedListModel,
+    NestedDictModel,
+    ListOfDictsModel,
+    DictOfListsModel,
+    OuterModel,
+    ModelWithIntEnumDefault,
+    ModelWithStrEnumDefault,
+    ModelWithStrEnumInList,
+    ModelWithEnumCreatedByFactory,
+    ModelWithNestedEnum,
+    AdminUserModel,
+]
+
+
 @pytest_asyncio.fixture
 async def prefer_json_dump():
-    # All models share the same Meta class, so store original ONCE before modifying
-    from rapyer.base import AtomicRedisModel
-
-    original_preference = AtomicRedisModel.Meta.prefer_normal_json_dump
-    AtomicRedisModel.Meta.prefer_normal_json_dump = True
+    original_values = {
+        model: model.Meta.prefer_normal_json_dump for model in PREFER_JSON_DUMP_MODELS
+    }
+    for model in PREFER_JSON_DUMP_MODELS:
+        model.Meta.prefer_normal_json_dump = True
     yield
-    AtomicRedisModel.Meta.prefer_normal_json_dump = original_preference
+    for model, original_value in original_values.items():
+        model.Meta.prefer_normal_json_dump = original_value
 
 
 @pytest.mark.asyncio
