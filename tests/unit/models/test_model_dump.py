@@ -53,39 +53,13 @@ from tests.models.unknown_types import (
 
 @pytest_asyncio.fixture
 async def prefer_json_dump():
-    models = [
-        StrModel,
-        IntModel,
-        FloatModel,
-        BoolModel,
-        BytesModel,
-        DatetimeModel,
-        DatetimeTimestampModel,
-        TaskModel,
-        DirectRedisStringModel,
-        DirectRedisIntModel,
-        DirectRedisBytesModel,
-        DirectRedisListModel,
-        DirectRedisDictModel,
-        MixedDirectRedisTypesModel,
-        NestedListModel,
-        NestedDictModel,
-        ListOfDictsModel,
-        DictOfListsModel,
-        OuterModel,
-        ModelWithIntEnumDefault,
-    ]
-    original_preference = {}
+    # All models share the same Meta class, so store original ONCE before modifying
+    from rapyer.base import AtomicRedisModel
 
-    for model in models:
-        original_preference[model] = model.Meta.prefer_normal_json_dump
-        model.Meta.prefer_normal_json_dump = True
-        model.model_rebuild(force=True)
+    original_preference = AtomicRedisModel.Meta.prefer_normal_json_dump
+    AtomicRedisModel.Meta.prefer_normal_json_dump = True
     yield
-    # Restore pickle serializers for all models
-    for model in models:
-        model.Meta.prefer_normal_json_dump = original_preference[model]
-        model.model_rebuild(force=True)
+    AtomicRedisModel.Meta.prefer_normal_json_dump = original_preference
 
 
 @pytest.mark.asyncio
