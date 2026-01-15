@@ -26,11 +26,13 @@ class PlainEnum(Enum):
 
 
 class ModelWithStrEnumDefault(AtomicRedisModel):
+    Meta: ClassVar[RedisConfig] = RedisConfig(prefer_normal_json_dump=True)
     status: StrStatus = StrStatus.ACTIVE
     name: str = "test"
 
 
 class ModelWithIntEnumDefault(AtomicRedisModel):
+    Meta: ClassVar[RedisConfig] = RedisConfig(prefer_normal_json_dump=True)
     priority: IntPriority = Field(default=IntPriority.LOW)
     name: str = "test"
 
@@ -40,11 +42,13 @@ class ModelWithEnumCreatedByFactory(AtomicRedisModel):
 
 
 class ModelWithStrEnumInList(AtomicRedisModel):
+    Meta: ClassVar[RedisConfig] = RedisConfig(prefer_normal_json_dump=True)
     statuses: list[StrStatus] = Field(default_factory=list)
     name: str = "test"
 
 
 class ModelWithStrEnumInDict(AtomicRedisModel):
+    Meta: ClassVar[RedisConfig] = RedisConfig(prefer_normal_json_dump=True)
     status_map: dict[str, StrStatus] = {}
     name: str = "test"
 

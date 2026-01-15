@@ -97,6 +97,14 @@ from tests.models.simple_types import (
 # Specialized types
 from tests.models.specialized import UserModel
 
+# Unknown types (JSON serializable enums)
+from tests.models.unknown_types import (
+    ModelWithStrEnumDefault,
+    ModelWithIntEnumDefault,
+    ModelWithStrEnumInList,
+    ModelWithStrEnumInDict,
+)
+
 
 @pytest_asyncio.fixture
 async def redis_client():
@@ -189,6 +197,11 @@ async def real_redis_client(redis_client):
         # Index types
         ParentWithIndexModel,
         ChildWithParentModel,
+        # Unknown types (JSON serializable enums)
+        ModelWithStrEnumDefault,
+        ModelWithIntEnumDefault,
+        ModelWithStrEnumInList,
+        ModelWithStrEnumInDict,
     ]
 
     # Configure Redis client for all models
