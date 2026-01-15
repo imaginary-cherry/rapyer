@@ -48,6 +48,7 @@ nav:
     - Model Lifecycle: documentation/model-lifecycle.md
     - CRUD Operations: documentation/crud-operations.md
     - Initialization: documentation/initialization.md
+    - Redis Serialization: documentation/redis-serialization.md
     - Redis Types: documentation/redis-types.md
     - Atomic Actions: documentation/atomic-actions.md
     - Key adjustment: documentation/setting-key-field.md
