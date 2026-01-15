@@ -7,6 +7,9 @@ on:
       - develop
       - main
 
+permissions:
+  issues: write
+
 jobs:
   closeIssueOnPrMergeTrigger:
     if: github.event.pull_request.merged == true
