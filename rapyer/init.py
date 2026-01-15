@@ -6,7 +6,10 @@ from rapyer.base import REDIS_MODELS
 
 
 async def init_rapyer(
-    redis: str | Redis = None, ttl: int = None, override_old_idx: bool = True
+    redis: str | Redis = None,
+    ttl: int = None,
+    override_old_idx: bool = True,
+    prefer_normal_json_dump: bool = None,
 ):
     if isinstance(redis, str):
         redis = redis_async.from_url(redis, decode_responses=True, max_connections=20)
@@ -16,6 +19,12 @@ async def init_rapyer(
             model.Meta.redis = redis
         if ttl is not None:
             model.Meta.ttl = ttl
+        if prefer_normal_json_dump is not None:
+            model.Meta.prefer_normal_json_dump = prefer_normal_json_dump
+
+        # Swap serializers and rebuild if prefer_normal_json_dump is enabled
+        if model.Meta.prefer_normal_json_dump:
+            model.model_rebuild(force=True)
 
         # Initialize model fields
         model.init_class()
