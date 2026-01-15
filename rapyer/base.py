@@ -65,9 +65,8 @@ def make_pickle_field_serializer(
         ctx = info.context or {}
         should_serialize_redis = ctx.get(REDIS_DUMP_FLAG_NAME, False)
         # Skip pickling if field CAN be JSON serialized AND user prefers JSON dump
-        if should_serialize_redis and not (
-            can_json and cls.Meta.prefer_normal_json_dump
-        ):
+        field_can_be_json = can_json and cls.Meta.prefer_normal_json_dump
+        if should_serialize_redis and not field_can_be_json:
             return base64.b64encode(pickle.dumps(v)).decode("utf-8")
         return v
 
