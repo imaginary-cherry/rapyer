@@ -277,7 +277,10 @@ class AtomicRedisModel(BaseModel):
                 continue
             if original_annotations[attr_name] == attr_type:
                 default_value = cls.__dict__.get(attr_name, None)
-                can_json_serialize = is_type_json_serializable(attr_type, default_value)
+                can_json_serialize = (
+                    is_type_json_serializable(attr_type, default_value)
+                    and cls.Meta.prefer_normal_json_dump
+                )
 
                 if not can_json_serialize:
                     is_field_marked_safe = attr_name in cls._safe_load_fields
