@@ -1,6 +1,7 @@
 from typing import Type
 
 import pytest
+from pydantic import Field
 
 from rapyer.utils.fields import is_type_json_serializable
 from tests.models.unknown_types import (
@@ -55,3 +56,14 @@ def test_is_type_json_serializable_type_without_value_returns_false():
     # Assert
     assert result_type is False
     assert result_type_str is False
+
+
+@pytest.mark.parametrize(
+    ["typ", "default_value"], [[StrStatus, None], [IntPriority, Field()]]
+)
+def test_is_type_json_serializable_no_default_value(typ, default_value):
+    # Act
+    result = is_type_json_serializable(typ, default_value)
+
+    # Assert
+    assert result is False
