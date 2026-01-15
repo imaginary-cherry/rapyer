@@ -1,3 +1,5 @@
+from typing import Type
+
 import pytest
 
 from rapyer.utils.fields import is_type_json_serializable
@@ -35,22 +37,20 @@ def test_is_type_json_serializable_with_value_sanity(typ, test_value, expected):
 
 def test_is_type_json_serializable_without_test_value_sanity():
     # Arrange & Act
-    result_str_enum = is_type_json_serializable(StrStatus)
-    result_int_enum = is_type_json_serializable(IntPriority)
-    result_str = is_type_json_serializable(str)
+    result_str_enum = is_type_json_serializable(StrStatus, StrStatus.ACTIVE)
+    result_int_enum = is_type_json_serializable(IntPriority, IntPriority.LOW)
+    result_str = is_type_json_serializable(str, "str")
 
     # Assert
     assert result_str_enum is True
     assert result_int_enum is True
-    assert result_str is False
+    assert result_str is True
 
 
 def test_is_type_json_serializable_type_without_value_returns_false():
     # Arrange & Act
-    from typing import Type
-
-    result_type = is_type_json_serializable(type)
-    result_type_str = is_type_json_serializable(Type[str])
+    result_type = is_type_json_serializable(type, int)
+    result_type_str = is_type_json_serializable(Type[str], str)
 
     # Assert
     assert result_type is False

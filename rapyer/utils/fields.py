@@ -65,7 +65,7 @@ def is_redis_field(field_name, field_annotation):
     )
 
 
-def is_type_json_serializable(typ: type, test_value: Any = None) -> bool:
+def is_type_json_serializable(typ: type, test_value: Any) -> bool:
     try:
         adapter = TypeAdapter(typ)
         if isinstance(test_value, FieldInfo):
