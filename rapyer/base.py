@@ -56,12 +56,18 @@ from typing_extensions import deprecated
 logger = logging.getLogger("rapyer")
 
 
-def make_pickle_field_serializer(field: str, safe_load: bool = False):
+def make_pickle_field_serializer(
+    field: str, safe_load: bool = False, can_json: bool = False
+):
     @field_serializer(field, when_used="json-unless-none")
-    def pickle_field_serializer(v, info: FieldSerializationInfo):
+    @classmethod
+    def pickle_field_serializer(cls, v, info: FieldSerializationInfo):
         ctx = info.context or {}
         should_serialize_redis = ctx.get(REDIS_DUMP_FLAG_NAME, False)
-        if should_serialize_redis:
+        # Skip pickling if field CAN be JSON serialized AND user prefers JSON dump
+        if should_serialize_redis and not (
+            can_json and cls.Meta.prefer_normal_json_dump
+        ):
             return base64.b64encode(pickle.dumps(v)).decode("utf-8")
         return v
 
@@ -271,10 +277,7 @@ class AtomicRedisModel(BaseModel):
                 continue
             if original_annotations[attr_name] == attr_type:
                 default_value = cls.__dict__.get(attr_name, None)
-                can_json_serialize = (
-                    is_type_json_serializable(attr_type, test_value=default_value)
-                    and cls.Meta.prefer_normal_json_dump
-                )
+                can_json_serialize = is_type_json_serializable(attr_type, default_value)
 
                 if not can_json_serialize:
                     is_field_marked_safe = attr_name in cls._safe_load_fields
