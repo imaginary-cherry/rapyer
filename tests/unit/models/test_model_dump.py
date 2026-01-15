@@ -4,7 +4,6 @@ import pytest
 import pytest_asyncio
 
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME
-
 from tests.models.collection_types import (
     SimpleListModel,
     SimpleDictModel,
@@ -392,7 +391,10 @@ async def test_non_redis_fields_in_nested_base_model_serialize_correctly_sanity(
     assert redis_data["middle_model"]["inner_model"]["lst"] == ["item1", "item2"]
     assert redis_data["middle_model"]["inner_model"]["counter"] == 42
     assert redis_data["middle_model"]["tags"] == ["tag1", "tag2"]
-    assert redis_data["middle_model"]["metadata"] == {"key1": "value1", "key2": "value2"}
+    assert redis_data["middle_model"]["metadata"] == {
+        "key1": "value1",
+        "key2": "value2",
+    }
     assert redis_data["user_data"] == {"user_id": 123}
     assert redis_data["items"] == [1, 2, 3]
     assert loaded_model == model
