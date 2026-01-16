@@ -6,7 +6,7 @@ from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, SerializationInfo
 from typing_extensions import TypeAlias
 
-from rapyer.scripts import get_script_sha, REMOVE_RANGE_SCRIPT_NAME
+from rapyer.scripts import run_sha, REMOVE_RANGE_SCRIPT_NAME
 from rapyer.types.base import (
     GenericRedisType,
     RedisType,
@@ -77,8 +77,15 @@ class RedisList(list, GenericRedisType[T]):
 
     def remove_range(self, start: int, end: int):
         if self.pipeline:
-            sha = get_script_sha(REMOVE_RANGE_SCRIPT_NAME)
-            self.pipeline.evalsha(sha, 1, self.key, self.json_path, start, end)
+            run_sha(
+                self.pipeline,
+                REMOVE_RANGE_SCRIPT_NAME,
+                1,
+                self.key,
+                self.json_path,
+                start,
+                end,
+            )
             del self[start:end]
         else:
             logger.warning(

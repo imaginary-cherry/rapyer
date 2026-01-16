@@ -1,3 +1,5 @@
+from rapyer.errors import ScriptsNotInitializedError
+
 REMOVE_RANGE_SCRIPT_NAME = "remove_range"
 REMOVE_RANGE_SCRIPT = """
 local key = KEYS[1]
@@ -37,6 +39,7 @@ local encoded = j == 1 and '[]' or cjson.encode(new_arr)
 redis.call('JSON.SET', key, path, encoded)
 return true
 """
+
 SCRIPTS: dict[str, str] = {
     REMOVE_RANGE_SCRIPT_NAME: REMOVE_RANGE_SCRIPT,
 }
@@ -50,5 +53,14 @@ async def register_scripts(redis_client):
         _REGISTERED_SCRIPT_SHAS[name] = sha
 
 
-def get_script_sha(name: str) -> str:
-    return _REGISTERED_SCRIPT_SHAS.get(name)
+def run_sha(pipeline, script_name: str, keys: int, *args):
+    sha = _REGISTERED_SCRIPT_SHAS.get(script_name)
+    if sha is None:
+        raise ScriptsNotInitializedError(
+            f"Script '{script_name}' not loaded. Did you forget to call init_rapyer()?"
+        )
+    pipeline.evalsha(sha, keys, *args)
+
+
+async def handle_noscript_error(redis_client):
+    await register_scripts(redis_client)
