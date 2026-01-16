@@ -1,5 +1,8 @@
+from unittest.mock import AsyncMock, patch
+
 import pytest
 
+from rapyer.errors import PersistentNoScriptError
 from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.simple_types import TTLRefreshTestModel
 
@@ -71,3 +74,19 @@ async def test_pipeline_recovers_with_all_redis_types_after_script_flush_sanity(
         "setting2": "value2",
         "setting3": "value3",
     }
+
+
+@pytest.mark.asyncio
+async def test_pipeline_raises_persistent_noscript_error_when_scripts_keep_failing_error():
+    # Arrange
+    model = ComprehensiveTestModel(tags=["a", "b", "c"])
+    await model.asave()
+    await model.Meta.redis.execute_command("SCRIPT", "FLUSH")
+
+    # Act & Assert - patch handle_noscript_error to not actually register scripts
+    with patch("rapyer.base.handle_noscript_error", new_callable=AsyncMock):
+        with pytest.raises(PersistentNoScriptError) as exc_info:
+            async with model.apipeline() as redis_model:
+                redis_model.tags.remove_range(0, 1)
+
+        assert "server-side" in str(exc_info.value).lower()
