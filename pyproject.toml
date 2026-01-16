@@ -71,6 +71,7 @@ mypy = "^1.0.0"
 pytest = "^8.4.2"
 pytest-asyncio = "^0.25.0"
 pytest-cov = "^6.0.0"
+fakeredis = {version = "^2.20.0", extras = ["lua", "json"]}
 
 [tool.coverage.run]
 source = ["rapyer"]
