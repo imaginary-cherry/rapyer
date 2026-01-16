@@ -5,6 +5,7 @@ from redis import ResponseError
 from redis.asyncio.client import Redis
 
 from rapyer.init import init_rapyer, teardown_rapyer
+from rapyer.scripts import SCRIPTS
 from tests.models.collection_types import IntListModel, ProductListModel, StrListModel
 from tests.models.index_types import IndexTestModel
 from tests.models.simple_types import (
@@ -190,3 +191,18 @@ async def test_init_rapyer_without_prefer_normal_json_dump_keeps_preconfigured_v
     assert ModelWithStrEnumDefault.Meta.prefer_normal_json_dump is False
     ModelWithPreferJsonDumpConfig.Meta.prefer_normal_json_dump = original_preconfigured
     ModelWithStrEnumDefault.Meta.prefer_normal_json_dump = original_default
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ["script_name", "script_text"],
+    [[name, text] for name, text in SCRIPTS.items()],
+)
+async def test_init_rapyer_loads_all_scripts_sanity(
+    mock_redis_client, script_name, script_text
+):
+    # Arrange & Act
+    await init_rapyer(mock_redis_client)
+
+    # Assert
+    mock_redis_client.script_load.assert_any_call(script_text)
