@@ -21,6 +21,8 @@ from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 from typing_extensions import deprecated
 
+from redis.exceptions import NoScriptError
+
 from rapyer.config import RedisConfig
 from rapyer.context import _context_var, _context_xx_pipe
 from rapyer.errors.base import (
@@ -28,6 +30,7 @@ from rapyer.errors.base import (
     UnsupportedIndexedFieldError,
     CantSerializeRedisValueError,
 )
+from rapyer.scripts import handle_noscript_error
 from rapyer.fields.expression import ExpressionField, AtomicField, Expression
 from rapyer.fields.index import IndexAnnotation
 from rapyer.fields.key import KeyAnnotation
@@ -608,7 +611,15 @@ class AtomicRedisModel(BaseModel):
             _context_var.set(pipe)
             _context_xx_pipe.set(ignore_if_deleted)
             yield redis_model
-            await pipe.execute()
+            commands_backup = list(pipe.command_stack)
+            try:
+                await pipe.execute()
+            except NoScriptError:
+                await handle_noscript_error(self.Meta.redis)
+                async with self.Meta.redis.pipeline() as retry_pipe:
+                    for args, options in commands_backup:
+                        retry_pipe.execute_command(*args, **options)
+                    await retry_pipe.execute()
             await refresh_ttl_if_needed(
                 self.Meta.redis, self.key, self.Meta.ttl, self.Meta.refresh_ttl
             )
