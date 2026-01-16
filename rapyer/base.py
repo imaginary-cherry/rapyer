@@ -596,7 +596,7 @@ class AtomicRedisModel(BaseModel):
     async def apipeline(
         self, ignore_if_deleted: bool = False
     ) -> AbstractAsyncContextManager[Self]:
-        async with self.Meta.redis.pipeline() as pipe:
+        async with self.Meta.redis.pipeline(transaction=True) as pipe:
             try:
                 redis_model = await self.__class__.aget(self.key)
                 unset_fields = {
@@ -616,8 +616,13 @@ class AtomicRedisModel(BaseModel):
                 await pipe.execute()
             except NoScriptError:
                 await handle_noscript_error(self.Meta.redis)
-                async with self.Meta.redis.pipeline() as retry_pipe:
-                    for args, options in commands_backup:
+                evalsha_commands = [
+                    (args, options)
+                    for args, options in commands_backup
+                    if args[0] == "EVALSHA"
+                ]
+                async with self.Meta.redis.pipeline(transaction=True) as retry_pipe:
+                    for args, options in evalsha_commands:
                         retry_pipe.execute_command(*args, **options)
                     await retry_pipe.execute()
             await refresh_ttl_if_needed(
