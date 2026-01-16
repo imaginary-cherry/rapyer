@@ -1,6 +1,17 @@
 import pytest
 
+from rapyer.errors import ScriptsNotInitializedError
+from rapyer.scripts import _REGISTERED_SCRIPT_SHAS
 from tests.models.collection_types import ComprehensiveTestModel
+
+
+@pytest.fixture
+def clear_script_state():
+    original_shas = _REGISTERED_SCRIPT_SHAS.copy()
+    _REGISTERED_SCRIPT_SHAS.clear()
+    yield
+    _REGISTERED_SCRIPT_SHAS.clear()
+    _REGISTERED_SCRIPT_SHAS.update(original_shas)
 
 
 @pytest.mark.parametrize(
@@ -184,3 +195,19 @@ async def test_redis_list_remove_range_without_pipeline_no_changes_sanity(
     # Assert - Redis should NOT be modified (no pipeline to execute)
     loaded_model = await ComprehensiveTestModel.aget(model.key)
     assert loaded_model.tags == initial_tags
+
+
+@pytest.mark.asyncio
+async def test_remove_range_raises_scripts_not_initialized_error_when_init_rapyer_not_called_error(
+    clear_script_state,
+):
+    # Arrange
+    model = ComprehensiveTestModel(tags=["a", "b", "c", "d", "e"])
+    await model.asave()
+
+    # Act & Assert
+    with pytest.raises(ScriptsNotInitializedError) as exc_info:
+        async with model.apipeline():
+            model.tags.remove_range(1, 3)
+
+    assert "init_rapyer()" in str(exc_info.value)
