@@ -3,6 +3,7 @@ from redis import ResponseError
 from redis.asyncio.client import Redis
 
 from rapyer.base import REDIS_MODELS
+from rapyer.scripts import register_scripts
 
 
 async def init_rapyer(
@@ -13,6 +14,9 @@ async def init_rapyer(
 ):
     if isinstance(redis, str):
         redis = redis_async.from_url(redis, decode_responses=True, max_connections=20)
+
+    if redis is not None:
+        await register_scripts(redis)
 
     for model in REDIS_MODELS:
         if redis is not None:
