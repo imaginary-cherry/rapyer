@@ -18,6 +18,8 @@
 
 ### 🛠️ Technical Improvements
 
+- **Pipeline Transactions**: Pipelines now use Redis MULTI/EXEC transactions for atomic execution of batched operations.
+- **NOSCRIPT Error Recovery**: Pipelines automatically recover from NOSCRIPT errors (e.g., after Redis restart) by re-registering Lua scripts and retrying failed script commands.
 - **Smart Field Serialization**: Fields that can be JSON-serialized are now stored as native JSON instead of being pickled. This improves Redis data readability and interoperability with other systems.
   - Pickle is only used for fields that cannot be JSON-serialized (e.g., `type` objects, custom classes)
   - Backward compatible: existing pickled data is automatically detected and loaded correctly, We will remove the compatibility in version 1.2.0 
