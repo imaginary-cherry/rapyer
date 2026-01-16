@@ -24,6 +24,7 @@ def mock_redis_client():
     redis_mock = AsyncMock(spec=Redis)
     redis_mock.ft.return_value.dropindex = AsyncMock()
     redis_mock.ft.return_value.create_index = AsyncMock()
+    redis_mock.script_load = AsyncMock(return_value="mock_sha")
     return redis_mock
 
 
@@ -145,6 +146,7 @@ async def test_init_rapyer_raises_response_error_when_acreate_index_fails_with_o
     # Arrange
     mock_redis = AsyncMock(spec=Redis)
     mock_redis.ft.return_value.dropindex = AsyncMock()
+    mock_redis.script_load = AsyncMock(return_value="mock_sha")
 
     with patch.object(
         IndexTestModel,
