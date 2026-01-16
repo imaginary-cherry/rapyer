@@ -1,6 +1,7 @@
 from rapyer.errors.base import (
     BadFilterError,
     FindError,
+    PersistentNoScriptError,
     RapyerError,
     ScriptsNotInitializedError,
     UnsupportedIndexedFieldError,
@@ -9,6 +10,7 @@ from rapyer.errors.base import (
 __all__ = [
     "BadFilterError",
     "FindError",
+    "PersistentNoScriptError",
     "RapyerError",
     "ScriptsNotInitializedError",
     "UnsupportedIndexedFieldError",

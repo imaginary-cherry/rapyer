@@ -19,23 +19,23 @@ from pydantic import (
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
-from typing_extensions import deprecated
-
 from redis.exceptions import NoScriptError
+from typing_extensions import deprecated
 
 from rapyer.config import RedisConfig
 from rapyer.context import _context_var, _context_xx_pipe
 from rapyer.errors.base import (
     KeyNotFound,
+    PersistentNoScriptError,
     UnsupportedIndexedFieldError,
     CantSerializeRedisValueError,
 )
-from rapyer.scripts import handle_noscript_error
 from rapyer.fields.expression import ExpressionField, AtomicField, Expression
 from rapyer.fields.index import IndexAnnotation
 from rapyer.fields.key import KeyAnnotation
 from rapyer.fields.safe_load import SafeLoadAnnotation
 from rapyer.links import REDIS_SUPPORTED_LINK
+from rapyer.scripts import handle_noscript_error
 from rapyer.types.base import RedisType, REDIS_DUMP_FLAG_NAME, FAILED_FIELDS_KEY
 from rapyer.types.convert import RedisConverter
 from rapyer.typing_support import Self, Unpack
@@ -612,19 +612,36 @@ class AtomicRedisModel(BaseModel):
             _context_xx_pipe.set(ignore_if_deleted)
             yield redis_model
             commands_backup = list(pipe.command_stack)
+            noscript_on_first_attempt = False
+            noscript_on_retry = False
+
             try:
                 await pipe.execute()
             except NoScriptError:
+                noscript_on_first_attempt = True
+
+            if noscript_on_first_attempt:
                 await handle_noscript_error(self.Meta.redis)
                 evalsha_commands = [
                     (args, options)
                     for args, options in commands_backup
                     if args[0] == "EVALSHA"
                 ]
+                # Retry execute the pipeline actions
                 async with self.Meta.redis.pipeline(transaction=True) as retry_pipe:
                     for args, options in evalsha_commands:
                         retry_pipe.execute_command(*args, **options)
-                    await retry_pipe.execute()
+                    try:
+                        await retry_pipe.execute()
+                    except NoScriptError:
+                        noscript_on_retry = True
+
+            if noscript_on_retry:
+                raise PersistentNoScriptError(
+                    "NOSCRIPT error persisted after re-registering scripts. "
+                    "This indicates a server-side problem with Redis."
+                )
+
             await refresh_ttl_if_needed(
                 self.Meta.redis, self.key, self.Meta.ttl, self.Meta.refresh_ttl
             )

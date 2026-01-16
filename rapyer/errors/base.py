@@ -32,3 +32,7 @@ class CantSerializeRedisValueError(RapyerError):
 
 class ScriptsNotInitializedError(RapyerError):
     pass
+
+
+class PersistentNoScriptError(RapyerError):
+    pass
