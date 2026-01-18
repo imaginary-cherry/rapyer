@@ -1,3 +1,4 @@
+import logging
 from unittest.mock import Mock, patch, AsyncMock
 
 import pytest
@@ -206,3 +207,36 @@ async def test_init_rapyer_loads_all_scripts_sanity(
 
     # Assert
     mock_redis_client.script_load.assert_any_call(script_text)
+
+
+@pytest.mark.asyncio
+async def test_init_rapyer_with_logger_configures_rapyer_logger_sanity():
+    # Arrange
+    custom_logger = logging.getLogger("custom_test_logger")
+    custom_logger.setLevel(logging.DEBUG)
+    custom_handler = logging.StreamHandler()
+    custom_logger.handlers.clear()
+    custom_logger.addHandler(custom_handler)
+
+    # Act
+    await init_rapyer(logger=custom_logger)
+
+    # Assert
+    rapyer_logger = logging.getLogger("rapyer")
+    assert rapyer_logger.level == logging.DEBUG
+    assert custom_handler in rapyer_logger.handlers
+
+
+@pytest.mark.asyncio
+async def test_init_rapyer_without_logger_does_not_modify_rapyer_logger_sanity():
+    # Arrange
+    rapyer_logger = logging.getLogger("rapyer")
+    original_level = rapyer_logger.level
+    original_handlers = rapyer_logger.handlers.copy()
+
+    # Act
+    await init_rapyer()
+
+    # Assert
+    assert rapyer_logger.level == original_level
+    assert rapyer_logger.handlers == original_handlers
