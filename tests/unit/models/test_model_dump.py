@@ -52,7 +52,6 @@ from tests.models.unknown_types import (
     ModelWithPreferJsonDumpConfig,
 )
 
-
 PREFER_JSON_DUMP_MODELS = [
     StrModel,
     DirectRedisStringModel,
