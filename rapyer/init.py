@@ -1,3 +1,5 @@
+import logging
+
 import redis.asyncio as redis_async
 from redis import ResponseError
 from redis.asyncio.client import Redis
@@ -11,7 +13,15 @@ async def init_rapyer(
     ttl: int = None,
     override_old_idx: bool = True,
     prefer_normal_json_dump: bool = None,
+    logger: logging.Logger = None,
 ):
+    if logger is not None:
+        rapyer_logger = logging.getLogger("rapyer")
+        rapyer_logger.setLevel(logger.level)
+        rapyer_logger.handlers.clear()
+        for handler in logger.handlers:
+            rapyer_logger.addHandler(handler)
+
     if isinstance(redis, str):
         redis = redis_async.from_url(redis, decode_responses=True, max_connections=20)
 

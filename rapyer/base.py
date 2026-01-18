@@ -15,11 +15,12 @@ from pydantic import (
     model_validator,
     field_serializer,
     field_validator,
+    ValidationError,
 )
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
-from redis.exceptions import NoScriptError
+from redis.exceptions import NoScriptError, ResponseError
 from typing_extensions import deprecated
 
 from rapyer.config import RedisConfig
@@ -476,19 +477,30 @@ class AtomicRedisModel(BaseModel):
             # Fetch the actual documents
             models = await cls.Meta.redis.json().mget(keys=keys, path="$")
 
-        if cls.Meta.ttl is not None and cls.Meta.refresh_ttl:
-            async with cls.Meta.redis.pipeline() as pipe:
-                for key in keys:
-                    pipe.expire(key, cls.Meta.ttl)
-                await pipe.execute()
-
         instances = []
         for model, key in zip(models, keys):
+            if model is None:
+                continue
             context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
-            model = cls.model_validate(model[0], context=context)
+            try:
+                model = cls.model_validate(model[0], context=context)
+            except ValidationError as exc:
+                logger.debug(
+                    "Skipping key %s due to validation error during afind: %s",
+                    key,
+                    exc,
+                )
+                continue
             model.key = key
             model._failed_fields = context.get(FAILED_FIELDS_KEY, set())
             instances.append(model)
+
+        if cls.Meta.ttl is not None and cls.Meta.refresh_ttl:
+            async with cls.Meta.redis.pipeline() as pipe:
+                for model in instances:
+                    pipe.expire(model.key, cls.Meta.ttl)
+                await pipe.execute()
+
         return instances
 
     @classmethod
@@ -619,6 +631,16 @@ class AtomicRedisModel(BaseModel):
                 await pipe.execute()
             except NoScriptError:
                 noscript_on_first_attempt = True
+            except ResponseError as exc:
+                if ignore_if_deleted:
+                    logger.warning(
+                        "Swallowed ResponseError during pipeline.execute() with "
+                        "ignore_if_deleted=True for key %r: %s",
+                        getattr(self, "key", None),
+                        exc,
+                    )
+                else:
+                    raise
 
             if noscript_on_first_attempt:
                 await handle_noscript_error(self.Meta.redis)

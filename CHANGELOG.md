@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.1.6]
+
+### ✨ Added
+
+- **Logger Configuration in init_rapyer**: Added `logger` parameter to `init_rapyer()` function to configure the rapyer logger with a custom logger's level and handlers.
+  - Example: `await init_rapyer(redis=redis_client, logger=my_logger)`
+
+### 🐛 Fixed
+
+- **afind with Non-JSON Keys**: Fixed `afind` to gracefully skip non-JSON keys (e.g., lock keys like `Model:key:lock`) that match the model's key pattern but contain plain string values instead of JSON.
+- **afind with Invalid JSON Schema**: Fixed `afind` to skip entries with JSON values that don't match the model schema, preventing validation errors from crashing the entire operation.
+- **Global afind Bug**: Fixed a bug where `afind` would fail when encountering keys that were deleted during the operation.
+- **apipeline bug**: Fixed a bug for apipeline when we want to ignore deleted model.
+
+
 ## [1.1.5]
 
 ### ✨ Added
