@@ -631,8 +631,15 @@ class AtomicRedisModel(BaseModel):
                 await pipe.execute()
             except NoScriptError:
                 noscript_on_first_attempt = True
-            except ResponseError:
-                if not ignore_if_deleted:
+            except ResponseError as exc:
+                if ignore_if_deleted:
+                    logger.warning(
+                        "Swallowed ResponseError during pipeline.execute() with "
+                        "ignore_if_deleted=True for key %r: %s",
+                        getattr(self, "key", None),
+                        exc,
+                    )
+                else:
                     raise
 
             if noscript_on_first_attempt:
