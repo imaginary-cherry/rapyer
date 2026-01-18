@@ -1,10 +1,12 @@
 import json
+import logging
 from typing import TypeVar, TYPE_CHECKING
 
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, SerializationInfo
 from typing_extensions import TypeAlias
 
+from rapyer.scripts import run_sha, REMOVE_RANGE_SCRIPT_NAME
 from rapyer.types.base import (
     GenericRedisType,
     RedisType,
@@ -12,6 +14,8 @@ from rapyer.types.base import (
     SKIP_SENTINEL,
 )
 from rapyer.utils.redis import refresh_ttl_if_needed
+
+logger = logging.getLogger("rapyer")
 
 T = TypeVar("T")
 
@@ -70,6 +74,24 @@ class RedisList(list, GenericRedisType[T]):
         if self.pipeline:
             self.pipeline.json().set(self.key, self.json_path, [])
         return super().clear()
+
+    def remove_range(self, start: int, end: int):
+        if self.pipeline:
+            run_sha(
+                self.pipeline,
+                REMOVE_RANGE_SCRIPT_NAME,
+                1,
+                self.key,
+                self.json_path,
+                start,
+                end,
+            )
+            del self[start:end]
+        else:
+            logger.warning(
+                "remove_range() called without a pipeline context. "
+                "No changes were made. Use 'async with model.apipeline():' to execute."
+            )
 
     async def aappend(self, __object):
         self.append(__object)

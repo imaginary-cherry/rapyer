@@ -51,6 +51,14 @@ dependencies = [
     "pydantic>=2.11.0, <2.13.0",
 ]
 
+[project.optional-dependencies]
+test = [
+    "pytest>=8.4.2",
+    "pytest-asyncio>=0.25.0",
+    "pytest-cov>=6.0.0",
+    "fakeredis[lua,json]>=2.20.0",
+]
+
 [project.urls]
 Homepage = "https://imaginary-cherry.github.io/rapyer/"
 Documentation = "https://imaginary-cherry.github.io/rapyer/"
@@ -66,11 +74,6 @@ packages = [{include = "rapyer"}]
 [tool.poetry.group.dev.dependencies]
 black = "^25.9.0"
 mypy = "^1.0.0"
-
-[tool.poetry.group.tests.dependencies]
-pytest = "^8.4.2"
-pytest-asyncio = "^0.25.0"
-pytest-cov = "^6.0.0"
 
 [tool.coverage.run]
 source = ["rapyer"]

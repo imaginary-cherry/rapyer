@@ -28,3 +28,11 @@ class UnsupportedIndexedFieldError(FindError):
 
 class CantSerializeRedisValueError(RapyerError):
     pass
+
+
+class ScriptsNotInitializedError(RapyerError):
+    pass
+
+
+class PersistentNoScriptError(RapyerError):
+    pass
