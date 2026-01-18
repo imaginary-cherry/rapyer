@@ -49,7 +49,9 @@ async def test_find_isolation_between_different_model_classes_sanity():
 @pytest.mark.asyncio
 async def test_afind_ignores_non_json_keys_with_matching_pattern_sanity():
     # Arrange
-    valid_models = [StrModel(name=f"valid_{i}", description=f"desc_{i}") for i in range(3)]
+    valid_models = [
+        StrModel(name=f"valid_{i}", description=f"desc_{i}") for i in range(3)
+    ]
     for model in valid_models:
         await model.asave()
 
@@ -75,7 +77,9 @@ async def test_afind_ignores_invalid_json_schema_sanity():
 
     redis = IntModel.Meta.redis
     invalid_key = f"IntModel:{uuid4()}"
-    await redis.json().set(invalid_key, "$", {"count": "not_an_int", "score": "invalid"})
+    await redis.json().set(
+        invalid_key, "$", {"count": "not_an_int", "score": "invalid"}
+    )
 
     # Act
     found_models = await IntModel.afind()
@@ -98,7 +102,9 @@ async def test_afind_handles_mixed_invalid_values_comprehensive():
     await redis.set(lock_key, "lock_value")
 
     invalid_schema_key = f"IntModel:{uuid4()}"
-    await redis.json().set(invalid_schema_key, "$", {"count": "not_an_int", "score": "invalid"})
+    await redis.json().set(
+        invalid_schema_key, "$", {"count": "not_an_int", "score": "invalid"}
+    )
 
     # Act
     found_models = await IntModel.afind()
