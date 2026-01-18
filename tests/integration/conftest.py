@@ -3,6 +3,7 @@ import os
 import pytest_asyncio
 
 import rapyer
+from rapyer.scripts import register_scripts
 
 # Collection types
 from tests.models.collection_types import (
@@ -64,6 +65,18 @@ from tests.models.inheritance_types import (
 # Pickle types
 from tests.models.pickle_types import ModelWithUnserializableFields
 
+# SafeLoad types
+from tests.models.safe_load_types import (
+    ModelWithSafeLoadField,
+    ModelWithMultipleSafeLoadFields,
+    ModelWithMixedFields,
+    ModelWithSafeLoadAllConfig,
+    ModelWithSafeLoadListOfAny,
+    ModelWithSafeLoadDictOfAny,
+    ModelWithUnsafeListOfAny,
+    ModelWithUnsafeDictOfAny,
+)
+
 # Simple types
 from tests.models.simple_types import (
     IntModel,
@@ -84,6 +97,14 @@ from tests.models.simple_types import (
 
 # Specialized types
 from tests.models.specialized import UserModel
+
+# Unknown types (JSON serializable enums)
+from tests.models.unknown_types import (
+    ModelWithStrEnumDefault,
+    ModelWithIntEnumDefault,
+    ModelWithStrEnumInList,
+    ModelWithStrEnumInDict,
+)
 
 
 @pytest_asyncio.fixture
@@ -153,6 +174,15 @@ async def real_redis_client(redis_client):
         UserModel,
         # Pickle types
         ModelWithUnserializableFields,
+        # SafeLoad types
+        ModelWithSafeLoadField,
+        ModelWithMultipleSafeLoadFields,
+        ModelWithMixedFields,
+        ModelWithSafeLoadAllConfig,
+        ModelWithSafeLoadListOfAny,
+        ModelWithSafeLoadDictOfAny,
+        ModelWithUnsafeListOfAny,
+        ModelWithUnsafeDictOfAny,
         # Inheritance types
         BaseUserModel,
         AdminUserModel,
@@ -168,11 +198,20 @@ async def real_redis_client(redis_client):
         # Index types
         ParentWithIndexModel,
         ChildWithParentModel,
+        # Unknown types (JSON serializable enums)
+        ModelWithStrEnumDefault,
+        ModelWithIntEnumDefault,
+        ModelWithStrEnumInList,
+        ModelWithStrEnumInDict,
     ]
 
     # Configure Redis client for all models
     for model in redis_models:
         model.Meta.redis = redis_client
 
+    # Register Lua scripts
+    await register_scripts(redis_client)
+
     yield redis_client
+
     await redis_client.aclose()

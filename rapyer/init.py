@@ -3,19 +3,28 @@ from redis import ResponseError
 from redis.asyncio.client import Redis
 
 from rapyer.base import REDIS_MODELS
+from rapyer.scripts import register_scripts
 
 
 async def init_rapyer(
-    redis: str | Redis = None, ttl: int = None, override_old_idx: bool = True
+    redis: str | Redis = None,
+    ttl: int = None,
+    override_old_idx: bool = True,
+    prefer_normal_json_dump: bool = None,
 ):
     if isinstance(redis, str):
         redis = redis_async.from_url(redis, decode_responses=True, max_connections=20)
+
+    if redis is not None:
+        await register_scripts(redis)
 
     for model in REDIS_MODELS:
         if redis is not None:
             model.Meta.redis = redis
         if ttl is not None:
             model.Meta.ttl = ttl
+        if prefer_normal_json_dump is not None:
+            model.Meta.prefer_normal_json_dump = prefer_normal_json_dump
 
         # Initialize model fields
         model.init_class()

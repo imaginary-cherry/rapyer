@@ -1,6 +1,9 @@
+from typing import Any
+
 from pydantic import Field, BaseModel
 
 from rapyer.base import AtomicRedisModel
+from rapyer.fields.safe_load import SafeLoad
 
 
 class NestedListModel(AtomicRedisModel):
@@ -52,6 +55,7 @@ class InnerRedisModel(AtomicRedisModel):
     tags: list[str] = Field(default_factory=list)
     metadata: dict[str, str] = Field(default_factory=dict)
     counter: int = 0
+    safe_data: SafeLoad[list[Any]] = Field(default_factory=list)
 
 
 class ContainerModel(BaseModel):

@@ -110,6 +110,7 @@ Retrieves a model instance from Redis by its key, automatically determining the 
 
 - **KeyError**: If the model class cannot be determined from the key
 - **ValueError**: If the key format is invalid
+- **CantSerializeRedisValueError**: If the value in Redis cannot be deserialized (Corruption or missing resources)
 
 ### Description
 
@@ -314,6 +315,10 @@ None
 ### Returns
 
 - **list[AtomicRedisModel]**: A list containing all instances of the model class stored in Redis
+
+### Raises
+
+- **CantSerializeRedisValueError**: If a value in Redis cannot be deserialized (Corruption or missing resources)
 
 ### Description
 

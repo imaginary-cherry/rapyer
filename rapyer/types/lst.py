@@ -1,12 +1,21 @@
 import json
+import logging
 from typing import TypeVar, TYPE_CHECKING
 
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, SerializationInfo
 from typing_extensions import TypeAlias
 
-from rapyer.types.base import GenericRedisType, RedisType, REDIS_DUMP_FLAG_NAME
+from rapyer.scripts import run_sha, REMOVE_RANGE_SCRIPT_NAME
+from rapyer.types.base import (
+    GenericRedisType,
+    RedisType,
+    REDIS_DUMP_FLAG_NAME,
+    SKIP_SENTINEL,
+)
 from rapyer.utils.redis import refresh_ttl_if_needed
+
+logger = logging.getLogger("rapyer")
 
 T = TypeVar("T")
 
@@ -65,6 +74,24 @@ class RedisList(list, GenericRedisType[T]):
         if self.pipeline:
             self.pipeline.json().set(self.key, self.json_path, [])
         return super().clear()
+
+    def remove_range(self, start: int, end: int):
+        if self.pipeline:
+            run_sha(
+                self.pipeline,
+                REMOVE_RANGE_SCRIPT_NAME,
+                1,
+                self.key,
+                self.json_path,
+                start,
+                end,
+            )
+            del self[start:end]
+        else:
+            logger.warning(
+                "remove_range() called without a pipeline context. "
+                "No changes were made. Use 'async with model.apipeline():' to execute."
+            )
 
     async def aappend(self, __object):
         self.append(__object)
@@ -162,8 +189,14 @@ class RedisList(list, GenericRedisType[T]):
         ctx = info.context or {}
         is_redis_data = ctx.get(REDIS_DUMP_FLAG_NAME)
 
+        if not is_redis_data:
+            return value
+
         return [
-            cls.deserialize_unknown(item) if is_redis_data else item for item in value
+            deserialized
+            for idx, item in enumerate(value)
+            if (deserialized := cls.try_deserialize_item(item, f"index {idx}"))
+            is not SKIP_SENTINEL
         ]
 
     @classmethod

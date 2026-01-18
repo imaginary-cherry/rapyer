@@ -1,9 +1,65 @@
-from typing import Any
+from enum import Enum
+from typing import Any, ClassVar
 
-from pydantic import GetCoreSchemaHandler, BaseModel, ConfigDict
+from pydantic import GetCoreSchemaHandler, BaseModel, ConfigDict, Field
 from pydantic_core import core_schema
 
 from rapyer.base import AtomicRedisModel
+from rapyer.config import RedisConfig
+
+
+class StrStatus(str, Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    PENDING = "pending"
+
+
+class IntPriority(int, Enum):
+    LOW = 1
+    MEDIUM = 2
+    HIGH = 3
+
+
+class PlainEnum(Enum):
+    A = "a"
+    B = "b"
+
+
+class ModelWithStrEnumDefault(AtomicRedisModel):
+    Meta: ClassVar[RedisConfig] = RedisConfig(prefer_normal_json_dump=True)
+    status: StrStatus = StrStatus.ACTIVE
+    name: str = "test"
+
+
+class ModelWithIntEnumDefault(AtomicRedisModel):
+    Meta: ClassVar[RedisConfig] = RedisConfig(prefer_normal_json_dump=True)
+    priority: IntPriority = Field(default=IntPriority.LOW)
+    name: str = "test"
+
+
+class ModelWithEnumCreatedByFactory(AtomicRedisModel):
+    status: PlainEnum = Field(default_factory=lambda: PlainEnum.A)
+
+
+class ModelWithStrEnumInList(AtomicRedisModel):
+    Meta: ClassVar[RedisConfig] = RedisConfig(prefer_normal_json_dump=True)
+    statuses: list[StrStatus] = Field(default_factory=list)
+    name: str = "test"
+
+
+class ModelWithStrEnumInDict(AtomicRedisModel):
+    Meta: ClassVar[RedisConfig] = RedisConfig(prefer_normal_json_dump=True)
+    status_map: dict[str, StrStatus] = {}
+    name: str = "test"
+
+
+class InnerModelWithEnum(BaseModel):
+    status: StrStatus = StrStatus.ACTIVE
+
+
+class ModelWithNestedEnum(AtomicRedisModel):
+    inner: InnerModelWithEnum = Field(default_factory=InnerModelWithEnum)
+    name: str = "test"
 
 
 class CustomSerializableType:
@@ -123,3 +179,9 @@ class ModelWithCustomTypes(AtomicRedisModel):
     simple_custom: CustomSerializableType
     complex_custom: ComplexCustomType
     pydantic_nested: NestedPydanticModel
+
+
+class ModelWithPreferJsonDumpConfig(AtomicRedisModel):
+    Meta: ClassVar[RedisConfig] = RedisConfig(prefer_normal_json_dump=True)
+    status: StrStatus = StrStatus.ACTIVE
+    name: str = "test"

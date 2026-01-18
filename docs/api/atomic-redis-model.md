@@ -51,8 +51,9 @@ await user.asave()
 ```
 
 #### `aload()`
-**Type:** `async` method  
-**Returns:** `Self`  
+**Type:** `async` method
+**Returns:** `Self`
+**Raises:** `CantSerializeRedisValueError` if the value in Redis cannot be deserialized (Corruption or missing resources)
 **Description:** Loads the latest data from Redis for this model instance, updating the current instance.
 
 ```python
@@ -121,11 +122,15 @@ if user.is_inner_model():
 ### Class Methods
 
 #### `aget(key)`
-**Type:** `async` class method  
-**Parameters:** 
-- `key` (str): The Redis key to retrieve  
-**Returns:** `Self`  
-**Raises:** `KeyNotFound` if key doesn't exist  
+**Type:** `async` class method
+**Parameters:**
+- `key` (str): The Redis key to retrieve
+**Returns:** `Self`
+**Raises:**
+
+- `KeyNotFound` if key doesn't exist
+- `CantSerializeRedisValueError` if the value in Redis cannot be deserialized  (Corruption or missing resources)
+
 **Description:** Retrieves a model instance from Redis by its key.
 
 ```python
@@ -144,10 +149,11 @@ success = await User.adelete_by_key("User:abc-123")
 ```
 
 #### `afind(*expressions)`
-**Type:** `async` class method  
+**Type:** `async` class method
 **Parameters:**
-- `*expressions` (Expression): Optional filter expressions  
-**Returns:** `list of redis models`  
+- `*expressions` (Expression): Optional filter expressions
+**Returns:** `list of redis models`
+**Raises:** `CantSerializeRedisValueError` if a value in Redis cannot be deserialized  (Corruption or missing resources)
 **Description:** Retrieves all instances of this model class from Redis, optionally filtered by expressions.
 
 **Supported Filter Operators:**
@@ -299,9 +305,17 @@ async with user.apipeline() as pipeline_user:
 class User(AtomicRedisModel):
     name: str
     age: int
-    
+
     Meta = RedisConfig(redis=redis_client, ttl=3600)  # Expire after 1 hour
 ```
+
+**Available options:**
+
+- `redis` - Redis client instance
+- `ttl` - Time-to-live in seconds
+- `refresh_ttl` - Refresh TTL on read/write (default: `True`)
+- `safe_load_all` - Treat all non-Redis fields as SafeLoad (default: `False`)
+- `prefer_normal_json_dump` - Use JSON serialization for compatible fields instead of pickle (default: `False`)
 
 ### Special Behaviors
 

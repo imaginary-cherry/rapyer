@@ -2,7 +2,12 @@ from typing import TypeVar, Generic, get_args, Any, TypeAlias, TYPE_CHECKING
 
 from pydantic_core import core_schema
 
-from rapyer.types.base import GenericRedisType, RedisType, REDIS_DUMP_FLAG_NAME
+from rapyer.types.base import (
+    GenericRedisType,
+    RedisType,
+    REDIS_DUMP_FLAG_NAME,
+    SKIP_SENTINEL,
+)
 from rapyer.utils.redis import refresh_ttl_if_needed
 from rapyer.utils.redis import update_keys_in_pipeline
 
@@ -239,9 +244,15 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
     def full_deserializer(cls, value: dict, info: core_schema.ValidationInfo):
         ctx = info.context or {}
         should_serialize_redis = ctx.get(REDIS_DUMP_FLAG_NAME)
+
+        if not should_serialize_redis:
+            return value
+
         return {
-            key: cls.deserialize_unknown(item) if should_serialize_redis else item
+            key: deserialized
             for key, item in value.items()
+            if (deserialized := cls.try_deserialize_item(item, f"key '{key}'"))
+            is not SKIP_SENTINEL
         }
 
     @classmethod

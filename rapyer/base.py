@@ -2,6 +2,7 @@ import asyncio
 import base64
 import contextlib
 import functools
+import logging
 import pickle
 import uuid
 from contextlib import AbstractAsyncContextManager
@@ -18,16 +19,24 @@ from pydantic import (
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
+from redis.exceptions import NoScriptError
 from typing_extensions import deprecated
 
 from rapyer.config import RedisConfig
 from rapyer.context import _context_var, _context_xx_pipe
-from rapyer.errors.base import KeyNotFound, UnsupportedIndexedFieldError
+from rapyer.errors.base import (
+    KeyNotFound,
+    PersistentNoScriptError,
+    UnsupportedIndexedFieldError,
+    CantSerializeRedisValueError,
+)
 from rapyer.fields.expression import ExpressionField, AtomicField, Expression
 from rapyer.fields.index import IndexAnnotation
 from rapyer.fields.key import KeyAnnotation
+from rapyer.fields.safe_load import SafeLoadAnnotation
 from rapyer.links import REDIS_SUPPORTED_LINK
-from rapyer.types.base import RedisType, REDIS_DUMP_FLAG_NAME
+from rapyer.scripts import handle_noscript_error
+from rapyer.types.base import RedisType, REDIS_DUMP_FLAG_NAME, FAILED_FIELDS_KEY
 from rapyer.types.convert import RedisConverter
 from rapyer.typing_support import Self, Unpack
 from rapyer.utils.annotation import (
@@ -36,7 +45,11 @@ from rapyer.utils.annotation import (
     field_with_flag,
     DYNAMIC_CLASS_DOC,
 )
-from rapyer.utils.fields import get_all_pydantic_annotation, is_redis_field
+from rapyer.utils.fields import (
+    get_all_pydantic_annotation,
+    is_redis_field,
+    is_type_json_serializable,
+)
 from rapyer.utils.pythonic import safe_issubclass
 from rapyer.utils.redis import (
     acquire_lock,
@@ -44,26 +57,45 @@ from rapyer.utils.redis import (
     refresh_ttl_if_needed,
 )
 
+logger = logging.getLogger("rapyer")
 
-def make_pickle_field_serializer(field: str):
+
+def make_pickle_field_serializer(
+    field: str, safe_load: bool = False, can_json: bool = False
+):
     @field_serializer(field, when_used="json-unless-none")
-    def pickle_field_serializer(v, info: FieldSerializationInfo):
+    @classmethod
+    def pickle_field_serializer(cls, v, info: FieldSerializationInfo):
         ctx = info.context or {}
         should_serialize_redis = ctx.get(REDIS_DUMP_FLAG_NAME, False)
-        if should_serialize_redis:
+        # Skip pickling if field CAN be JSON serialized AND user prefers JSON dump
+        field_can_be_json = can_json and cls.Meta.prefer_normal_json_dump
+        if should_serialize_redis and not field_can_be_json:
             return base64.b64encode(pickle.dumps(v)).decode("utf-8")
         return v
 
     pickle_field_serializer.__name__ = f"__serialize_{field}"
 
     @field_validator(field, mode="before")
-    def pickle_field_validator(v, info: ValidationInfo):
+    @classmethod
+    def pickle_field_validator(cls, v, info: ValidationInfo):
         if v is None:
             return v
         ctx = info.context or {}
         should_serialize_redis = ctx.get(REDIS_DUMP_FLAG_NAME, False)
         if should_serialize_redis:
-            return pickle.loads(base64.b64decode(v))
+            try:
+                field_can_be_json = can_json and cls.Meta.prefer_normal_json_dump
+                if should_serialize_redis and not field_can_be_json:
+                    return pickle.loads(base64.b64decode(v))
+                return v
+            except Exception as e:
+                if safe_load:
+                    failed_fields = ctx.setdefault(FAILED_FIELDS_KEY, set())
+                    failed_fields.add(field)
+                    logger.warning("SafeLoad: Failed to deserialize field '%s'", field)
+                    return None
+                raise CantSerializeRedisValueError() from e
         return v
 
     pickle_field_validator.__name__ = f"__deserialize_{field}"
@@ -71,14 +103,39 @@ def make_pickle_field_serializer(field: str):
     return pickle_field_serializer, pickle_field_validator
 
 
+# TODO: Remove in next major version (2.0) - backward compatibility for pickled data
+# This validator handles loading old pickled data for fields that are now JSON-serializable.
+# In 2.0, remove this function and the validator registration in __init_subclass__.
+def make_backward_compat_validator(field: str):
+    @field_validator(field, mode="before")
+    def backward_compat_validator(v, info: ValidationInfo):
+        ctx = info.context or {}
+        should_deserialize_redis = ctx.get(REDIS_DUMP_FLAG_NAME, False)
+        if should_deserialize_redis and isinstance(v, str):
+            try:
+                return pickle.loads(base64.b64decode(v))
+            except Exception:
+                pass
+        return v
+
+    backward_compat_validator.__name__ = f"__backward_compat_{field}"
+    return backward_compat_validator
+
+
 class AtomicRedisModel(BaseModel):
     _pk: str = PrivateAttr(default_factory=lambda: str(uuid.uuid4()))
     _base_model_link: Self | RedisType = PrivateAttr(default=None)
+    _failed_fields: set[str] = PrivateAttr(default_factory=set)
 
     Meta: ClassVar[RedisConfig] = RedisConfig()
     _key_field_name: ClassVar[str | None] = None
+    _safe_load_fields: ClassVar[set[str]] = set()
     _field_name: str = PrivateAttr(default="")
     model_config = ConfigDict(validate_assignment=True, validate_default=True)
+
+    @property
+    def failed_fields(self) -> set[str]:
+        return self._failed_fields
 
     @property
     def pk(self):
@@ -184,11 +241,13 @@ class AtomicRedisModel(BaseModel):
         self._pk = value.split(":", maxsplit=1)[-1]
 
     def __init_subclass__(cls, **kwargs):
-        # Find a field with KeyAnnotation and save its name
+        # Find fields with KeyAnnotation and SafeLoadAnnotation
+        cls._safe_load_fields = set()
         for field_name, annotation in cls.__annotations__.items():
             if has_annotation(annotation, KeyAnnotation):
                 cls._key_field_name = field_name
-                break
+            if has_annotation(annotation, SafeLoadAnnotation):
+                cls._safe_load_fields.add(field_name)
 
         # Redefine annotations to use redis types
         pydantic_annotation = get_all_pydantic_annotation(cls, AtomicRedisModel)
@@ -200,7 +259,13 @@ class AtomicRedisModel(BaseModel):
         original_annotations.update(new_annotation)
         new_annotations = {
             field_name: replace_to_redis_types_in_annotation(
-                annotation, RedisConverter(cls.Meta.redis_type, f".{field_name}")
+                annotation,
+                RedisConverter(
+                    cls.Meta.redis_type,
+                    f".{field_name}",
+                    safe_load=field_name in cls._safe_load_fields
+                    or cls.Meta.safe_load_all,
+                ),
             )
             for field_name, annotation in original_annotations.items()
             if is_redis_field(field_name, annotation)
@@ -216,9 +281,22 @@ class AtomicRedisModel(BaseModel):
             if not is_redis_field(attr_name, attr_type):
                 continue
             if original_annotations[attr_name] == attr_type:
-                serializer, validator = make_pickle_field_serializer(attr_name)
-                setattr(cls, serializer.__name__, serializer)
-                setattr(cls, validator.__name__, validator)
+                default_value = cls.__dict__.get(attr_name, None)
+                can_json = is_type_json_serializable(attr_type, default_value)
+                should_json_serialize = can_json and cls.Meta.prefer_normal_json_dump
+
+                if not should_json_serialize:
+                    is_field_marked_safe = attr_name in cls._safe_load_fields
+                    is_safe_load = is_field_marked_safe or cls.Meta.safe_load_all
+                    serializer, validator = make_pickle_field_serializer(
+                        attr_name, safe_load=is_safe_load, can_json=can_json
+                    )
+                    setattr(cls, serializer.__name__, serializer)
+                    setattr(cls, validator.__name__, validator)
+                else:
+                    # TODO: Remove in 2.0 - backward compatibility for old pickled data
+                    validator = make_backward_compat_validator(attr_name)
+                    setattr(cls, validator.__name__, validator)
                 continue
 
         # Update the redis model list for initialization
@@ -337,8 +415,10 @@ class AtomicRedisModel(BaseModel):
             raise KeyNotFound(f"{key} is missing in redis")
         model_dump = model_dump[0]
 
-        instance = cls.model_validate(model_dump, context={REDIS_DUMP_FLAG_NAME: True})
+        context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
+        instance = cls.model_validate(model_dump, context=context)
         instance.key = key
+        instance._failed_fields = context.get(FAILED_FIELDS_KEY, set())
         await refresh_ttl_if_needed(
             cls.Meta.redis, key, cls.Meta.ttl, cls.Meta.refresh_ttl
         )
@@ -355,9 +435,11 @@ class AtomicRedisModel(BaseModel):
         if not model_dump:
             raise KeyNotFound(f"{self.key} is missing in redis")
         model_dump = model_dump[0]
-        instance = self.__class__(**model_dump)
+        context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
+        instance = self.__class__.model_validate(model_dump, context=context)
         instance._pk = self._pk
         instance._base_model_link = self._base_model_link
+        instance._failed_fields = context.get(FAILED_FIELDS_KEY, set())
         await refresh_ttl_if_needed(
             self.Meta.redis, self.key, self.Meta.ttl, self.Meta.refresh_ttl
         )
@@ -402,8 +484,10 @@ class AtomicRedisModel(BaseModel):
 
         instances = []
         for model, key in zip(models, keys):
-            model = cls.model_validate(model[0], context={REDIS_DUMP_FLAG_NAME: True})
+            context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
+            model = cls.model_validate(model[0], context=context)
             model.key = key
+            model._failed_fields = context.get(FAILED_FIELDS_KEY, set())
             instances.append(model)
         return instances
 
@@ -512,7 +596,7 @@ class AtomicRedisModel(BaseModel):
     async def apipeline(
         self, ignore_if_deleted: bool = False
     ) -> AbstractAsyncContextManager[Self]:
-        async with self.Meta.redis.pipeline() as pipe:
+        async with self.Meta.redis.pipeline(transaction=True) as pipe:
             try:
                 redis_model = await self.__class__.aget(self.key)
                 unset_fields = {
@@ -527,7 +611,37 @@ class AtomicRedisModel(BaseModel):
             _context_var.set(pipe)
             _context_xx_pipe.set(ignore_if_deleted)
             yield redis_model
-            await pipe.execute()
+            commands_backup = list(pipe.command_stack)
+            noscript_on_first_attempt = False
+            noscript_on_retry = False
+
+            try:
+                await pipe.execute()
+            except NoScriptError:
+                noscript_on_first_attempt = True
+
+            if noscript_on_first_attempt:
+                await handle_noscript_error(self.Meta.redis)
+                evalsha_commands = [
+                    (args, options)
+                    for args, options in commands_backup
+                    if args[0] == "EVALSHA"
+                ]
+                # Retry execute the pipeline actions
+                async with self.Meta.redis.pipeline(transaction=True) as retry_pipe:
+                    for args, options in evalsha_commands:
+                        retry_pipe.execute_command(*args, **options)
+                    try:
+                        await retry_pipe.execute()
+                    except NoScriptError:
+                        noscript_on_retry = True
+
+            if noscript_on_retry:
+                raise PersistentNoScriptError(
+                    "NOSCRIPT error persisted after re-registering scripts. "
+                    "This indicates a server-side problem with Redis."
+                )
+
             await refresh_ttl_if_needed(
                 self.Meta.redis, self.key, self.Meta.ttl, self.Meta.refresh_ttl
             )
