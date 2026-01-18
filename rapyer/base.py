@@ -479,6 +479,8 @@ class AtomicRedisModel(BaseModel):
 
         instances = []
         for model, key in zip(models, keys):
+            if model is None:
+                continue
             context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
             try:
                 model = cls.model_validate(model[0], context=context)
