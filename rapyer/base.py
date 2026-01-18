@@ -624,11 +624,11 @@ class AtomicRedisModel(BaseModel):
 
             try:
                 await pipe.execute()
+            except NoScriptError:
+                noscript_on_first_attempt = True
             except ResponseError:
                 if not ignore_if_deleted:
                     raise
-            except NoScriptError:
-                noscript_on_first_attempt = True
 
             if noscript_on_first_attempt:
                 await handle_noscript_error(self.Meta.redis)
