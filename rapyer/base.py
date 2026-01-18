@@ -484,7 +484,12 @@ class AtomicRedisModel(BaseModel):
             context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
             try:
                 model = cls.model_validate(model[0], context=context)
-            except ValidationError:
+            except ValidationError as exc:
+                logger.debug(
+                    "Skipping key %s due to validation error during afind: %s",
+                    key,
+                    exc,
+                )
                 continue
             model.key = key
             model._failed_fields = context.get(FAILED_FIELDS_KEY, set())
@@ -626,8 +631,15 @@ class AtomicRedisModel(BaseModel):
                 await pipe.execute()
             except NoScriptError:
                 noscript_on_first_attempt = True
-            except ResponseError:
-                if not ignore_if_deleted:
+            except ResponseError as exc:
+                if ignore_if_deleted:
+                    logger.warning(
+                        "Swallowed ResponseError during pipeline.execute() with "
+                        "ignore_if_deleted=True for key %r: %s",
+                        getattr(self, "key", None),
+                        exc,
+                    )
+                else:
                     raise
 
             if noscript_on_first_attempt:
