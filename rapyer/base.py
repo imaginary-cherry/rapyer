@@ -15,6 +15,7 @@ from pydantic import (
     model_validator,
     field_serializer,
     field_validator,
+    ValidationError,
 )
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
 from redis.commands.search.index_definition import IndexDefinition, IndexType
@@ -476,19 +477,23 @@ class AtomicRedisModel(BaseModel):
             # Fetch the actual documents
             models = await cls.Meta.redis.json().mget(keys=keys, path="$")
 
-        if cls.Meta.ttl is not None and cls.Meta.refresh_ttl:
-            async with cls.Meta.redis.pipeline() as pipe:
-                for key in keys:
-                    pipe.expire(key, cls.Meta.ttl)
-                await pipe.execute()
-
         instances = []
         for model, key in zip(models, keys):
             context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
-            model = cls.model_validate(model[0], context=context)
+            try:
+                model = cls.model_validate(model[0], context=context)
+            except ValidationError:
+                continue
             model.key = key
             model._failed_fields = context.get(FAILED_FIELDS_KEY, set())
             instances.append(model)
+
+        if cls.Meta.ttl is not None and cls.Meta.refresh_ttl:
+            async with cls.Meta.redis.pipeline() as pipe:
+                for model in instances:
+                    pipe.expire(model.key, cls.Meta.ttl)
+                await pipe.execute()
+
         return instances
 
     @classmethod
