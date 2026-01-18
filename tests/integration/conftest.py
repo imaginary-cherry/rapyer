@@ -3,6 +3,7 @@ import os
 import pytest_asyncio
 
 import rapyer
+from rapyer.scripts import register_scripts
 
 # Collection types
 from tests.models.collection_types import (
@@ -208,5 +209,9 @@ async def real_redis_client(redis_client):
     for model in redis_models:
         model.Meta.redis = redis_client
 
+    # Register Lua scripts
+    await register_scripts(redis_client)
+
     yield redis_client
+
     await redis_client.aclose()
