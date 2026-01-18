@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from uuid import uuid4
 
 import pytest
 import pytest_asyncio
@@ -469,3 +470,37 @@ async def test_expression_field_create_filter_raises_bad_filter_error_sanity():
     # Act & Assert
     with pytest.raises(BadFilterError):
         await IndexTestModel.afind(IndexTestModel.name)
+
+
+@pytest.mark.asyncio
+async def test_afind_with_expression_handles_mixed_corrupted_data_comprehensive(
+    create_indices,
+):
+    # Arrange
+    models = [
+        IndexTestModel(name="Alice", age=25, description="Engineer"),
+        IndexTestModel(name="Bob", age=30, description="Manager"),
+        IndexTestModel(name="Charlie", age=35, description="Designer"),
+        IndexTestModel(name="David", age=40, description="Director"),
+    ]
+    await IndexTestModel.ainsert(*models)
+
+    redis = IndexTestModel.Meta.redis
+    lock_key = f"IndexTestModel:{uuid4()}:lock"
+    await redis.set(lock_key, "lock_value")
+
+    invalid_schema_key = f"IndexTestModel:{uuid4()}"
+    await redis.json().set(invalid_schema_key, "$", {"age": "invalid", "name": 999})
+
+    IndexTestModel.init_class()
+
+    # Act
+    found_models = await IndexTestModel.afind(
+        (IndexTestModel.age > 25) & (IndexTestModel.age < 40)
+    )
+
+    # Assert
+    assert len(found_models) == 2
+    found_names = {m.name for m in found_models}
+    assert "Bob" in found_names
+    assert "Charlie" in found_names
