@@ -19,7 +19,7 @@ from pydantic import (
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
-from redis.exceptions import NoScriptError
+from redis.exceptions import NoScriptError, ResponseError
 from typing_extensions import deprecated
 
 from rapyer.config import RedisConfig
@@ -617,6 +617,9 @@ class AtomicRedisModel(BaseModel):
 
             try:
                 await pipe.execute()
+            except ResponseError:
+                if not ignore_if_deleted:
+                    raise
             except NoScriptError:
                 noscript_on_first_attempt = True
 
