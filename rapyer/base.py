@@ -484,7 +484,12 @@ class AtomicRedisModel(BaseModel):
             context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
             try:
                 model = cls.model_validate(model[0], context=context)
-            except ValidationError:
+            except ValidationError as exc:
+                logger.debug(
+                    "Skipping key %s due to validation error during afind: %s",
+                    key,
+                    exc,
+                )
                 continue
             model.key = key
             model._failed_fields = context.get(FAILED_FIELDS_KEY, set())
