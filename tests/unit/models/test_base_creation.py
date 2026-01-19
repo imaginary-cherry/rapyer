@@ -1,7 +1,6 @@
 from datetime import datetime
 
 import pytest
-
 from rapyer.base import AtomicRedisModel
 from rapyer.types.base import RedisType
 from rapyer.types.byte import RedisBytes

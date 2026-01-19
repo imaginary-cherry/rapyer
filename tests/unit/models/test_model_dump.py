@@ -2,7 +2,6 @@ from datetime import datetime
 
 import pytest
 import pytest_asyncio
-
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME
 from tests.models.collection_types import (
     SimpleListModel,

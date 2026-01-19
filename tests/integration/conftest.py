@@ -1,7 +1,6 @@
 import os
 
 import pytest_asyncio
-
 import rapyer
 from rapyer.scripts import register_scripts
 

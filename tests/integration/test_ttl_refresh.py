@@ -1,7 +1,6 @@
 import asyncio
 
 import pytest
-
 from rapyer import AtomicRedisModel
 from rapyer.types import RedisDict, RedisFloat, RedisInt, RedisList
 from rapyer.types.base import RedisType

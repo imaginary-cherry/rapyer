@@ -1,7 +1,6 @@
 from typing import Any
 
 from pydantic import Field, BaseModel
-
 from rapyer.base import AtomicRedisModel
 from rapyer.fields.safe_load import SafeLoad
 

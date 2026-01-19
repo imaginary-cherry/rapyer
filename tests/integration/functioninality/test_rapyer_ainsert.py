@@ -1,7 +1,6 @@
 from datetime import datetime
 
 import pytest
-
 import rapyer
 from tests.models.collection_types import (
     ListModel,

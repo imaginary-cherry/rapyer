@@ -2,7 +2,6 @@ from datetime import datetime
 from typing import List, Dict, Any
 
 from pydantic import Field
-
 from rapyer.base import AtomicRedisModel
 from tests.models.common import (
     Status,

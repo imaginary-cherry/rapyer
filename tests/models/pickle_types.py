@@ -1,7 +1,6 @@
 from typing import Type, Any, Optional
 
 from pydantic import Field
-
 from rapyer.base import AtomicRedisModel
 
 

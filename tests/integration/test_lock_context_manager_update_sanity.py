@@ -3,7 +3,6 @@ from typing import List
 import pytest
 import pytest_asyncio
 from pydantic import Field
-
 from rapyer.base import AtomicRedisModel
 
 

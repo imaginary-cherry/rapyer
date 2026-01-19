@@ -1,7 +1,6 @@
 import logging
 
 import pytest
-
 from tests.models.collection_types import SimpleListModel
 
 
