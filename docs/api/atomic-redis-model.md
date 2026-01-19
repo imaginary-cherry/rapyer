@@ -69,9 +69,17 @@ await user.aload()  # Refreshes user with latest Redis data
 success = await user.adelete()
 ```
 
+#### `aset_ttl(ttl)`
+**Type:** `async` method
+**Parameters:**
+- `ttl` (int): Time-to-live in seconds
+**Description:** Sets the TTL for this model instance in Redis. Can only be called on top-level models.
+
+```python
+await user.aset_ttl(3600)  # Expire in 1 hour
+```
+
 #### `aduplicate()`
-**Type:** `async` method  
-**Returns:** `Self`  
 **Description:** Creates a duplicate of the current model with a new primary key and saves it to Redis.
 
 ```python
