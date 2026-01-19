@@ -170,6 +170,9 @@ class AtomicRedisModel(BaseModel):
         field_path = self.field_path
         return f"${field_path}" if field_path else "$"
 
+    def should_refresh(self):
+        return self.Meta.refresh_ttl and self.Meta.ttl is not None
+
     @classmethod
     def redis_schema(cls, redis_name: str = ""):
         fields = []
@@ -635,6 +638,8 @@ class AtomicRedisModel(BaseModel):
             noscript_on_retry = False
 
             try:
+                if self.should_refresh():
+                    pipe.expire(self.key, self.Meta.ttl)
                 await pipe.execute()
             except NoScriptError:
                 noscript_on_first_attempt = True
@@ -671,9 +676,6 @@ class AtomicRedisModel(BaseModel):
                     "This indicates a server-side problem with Redis."
                 )
 
-            await refresh_ttl_if_needed(
-                self.Meta.redis, self.key, self.Meta.ttl, self.Meta.refresh_ttl
-            )
             _context_var.set(None)
             _context_xx_pipe.set(False)
 
