@@ -69,9 +69,17 @@ await user.aload()  # Refreshes user with latest Redis data
 success = await user.adelete()
 ```
 
+#### `aset_ttl(ttl)`
+**Type:** `async` method
+**Parameters:**
+- `ttl` (int): Time-to-live in seconds
+**Description:** Sets the TTL for this model instance in Redis. Can only be called on top-level models.
+
+```python
+await user.aset_ttl(3600)  # Expire in 1 hour
+```
+
 #### `aduplicate()`
-**Type:** `async` method  
-**Returns:** `Self`  
 **Description:** Creates a duplicate of the current model with a new primary key and saves it to Redis.
 
 ```python
@@ -148,17 +156,24 @@ user = await User.aget("User:abc-123")
 success = await User.adelete_by_key("User:abc-123")
 ```
 
-#### `afind(*expressions)`
+#### `afind(*args)`
 **Type:** `async` class method
 **Parameters:**
-- `*expressions` (Expression): Optional filter expressions
+- `*args` (str | Expression): Keys (strings) or filter expressions
 **Returns:** `list of redis models`
 **Raises:** `CantSerializeRedisValueError` if a value in Redis cannot be deserialized  (Corruption or missing resources)
-**Description:** Retrieves all instances of this model class from Redis, optionally filtered by expressions.
+**Description:** Retrieves model instances from Redis. Supports three modes:
+
+1. **No arguments** - Returns all instances
+2. **Keys** - Pass string keys to retrieve specific models
+3. **Expressions** - Pass filter expressions (requires `Index` annotation)
+
+!!! note
+    Keys and expressions are mutually exclusive. If both are provided, keys take priority and expressions are ignored (a warning is logged).
 
 **Supported Filter Operators:**
 - `==` - Equal to
-- `!=` - Not equal to  
+- `!=` - Not equal to
 - `>` - Greater than
 - `<` - Less than
 - `>=` - Greater than or equal to
@@ -169,7 +184,11 @@ success = await User.adelete_by_key("User:abc-123")
 
 ```python
 # Get all users
-all_users = await User.afind()  
+all_users = await User.afind()
+
+# Find by keys (full key or just primary key)
+users = await User.afind("User:abc123", "User:def456")
+users = await User.afind("abc123", "def456")  # prefix added automatically
 
 # Filter with expressions (requires Index annotation on fields)
 active_users = await User.afind(User.status == "active")

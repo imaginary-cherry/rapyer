@@ -35,6 +35,8 @@ EXCLUDED_METHODS = [
     AtomicRedisModel.afind_keys,
     AtomicRedisModel.acreate_index,
     AtomicRedisModel.adelete_index,
+    # TTL operations - this method IS the TTL operation itself
+    AtomicRedisModel.aset_ttl,
 ]
 
 

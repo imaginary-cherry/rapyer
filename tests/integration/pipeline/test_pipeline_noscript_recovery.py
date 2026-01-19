@@ -4,7 +4,7 @@ import pytest
 
 from rapyer.errors import PersistentNoScriptError
 from tests.models.collection_types import ComprehensiveTestModel
-from tests.models.simple_types import TTLRefreshTestModel
+from tests.models.simple_types import TTLRefreshTestModel, TTL_TEST_SECONDS
 
 
 @pytest.mark.asyncio
@@ -74,6 +74,8 @@ async def test_pipeline_recovers_with_all_redis_types_after_script_flush_sanity(
         "setting2": "value2",
         "setting3": "value3",
     }
+    ttl = await model.Meta.redis.ttl(model.key)
+    assert TTL_TEST_SECONDS - 2 < ttl <= TTL_TEST_SECONDS
 
 
 @pytest.mark.asyncio

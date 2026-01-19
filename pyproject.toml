@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "rapyer"
-version = "1.1.5"
+version = "1.1.6"
 description = "Pydantic models with Redis as the backend"
 authors = [{name = "YedidyaHKfir", email = "yedidyakfir@gmail.com"}]
 readme = "README.md"
@@ -74,6 +74,10 @@ packages = [{include = "rapyer"}]
 [tool.poetry.group.dev.dependencies]
 black = "^25.9.0"
 mypy = "^1.0.0"
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101"]  # assert_used - valid in test files
 
 [tool.coverage.run]
 source = ["rapyer"]
