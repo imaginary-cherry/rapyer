@@ -2,6 +2,7 @@ import inspect
 from typing import Callable
 
 import pytest
+
 import tests.integration.test_ttl_refresh  # noqa: F401 - triggers decorator registration
 from rapyer.base import AtomicRedisModel
 from rapyer.types import RedisInt
@@ -34,6 +35,8 @@ EXCLUDED_METHODS = [
     AtomicRedisModel.afind_keys,
     AtomicRedisModel.acreate_index,
     AtomicRedisModel.adelete_index,
+    # TTL operations - this method IS the TTL operation itself
+    AtomicRedisModel.aset_ttl,
 ]
 
 

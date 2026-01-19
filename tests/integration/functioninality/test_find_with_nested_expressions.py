@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 import pytest
 import pytest_asyncio
+
 from tests.models.index_types import ChildWithParentModel, ParentWithIndexModel
 
 

@@ -1,6 +1,7 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
+
 from rapyer.errors import PersistentNoScriptError
 from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.simple_types import TTLRefreshTestModel, TTL_TEST_SECONDS

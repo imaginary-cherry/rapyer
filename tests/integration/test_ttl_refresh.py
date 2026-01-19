@@ -1,6 +1,7 @@
 import asyncio
 
 import pytest
+
 from rapyer import AtomicRedisModel
 from rapyer.types import RedisDict, RedisFloat, RedisInt, RedisList
 from rapyer.types.base import RedisType
@@ -812,3 +813,37 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_list_apop__sani
     # Assert
     ttl = await real_redis_client.ttl(model.key)
     assert 0 < ttl <= TTL_TEST_SECONDS - SLEEP_BEFORE_REFRESH
+
+
+@pytest.mark.parametrize(
+    ["new_ttl"],
+    [
+        [100],  # Extend TTL (longer than TTL_TEST_SECONDS=24)
+        [5],  # Shorten TTL (shorter than TTL_TEST_SECONDS=24)
+    ],
+)
+@pytest.mark.asyncio
+async def test_aset_ttl__sanity(real_redis_client, new_ttl):
+    # Arrange
+    model = ModelWithTTL(name="test_aset_ttl", age=25)
+    await model.asave()
+
+    # Act
+    await model.aset_ttl(new_ttl)
+
+    # Assert
+    actual_ttl = await real_redis_client.ttl(model.key)
+    assert new_ttl - 2 < actual_ttl <= new_ttl
+
+
+@pytest.mark.asyncio
+async def test_aset_ttl_on_inner_model__edge_case():
+    # Arrange
+    from tests.models.complex_types import OuterModelWithRedisNested
+
+    outer = OuterModelWithRedisNested()
+    await outer.asave()
+
+    # Act & Assert
+    with pytest.raises(RuntimeError, match="Can only set TTL from top level model"):
+        await outer.container.inner_redis.aset_ttl(100)

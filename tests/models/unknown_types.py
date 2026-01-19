@@ -3,6 +3,7 @@ from typing import Any, ClassVar
 
 from pydantic import GetCoreSchemaHandler, BaseModel, ConfigDict, Field
 from pydantic_core import core_schema
+
 from rapyer.base import AtomicRedisModel
 from rapyer.config import RedisConfig
 
