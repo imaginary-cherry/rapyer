@@ -104,7 +104,7 @@ async def test_afind_with_only_non_existent_keys_edge_case(redis_client):
 
 
 @pytest.mark.asyncio
-async def test_afind_with_keys_and_expression_logs_warning_and_ignores_expression(
+async def test_afind_with_keys_and_expression_ignores_expression(
     redis_client, inserted_test_models
 ):
     # Arrange
