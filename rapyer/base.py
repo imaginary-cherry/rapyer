@@ -483,11 +483,10 @@ class AtomicRedisModel(BaseModel):
             return []
 
         # Fetch the actual documents
-        keys = targeted_keys
-        models = await cls.Meta.redis.json().mget(keys=keys, path="$")
+        models = await cls.Meta.redis.json().mget(keys=targeted_keys, path="$")
 
         instances = []
-        for model, key in zip(models, keys):
+        for model, key in zip(models, targeted_keys):
             if model is None:
                 continue
             context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
