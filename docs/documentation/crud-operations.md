@@ -163,6 +163,42 @@ if __name__ == "__main__":
 
 This is much more efficient than individual get operations when you need to retrieve multiple instances.
 
+### Finding by Keys
+
+Retrieve specific models by passing their keys directly to `afind()`:
+
+```python
+async def find_by_keys_example():
+    # Create and save users
+    users = [
+        User(name="Alice", age=25, email="alice@example.com"),
+        User(name="Bob", age=30, email="bob@example.com"),
+        User(name="Charlie", age=35, email="charlie@example.com")
+    ]
+    await User.ainsert(*users)
+
+    # Find specific users by their full keys
+    alice_key = users[0].key  # e.g., "User:abc123"
+    bob_key = users[1].key
+
+    found_users = await User.afind(alice_key, bob_key)
+    print(f"Found {len(found_users)} users")  # 2
+
+    # You can also use just the primary key (without prefix)
+    alice_pk = users[0].pk  # e.g., "abc123"
+    found_alice = await User.afind(alice_pk)
+    print(f"Found: {found_alice[0].name}")  # Alice
+```
+
+**Key behavior:**
+
+- Pass full keys (`User:abc123`) or just the primary key (`abc123`)
+- Non-existent keys are silently ignored
+- Returns an empty list if no keys match
+
+!!! warning "Keys and Expressions are Mutually Exclusive"
+    If you pass both keys and expressions to `afind()`, the expressions are ignored and only the keys are used. A warning is logged when this happens.
+
 ### Filtering with Expressions
 
 The `afind()` method also supports filtering using expressions to find models that match specific criteria. To use filtering, your model fields must be marked with the `Index` annotation.

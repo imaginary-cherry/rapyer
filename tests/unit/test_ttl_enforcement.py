@@ -2,7 +2,6 @@ import inspect
 from typing import Callable
 
 import pytest
-
 import tests.integration.test_ttl_refresh  # noqa: F401 - triggers decorator registration
 from rapyer.base import AtomicRedisModel
 from rapyer.types import RedisInt

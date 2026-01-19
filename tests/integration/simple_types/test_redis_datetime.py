@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 
 import pytest
-
 from tests.models.simple_types import (
     DatetimeModel,
     DatetimeListModel,

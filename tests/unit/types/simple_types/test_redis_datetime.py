@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 
 import pytest
-
 from rapyer.types.datetime import RedisDatetime
 
 

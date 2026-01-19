@@ -1,7 +1,6 @@
 import pytest
-import redis
-
 import rapyer
+import redis
 from rapyer.base import REDIS_MODELS
 
 

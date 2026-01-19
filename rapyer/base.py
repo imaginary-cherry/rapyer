@@ -18,11 +18,6 @@ from pydantic import (
     ValidationError,
 )
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
-from redis.commands.search.index_definition import IndexDefinition, IndexType
-from redis.commands.search.query import Query
-from redis.exceptions import NoScriptError, ResponseError
-from typing_extensions import deprecated
-
 from rapyer.config import RedisConfig
 from rapyer.context import _context_var, _context_xx_pipe
 from rapyer.errors.base import (
@@ -57,6 +52,10 @@ from rapyer.utils.redis import (
     update_keys_in_pipeline,
     refresh_ttl_if_needed,
 )
+from redis.commands.search.index_definition import IndexDefinition, IndexType
+from redis.commands.search.query import Query
+from redis.exceptions import NoScriptError, ResponseError
+from typing_extensions import deprecated
 
 logger = logging.getLogger("rapyer")
 
@@ -169,6 +168,9 @@ class AtomicRedisModel(BaseModel):
     def json_path(self):
         field_path = self.field_path
         return f"${field_path}" if field_path else "$"
+
+    def should_refresh(self):
+        return self.Meta.refresh_ttl and self.Meta.ttl is not None
 
     @classmethod
     def redis_schema(cls, redis_name: str = ""):
@@ -447,38 +449,44 @@ class AtomicRedisModel(BaseModel):
         return instance
 
     @classmethod
-    async def afind(cls, *expressions):
-        # Original behavior when no expressions provided - return all
-        if not expressions:
-            keys = await cls.afind_keys()
-            if not keys:
-                return []
+    async def afind(cls, *args):
+        # Separate keys (str) from expressions (Expression)
+        provided_keys = [arg for arg in args if isinstance(arg, str)]
+        expressions = [arg for arg in args if isinstance(arg, Expression)]
 
-            models = await cls.Meta.redis.json().mget(keys=keys, path="$")
-        else:
-            # With expressions - use Redis Search
-            # Combine all expressions with & operator
+        if provided_keys and expressions:
+            logger.warning(
+                "afind called with both keys and expressions; expressions ignored"
+            )
+
+        if provided_keys:
+            # Case 1: Extract by keys
+            targeted_keys = [
+                k if ":" in k else f"{cls.class_key_initials()}:{k}"
+                for k in provided_keys
+            ]
+        elif expressions:
+            # Case 2: Extract by expressions
             combined_expression = functools.reduce(lambda a, b: a & b, expressions)
             query_string = combined_expression.create_filter()
-
-            # Create a Query object
             query = Query(query_string).no_content()
-
-            # Try to search using the index
             index_name = cls.index_name()
             search_result = await cls.Meta.redis.ft(index_name).search(query)
-
             if not search_result.docs:
                 return []
+            targeted_keys = [doc.id for doc in search_result.docs]
+        else:
+            # Case 3: Extract all
+            targeted_keys = await cls.afind_keys()
 
-            # Get the keys from search results
-            keys = [doc.id for doc in search_result.docs]
+        if not targeted_keys:
+            return []
 
-            # Fetch the actual documents
-            models = await cls.Meta.redis.json().mget(keys=keys, path="$")
+        # Fetch the actual documents
+        models = await cls.Meta.redis.json().mget(keys=targeted_keys, path="$")
 
         instances = []
-        for model, key in zip(models, keys):
+        for model, key in zip(models, targeted_keys):
             if model is None:
                 continue
             context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
@@ -628,6 +636,8 @@ class AtomicRedisModel(BaseModel):
             noscript_on_retry = False
 
             try:
+                if self.should_refresh():
+                    pipe.expire(self.key, self.Meta.ttl)
                 await pipe.execute()
             except NoScriptError:
                 noscript_on_first_attempt = True
@@ -664,9 +674,6 @@ class AtomicRedisModel(BaseModel):
                     "This indicates a server-side problem with Redis."
                 )
 
-            await refresh_ttl_if_needed(
-                self.Meta.redis, self.key, self.Meta.ttl, self.Meta.refresh_ttl
-            )
             _context_var.set(None)
             _context_xx_pipe.set(False)
 

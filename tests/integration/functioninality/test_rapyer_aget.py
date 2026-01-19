@@ -1,7 +1,6 @@
 from datetime import datetime
 
 import pytest
-
 import rapyer
 from rapyer.errors.base import KeyNotFound
 from tests.models.collection_types import (

@@ -1,9 +1,8 @@
 from typing import TypeAlias, TYPE_CHECKING
 
-from redis.commands.search.field import NumericField
-
 from rapyer.types.base import RedisType
 from rapyer.utils.redis import refresh_ttl_if_needed
+from redis.commands.search.field import NumericField
 
 
 class RedisFloat(float, RedisType):

@@ -2,7 +2,6 @@ from enum import Enum
 from typing import Generic, TypeVar, Any
 
 import pytest
-
 from rapyer import AtomicRedisModel
 from rapyer.base import find_redis_models, REDIS_MODELS
 

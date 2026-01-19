@@ -3,7 +3,6 @@ from datetime import datetime
 from unittest.mock import Mock
 
 import pytest
-
 import rapyer
 from tests.models.functionality_types import RichModel
 

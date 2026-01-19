@@ -1,7 +1,6 @@
 import pytest
-from redis import ResponseError
-
 from rapyer.types.lst import RedisList
+from redis import ResponseError
 from tests.models.collection_types import ComprehensiveTestModel
 
 
