@@ -97,8 +97,23 @@ PasswordResetToken.Meta.ttl = 3600  # 1 hour
 PasswordResetToken.Meta.refresh_ttl = False  # Token expires in exactly 1 hour
 ```
 
+## Setting TTL Dynamically
+
+Use `aset_ttl()` to set or update the TTL of a specific model instance at runtime:
+
+```python
+session = await Session.aget("Session:abc123")
+await session.aset_ttl(7200)  # Expire in 2 hours
+```
+
+This is useful when you need different expiration times for individual instances, or when the TTL should be determined by business logic rather than a fixed configuration.
+
+!!! note
+    `aset_ttl()` can only be called on top-level models, not on nested models.
+
 ### Best Practices
 
 1. **Enable for sessions**: User sessions, shopping carts, and other user-activity-related models benefit from TTL refresh
 2. **Disable for time-sensitive tokens**: Password reset tokens, verification codes, and similar security-related models should have fixed expiration
 3. **Consider your use case**: If a model should "live" as long as it's being used, enable TTL refresh. If it should expire at a specific time, disable it
+4. **Use `aset_ttl()` for dynamic expiration**: When different instances need different TTLs based on runtime conditions

@@ -10,6 +10,9 @@
   - Note: If both keys and expressions are provided, expressions are ignored with a warning
 - **Logger Configuration in init_rapyer**: Added `logger` parameter to `init_rapyer()` function to configure the rapyer logger with a custom logger's level and handlers.
   - Example: `await init_rapyer(redis=redis_client, logger=my_logger)`
+- **aset_ttl Method**: Added `aset_ttl(ttl)` method to `AtomicRedisModel` for manually setting or updating the TTL of a model instance.
+  - Example: `await model.aset_ttl(3600)` sets TTL to 1 hour
+  - Only works on top-level models (raises `RuntimeError` if called on inner models)
 
 ### 🐛 Fixed
 
