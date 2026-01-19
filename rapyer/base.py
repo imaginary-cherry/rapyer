@@ -447,35 +447,42 @@ class AtomicRedisModel(BaseModel):
         return instance
 
     @classmethod
-    async def afind(cls, *expressions):
-        # Original behavior when no expressions provided - return all
-        if not expressions:
-            keys = await cls.afind_keys()
-            if not keys:
-                return []
+    async def afind(cls, *args):
+        # Separate keys (str) from expressions (Expression)
+        provided_keys = [arg for arg in args if isinstance(arg, str)]
+        expressions = [arg for arg in args if isinstance(arg, Expression)]
 
-            models = await cls.Meta.redis.json().mget(keys=keys, path="$")
-        else:
-            # With expressions - use Redis Search
-            # Combine all expressions with & operator
+        if provided_keys and expressions:
+            logger.warning(
+                "afind called with both keys and expressions; expressions ignored"
+            )
+
+        if provided_keys:
+            # Case 1: Extract by keys
+            targeted_keys = [
+                k if ":" in k else f"{cls.class_key_initials()}:{k}"
+                for k in provided_keys
+            ]
+        elif expressions:
+            # Case 2: Extract by expressions
             combined_expression = functools.reduce(lambda a, b: a & b, expressions)
             query_string = combined_expression.create_filter()
-
-            # Create a Query object
             query = Query(query_string).no_content()
-
-            # Try to search using the index
             index_name = cls.index_name()
             search_result = await cls.Meta.redis.ft(index_name).search(query)
-
             if not search_result.docs:
                 return []
+            targeted_keys = [doc.id for doc in search_result.docs]
+        else:
+            # Case 3: Extract all
+            targeted_keys = await cls.afind_keys()
 
-            # Get the keys from search results
-            keys = [doc.id for doc in search_result.docs]
+        if not targeted_keys:
+            return []
 
-            # Fetch the actual documents
-            models = await cls.Meta.redis.json().mget(keys=keys, path="$")
+        # Fetch the actual documents
+        keys = targeted_keys
+        models = await cls.Meta.redis.json().mget(keys=keys, path="$")
 
         instances = []
         for model, key in zip(models, keys):
