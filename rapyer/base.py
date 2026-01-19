@@ -402,6 +402,11 @@ class AtomicRedisModel(BaseModel):
             self.Meta.redis, self.key, self.Meta.ttl, self.Meta.refresh_ttl
         )
 
+    async def aset_ttl(self, ttl: int) -> None:
+        if self.is_inner_model():
+            raise RuntimeError("Can only set TTL from top level model")
+        await self.Meta.redis.expire(self.key, ttl)
+
     @classmethod
     @deprecated(
         "get() classmethod is deprecated and will be removed in rapyer 1.2.0, use aget instead"
