@@ -75,6 +75,10 @@ packages = [{include = "rapyer"}]
 black = "^25.9.0"
 mypy = "^1.0.0"
 
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101"]  # assert_used - valid in test files
+
 [tool.coverage.run]
 source = ["rapyer"]
 omit = ["*/tests/*", "*/test_*"]
