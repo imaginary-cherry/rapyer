@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import pytest
+
 from rapyer.base import AtomicRedisModel
 from rapyer.types.dct import RedisDict
 from tests.models.collection_types import (
