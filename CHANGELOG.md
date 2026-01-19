@@ -4,6 +4,10 @@
 
 ### ✨ Added
 
+- **afind Key-Based Search**: Added support for passing keys directly to `afind()` to retrieve specific models by their keys, without requiring a Redis Search query.
+  - Supports both full keys (`Model:uuid`) and primary key values (`uuid`)
+  - Example: `await Model.afind(key1, key2)` or `await Model.afind("uuid1", "uuid2")`
+  - Note: If both keys and expressions are provided, expressions are ignored with a warning
 - **Logger Configuration in init_rapyer**: Added `logger` parameter to `init_rapyer()` function to configure the rapyer logger with a custom logger's level and handlers.
   - Example: `await init_rapyer(redis=redis_client, logger=my_logger)`
 
