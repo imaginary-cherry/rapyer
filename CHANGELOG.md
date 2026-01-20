@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.0]
+
+### ✨ Added
+
+- **Global `rapyer.afind()` Function**: Added `rapyer.afind()` function to retrieve multiple models of different types by their keys in a single bulk operation.
+  - Supports fetching models of heterogeneous types in one call
+  - Automatically refreshes TTL for models with `refresh_ttl` enabled
+  - Raises `KeyNotFound` if any key is missing in Redis
+  - Example: `models = await rapyer.afind("UserModel:123", "OrderModel:456")`
+
 ## [1.1.6]
 
 ### ✨ Added
