@@ -30,6 +30,7 @@ from rapyer.errors.base import (
     PersistentNoScriptError,
     UnsupportedIndexedFieldError,
     CantSerializeRedisValueError,
+    RapyerModelDoesntExist,
 )
 from rapyer.fields.expression import ExpressionField, AtomicField, Expression
 from rapyer.fields.index import IndexAnnotation
@@ -755,8 +756,7 @@ async def afind(*redis_keys: str) -> list[AtomicRedisModel]:
     for key in redis_keys:
         class_name = key.split(":")[0]
         if class_name not in redis_model_mapping:
-            logger.warning("Skipping key %s: unknown model class %s", key, class_name)
-            continue
+            raise RapyerModelDoesntExist(class_name, f"{key} is missing in redis")
         key_to_class[key] = redis_model_mapping[class_name]
         valid_keys.append(key)
 
@@ -772,7 +772,7 @@ async def afind(*redis_keys: str) -> list[AtomicRedisModel]:
 
     for data, key in zip(models_data, valid_keys):
         if data is None:
-            continue
+            raise KeyNotFound(f"{key} is missing in redis")
         klass = key_to_class[key]
         model = klass.create_redis_model(data, key)
         if model is None:
