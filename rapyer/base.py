@@ -516,7 +516,7 @@ class AtomicRedisModel(BaseModel):
                 continue
             instances.append(model)
 
-        if cls.Meta.ttl is not None and cls.Meta.refresh_ttl:
+        if cls.should_refresh():
             async with cls.Meta.redis.pipeline() as pipe:
                 for model in instances:
                     pipe.expire(model.key, cls.Meta.ttl)
