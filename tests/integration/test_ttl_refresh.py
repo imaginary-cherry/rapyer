@@ -2,6 +2,7 @@ import asyncio
 
 import pytest
 
+import rapyer
 from rapyer import AtomicRedisModel
 from rapyer.types import RedisDict, RedisFloat, RedisInt, RedisList
 from rapyer.types.base import RedisType
@@ -847,3 +848,25 @@ async def test_aset_ttl_on_inner_model__edge_case():
     # Act & Assert
     with pytest.raises(RuntimeError, match="Can only set TTL from top level model"):
         await outer.container.inner_redis.aset_ttl(100)
+
+
+@pytest.mark.asyncio
+async def test_ttl_refresh_on_rapyer_afind_with_mixed_ttl_classes__sanity(
+    real_redis_client,
+):
+    # Arrange
+    model_with_ttl = ModelWithTTL(name="mixed_ttl", age=25)
+    model_without_ttl = ModelWithoutTTL(name="mixed_no_ttl", age=30)
+    await model_with_ttl.asave()
+    await model_without_ttl.asave()
+    await asyncio.sleep(SLEEP_BEFORE_REFRESH)
+
+    # Act
+    found_models = await rapyer.afind(model_with_ttl.key, model_without_ttl.key)
+
+    # Assert
+    ttl_with = await real_redis_client.ttl(model_with_ttl.key)
+    ttl_without = await real_redis_client.ttl(model_without_ttl.key)
+    assert TTL_TEST_SECONDS - 2 < ttl_with <= TTL_TEST_SECONDS
+    assert ttl_without == -1  # No TTL set
+    assert len(found_models) == 2
