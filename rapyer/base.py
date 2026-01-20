@@ -475,6 +475,7 @@ class AtomicRedisModel(BaseModel):
         # Separate keys (str) from expressions (Expression)
         provided_keys = [arg for arg in args if isinstance(arg, str)]
         expressions = [arg for arg in args if isinstance(arg, Expression)]
+        raise_on_missing = bool(provided_keys)
 
         if provided_keys and expressions:
             logger.warning(
@@ -510,6 +511,8 @@ class AtomicRedisModel(BaseModel):
         instances = []
         for model, key in zip(models, targeted_keys):
             if model is None:
+                if raise_on_missing:
+                    raise KeyNotFound(f"{key} is missing in redis")
                 continue
             model = cls.create_redis_model(model, key)
             if model is None:
