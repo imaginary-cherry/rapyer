@@ -1,6 +1,7 @@
 import pytest
 import pytest_asyncio
 
+from rapyer.errors.base import KeyNotFound
 from tests.models.index_types import IndexTestModel
 
 
@@ -9,22 +10,6 @@ async def create_index(redis_client):
     await IndexTestModel.acreate_index()
     yield
     await IndexTestModel.adelete_index()
-
-
-@pytest.fixture
-def test_models():
-    return [
-        IndexTestModel(name="Alice", age=25, description="Engineer"),
-        IndexTestModel(name="Bob", age=30, description="Manager"),
-        IndexTestModel(name="Charlie", age=35, description="Designer"),
-        IndexTestModel(name="David", age=40, description="Director"),
-    ]
-
-
-@pytest_asyncio.fixture
-async def inserted_test_models(test_models):
-    await IndexTestModel.ainsert(*test_models)
-    return test_models
 
 
 @pytest.mark.asyncio
@@ -80,27 +65,9 @@ async def test_afind_with_non_existent_keys_edge_case(
     existing_key = inserted_test_models[0].key
     non_existent_key = "IndexTestModel:non_existent_key_12345"
 
-    # Act
-    found_models = await IndexTestModel.afind(existing_key, non_existent_key)
-
-    # Assert
-    assert len(found_models) == 1
-    assert found_models[0] == inserted_test_models[0]
-
-
-@pytest.mark.asyncio
-async def test_afind_with_only_non_existent_keys_edge_case(redis_client):
-    # Arrange
-    non_existent_keys = [
-        "IndexTestModel:fake_key_1",
-        "IndexTestModel:fake_key_2",
-    ]
-
-    # Act
-    found_models = await IndexTestModel.afind(*non_existent_keys)
-
-    # Assert
-    assert found_models == []
+    # Act + Assert
+    with pytest.raises(KeyNotFound):
+        await IndexTestModel.afind(existing_key, non_existent_key)
 
 
 @pytest.mark.asyncio
