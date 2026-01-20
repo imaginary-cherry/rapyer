@@ -6,7 +6,7 @@ import logging
 import pickle
 import uuid
 from contextlib import AbstractAsyncContextManager
-from typing import ClassVar, Any, get_origin
+from typing import ClassVar, Any, get_origin, Optional
 
 from pydantic import (
     BaseModel,
@@ -18,6 +18,11 @@ from pydantic import (
     ValidationError,
 )
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
+from redis.commands.search.index_definition import IndexDefinition, IndexType
+from redis.commands.search.query import Query
+from redis.exceptions import NoScriptError, ResponseError
+from typing_extensions import deprecated
+
 from rapyer.config import RedisConfig
 from rapyer.context import _context_var, _context_xx_pipe
 from rapyer.errors.base import (
@@ -52,10 +57,6 @@ from rapyer.utils.redis import (
     update_keys_in_pipeline,
     refresh_ttl_if_needed,
 )
-from redis.commands.search.index_definition import IndexDefinition, IndexType
-from redis.commands.search.query import Query
-from redis.exceptions import NoScriptError, ResponseError
-from typing_extensions import deprecated
 
 logger = logging.getLogger("rapyer")
 
@@ -454,6 +455,22 @@ class AtomicRedisModel(BaseModel):
         return instance
 
     @classmethod
+    def create_redis_model(cls, model_dump: dict, key: str) -> Optional[Self]:
+        context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
+        try:
+            model = cls.model_validate(model_dump[0], context=context)
+        except ValidationError as exc:
+            logger.debug(
+                "Skipping key %s due to validation error during afind: %s",
+                key,
+                exc,
+            )
+            return None
+        model.key = key
+        model._failed_fields = context.get(FAILED_FIELDS_KEY, set())
+        return model
+
+    @classmethod
     async def afind(cls, *args):
         # Separate keys (str) from expressions (Expression)
         provided_keys = [arg for arg in args if isinstance(arg, str)]
@@ -494,18 +511,9 @@ class AtomicRedisModel(BaseModel):
         for model, key in zip(models, targeted_keys):
             if model is None:
                 continue
-            context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
-            try:
-                model = cls.model_validate(model[0], context=context)
-            except ValidationError as exc:
-                logger.debug(
-                    "Skipping key %s due to validation error during afind: %s",
-                    key,
-                    exc,
-                )
+            model = cls.create_redis_model(model, key)
+            if model is None:
                 continue
-            model.key = key
-            model._failed_fields = context.get(FAILED_FIELDS_KEY, set())
             instances.append(model)
 
         if cls.Meta.ttl is not None and cls.Meta.refresh_ttl:
@@ -734,6 +742,52 @@ async def aget(redis_key: str) -> AtomicRedisModel:
     if klass is None:
         raise KeyNotFound(f"{redis_key} is missing in redis")
     return await klass.aget(redis_key)
+
+
+async def afind(*redis_keys: str) -> list[AtomicRedisModel]:
+    if not redis_keys:
+        return []
+
+    redis_model_mapping = {klass.__name__: klass for klass in REDIS_MODELS}
+
+    key_to_class: dict[str, type[AtomicRedisModel]] = {}
+    valid_keys = []
+    for key in redis_keys:
+        class_name = key.split(":")[0]
+        if class_name not in redis_model_mapping:
+            logger.warning("Skipping key %s: unknown model class %s", key, class_name)
+            continue
+        key_to_class[key] = redis_model_mapping[class_name]
+        valid_keys.append(key)
+
+    if not valid_keys:
+        return []
+
+    models_data = await AtomicRedisModel.Meta.redis.json().mget(
+        keys=valid_keys, path="$"
+    )
+
+    instances = []
+    instances_by_class: dict[type[AtomicRedisModel], list[AtomicRedisModel]] = {}
+
+    for data, key in zip(models_data, valid_keys):
+        if data is None:
+            continue
+        klass = key_to_class[key]
+        model = klass.create_redis_model(data, key)
+        if model is None:
+            continue
+        instances.append(model)
+        instances_by_class.setdefault(klass, []).append(model)
+
+    async with AtomicRedisModel.Meta.redis.pipeline() as pipe:
+        for klass, class_instances in instances_by_class.items():
+            if klass.Meta.ttl is not None and klass.Meta.refresh_ttl:
+                for model in class_instances:
+                    pipe.expire(model.key, klass.Meta.ttl)
+                await pipe.execute()
+
+    return instances
 
 
 def find_redis_models() -> list[type[AtomicRedisModel]]:
