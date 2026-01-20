@@ -387,4 +387,4 @@ if __name__ == "__main__":
 
 ### Note
 
-The `afind()` method only returns instances of the specific model class it's called on. To find all instances across different model types, you would need to call `afind()` on each model class separately.
+The `afind()` method only returns instances of the specific model class it's called on. To find all instances across different model types, you would need to call `rapyer.afind()`.
