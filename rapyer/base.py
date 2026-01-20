@@ -56,7 +56,6 @@ from rapyer.utils.pythonic import safe_issubclass
 from rapyer.utils.redis import (
     acquire_lock,
     update_keys_in_pipeline,
-    refresh_ttl_if_needed,
 )
 
 logger = logging.getLogger("rapyer")
@@ -174,6 +173,10 @@ class AtomicRedisModel(BaseModel):
     @classmethod
     def should_refresh(cls):
         return cls.Meta.refresh_ttl and cls.Meta.ttl is not None
+
+    async def refresh_ttl_if_needed(self):
+        if self.should_refresh():
+            await self.Meta.redis.expire(self.key, self.Meta.ttl)
 
     @classmethod
     def redis_schema(cls, redis_name: str = ""):
@@ -401,9 +404,7 @@ class AtomicRedisModel(BaseModel):
         async with self.Meta.redis.pipeline() as pipe:
             update_keys_in_pipeline(pipe, self.key, **json_path_kwargs)
             await pipe.execute()
-        await refresh_ttl_if_needed(
-            self.Meta.redis, self.key, self.Meta.ttl, self.Meta.refresh_ttl
-        )
+        await self.refresh_ttl_if_needed()
 
     async def aset_ttl(self, ttl: int) -> None:
         if self.is_inner_model():
@@ -430,9 +431,8 @@ class AtomicRedisModel(BaseModel):
         instance = cls.model_validate(model_dump, context=context)
         instance.key = key
         instance._failed_fields = context.get(FAILED_FIELDS_KEY, set())
-        await refresh_ttl_if_needed(
-            cls.Meta.redis, key, cls.Meta.ttl, cls.Meta.refresh_ttl
-        )
+        if cls.should_refresh():
+            await cls.Meta.redis.expire(key, cls.Meta.ttl)
         return instance
 
     @deprecated(
@@ -451,9 +451,7 @@ class AtomicRedisModel(BaseModel):
         instance._pk = self._pk
         instance._base_model_link = self._base_model_link
         instance._failed_fields = context.get(FAILED_FIELDS_KEY, set())
-        await refresh_ttl_if_needed(
-            self.Meta.redis, self.key, self.Meta.ttl, self.Meta.refresh_ttl
-        )
+        await self.refresh_ttl_if_needed()
         return instance
 
     @classmethod

@@ -1,7 +1,6 @@
 from typing import TypeAlias, TYPE_CHECKING
 
 from rapyer.types.base import RedisType
-from rapyer.utils.redis import refresh_ttl_if_needed
 from redis.commands.search.field import NumericField
 
 
@@ -14,9 +13,7 @@ class RedisFloat(float, RedisType):
 
     async def aincrease(self, amount: float = 1.0):
         result = await self.client.json().numincrby(self.key, self.json_path, amount)
-        await refresh_ttl_if_needed(
-            self.client, self.key, self.Meta.ttl, self.Meta.refresh_ttl
-        )
+        await self.refresh_ttl_if_needed()
         return result[0] if isinstance(result, list) and result else result
 
     def clone(self):

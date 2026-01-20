@@ -8,12 +8,12 @@ from typing import get_args, Any, TypeVar, Generic
 from pydantic import GetCoreSchemaHandler, TypeAdapter
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, CoreSchema, SerializationInfo
+from redis.commands.search.field import TextField
+from typing_extensions import deprecated
+
 from rapyer.context import _context_var
 from rapyer.errors.base import CantSerializeRedisValueError
 from rapyer.typing_support import Self
-from rapyer.utils.redis import refresh_ttl_if_needed
-from redis.commands.search.field import TextField
-from typing_extensions import deprecated
 
 logger = logging.getLogger("rapyer")
 
@@ -38,6 +38,9 @@ class RedisType(ABC):
     @property
     def Meta(self):
         return self._base_model_link.Meta
+
+    async def refresh_ttl_if_needed(self):
+        await self._base_model_link.refresh_ttl_if_needed()
 
     @property
     def field_path(self) -> str:
@@ -100,9 +103,8 @@ class RedisType(ABC):
         result = self._adapter.validate_python(
             redis_value, context={REDIS_DUMP_FLAG_NAME: True}
         )
-        await refresh_ttl_if_needed(
-            self.client, self.key, self.Meta.ttl, self.Meta.refresh_ttl
-        )
+
+        await self.refresh_ttl_if_needed()
         return result
 
     @abc.abstractmethod

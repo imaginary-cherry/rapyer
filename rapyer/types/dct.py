@@ -1,13 +1,13 @@
 from typing import TypeVar, Generic, get_args, Any, TypeAlias, TYPE_CHECKING
 
 from pydantic_core import core_schema
+
 from rapyer.types.base import (
     GenericRedisType,
     RedisType,
     REDIS_DUMP_FLAG_NAME,
     SKIP_SENTINEL,
 )
-from rapyer.utils.redis import refresh_ttl_if_needed
 from rapyer.utils.redis import update_keys_in_pipeline
 
 T = TypeVar("T")
@@ -145,17 +145,13 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         result = await self.client.json().set(
             self.key, self.json_field_path(key), serialized_value[key]
         )
-        await refresh_ttl_if_needed(
-            self.client, self.key, self.Meta.ttl, self.Meta.refresh_ttl
-        )
+        await self.refresh_ttl_if_needed()
         return result
 
     async def adel_item(self, key):
         super().__delitem__(key)
         result = await self.client.json().delete(self.key, self.json_field_path(key))
-        await refresh_ttl_if_needed(
-            self.client, self.key, self.Meta.ttl, self.Meta.refresh_ttl
-        )
+        await self.refresh_ttl_if_needed()
         return result
 
     async def aupdate(self, **kwargs):
@@ -171,18 +167,14 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
             async with self.redis.pipeline() as pipeline:
                 update_keys_in_pipeline(pipeline, self.key, **redis_params)
                 await pipeline.execute()
-            await refresh_ttl_if_needed(
-                self.redis, self.key, self.Meta.ttl, self.Meta.refresh_ttl
-            )
+            await self.refresh_ttl_if_needed()
 
     async def apop(self, key, default=None):
         # Execute the script atomically
         result = await self.client.eval(POP_SCRIPT, 1, self.key, self.json_path, key)
         # Key exists in Redis, pop from local dict (it should exist there too)
         super().pop(key, None)
-        await refresh_ttl_if_needed(
-            self.client, self.key, self.Meta.ttl, self.Meta.refresh_ttl
-        )
+        await self.refresh_ttl_if_needed()
 
         if result is None:
             # Key doesn't exist in Redis
@@ -195,9 +187,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
     async def apopitem(self):
         # Execute the script atomically
         result = await self.client.eval(POPITEM_SCRIPT, 1, self.key, self.json_path)
-        await refresh_ttl_if_needed(
-            self.client, self.key, self.Meta.ttl, self.Meta.refresh_ttl
-        )
+        await self.refresh_ttl_if_needed()
 
         if result is not None:
             redis_key, redis_value = result
@@ -216,9 +206,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         self.clear()
         # Clear Redis dict
         result = await self.client.json().set(self.key, self.json_path, {})
-        await refresh_ttl_if_needed(
-            self.client, self.key, self.Meta.ttl, self.Meta.refresh_ttl
-        )
+        await self.refresh_ttl_if_needed()
         return result
 
     def clone(self):
