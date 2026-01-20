@@ -8,7 +8,12 @@
   - Supports fetching models of heterogeneous types in one call
   - Automatically refreshes TTL for models with `refresh_ttl` enabled
   - Raises `KeyNotFound` if any key is missing in Redis
+  - Raises `RapyerModelDoesntExist` if a key refers to an unregistered model class
   - Example: `models = await rapyer.afind("UserModel:123", "OrderModel:456")`
+
+### 🔄 Changed
+
+- **`Model.afind()` Strict Key Validation**: When specific keys are passed to `Model.afind()`, it now raises `KeyNotFound` if any key is missing in Redis. Previously, missing keys were silently ignored.
 
 ## [1.1.6]
 
