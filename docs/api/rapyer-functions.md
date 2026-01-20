@@ -302,6 +302,110 @@ The `find_redis_models()` function provides access to all Redis model classes th
 ## afind()
 
 ```python
+async def afind(*redis_keys: str) -> list[AtomicRedisModel]
+```
+
+Retrieves multiple models of different types by their keys in a single bulk operation.
+
+### Parameters
+
+- **redis_keys** (`str`): Variable number of Redis keys to retrieve (e.g., `"UserModel:123"`, `"OrderModel:456"`)
+
+### Returns
+
+- **list[AtomicRedisModel]**: A list of model instances in the same order as the input keys
+
+### Raises
+
+- **KeyNotFound**: If any of the specified keys is missing in Redis
+- **RapyerModelDoesntExist**: If a key refers to an unregistered model class (the class name prefix doesn't match any known model)
+
+### Description
+
+The global `rapyer.afind()` function provides a way to retrieve multiple models of heterogeneous types in a single bulk operation. Unlike the class-specific `Model.afind()` method (which retrieves all instances of one model type), this function:
+
+1. Accepts explicit Redis keys as arguments
+2. Supports fetching different model types in one call
+3. Automatically refreshes TTL for models with `refresh_ttl` enabled
+4. Raises errors for missing keys or unknown model types
+
+This is particularly useful when you need to fetch related models of different types in a single efficient operation.
+
+### Example
+
+```python
+import asyncio
+import rapyer
+from rapyer import AtomicRedisModel
+
+
+class User(AtomicRedisModel):
+    name: str
+    email: str
+
+
+class Order(AtomicRedisModel):
+    user_id: str
+    total: float
+
+
+class Product(AtomicRedisModel):
+    name: str
+    price: float
+
+
+async def main():
+    # Create and save models of different types
+    user = User(name="Alice", email="alice@example.com")
+    order = Order(user_id=user.key, total=150.00)
+    product = Product(name="Laptop", price=999.99)
+
+    await rapyer.ainsert(user, order, product)
+
+    # Retrieve multiple models of different types in one call
+    models = await rapyer.afind(user.key, order.key, product.key)
+
+    print(f"Retrieved {len(models)} models:")
+    for model in models:
+        print(f"  - {type(model).__name__}: {model.key}")
+
+    # Models are returned in the same order as keys
+    retrieved_user, retrieved_order, retrieved_product = models
+    print(f"User: {retrieved_user.name}")
+    print(f"Order total: ${retrieved_order.total}")
+    print(f"Product: {retrieved_product.name}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Error Handling
+
+```python
+from rapyer.errors import KeyNotFound, RapyerModelDoesntExist
+
+async def safe_fetch():
+    try:
+        models = await rapyer.afind("User:123", "Order:456")
+    except KeyNotFound as e:
+        print(f"Key not found: {e}")
+    except RapyerModelDoesntExist as e:
+        print(f"Unknown model type: {e}")
+```
+
+### Comparison with Class-Specific Model.afind()
+
+| Feature | `rapyer.afind()` (Global) | `Model.afind()` (Class Method) |
+|---------|---------------------------|--------------------------------|
+| Input | Explicit Redis keys | Optional keys or filter expressions |
+| Model types | Heterogeneous (any types) | Homogeneous (single type) |
+| Missing keys | Raises `KeyNotFound` | Raises `KeyNotFound` (when keys provided) |
+| Use case | Fetch specific models of different types | Fetch all or filtered models of one type |
+
+## Model.afind() (Class Method)
+
+```python
 @classmethod
 async def afind(cls) -> list[AtomicRedisModel]
 ```
@@ -387,4 +491,4 @@ if __name__ == "__main__":
 
 ### Note
 
-The `afind()` method only returns instances of the specific model class it's called on. To find all instances across different model types, you would need to call `rapyer.afind()`.
+The `Model.afind()` method only returns instances of the specific model class it's called on. To retrieve specific models of different types by their keys, use the global `rapyer.afind()` function instead.
