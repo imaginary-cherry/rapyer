@@ -171,8 +171,9 @@ class AtomicRedisModel(BaseModel):
         field_path = self.field_path
         return f"${field_path}" if field_path else "$"
 
-    def should_refresh(self):
-        return self.Meta.refresh_ttl and self.Meta.ttl is not None
+    @classmethod
+    def should_refresh(cls):
+        return cls.Meta.refresh_ttl and cls.Meta.ttl is not None
 
     @classmethod
     def redis_schema(cls, redis_name: str = ""):
@@ -782,7 +783,7 @@ async def afind(*redis_keys: str) -> list[AtomicRedisModel]:
 
     async with AtomicRedisModel.Meta.redis.pipeline() as pipe:
         for klass, class_instances in instances_by_class.items():
-            if klass.Meta.ttl is not None and klass.Meta.refresh_ttl:
+            if klass.should_refresh():
                 for model in class_instances:
                     pipe.expire(model.key, klass.Meta.ttl)
                 await pipe.execute()
