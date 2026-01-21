@@ -1,5 +1,6 @@
 import pytest
 
+import rapyer
 from tests.models.collection_types import MixedTypesModel
 
 
@@ -90,8 +91,7 @@ async def test_pipeline_list_any__multiple_models__check_atomicity_sanity():
     # Arrange
     model1 = MixedTypesModel()
     model2 = MixedTypesModel()
-    await model1.asave()
-    await model2.asave()
+    await rapyer.ainsert(model1, model2)
 
     # Act
     async with model1.apipeline() as redis_model1:
@@ -103,14 +103,12 @@ async def test_pipeline_list_any__multiple_models__check_atomicity_sanity():
         model2_in_pipeline.mixed_list.extend([{"model2": "item2"}, {"model2": "item3"}])
 
         # Assert - changes not visible during pipeline for both models
-        loaded1 = await MixedTypesModel.aget(model1.key)
-        loaded2 = await MixedTypesModel.aget(model2.key)
+        loaded1, loaded2 = await rapyer.afind(model1.key, model2.key)
         assert loaded1.mixed_list == []
         assert loaded2.mixed_list == []
 
     # Assert - all changes committed after pipeline
-    final1 = await MixedTypesModel.aget(model1.key)
-    final2 = await MixedTypesModel.aget(model2.key)
+    final1, final2 = await rapyer.afind(model1.key, model2.key)
     assert final1.mixed_list == [{"model1": "item1"}, {"model1": "item2"}]
     assert final2.mixed_list == [
         {"model2": "item1"},
@@ -124,8 +122,7 @@ async def test_pipeline_dict_any__multiple_models__check_atomicity_sanity():
     # Arrange
     model1 = MixedTypesModel()
     model2 = MixedTypesModel()
-    await model1.asave()
-    await model2.asave()
+    await rapyer.ainsert(model1, model2)
 
     # Act
     async with model1.apipeline() as redis_model1:
@@ -137,14 +134,12 @@ async def test_pipeline_dict_any__multiple_models__check_atomicity_sanity():
         model2_in_pipeline.mixed_dict["model2_key2"] = None
 
         # Assert - changes not visible during pipeline for both models
-        loaded1 = await MixedTypesModel.aget(model1.key)
-        loaded2 = await MixedTypesModel.aget(model2.key)
+        loaded1, loaded2 = await rapyer.afind(model1.key, model2.key)
         assert loaded1.mixed_dict == {}
         assert loaded2.mixed_dict == {}
 
     # Assert - all changes committed after pipeline
-    final1 = await MixedTypesModel.aget(model1.key)
-    final2 = await MixedTypesModel.aget(model2.key)
+    final1, final2 = await rapyer.afind(model1.key, model2.key)
     assert final1.mixed_dict == {
         "model1_key1": {"nested": "value1"},
         "model1_key2": [1, 2, 3],
@@ -234,7 +229,7 @@ async def test_pipeline_list_any__setitem_various_indices__check_atomicity_sanit
 
 
 @pytest.mark.asyncio
-async def test_pipeline_list_any__insert_various_positions__check_atomicity_sanity():
+async def test_pipeline_list_any__ainsert_various_positions__check_atomicity_sanity():
     # Arrange
     model = MixedTypesModel(mixed_list=[{"middle": "item"}])
     await model.asave()
@@ -338,8 +333,7 @@ async def test_pipeline_list_and_dict_any__multiple_models_combined__check_atomi
     # Arrange
     model1 = MixedTypesModel()
     model2 = MixedTypesModel()
-    await model1.asave()
-    await model2.asave()
+    await rapyer.ainsert(model1, model2)
 
     # Act
     async with model1.apipeline() as redis_model1:
@@ -351,16 +345,14 @@ async def test_pipeline_list_and_dict_any__multiple_models_combined__check_atomi
         model2_in_pipeline.mixed_dict.update({"m2_key1": None, "m2_key2": "value"})
 
         # Assert - changes not visible during pipeline
-        loaded1 = await MixedTypesModel.aget(model1.key)
-        loaded2 = await MixedTypesModel.aget(model2.key)
+        loaded1, loaded2 = await rapyer.afind(model1.key, model2.key)
         assert loaded1.mixed_list == []
         assert loaded1.mixed_dict == {}
         assert loaded2.mixed_list == []
         assert loaded2.mixed_dict == {}
 
     # Assert - all changes committed after pipeline
-    final1 = await MixedTypesModel.aget(model1.key)
-    final2 = await MixedTypesModel.aget(model2.key)
+    final1, final2 = await rapyer.afind(model1.key, model2.key)
     assert final1.mixed_list == [{"m1_list": "item"}]
     assert final1.mixed_dict == {"m1_dict": {"nested": True}}
     assert final2.mixed_list == [[1, 2], [3, 4]]
