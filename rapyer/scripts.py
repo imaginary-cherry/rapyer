@@ -154,9 +154,9 @@ return result
 """
 
 _EXTRACT_VALUE_REDIS = "local value = tonumber(cjson.decode(current_json)[1])"
-_EXTRACT_VALUE_FAKEREDIS = "local value = tonumber(cjson.decode(current_json))"
+_EXTRACT_VALUE_FAKEREDIS = "local value = tonumber(cjson.decode(current_json)[1])"
 _EXTRACT_STR_REDIS = "local value = cjson.decode(current_json)[1]"
-_EXTRACT_STR_FAKEREDIS = "local value = cjson.decode(current_json)"
+_EXTRACT_STR_FAKEREDIS = "local value = cjson.decode(current_json)[1]"
 
 NUM_MUL_SCRIPT = _NUM_MUL_SCRIPT_TEMPLATE.format(extract_value=_EXTRACT_VALUE_REDIS)
 NUM_MUL_SCRIPT_FAKEREDIS = _NUM_MUL_SCRIPT_TEMPLATE.format(extract_value=_EXTRACT_VALUE_FAKEREDIS)
