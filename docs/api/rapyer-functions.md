@@ -394,101 +394,41 @@ async def safe_fetch():
         print(f"Unknown model type: {e}")
 ```
 
-### Comparison with Class-Specific Model.afind()
-
-| Feature | `rapyer.afind()` (Global) | `Model.afind()` (Class Method) |
-|---------|---------------------------|--------------------------------|
-| Input | Explicit Redis keys | Optional keys or filter expressions |
-| Model types | Heterogeneous (any types) | Homogeneous (single type) |
-| Missing keys | Raises `KeyNotFound` | Raises `KeyNotFound` (when keys provided) |
-| Use case | Fetch specific models of different types | Fetch all or filtered models of one type |
-
 ## Model.afind() (Class Method)
 
 ```python
 @classmethod
-async def afind(cls) -> list[AtomicRedisModel]
+async def afind(cls, *args) -> list[AtomicRedisModel]
 ```
 
 Retrieves all instances of a specific model class from Redis.
 
 ### Parameters
 
-None
+- **args**: Optional. Can be:
+    - **Empty**: Returns all instances of the model
+    - **Keys** (`str`): One or more Redis keys to retrieve specific models
+    - **Expressions** (`Expression`): Filter conditions for indexed fields
 
 ### Returns
 
-- **list[AtomicRedisModel]**: A list containing all instances of the model class stored in Redis
+- **list[AtomicRedisModel]**: A list of model instances in the order corresponding to the input keys (when keys are provided)
 
 ### Raises
 
-- **CantSerializeRedisValueError**: If a value in Redis cannot be deserialized (Corruption or missing resources)
+- **KeyNotFound**: If any specified key is missing in Redis (only when keys are provided)
+- **CantSerializeRedisValueError**: If a value cannot be deserialized
 
 ### Description
 
-The `afind()` method is a class method that retrieves all instances of a particular model class from Redis. It works by:
+The `afind()` class method retrieves instances of a model class from Redis with three modes:
 
-1. Finding all Redis keys that match the model's key pattern using `afind_keys()`
-2. Performing a batch retrieval of all matching records using Redis JSON's `mget` operation
-3. Deserializing each record back into the appropriate model instance
+1. **No arguments**: Retrieves all instances matching the model's key pattern
+2. **With keys**: Retrieves specific instances by their Redis keys (full key or just primary key)
+3. **With expressions**: Filters instances using indexed field conditions
 
-This method is efficient for retrieving multiple instances as it uses Redis's bulk operations rather than individual get operations.
-
-### Example
-
-```python
-import asyncio
-from rapyer import AtomicRedisModel
-
-
-class User(AtomicRedisModel):
-    name: str
-    age: int
-    email: str
-
-
-class Product(AtomicRedisModel):
-    name: str
-    price: float
-    in_stock: bool
-
-
-async def main():
-    # Create and save multiple users
-    users = [
-        User(name="Alice", age=30, email="alice@example.com"),
-        User(name="Bob", age=25, email="bob@example.com"),
-        User(name="Charlie", age=35, email="charlie@example.com")
-    ]
-
-    products = [
-        Product(name="Laptop", price=999.99, in_stock=True),
-        Product(name="Mouse", price=29.99, in_stock=False)
-    ]
-
-    # Save all instances
-    for user in users:
-        await user.asave()
-    for product in products:
-        await product.asave()
-
-    # Find all users and products
-    all_users = await User.afind()
-    all_products = await Product.afind()
-
-    print(f"Found {len(all_users)} users:")
-    for user in all_users:
-        print(f"  - {user.name} ({user.age})")
-
-    print(f"Found {len(all_products)} products:")
-    for product in all_products:
-        print(f"  - {product.name}: ${product.price}")
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
+When passing keys, the method raises `KeyNotFound` if any key is missing.
 
 ### Note
 
-The `Model.afind()` method only returns instances of the specific model class it's called on. To retrieve specific models of different types by their keys, use the global `rapyer.afind()` function instead.
+The `Model.afind()` method only returns instances of the specific model class it's called on. To retrieve models of different types by their keys, use the global `rapyer.afind()` function instead.
