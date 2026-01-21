@@ -757,7 +757,7 @@ async def afind(*redis_keys: str) -> list[AtomicRedisModel]:
     for key in redis_keys:
         class_name = key.split(":")[0]
         if class_name not in redis_model_mapping:
-            raise RapyerModelDoesntExist(class_name, f"{key} is missing in redis")
+            raise RapyerModelDoesntExist(class_name, f"Unknown model class: {class_name}")
         key_to_class[key] = redis_model_mapping[class_name]
 
     if not redis_keys:
