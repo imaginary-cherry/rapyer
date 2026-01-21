@@ -60,6 +60,12 @@ from typing_extensions import deprecated
 logger = logging.getLogger("rapyer")
 
 
+def _normalize_json_response(data, is_fake_redis: bool):
+    if is_fake_redis:
+        return data
+    return data[0]
+
+
 def make_pickle_field_serializer(
     field: str, safe_load: bool = False, can_json: bool = False
 ):
@@ -424,7 +430,7 @@ class AtomicRedisModel(BaseModel):
         model_dump = await cls.Meta.redis.json().get(key, "$")
         if not model_dump:
             raise KeyNotFound(f"{key} is missing in redis")
-        model_dump = model_dump[0]
+        model_dump = _normalize_json_response(model_dump, cls.Meta.is_fake_redis)
 
         context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
         instance = cls.model_validate(model_dump, context=context)
@@ -444,7 +450,7 @@ class AtomicRedisModel(BaseModel):
         model_dump = await self.Meta.redis.json().get(self.key, self.json_path)
         if not model_dump:
             raise KeyNotFound(f"{self.key} is missing in redis")
-        model_dump = model_dump[0]
+        model_dump = _normalize_json_response(model_dump, self.Meta.is_fake_redis)
         context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
         instance = self.__class__.model_validate(model_dump, context=context)
         instance._pk = self._pk
@@ -457,7 +463,8 @@ class AtomicRedisModel(BaseModel):
     def create_redis_model(cls, model_dump: dict, key: str) -> Optional[Self]:
         context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
         try:
-            model = cls.model_validate(model_dump[0], context=context)
+            model_dump = _normalize_json_response(model_dump, cls.Meta.is_fake_redis)
+            model = cls.model_validate(model_dump, context=context)
         except ValidationError as exc:
             logger.debug(
                 "Skipping key %s due to validation error during afind: %s",
@@ -708,7 +715,7 @@ class AtomicRedisModel(BaseModel):
             serialized = self.model_dump(
                 mode="json",
                 context={REDIS_DUMP_FLAG_NAME: True},
-                include={name}
+                include={name},
             )
             json_path = f"{self.json_path}.{name}"
             pipeline.json().set(self.key, json_path, serialized[name])

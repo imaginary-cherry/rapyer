@@ -7,6 +7,10 @@ from redis import ResponseError
 from redis.asyncio.client import Redis
 
 
+def is_fakeredis(client) -> bool:
+    return "fakeredis" in type(client).__module__
+
+
 async def init_rapyer(
     redis: str | Redis = None,
     ttl: int = None,
@@ -24,12 +28,14 @@ async def init_rapyer(
     if isinstance(redis, str):
         redis = redis_async.from_url(redis, decode_responses=True, max_connections=20)
 
+    is_fake_redis = is_fakeredis(redis)
     if redis is not None:
-        await register_scripts(redis)
+        await register_scripts(redis, is_fake_redis)
 
     for model in REDIS_MODELS:
         if redis is not None:
             model.Meta.redis = redis
+            model.Meta.is_fake_redis = is_fake_redis
         if ttl is not None:
             model.Meta.ttl = ttl
         if prefer_normal_json_dump is not None:

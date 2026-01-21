@@ -28,3 +28,5 @@ class RedisConfig:
     safe_load_all: bool = False
     # If True, use JSON serialization for fields that support it instead of pickle
     prefer_normal_json_dump: bool = False
+    # Set to True when using FakeRedis to normalize JSON responses
+    is_fake_redis: bool = False

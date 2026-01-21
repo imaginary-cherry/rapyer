@@ -159,17 +159,33 @@ _EXTRACT_STR_REDIS = "local value = cjson.decode(current_json)[1]"
 _EXTRACT_STR_FAKEREDIS = "local value = cjson.decode(current_json)[1]"
 
 NUM_MUL_SCRIPT = _NUM_MUL_SCRIPT_TEMPLATE.format(extract_value=_EXTRACT_VALUE_REDIS)
-NUM_MUL_SCRIPT_FAKEREDIS = _NUM_MUL_SCRIPT_TEMPLATE.format(extract_value=_EXTRACT_VALUE_FAKEREDIS)
-NUM_FLOORDIV_SCRIPT = _NUM_FLOORDIV_SCRIPT_TEMPLATE.format(extract_value=_EXTRACT_VALUE_REDIS)
-NUM_FLOORDIV_SCRIPT_FAKEREDIS = _NUM_FLOORDIV_SCRIPT_TEMPLATE.format(extract_value=_EXTRACT_VALUE_FAKEREDIS)
+NUM_MUL_SCRIPT_FAKEREDIS = _NUM_MUL_SCRIPT_TEMPLATE.format(
+    extract_value=_EXTRACT_VALUE_FAKEREDIS
+)
+NUM_FLOORDIV_SCRIPT = _NUM_FLOORDIV_SCRIPT_TEMPLATE.format(
+    extract_value=_EXTRACT_VALUE_REDIS
+)
+NUM_FLOORDIV_SCRIPT_FAKEREDIS = _NUM_FLOORDIV_SCRIPT_TEMPLATE.format(
+    extract_value=_EXTRACT_VALUE_FAKEREDIS
+)
 NUM_MOD_SCRIPT = _NUM_MOD_SCRIPT_TEMPLATE.format(extract_value=_EXTRACT_VALUE_REDIS)
-NUM_MOD_SCRIPT_FAKEREDIS = _NUM_MOD_SCRIPT_TEMPLATE.format(extract_value=_EXTRACT_VALUE_FAKEREDIS)
+NUM_MOD_SCRIPT_FAKEREDIS = _NUM_MOD_SCRIPT_TEMPLATE.format(
+    extract_value=_EXTRACT_VALUE_FAKEREDIS
+)
 NUM_POW_SCRIPT = _NUM_POW_SCRIPT_TEMPLATE.format(extract_value=_EXTRACT_VALUE_REDIS)
-NUM_POW_SCRIPT_FAKEREDIS = _NUM_POW_SCRIPT_TEMPLATE.format(extract_value=_EXTRACT_VALUE_FAKEREDIS)
-NUM_TRUEDIV_SCRIPT = _NUM_TRUEDIV_SCRIPT_TEMPLATE.format(extract_value=_EXTRACT_VALUE_REDIS)
-NUM_TRUEDIV_SCRIPT_FAKEREDIS = _NUM_TRUEDIV_SCRIPT_TEMPLATE.format(extract_value=_EXTRACT_VALUE_FAKEREDIS)
+NUM_POW_SCRIPT_FAKEREDIS = _NUM_POW_SCRIPT_TEMPLATE.format(
+    extract_value=_EXTRACT_VALUE_FAKEREDIS
+)
+NUM_TRUEDIV_SCRIPT = _NUM_TRUEDIV_SCRIPT_TEMPLATE.format(
+    extract_value=_EXTRACT_VALUE_REDIS
+)
+NUM_TRUEDIV_SCRIPT_FAKEREDIS = _NUM_TRUEDIV_SCRIPT_TEMPLATE.format(
+    extract_value=_EXTRACT_VALUE_FAKEREDIS
+)
 STR_APPEND_SCRIPT = _STR_APPEND_SCRIPT_TEMPLATE.format(extract_value=_EXTRACT_STR_REDIS)
-STR_APPEND_SCRIPT_FAKEREDIS = _STR_APPEND_SCRIPT_TEMPLATE.format(extract_value=_EXTRACT_STR_FAKEREDIS)
+STR_APPEND_SCRIPT_FAKEREDIS = _STR_APPEND_SCRIPT_TEMPLATE.format(
+    extract_value=_EXTRACT_STR_FAKEREDIS
+)
 
 SCRIPTS: dict[str, str] = {
     REMOVE_RANGE_SCRIPT_NAME: REMOVE_RANGE_SCRIPT,
@@ -194,12 +210,8 @@ SCRIPTS_FAKEREDIS: dict[str, str] = {
 _REGISTERED_SCRIPT_SHAS: dict[str, str] = {}
 
 
-def is_fakeredis(client) -> bool:
-    return "fakeredis" in type(client).__module__
-
-
-async def register_scripts(redis_client):
-    scripts = SCRIPTS_FAKEREDIS if is_fakeredis(redis_client) else SCRIPTS
+async def register_scripts(redis_client, is_fakeredis=False):
+    scripts = SCRIPTS_FAKEREDIS if is_fakeredis else SCRIPTS
     for name, script_text in scripts.items():
         sha = await redis_client.script_load(script_text)
         _REGISTERED_SCRIPT_SHAS[name] = sha
