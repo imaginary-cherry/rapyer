@@ -874,3 +874,38 @@ async def test_ttl_refresh_on_rapyer_afind_with_mixed_ttl_classes__sanity(
     assert USER_TTL - 2 < user_ttl_with <= USER_TTL
     assert ttl_without == -1  # No TTL set
     assert len(found_models) == 3
+
+
+@pytest.mark.asyncio
+async def test_ttl_on_rapyer_ainsert_with_mixed_ttl_models__sanity(real_redis_client):
+    # Arrange
+    model_with_ttl = ModelWithTTL(name="rapyer_insert_ttl", age=25)
+    user_with_ttl = UserModelWithTTL(name="rapyer_insert_user_ttl", age=30)
+    model_without_ttl = ModelWithoutTTL(name="rapyer_insert_no_ttl", age=35)
+
+    # Act
+    await rapyer.ainsert(model_with_ttl, user_with_ttl, model_without_ttl)
+
+    # Assert
+    ttl_model_with = await real_redis_client.ttl(model_with_ttl.key)
+    ttl_user_with = await real_redis_client.ttl(user_with_ttl.key)
+    ttl_model_without = await real_redis_client.ttl(model_without_ttl.key)
+    assert TTL_TEST_SECONDS - 2 < ttl_model_with <= TTL_TEST_SECONDS
+    assert USER_TTL - 2 < ttl_user_with <= USER_TTL
+    assert ttl_model_without == -1
+
+
+@pytest.mark.asyncio
+async def test_no_ttl_on_ainsert_when_ttl_not_configured__sanity(real_redis_client):
+    # Arrange
+    model1 = ModelWithoutTTL(name="insert_no_ttl1", age=25)
+    model2 = ModelWithoutTTL(name="insert_no_ttl2", age=30)
+
+    # Act
+    await ModelWithoutTTL.ainsert(model1, model2)
+
+    # Assert
+    ttl1 = await real_redis_client.ttl(model1.key)
+    ttl2 = await real_redis_client.ttl(model2.key)
+    assert ttl1 == -1
+    assert ttl2 == -1
