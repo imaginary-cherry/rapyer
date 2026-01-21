@@ -761,9 +761,6 @@ async def afind(*redis_keys: str) -> list[AtomicRedisModel]:
             )
         key_to_class[key] = redis_model_mapping[class_name]
 
-    if not redis_keys:
-        return []
-
     models_data = await AtomicRedisModel.Meta.redis.json().mget(
         keys=redis_keys, path="$"
     )
