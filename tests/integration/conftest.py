@@ -17,6 +17,7 @@ class SavedModelWithReducedTTL(Generic[T]):
     model: T
     initial_ttl: int
 
+
 # Collection types
 from tests.models.collection_types import (
     UserListModel,
