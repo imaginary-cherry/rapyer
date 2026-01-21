@@ -1,7 +1,9 @@
 from typing import TypeAlias, TYPE_CHECKING
 
-from rapyer.types.base import RedisType
 from redis.commands.search.field import NumericField
+
+from rapyer.scripts import run_sha, NUM_MUL_SCRIPT_NAME, NUM_TRUEDIV_SCRIPT_NAME
+from rapyer.types.base import RedisType
 
 
 class RedisFloat(float, RedisType):
@@ -34,13 +36,22 @@ class RedisFloat(float, RedisType):
     def __imul__(self, other):
         new_value = self * other
         if self.pipeline:
-            self.pipeline.json().set(self.key, self.json_path, new_value)
+            run_sha(
+                self.pipeline, NUM_MUL_SCRIPT_NAME, 1, self.key, self.json_path, other
+            )
         return self.__class__(new_value)
 
     def __itruediv__(self, other):
         new_value = self / other
         if self.pipeline:
-            self.pipeline.json().set(self.key, self.json_path, new_value)
+            run_sha(
+                self.pipeline,
+                NUM_TRUEDIV_SCRIPT_NAME,
+                1,
+                self.key,
+                self.json_path,
+                other,
+            )
         return self.__class__(new_value)
 
 
