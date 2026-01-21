@@ -11,6 +11,10 @@
   - Raises `RapyerModelDoesntExist` if a key refers to an unregistered model class
   - Example: `models = await rapyer.afind("UserModel:123", "OrderModel:456")`
 
+### 🐛 Fixed
+
+- **TTL Support in `ainsert`**: The `ainsert()` method now automatically sets TTL on inserted models based on their model configuration.
+
 ### 🔄 Changed
 
 - **`Model.afind()` Strict Key Validation**: When specific keys are passed to `Model.afind()`, it now raises `KeyNotFound` if any key is missing in Redis. Previously, missing keys were silently ignored.
