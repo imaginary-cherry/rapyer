@@ -785,7 +785,7 @@ async def afind(*redis_keys: str) -> list[AtomicRedisModel]:
             if klass.should_refresh():
                 for model in class_instances:
                     pipe.expire(model.key, klass.Meta.ttl)
-                await pipe.execute()
+        await pipe.execute()
 
     return instances
 
