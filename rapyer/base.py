@@ -703,6 +703,16 @@ class AtomicRedisModel(BaseModel):
             if isinstance(attr, RedisType):
                 attr._base_model_link = self
 
+        pipeline = _context_var.get()
+        if pipeline is not None:
+            serialized = self.model_dump(
+                mode="json",
+                context={REDIS_DUMP_FLAG_NAME: True},
+                include={name}
+            )
+            json_path = f"{self.json_path}.{name}"
+            pipeline.json().set(self.key, json_path, serialized[name])
+
     def __eq__(self, other):
         if not isinstance(other, BaseModel):
             return False
