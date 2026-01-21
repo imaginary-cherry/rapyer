@@ -754,25 +754,23 @@ async def afind(*redis_keys: str) -> list[AtomicRedisModel]:
     redis_model_mapping = {klass.__name__: klass for klass in REDIS_MODELS}
 
     key_to_class: dict[str, type[AtomicRedisModel]] = {}
-    valid_keys = []
     for key in redis_keys:
         class_name = key.split(":")[0]
         if class_name not in redis_model_mapping:
             raise RapyerModelDoesntExist(class_name, f"{key} is missing in redis")
         key_to_class[key] = redis_model_mapping[class_name]
-        valid_keys.append(key)
 
-    if not valid_keys:
+    if not redis_keys:
         return []
 
     models_data = await AtomicRedisModel.Meta.redis.json().mget(
-        keys=valid_keys, path="$"
+        keys=redis_keys, path="$"
     )
 
     instances = []
     instances_by_class: dict[type[AtomicRedisModel], list[AtomicRedisModel]] = {}
 
-    for data, key in zip(models_data, valid_keys):
+    for data, key in zip(models_data, redis_keys):
         if data is None:
             raise KeyNotFound(f"{key} is missing in redis")
         klass = key_to_class[key]
