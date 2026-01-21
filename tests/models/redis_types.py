@@ -57,3 +57,12 @@ class AnnotatedDirectRedisTypesModel(AtomicRedisModel):
     settings: Annotated[RedisDict[str], Field(description="Settings dict")] = Field(
         default_factory=dict
     )
+
+
+class PipelineAllTypesTestModel(AtomicRedisModel):
+    counter: int = 0
+    amount: float = 0.0
+    name: str = ""
+    data: bytes = b""
+    items: list[str] = Field(default_factory=list)
+    metadata: dict[str, str] = Field(default_factory=dict)
