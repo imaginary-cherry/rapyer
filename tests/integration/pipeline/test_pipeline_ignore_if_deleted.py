@@ -1,6 +1,6 @@
 import pytest
 
-from rapyer.errors.base import KeyNotFound
+from rapyer.errors import KeyNotFound
 from tests.models.collection_types import ComprehensiveTestModel
 
 
