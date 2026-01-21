@@ -18,8 +18,8 @@ async def test_rapyer_afind_with_multiple_keys_different_classes_sanity():
 
     # Assert
     assert len(found_models) == 2
-    assert str_model in found_models
-    assert int_model in found_models
+    assert str_model == found_models[0]
+    assert int_model == found_models[1]
 
 
 @pytest.mark.asyncio
