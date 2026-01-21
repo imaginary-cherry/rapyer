@@ -79,7 +79,9 @@ class RedisList(list, GenericRedisType[T]):
             serialized = self._adapter.dump_python(
                 [__object], mode="json", context={REDIS_DUMP_FLAG_NAME: True}
             )
-            self.pipeline.json().arrinsert(self.key, self.json_path, index, serialized[0])
+            self.pipeline.json().arrinsert(
+                self.key, self.json_path, index, serialized[0]
+            )
         new_val = self.create_new_value(index, __object)
         return super().insert(index, new_val)
 

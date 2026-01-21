@@ -134,7 +134,9 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
             serialized = self._adapter.dump_python(
                 {key: value}, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
             )
-            self.pipeline.json().set(self.key, self.json_field_path(key), serialized[key])
+            self.pipeline.json().set(
+                self.key, self.json_field_path(key), serialized[key]
+            )
         new_val = self.validate_dict({key: value})[key]
         super().__setitem__(key, new_val)
 
