@@ -22,13 +22,13 @@ class RedisFloat(float, RedisType):
     def __iadd__(self, other):
         new_value = self + other
         if self.pipeline:
-            self.pipeline.json().set(self.key, self.json_path, new_value)
+            self.pipeline.json().numincrby(self.key, self.json_path, other)
         return self.__class__(new_value)
 
     def __isub__(self, other):
         new_value = self - other
         if self.pipeline:
-            self.pipeline.json().set(self.key, self.json_path, new_value)
+            self.pipeline.json().numincrby(self.key, self.json_path, -other)
         return self.__class__(new_value)
 
     def __imul__(self, other):
