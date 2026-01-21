@@ -858,9 +858,7 @@ async def test_ttl_refresh_on_rapyer_afind_with_mixed_ttl_classes__sanity(
     model_with_ttl = ModelWithTTL(name="mixed_ttl", age=25)
     user_with_ttl = UserModelWithTTL(name="mixed_ttl", age=25)
     model_without_ttl = ModelWithoutTTL(name="mixed_no_ttl", age=30)
-    await model_with_ttl.asave()
-    await model_without_ttl.asave()
-    await user_with_ttl.asave()
+    await rapyer.ainsert(model_with_ttl, user_with_ttl, model_without_ttl)
     await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act
