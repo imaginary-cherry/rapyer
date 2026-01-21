@@ -1,5 +1,6 @@
 import pytest
 
+from tests.models.complex_types import InnerMostModel, MiddleModel, OuterModel
 from tests.models.functionality_types import AllTypesModel
 from tests.models.simple_types import FloatModel
 
@@ -533,3 +534,28 @@ class TestPipelineCrossType:
         assert "extend2" in final_model.list_field
         assert final_model.dict_field["dict_key"] == "dict_value"
         assert final_model.dict_field["update_key"] == "update_value"
+
+
+class TestPipelineNestedModelField:
+    @pytest.mark.asyncio
+    async def test_assignment_changes_persisted_after_pipeline_sanity(self):
+        # Arrange
+        model = OuterModel()
+        await model.asave()
+
+        new_middle = MiddleModel(
+            inner_model=InnerMostModel(lst=["new_item"], counter=99),
+            tags=["new_tag"],
+            metadata={"new_key": "new_value"},
+        )
+
+        # Act
+        async with model.apipeline() as redis_model:
+            redis_model.middle_model = new_middle
+
+        # Assert
+        final = await OuterModel.aget(model.key)
+        assert final.middle_model.inner_model.lst == ["new_item"]
+        assert final.middle_model.inner_model.counter == 99
+        assert final.middle_model.tags == ["new_tag"]
+        assert final.middle_model.metadata == {"new_key": "new_value"}
