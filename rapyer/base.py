@@ -798,6 +798,9 @@ async def ainsert(*models: Unpack[AtomicRedisModel]) -> list[AtomicRedisModel]:
     async with AtomicRedisModel.Meta.redis.pipeline() as pipe:
         for model in models:
             pipe.json().set(model.key, model.json_path, model.redis_dump())
+            if model.Meta.ttl is not None:
+                nx = not model.Meta.refresh_ttl
+                await model.Meta.redis.expire(model.key, model.Meta.ttl, nx=nx)
         await pipe.execute()
     return models
 
