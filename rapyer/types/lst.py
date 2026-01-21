@@ -50,10 +50,10 @@ class RedisList(list, GenericRedisType[T]):
         return self
 
     def append(self, __object):
-        if self.pipeline:
-            self.pipeline.json().arrappend(self.key, self.json_path, __object)
         key = len(self)
         new_val = self.create_new_value(key, __object)
+        if self.pipeline:
+            self.pipeline.json().arrappend(self.key, self.json_path, new_val)
         return super().append(new_val)
 
     def extend(self, new_lst):
