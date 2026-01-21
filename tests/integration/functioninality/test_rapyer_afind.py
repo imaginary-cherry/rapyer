@@ -2,7 +2,7 @@ from uuid import uuid4
 
 import pytest
 import rapyer
-from rapyer.errors.base import KeyNotFound, RapyerModelDoesntExist
+from rapyer.errors.base import KeyNotFound, RapyerModelDoesntExistError
 from tests.models.simple_types import StrModel, IntModel
 
 
@@ -54,7 +54,7 @@ async def test_rapyer_afind_with_unknown_class_name_edge_case():
     unknown_class_key = "UnknownClass:some_key"
 
     # Act + Assert
-    with pytest.raises(RapyerModelDoesntExist):
+    with pytest.raises(RapyerModelDoesntExistError):
         await rapyer.afind(model.key, unknown_class_key)
 
 
