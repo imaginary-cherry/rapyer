@@ -18,11 +18,6 @@ from pydantic import (
     ValidationError,
 )
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
-from redis.commands.search.index_definition import IndexDefinition, IndexType
-from redis.commands.search.query import Query
-from redis.exceptions import NoScriptError, ResponseError
-from typing_extensions import deprecated
-
 from rapyer.config import RedisConfig
 from rapyer.context import _context_var, _context_xx_pipe
 from rapyer.errors.base import (
@@ -30,7 +25,7 @@ from rapyer.errors.base import (
     PersistentNoScriptError,
     UnsupportedIndexedFieldError,
     CantSerializeRedisValueError,
-    RapyerModelDoesntExist,
+    RapyerModelDoesntExistError,
 )
 from rapyer.fields.expression import ExpressionField, AtomicField, Expression
 from rapyer.fields.index import IndexAnnotation
@@ -57,6 +52,10 @@ from rapyer.utils.redis import (
     acquire_lock,
     update_keys_in_pipeline,
 )
+from redis.commands.search.index_definition import IndexDefinition, IndexType
+from redis.commands.search.query import Query
+from redis.exceptions import NoScriptError, ResponseError
+from typing_extensions import deprecated
 
 logger = logging.getLogger("rapyer")
 
@@ -757,7 +756,9 @@ async def afind(*redis_keys: str) -> list[AtomicRedisModel]:
     for key in redis_keys:
         class_name = key.split(":")[0]
         if class_name not in redis_model_mapping:
-            raise RapyerModelDoesntExist(class_name, f"{key} is missing in redis")
+            raise RapyerModelDoesntExistError(
+                class_name, f"Unknown model class: {class_name}"
+            )
         key_to_class[key] = redis_model_mapping[class_name]
 
     if not redis_keys:

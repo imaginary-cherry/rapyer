@@ -1,7 +1,7 @@
 import pytest
 import pytest_asyncio
 
-from rapyer.errors.base import KeyNotFound
+from rapyer.errors import KeyNotFound
 from tests.models.index_types import IndexTestModel
 
 

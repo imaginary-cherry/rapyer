@@ -10,7 +10,7 @@ class KeyNotFound(RapyerError):
     pass
 
 
-class RapyerModelDoesntExist(RapyerError):
+class RapyerModelDoesntExistError(RapyerError):
     """Raised when a model doesn't exist."""
 
     def __init__(self, model_name: str, *args):

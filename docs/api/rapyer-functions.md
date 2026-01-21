@@ -383,15 +383,16 @@ if __name__ == "__main__":
 ### Error Handling
 
 ```python
-from rapyer.errors import KeyNotFound, RapyerModelDoesntExist
+from rapyer.errors import KeyNotFound, RapyerModelDoesntExistError
+
 
 async def safe_fetch():
-    try:
-        models = await rapyer.afind("User:123", "Order:456")
-    except KeyNotFound as e:
-        print(f"Key not found: {e}")
-    except RapyerModelDoesntExist as e:
-        print(f"Unknown model type: {e}")
+  try:
+    models = await rapyer.afind("User:123", "Order:456")
+  except KeyNotFound as e:
+    print(f"Key not found: {e}")
+  except RapyerModelDoesntExistError as e:
+    print(f"Unknown model type: {e}")
 ```
 
 ## Model.afind() (Class Method)
