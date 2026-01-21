@@ -1,5 +1,6 @@
-import pytest
+from uuid import uuid4
 
+import pytest
 import rapyer
 from rapyer.errors.base import KeyNotFound, RapyerModelDoesntExist
 from tests.models.simple_types import StrModel, IntModel
@@ -55,3 +56,27 @@ async def test_rapyer_afind_with_unknown_class_name_edge_case():
     # Act + Assert
     with pytest.raises(RapyerModelDoesntExist):
         await rapyer.afind(model.key, unknown_class_key)
+
+
+@pytest.mark.asyncio
+async def test_rapyer_afind_skips_invalid_json_schema_sanity():
+    # Arrange
+    valid_str_model = StrModel(name="valid_user", description="valid description")
+    valid_int_model = IntModel(count=42, score=100)
+    await rapyer.ainsert(valid_str_model, valid_int_model)
+
+    redis = IntModel.Meta.redis
+    invalid_key = f"IntModel:{uuid4()}"
+    await redis.json().set(
+        invalid_key, "$", {"count": "not_an_int", "score": "invalid"}
+    )
+
+    # Act
+    found_models = await rapyer.afind(
+        valid_str_model.key, invalid_key, valid_int_model.key
+    )
+
+    # Assert
+    assert len(found_models) == 2
+    assert valid_str_model in found_models
+    assert valid_int_model in found_models
