@@ -13,6 +13,7 @@ from rapyer.types import (
 from tests.models.common import TaskStatus, Priority
 
 TTL_TEST_SECONDS = 24
+USER_TTL = 300
 
 
 class StrModel(AtomicRedisModel):
@@ -71,7 +72,7 @@ class UserModelWithTTL(AtomicRedisModel):
     tags: list[str] = Field(default_factory=list)
     settings: dict[str, str] = Field(default_factory=dict)
 
-    Meta = RedisConfig(ttl=300)
+    Meta = RedisConfig(ttl=USER_TTL)
 
 
 class UserModelWithoutTTL(AtomicRedisModel):

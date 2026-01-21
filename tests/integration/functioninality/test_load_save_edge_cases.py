@@ -1,6 +1,6 @@
 import pytest
 
-from rapyer.errors.base import KeyNotFound
+from rapyer.errors import KeyNotFound
 from tests.models.simple_types import UserModelWithTTL
 
 

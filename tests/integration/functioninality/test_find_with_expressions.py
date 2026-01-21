@@ -25,22 +25,6 @@ async def create_indices(redis_client):
     await BaseIndexModel.adelete_index()
 
 
-@pytest.fixture
-def test_models():
-    return [
-        IndexTestModel(name="Alice", age=25, description="Engineer"),
-        IndexTestModel(name="Bob", age=30, description="Manager"),
-        IndexTestModel(name="Charlie", age=35, description="Designer"),
-        IndexTestModel(name="David", age=40, description="Director"),
-    ]
-
-
-@pytest_asyncio.fixture
-async def inserted_test_models(test_models):
-    await IndexTestModel.ainsert(*test_models)
-    return test_models
-
-
 @pytest.mark.asyncio
 async def test_afind_with_single_expression_sanity(
     create_indices, inserted_test_models
