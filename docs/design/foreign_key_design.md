@@ -76,12 +76,26 @@ class Post(AtomicRedisModel):
 
 ## 2. Link Class Implementation
 
+### 2.1 Core Link Class with Seamless Attribute Access
+
+The Link class acts as a **transparent proxy** to the underlying model. Once fetched, you can access model attributes directly through the link without needing `.model`:
+
 ```python
-from typing import Generic, TypeVar, TYPE_CHECKING
+# After fetching, these are equivalent:
+book.author.name          # Seamless access (preferred)
+book.author.model.name    # Explicit access (also works)
+```
+
+```python
+from typing import Generic, TypeVar, TYPE_CHECKING, Any
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
 
 M = TypeVar("M", bound="AtomicRedisModel")
+
+class LinkNotFetchedError(Exception):
+    """Raised when accessing attributes on an unfetched link."""
+    pass
 
 class Link(Generic[M]):
     """
@@ -89,26 +103,36 @@ class Link(Generic[M]):
 
     When not fetched: stores the key string (e.g., "Author:uuid")
     When fetched: stores the actual model instance
+
+    Provides seamless attribute access - once fetched, you can access
+    the linked model's attributes directly:
+
+        book.author.name  # Works directly after fetch_links=True
     """
 
-    __slots__ = ("_key", "_model", "_model_class", "_is_fetched")
+    # Note: Can't use __slots__ with __getattr__ proxy pattern effectively
+    _key: str
+    _model: M | None
+    _model_class: type[M] | None
+    _is_fetched: bool
 
     def __init__(
         self,
         ref: str | M,
         model_class: type[M] | None = None
     ):
+        # Use object.__setattr__ to avoid triggering __setattr__ if we add it
+        object.__setattr__(self, "_model_class", model_class)
+
         if isinstance(ref, str):
-            self._key = ref
-            self._model = None
-            self._is_fetched = False
+            object.__setattr__(self, "_key", ref)
+            object.__setattr__(self, "_model", None)
+            object.__setattr__(self, "_is_fetched", False)
         else:
             # ref is a model instance
-            self._key = ref.key
-            self._model = ref
-            self._is_fetched = True
-
-        self._model_class = model_class
+            object.__setattr__(self, "_key", ref.key)
+            object.__setattr__(self, "_model", ref)
+            object.__setattr__(self, "_is_fetched", True)
 
     @property
     def key(self) -> str:
@@ -118,7 +142,6 @@ class Link(Generic[M]):
     @property
     def pk(self) -> str:
         """The primary key (ID portion) of the linked model."""
-        # Extract pk from key like "Author:uuid" -> "uuid"
         return self._key.split(":", 1)[1] if ":" in self._key else self._key
 
     @property
@@ -134,24 +157,77 @@ class Link(Generic[M]):
         """
         return self._model
 
+    def __getattr__(self, name: str) -> Any:
+        """
+        Proxy attribute access to the underlying model.
+
+        This enables seamless access like:
+            book.author.name  # instead of book.author.model.name
+        """
+        # Avoid infinite recursion for private attributes
+        if name.startswith("_"):
+            raise AttributeError(f"'{type(self).__name__}' has no attribute '{name}'")
+
+        if not self._is_fetched:
+            raise LinkNotFetchedError(
+                f"Cannot access '{name}' on unfetched Link[{self._model_class.__name__ if self._model_class else 'Model'}]. "
+                f"Use fetch_links=True when fetching, or await link.afetch() first. "
+                f"Link key: '{self._key}'"
+            )
+
+        if self._model is None:
+            raise LinkNotFetchedError(
+                f"Link to '{self._key}' was fetched but model not found (dangling reference)."
+            )
+
+        return getattr(self._model, name)
+
     def __repr__(self) -> str:
         if self._is_fetched:
             return f"Link({self._model!r})"
         return f"Link('{self._key}')"
 
-    async def afetch(self) -> M:
-        """Fetch the linked model from Redis."""
+    def __eq__(self, other) -> bool:
+        """Compare links by their key."""
+        if isinstance(other, Link):
+            return self._key == other._key
+        if isinstance(other, str):
+            return self._key == other
+        if hasattr(other, "key"):
+            return self._key == other.key
+        return False
+
+    def __hash__(self) -> int:
+        return hash(self._key)
+
+    async def afetch(self, fetch_links: "LinkFetchConfig | None" = None) -> M:
+        """
+        Fetch the linked model from Redis.
+
+        Args:
+            fetch_links: Optional nested fetch configuration for the linked model's links.
+
+        Returns:
+            The fetched model instance.
+        """
         if not self._is_fetched:
-            self._model = await self._model_class.aget(self._key)
-            self._is_fetched = True
+            self._model = await self._model_class.aget(
+                self._key,
+                fetch_links=fetch_links
+            )
+            object.__setattr__(self, "_is_fetched", True)
         return self._model
+
+    def _set_fetched_model(self, model: M) -> None:
+        """Internal method to set the fetched model (used by fetch system)."""
+        object.__setattr__(self, "_model", model)
+        object.__setattr__(self, "_is_fetched", True)
 
     # Pydantic integration
     @classmethod
     def __get_pydantic_core_schema__(
         cls, source_type, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
-        # Extract the model type from Link[Model]
         from typing import get_args
         args = get_args(source_type)
         model_class = args[0] if args else None
@@ -160,15 +236,12 @@ class Link(Generic[M]):
             if isinstance(value, Link):
                 return value
             if isinstance(value, str):
-                # Key string from Redis
                 return Link(value, model_class=model_class)
             if hasattr(value, "key"):
-                # Model instance
                 return Link(value, model_class=model_class)
             raise ValueError(f"Cannot create Link from {type(value)}")
 
         def serialize_link(link: Link, info) -> str:
-            # Always serialize to key string for Redis storage
             return link.key
 
         return core_schema.with_info_plain_validator_function(
@@ -181,22 +254,56 @@ class Link(Generic[M]):
         )
 ```
 
+### 2.2 Seamless Access Examples
+
+```python
+class Author(AtomicRedisModel):
+    name: str
+    email: str
+    bio: str
+
+class Publisher(AtomicRedisModel):
+    name: str
+    country: str
+
+class Book(AtomicRedisModel):
+    title: str
+    author: Link[Author]
+    publisher: Link[Publisher]
+
+# Fetch book with links
+book = await Book.aget("Book:123", fetch_links=True)
+
+# Seamless attribute access - NO .model needed!
+print(book.author.name)        # "F. Scott Fitzgerald"
+print(book.author.email)       # "fscott@example.com"
+print(book.publisher.country)  # "USA"
+
+# These also work but are more verbose:
+print(book.author.model.name)  # Same result
+
+# Check if fetched before accessing (optional)
+if book.author.is_fetched:
+    print(book.author.bio)
+
+# Error if not fetched:
+book2 = await Book.aget("Book:456")  # No fetch_links
+book2.author.name  # Raises LinkNotFetchedError with helpful message
+```
+
 ---
 
 ## 3. Extraction (Fetching Linked Models)
 
-### 3.1 API Design
+### 3.1 Basic API
 
 ```python
-# Fetch a single model with all its links populated
+# Fetch a single model with ALL its links populated (1 level deep)
 book = await Book.aget("Book:123", fetch_links=True)
-print(book.author.model.name)  # "F. Scott Fitzgerald"
+print(book.author.name)  # "F. Scott Fitzgerald" (seamless access!)
 
-# Fetch with selective links
+# Fetch with selective links (only specified fields)
 book = await Book.aget("Book:123", fetch_links=["author"])
-
-# Fetch with nesting depth (for self-referential or deep links)
-article = await Article.aget("Article:123", fetch_links=True, nesting_depth=2)
 
 # Bulk fetch with links
 books = await Book.afind(fetch_links=True)
@@ -207,236 +314,745 @@ await book.afetch_links()           # Now fetch all links
 await book.afetch_links(["author"]) # Or fetch specific links
 ```
 
-### 3.2 Configurable Fetch Options
+### 3.2 Nested Link Configuration (Deep Fetching)
+
+The key feature: **configure which nested links to fetch at each level**.
 
 ```python
-from rapyer import FetchConfig
+from rapyer import LinkFetchConfig
 
-# Model-level default configuration
+# Type alias for readability
+LinkFetchConfig = bool | list[str] | dict[str, "LinkFetchConfig"]
+```
+
+#### 3.2.1 Simple Nested Fetch
+
+```python
+class Country(AtomicRedisModel):
+    name: str
+
+class Publisher(AtomicRedisModel):
+    name: str
+    country: Link[Country]
+
+class Author(AtomicRedisModel):
+    name: str
+    publisher: Link[Publisher]
+
 class Book(AtomicRedisModel):
     title: str
     author: Link[Author]
     publisher: Link[Publisher]
 
-    class Settings:
-        # Default links to fetch (can be overridden per-query)
-        default_fetch_links = ["author"]  # Only fetch author by default
-
-# Query-level override
+# Fetch book -> author -> publisher -> country (3 levels deep!)
 book = await Book.aget(
     "Book:123",
-    fetch_links=FetchConfig(
-        include=["author", "publisher"],  # Fetch these
-        exclude=[],                        # Or exclude these
-        nesting_depth=1,                   # How deep to go
-    )
+    fetch_links={
+        "author": {                    # Fetch author
+            "publisher": {             # Also fetch author's publisher
+                "country": True        # Also fetch publisher's country
+            }
+        },
+        "publisher": True              # Fetch book's direct publisher (1 level)
+    }
 )
+
+# Now all these work seamlessly:
+print(book.title)                           # "The Great Gatsby"
+print(book.author.name)                     # "F. Scott Fitzgerald"
+print(book.author.publisher.name)           # "Scribner"
+print(book.author.publisher.country.name)   # "USA"
+print(book.publisher.name)                  # "Scribner" (direct link)
+print(book.publisher.country.is_fetched)    # False (not configured to fetch)
 ```
 
-### 3.3 Lua Script for Atomic Fetch
+#### 3.2.2 Fetch Config Options
 
-The key insight: we need to fetch the main model AND all linked models in a single round-trip.
+```python
+# Option 1: True = fetch this link only (no nested links)
+fetch_links=True                     # All direct links, 1 level
+fetch_links={"author": True}         # Only author, 1 level
+
+# Option 2: List = fetch these specific links only
+fetch_links=["author", "publisher"]  # These two links, 1 level
+
+# Option 3: Dict = nested configuration per field
+fetch_links={
+    "author": True,                  # Fetch author (no nested)
+    "publisher": {                   # Fetch publisher AND its nested links
+        "country": True,
+        "contacts": True
+    },
+    "reviews": {                     # Fetch reviews AND their authors
+        "author": True
+    }
+}
+
+# Option 4: "*" wildcard = all links at this level
+fetch_links={
+    "author": {
+        "*": True                    # Fetch ALL of author's links
+    }
+}
+
+# Option 5: Recursive depth limit for self-referential
+fetch_links={
+    "replies": {
+        "__depth__": 3,              # Max 3 levels of nested replies
+        "author": True               # Fetch author at each level
+    }
+}
+```
+
+#### 3.2.3 Complex Example: Blog with Comments
+
+```python
+class User(AtomicRedisModel):
+    username: Key[str]
+    profile_picture: Link[Image] | None = None
+
+class Comment(AtomicRedisModel):
+    text: str
+    author: Link[User]
+    replies: list[Link["Comment"]] = []  # Self-referential
+
+class Post(AtomicRedisModel):
+    title: str
+    author: Link[User]
+    comments: list[Link[Comment]] = []
+
+# Fetch post with:
+# - Author (with profile picture)
+# - Comments (with authors, and 2 levels of replies with their authors)
+post = await Post.aget(
+    "Post:123",
+    fetch_links={
+        "author": {
+            "profile_picture": True
+        },
+        "comments": {
+            "author": {
+                "profile_picture": True
+            },
+            "replies": {
+                "__depth__": 2,          # 2 levels of nested replies
+                "author": True           # Fetch author for each reply
+            }
+        }
+    }
+)
+
+# All seamless access:
+print(post.author.username)                          # "alice"
+print(post.author.profile_picture.url)               # "/images/alice.jpg"
+print(post.comments[0].text)                         # "Great post!"
+print(post.comments[0].author.username)              # "bob"
+print(post.comments[0].replies[0].text)              # "Thanks!"
+print(post.comments[0].replies[0].author.username)   # "alice"
+```
+
+### 3.3 FetchConfig Class
+
+```python
+from dataclasses import dataclass, field
+from typing import Literal
+
+# Recursive type for nested fetch configuration
+LinkFetchConfig = bool | list[str] | dict[str, "LinkFetchConfig | DepthConfig"]
+
+@dataclass
+class DepthConfig:
+    """Configuration for recursive/self-referential links."""
+    depth: int = 1
+    """Maximum recursion depth."""
+
+    fetch_links: LinkFetchConfig = True
+    """What to fetch at each level."""
+
+# Alternative: use special keys in dict
+# "__depth__": 3  -> max depth
+# "__all__": True -> fetch all links at this level
+# "*": {...}      -> apply config to all links
+```
+
+### 3.4 Lua Script for Atomic Nested Fetch
+
+The script recursively fetches linked models based on the nested configuration, all in a **single Redis round-trip**.
 
 ```lua
--- FETCH_WITH_LINKS_SCRIPT
+-- FETCH_WITH_NESTED_LINKS_SCRIPT
 -- KEYS[1] = main model key
--- ARGV[1] = JSON-encoded list of link field paths
--- ARGV[2] = nesting depth
--- Returns: JSON object with main model and all linked models
+-- ARGV[1] = JSON-encoded fetch configuration (nested dict)
+-- Returns: JSON object with main model and all linked models by key
 
 local main_key = KEYS[1]
-local link_paths = cjson.decode(ARGV[1])
-local max_depth = tonumber(ARGV[2]) or 1
+local fetch_config = cjson.decode(ARGV[1])
+local result = {
+    __models__ = {}  -- key -> model data
+}
+local visited = {}  -- Prevent infinite loops
 
--- Get the main model
-local main_data = redis.call('JSON.GET', main_key)
-if not main_data or main_data == 'null' then
+-- Helper: Get value at path in object
+local function get_at_path(obj, field_name)
+    if obj and type(obj) == "table" then
+        return obj[field_name]
+    end
     return nil
 end
 
-local main_obj = cjson.decode(main_data)
-local result = {
-    __main__ = main_obj,
-    __links__ = {}
-}
+-- Helper: Check if value looks like a Redis key (has ":")
+local function is_redis_key(value)
+    return type(value) == "string" and string.find(value, ":") ~= nil
+end
 
--- Collect all link keys to fetch
-local keys_to_fetch = {}
+-- Recursive fetch function
+local function fetch_with_config(key, config, depth)
+    -- Depth limit check
+    if depth > 20 then return end  -- Safety limit
 
-for _, path in ipairs(link_paths) do
-    -- Navigate to the field value using the path
-    local value = main_obj
-    for part in string.gmatch(path, "[^.]+") do
-        if value and type(value) == "table" then
-            value = value[part]
-        else
-            value = nil
-            break
-        end
+    -- Already visited check
+    if visited[key] then return end
+    visited[key] = true
+
+    -- Fetch the model
+    local data = redis.call('JSON.GET', key)
+    if not data or data == 'null' then
+        return
     end
 
-    if value then
-        if type(value) == "string" then
-            -- Single link
-            keys_to_fetch[value] = path
-        elseif type(value) == "table" then
-            -- List of links
-            for i, key in ipairs(value) do
-                keys_to_fetch[key] = path .. "[" .. (i-1) .. "]"
+    local obj = cjson.decode(data)
+
+    -- Handle array wrapping from Redis JSON
+    if type(obj) == "table" and obj[1] and not obj[2] then
+        obj = obj[1]
+    end
+
+    result.__models__[key] = obj
+
+    -- If config is false or nil, don't fetch nested
+    if not config or config == false then
+        return
+    end
+
+    -- If config is true, stop here (only fetch this level)
+    if config == true then
+        return
+    end
+
+    -- If config is a list, convert to dict with true values
+    if type(config) == "table" and config[1] then
+        local dict_config = {}
+        for _, field in ipairs(config) do
+            dict_config[field] = true
+        end
+        config = dict_config
+    end
+
+    -- Config is a dict - process each field
+    if type(config) == "table" then
+        -- Check for depth limit in config
+        local max_depth = config["__depth__"]
+        if max_depth and depth >= max_depth then
+            return
+        end
+
+        -- Check for wildcard "*" (fetch all links)
+        local wildcard_config = config["*"]
+
+        for field_name, field_config in pairs(config) do
+            -- Skip special keys
+            if field_name:sub(1, 2) ~= "__" and field_name ~= "*" then
+                local value = get_at_path(obj, field_name)
+
+                if value then
+                    if is_redis_key(value) then
+                        -- Single link
+                        fetch_with_config(value, field_config, depth + 1)
+                    elseif type(value) == "table" then
+                        -- List of links
+                        for _, link_key in ipairs(value) do
+                            if is_redis_key(link_key) then
+                                fetch_with_config(link_key, field_config, depth + 1)
+                            end
+                        end
+                    end
+                end
             end
         end
+
+        -- Handle wildcard if present
+        if wildcard_config then
+            for field_name, value in pairs(obj) do
+                if not config[field_name] then  -- Not already processed
+                    if is_redis_key(value) then
+                        fetch_with_config(value, wildcard_config, depth + 1)
+                    elseif type(value) == "table" then
+                        for _, link_key in ipairs(value) do
+                            if is_redis_key(link_key) then
+                                fetch_with_config(link_key, wildcard_config, depth + 1)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Handle self-referential with __self__
+        local self_config = config["__self__"]
+        if self_config then
+            -- Re-apply same config to this model type
+            -- The field that triggered this would need special handling
+        end
     end
 end
 
--- Fetch all linked models in batch
-for key, path in pairs(keys_to_fetch) do
-    local linked_data = redis.call('JSON.GET', key)
-    if linked_data and linked_data ~= 'null' then
-        result.__links__[key] = cjson.decode(linked_data)
-    end
-end
+-- Start recursive fetch
+fetch_with_config(main_key, fetch_config, 0)
 
 return cjson.encode(result)
 ```
 
-### 3.4 Alternative: Pipeline-Based Approach
+### 3.5 Python-Side Processing
 
-For simpler cases without deep nesting, we can use Redis pipelines:
+After the Lua script returns all models, Python reassembles them:
 
 ```python
 async def _fetch_with_links(
     cls,
     key: str,
-    link_fields: list[str] | None = None
+    fetch_links: LinkFetchConfig
 ) -> Self:
-    """Fetch model with links using pipeline."""
+    """Fetch model with nested links in single Redis trip."""
 
-    async with cls.Meta.redis.pipeline(transaction=False) as pipe:
-        # Queue main model fetch
-        pipe.json().get(key)
+    # Convert config to JSON for Lua
+    config_json = json.dumps(_normalize_fetch_config(fetch_links))
 
-        # We need to first get the main model to know which links to fetch
-        # This requires a two-phase approach for pipeline
-        pass
+    # Execute Lua script
+    result_json = await cls.Meta.redis.evalsha(
+        FETCH_NESTED_LINKS_SHA,
+        1,  # num keys
+        key,
+        config_json
+    )
 
-    # Better: Use Lua script for true single-trip
+    if not result_json:
+        return None
+
+    result = json.loads(result_json)
+    models_data = result["__models__"]
+
+    # Build model instances and populate links
+    models_cache = {}  # key -> model instance
+
+    for model_key, model_data in models_data.items():
+        model_class = _get_model_class_from_key(model_key)
+        models_cache[model_key] = model_class.model_validate(model_data)
+
+    # Now populate Link objects with fetched models
+    main_model = models_cache[key]
+    _populate_links(main_model, models_cache, fetch_links)
+
+    return main_model
+
+def _populate_links(model, cache, config):
+    """Recursively populate Link fields with cached models."""
+    for field_name, field_info in model.model_fields.items():
+        if _is_link_field(field_info):
+            link = getattr(model, field_name)
+            if link and link.key in cache:
+                link._set_fetched_model(cache[link.key])
+                # Recursively populate nested links
+                if isinstance(config, dict) and field_name in config:
+                    _populate_links(link.model, cache, config[field_name])
 ```
 
 ---
 
 ## 4. Deletion with Cascade
 
-### 4.1 Delete Rules Enum
+### 4.1 Basic Delete API
 
 ```python
-from enum import Enum
-
-class DeleteRules(str, Enum):
-    """Rules for handling linked models during deletion."""
-
-    DO_NOTHING = "do_nothing"
-    """Keep linked models (default)."""
-
-    CASCADE = "cascade"
-    """Delete all linked models recursively."""
-
-    SET_NULL = "set_null"
-    """Set the link field to null in referring models (back-reference)."""
-```
-
-### 4.2 API Design
-
-```python
-# Delete just the book (default behavior)
+# Delete just the book (default - no cascade)
 await book.adelete()
 
-# Delete book and cascade to linked models
-await book.adelete(link_rule=DeleteRules.CASCADE)
+# Delete book and cascade to ALL linked models
+await book.adelete(cascade_links=True)
 
-# Delete with selective cascade
-await book.adelete(
-    link_rule=DeleteRules.CASCADE,
-    cascade_links=["draft_versions"]  # Only cascade these links
-)
-
-# Bulk delete with cascade
-await Book.adelete_many(["Book:1", "Book:2"], link_rule=DeleteRules.CASCADE)
+# Delete with selective cascade - only specific fields
+await book.adelete(cascade_links=["drafts", "attachments"])
 ```
 
-### 4.3 Lua Script for Atomic Cascade Delete
+### 4.2 Nested Cascade Configuration
+
+Just like fetching, you can configure **which nested links to cascade delete**:
+
+```python
+# Type alias (same as fetch)
+LinkCascadeConfig = bool | list[str] | dict[str, "LinkCascadeConfig"]
+```
+
+#### 4.2.1 Cascade Examples
+
+```python
+class Image(AtomicRedisModel):
+    url: str
+
+class Draft(AtomicRedisModel):
+    content: str
+    attachments: list[Link[Image]] = []
+
+class Book(AtomicRedisModel):
+    title: str
+    author: Link[Author]           # Don't delete authors!
+    cover: Link[Image] | None      # Delete cover image
+    drafts: list[Link[Draft]] = [] # Delete drafts and their attachments
+
+# Delete book only (no cascade)
+await book.adelete()
+# Result: Only book deleted. Author, cover, drafts all preserved.
+
+# Delete book + cover image only
+await book.adelete(cascade_links=["cover"])
+# Result: Book and cover image deleted. Author and drafts preserved.
+
+# Delete book + drafts (but not draft attachments)
+await book.adelete(cascade_links={"drafts": True})
+# Result: Book and drafts deleted. Draft attachments preserved.
+
+# Delete book + drafts + draft attachments (nested cascade)
+await book.adelete(
+    cascade_links={
+        "cover": True,              # Delete cover
+        "drafts": {                 # Delete drafts AND...
+            "attachments": True     # ...their attachments
+        }
+        # "author" not listed = preserved
+    }
+)
+# Result: Book, cover, all drafts, all draft attachments deleted.
+#         Author preserved.
+```
+
+#### 4.2.2 Self-Referential Cascade with Depth Limit
+
+```python
+class Comment(AtomicRedisModel):
+    text: str
+    author: Link[User]
+    replies: list[Link["Comment"]] = []
+
+# Delete comment and ALL nested replies (recursive)
+await comment.adelete(
+    cascade_links={
+        "replies": {
+            "__depth__": 10,        # Max recursion depth
+            "__self__": True        # Continue cascading to nested replies
+        }
+        # "author" not listed = users preserved
+    }
+)
+
+# Shorthand for unlimited depth on self-referential:
+await comment.adelete(
+    cascade_links={
+        "replies": "__cascade_recursive__"
+    }
+)
+```
+
+#### 4.2.3 Complex Cascade Example
+
+```python
+class Post(AtomicRedisModel):
+    title: str
+    author: Link[User]
+    cover_image: Link[Image] | None = None
+    comments: list[Link[Comment]] = []
+    tags: list[Link[Tag]] = []
+
+# Delete post with fine-grained cascade control:
+await post.adelete(
+    cascade_links={
+        # Delete cover image
+        "cover_image": True,
+
+        # Delete comments, their replies (2 levels), but preserve comment authors
+        "comments": {
+            "replies": {
+                "__depth__": 2,
+                # Don't cascade to reply authors
+            }
+            # "author" not listed = comment authors preserved
+        },
+
+        # Don't delete tags (not listed)
+        # Don't delete post author (not listed)
+    }
+)
+```
+
+### 4.3 Bulk Delete with Cascade
+
+```python
+# Delete multiple books with same cascade config
+await Book.adelete_many(
+    ["Book:1", "Book:2", "Book:3"],
+    cascade_links={
+        "drafts": {"attachments": True},
+        "cover": True
+    }
+)
+
+# Delete by query with cascade
+await Book.adelete_where(
+    Book.status == "archived",
+    cascade_links=["drafts"]
+)
+```
+
+### 4.4 Safety Features
+
+```python
+# Dry run - see what would be deleted without actually deleting
+keys_to_delete = await book.adelete(
+    cascade_links={"drafts": {"attachments": True}},
+    dry_run=True
+)
+print(keys_to_delete)
+# ["Book:123", "Draft:456", "Draft:789", "Image:abc", "Image:def"]
+
+# Confirm before delete (useful for CLI/scripts)
+await book.adelete(
+    cascade_links=True,
+    confirm=True  # Raises if not confirmed
+)
+```
+
+### 4.5 Lua Script for Atomic Nested Cascade Delete
+
+The script traverses the nested cascade configuration and deletes all matching models atomically.
 
 ```lua
--- CASCADE_DELETE_SCRIPT
+-- CASCADE_DELETE_NESTED_SCRIPT
 -- KEYS[1] = main model key
--- ARGV[1] = JSON-encoded list of link field paths to cascade
--- ARGV[2] = max recursion depth
--- Returns: number of deleted keys
+-- ARGV[1] = JSON-encoded cascade configuration (nested dict)
+-- ARGV[2] = dry_run flag ("true" or "false")
+-- Returns: JSON array of deleted keys (or keys that would be deleted)
 
 local main_key = KEYS[1]
-local cascade_paths = cjson.decode(ARGV[1])
-local max_depth = tonumber(ARGV[2]) or 10
-local deleted_count = 0
+local cascade_config = cjson.decode(ARGV[1])
+local dry_run = ARGV[2] == "true"
+
+local keys_to_delete = {}
 local visited = {}
 
-local function collect_keys_to_delete(key, depth)
-    if depth > max_depth or visited[key] then
-        return {}
-    end
+-- Helper: Check if value looks like a Redis key
+local function is_redis_key(value)
+    return type(value) == "string" and string.find(value, ":") ~= nil
+end
+
+-- Recursive collection function
+local function collect_keys(key, config, depth)
+    -- Safety limit
+    if depth > 50 then return end
+
+    -- Already visited
+    if visited[key] then return end
     visited[key] = true
 
-    local keys = {key}
-    local data = redis.call('JSON.GET', key)
+    -- Add this key to delete list
+    table.insert(keys_to_delete, key)
 
+    -- If no cascade config, stop here
+    if not config or config == false then
+        return
+    end
+
+    -- If config is just "true", delete this but don't cascade further
+    if config == true then
+        return
+    end
+
+    -- Fetch model data to find nested links
+    local data = redis.call('JSON.GET', key)
     if not data or data == 'null' then
-        return keys
+        return
     end
 
     local obj = cjson.decode(data)
+    if type(obj) == "table" and obj[1] and not obj[2] then
+        obj = obj[1]
+    end
 
-    -- Extract link keys from specified paths
-    for _, path in ipairs(cascade_paths) do
-        local value = obj
-        for part in string.gmatch(path, "[^.]+") do
-            if value and type(value) == "table" then
-                value = value[part]
-            else
-                value = nil
-                break
-            end
+    -- Handle list config -> convert to dict
+    if type(config) == "table" and config[1] then
+        local dict_config = {}
+        for _, field in ipairs(config) do
+            dict_config[field] = true
+        end
+        config = dict_config
+    end
+
+    -- Process nested cascade config
+    if type(config) == "table" then
+        local max_depth = config["__depth__"]
+        if max_depth and depth >= max_depth then
+            return
         end
 
-        if value then
-            if type(value) == "string" then
-                -- Single link
-                local sub_keys = collect_keys_to_delete(value, depth + 1)
-                for _, k in ipairs(sub_keys) do
-                    table.insert(keys, k)
+        -- Special: __cascade_recursive__ for self-referential
+        for field_name, field_config in pairs(config) do
+            if field_name:sub(1, 2) ~= "__" then
+                local value = obj[field_name]
+
+                -- Handle recursive marker
+                local actual_config = field_config
+                if field_config == "__cascade_recursive__" then
+                    -- Re-use same config for this field
+                    actual_config = config
                 end
-            elseif type(value) == "table" then
-                -- List of links
-                for _, linked_key in ipairs(value) do
-                    local sub_keys = collect_keys_to_delete(linked_key, depth + 1)
-                    for _, k in ipairs(sub_keys) do
-                        table.insert(keys, k)
+
+                if value then
+                    if is_redis_key(value) then
+                        -- Single link
+                        collect_keys(value, actual_config, depth + 1)
+                    elseif type(value) == "table" then
+                        -- List of links
+                        for _, link_key in ipairs(value) do
+                            if is_redis_key(link_key) then
+                                collect_keys(link_key, actual_config, depth + 1)
+                            end
+                        end
                     end
                 end
             end
         end
     end
-
-    return keys
 end
 
--- Collect all keys to delete
-local all_keys = collect_keys_to_delete(main_key, 0)
+-- Collect all keys to delete starting from main key
+-- Pass 'true' as initial config to include the main key itself
+collect_keys(main_key, true, 0)
 
--- Delete all collected keys atomically
-for _, key in ipairs(all_keys) do
-    redis.call('DEL', key)
-    deleted_count = deleted_count + 1
+-- Remove main key's 'true' and re-collect with actual config
+keys_to_delete = {}
+visited = {}
+table.insert(keys_to_delete, main_key)
+visited[main_key] = true
+
+-- Now collect cascaded keys
+local data = redis.call('JSON.GET', main_key)
+if data and data ~= 'null' then
+    local obj = cjson.decode(data)
+    if type(obj) == "table" and obj[1] and not obj[2] then
+        obj = obj[1]
+    end
+
+    if type(cascade_config) == "table" then
+        for field_name, field_config in pairs(cascade_config) do
+            if field_name:sub(1, 2) ~= "__" then
+                local value = obj[field_name]
+                if value then
+                    if is_redis_key(value) then
+                        collect_keys(value, field_config, 1)
+                    elseif type(value) == "table" then
+                        for _, link_key in ipairs(value) do
+                            if is_redis_key(link_key) then
+                                collect_keys(link_key, field_config, 1)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    elseif cascade_config == true then
+        -- Delete all links (1 level)
+        for field_name, value in pairs(obj) do
+            if is_redis_key(value) then
+                if not visited[value] then
+                    visited[value] = true
+                    table.insert(keys_to_delete, value)
+                end
+            elseif type(value) == "table" then
+                for _, link_key in ipairs(value) do
+                    if is_redis_key(link_key) and not visited[link_key] then
+                        visited[link_key] = true
+                        table.insert(keys_to_delete, link_key)
+                    end
+                end
+            end
+        end
+    end
 end
 
-return deleted_count
+-- Execute deletion (or just return list for dry run)
+if not dry_run then
+    for _, del_key in ipairs(keys_to_delete) do
+        redis.call('DEL', del_key)
+    end
+end
+
+return cjson.encode(keys_to_delete)
+```
+
+### 4.6 Python Implementation
+
+```python
+async def adelete(
+    self,
+    *,
+    cascade_links: LinkCascadeConfig = False,
+    dry_run: bool = False
+) -> list[str]:
+    """
+    Delete this model, optionally cascading to linked models.
+
+    Args:
+        cascade_links: Configuration for which links to cascade delete.
+            - False: Only delete this model (default)
+            - True: Delete this model and all direct links (1 level)
+            - ["field1", "field2"]: Delete specific link fields
+            - {"field": {"nested": True}}: Nested cascade configuration
+
+        dry_run: If True, return keys that would be deleted without deleting.
+
+    Returns:
+        List of keys that were deleted (or would be deleted if dry_run).
+
+    Examples:
+        # Delete only this model
+        await book.adelete()
+
+        # Delete book and all its direct links
+        await book.adelete(cascade_links=True)
+
+        # Delete book and specific links with nesting
+        await book.adelete(cascade_links={
+            "drafts": {"attachments": True},  # Delete drafts and their attachments
+            "cover": True                      # Delete cover image
+        })
+
+        # Preview what would be deleted
+        keys = await book.adelete(cascade_links=True, dry_run=True)
+        print(f"Would delete: {keys}")
+    """
+    if not cascade_links:
+        # Simple delete, no cascade
+        await self.Meta.redis.delete(self.key)
+        return [self.key]
+
+    # Use Lua script for atomic cascade delete
+    config_json = json.dumps(_normalize_cascade_config(cascade_links))
+    result_json = await self.Meta.redis.evalsha(
+        CASCADE_DELETE_NESTED_SHA,
+        1,
+        self.key,
+        config_json,
+        "true" if dry_run else "false"
+    )
+
+    return json.loads(result_json)
 ```
 
 ---
@@ -558,12 +1174,17 @@ class AtomicRedisModel:
 ### 7.1 Blog System Example
 
 ```python
-from rapyer import AtomicRedisModel, Link, Key, DeleteRules
+from rapyer import AtomicRedisModel, Link, Key
 from typing import Annotated
 
 class User(AtomicRedisModel):
     username: Key[str]
     email: str
+    avatar: Link["Image"] | None = None
+
+class Image(AtomicRedisModel):
+    url: str
+    size: int
 
 class Category(AtomicRedisModel):
     name: Key[str]
@@ -572,12 +1193,19 @@ class Post(AtomicRedisModel):
     title: str
     content: str
     author: Link[User]
+    cover: Link[Image] | None = None
     category: Link[Category] | None = None
     tags: list[Link[Category]] = []
 
 # Create models
-user = User(username="alice", email="alice@example.com")
+avatar = Image(url="/avatars/alice.jpg", size=1024)
+await avatar.asave()
+
+user = User(username="alice", email="alice@example.com", avatar=Link(avatar))
 await user.asave()
+
+cover = Image(url="/covers/post1.jpg", size=2048)
+await cover.asave()
 
 cat = Category(name="tech")
 await cat.asave()
@@ -586,38 +1214,72 @@ post = Post(
     title="Hello World",
     content="My first post",
     author=Link(user),        # From model instance
+    cover=Link(cover),
     category=Link(cat),
     tags=[Link(cat)]
 )
 await post.asave()
 
+# ===== FETCHING =====
+
 # Fetch without links (default)
 post = await Post.aget(post.key)
 print(post.author.is_fetched)  # False
 print(post.author.key)         # "User:alice"
+# post.author.email            # Raises LinkNotFetchedError!
 
-# Fetch with all links
+# Fetch with all direct links (1 level)
 post = await Post.aget(post.key, fetch_links=True)
-print(post.author.is_fetched)  # True
-print(post.author.model.email) # "alice@example.com"
+print(post.author.email)       # "alice@example.com" (seamless!)
+print(post.cover.url)          # "/covers/post1.jpg"
+print(post.author.avatar.is_fetched)  # False (nested link not fetched)
 
-# Fetch with specific links only
+# Fetch with NESTED links
+post = await Post.aget(
+    post.key,
+    fetch_links={
+        "author": {
+            "avatar": True     # Also fetch author's avatar
+        },
+        "cover": True,
+        "category": True
+    }
+)
+print(post.author.email)           # "alice@example.com"
+print(post.author.avatar.url)      # "/avatars/alice.jpg" (nested!)
+print(post.author.avatar.size)     # 1024
+
+# Fetch specific links only
 post = await Post.aget(post.key, fetch_links=["author"])
-print(post.author.is_fetched)  # True
-print(post.category.is_fetched) # False (not fetched)
+print(post.author.is_fetched)      # True
+print(post.category.is_fetched)    # False (not requested)
 
-# Delete with cascade
-await post.adelete(link_rule=DeleteRules.CASCADE)
-# This deletes: post (user and category preserved unless configured)
+# ===== DELETING =====
+
+# Delete only the post
+await post.adelete()
+# Result: Post deleted. Author, cover, category all preserved.
+
+# Delete post and cover image
+await post.adelete(cascade_links=["cover"])
+# Result: Post and cover deleted. Author, category preserved.
+
+# Delete post and all direct links
+await post.adelete(cascade_links=True)
+# Result: Post, cover, category deleted. Author preserved (referenced elsewhere).
+
+# Preview deletion (dry run)
+keys = await post.adelete(cascade_links=True, dry_run=True)
+print(keys)  # ["Post:xxx", "Image:yyy", "Category:tech"]
 ```
 
-### 7.2 Self-Referential Links (Tree Structure)
+### 7.2 Self-Referential Links (Comment Tree)
 
 ```python
 class Comment(AtomicRedisModel):
     text: str
     author: Link[User]
-    parent: Link["Comment"] | None = None  # Forward reference
+    parent: Link["Comment"] | None = None
     replies: list[Link["Comment"]] = []
 
 # Create comment tree
@@ -627,12 +1289,121 @@ await root.asave()
 reply1 = Comment(text="Thanks!", author=Link(user), parent=Link(root))
 await reply1.asave()
 
-# Update root with reply
-root.replies = [Link(reply1)]
+reply2 = Comment(text="Agreed!", author=Link(user), parent=Link(root))
+await reply2.asave()
+
+nested_reply = Comment(text="Me too!", author=Link(user), parent=Link(reply1))
+await nested_reply.asave()
+
+# Update parents with replies
+reply1.replies = [Link(nested_reply)]
+await reply1.asave()
+
+root.replies = [Link(reply1), Link(reply2)]
 await root.asave()
 
-# Fetch with limited depth to prevent infinite recursion
-comment = await Comment.aget(root.key, fetch_links=True, nesting_depth=2)
+# Fetch with nested depth configuration
+comment = await Comment.aget(
+    root.key,
+    fetch_links={
+        "author": True,
+        "replies": {
+            "__depth__": 3,    # Max 3 levels of nested replies
+            "author": True,    # Fetch author at each level
+            "replies": {       # Recursive config for nested replies
+                "__depth__": 2,
+                "author": True
+            }
+        }
+    }
+)
+
+# Seamless access at all levels!
+print(comment.text)                              # "Great post!"
+print(comment.author.username)                   # "alice"
+print(comment.replies[0].text)                   # "Thanks!"
+print(comment.replies[0].author.username)        # "alice"
+print(comment.replies[0].replies[0].text)        # "Me too!"
+print(comment.replies[0].replies[0].author.username)  # "alice"
+
+# Delete comment and ALL nested replies
+await comment.adelete(
+    cascade_links={
+        "replies": "__cascade_recursive__"  # Recursively delete all replies
+        # "author" not listed = users preserved
+    }
+)
+# Result: root, reply1, reply2, nested_reply all deleted. Users preserved.
+```
+
+### 7.3 E-commerce Example (Complex Nested)
+
+```python
+class Manufacturer(AtomicRedisModel):
+    name: str
+    country: Link["Country"]
+
+class Country(AtomicRedisModel):
+    name: Key[str]
+    code: str
+
+class ProductImage(AtomicRedisModel):
+    url: str
+    alt_text: str
+
+class Product(AtomicRedisModel):
+    name: str
+    price: float
+    manufacturer: Link[Manufacturer]
+    images: list[Link[ProductImage]] = []
+
+class OrderItem(AtomicRedisModel):
+    product: Link[Product]
+    quantity: int
+
+class Order(AtomicRedisModel):
+    customer: Link[User]
+    items: list[Link[OrderItem]] = []
+    status: str = "pending"
+
+# Fetch order with DEEP nested links
+order = await Order.aget(
+    order_key,
+    fetch_links={
+        "customer": {
+            "avatar": True
+        },
+        "items": {
+            "product": {
+                "manufacturer": {
+                    "country": True  # 4 levels deep!
+                },
+                "images": True
+            }
+        }
+    }
+)
+
+# All seamless access:
+print(order.customer.username)
+print(order.customer.avatar.url)
+print(order.items[0].quantity)
+print(order.items[0].product.name)
+print(order.items[0].product.price)
+print(order.items[0].product.manufacturer.name)
+print(order.items[0].product.manufacturer.country.name)
+print(order.items[0].product.images[0].url)
+
+# Delete order with selective cascade
+await order.adelete(
+    cascade_links={
+        "items": {
+            # Delete order items, but preserve products
+            # (products are catalog items, not order-specific)
+        }
+    }
+)
+# Result: Order and OrderItems deleted. Products, manufacturer, etc. preserved.
 ```
 
 ---
@@ -699,11 +1470,67 @@ Existing models without links continue to work unchanged. Adding a `Link` field 
 
 This design provides:
 
-- **Type-safe foreign keys** with `Link[Model]` and `list[Link[Model]]`
-- **Single-trip extraction** via Lua scripts
-- **Single-trip cascade deletion** via Lua scripts
-- **Configurable behavior** at field and query level
-- **Backward compatibility** with existing models
+### Core Features
+
+| Feature | Description |
+|---------|-------------|
+| **Type-safe foreign keys** | `Link[Model]` and `list[Link[Model]]` with full Pydantic v2 validation |
+| **Seamless attribute access** | `book.author.name` works directly (no `.model` needed) |
+| **Single-trip extraction** | Lua script fetches all nested links atomically |
+| **Single-trip cascade deletion** | Lua script deletes all configured links atomically |
+| **Nested configuration** | Fine-grained control over which links to fetch/delete at each level |
+| **Self-referential support** | Depth limits and recursive configuration for tree structures |
+
+### Configuration Types
+
+```python
+# Both fetch_links and cascade_links accept:
+LinkConfig = (
+    bool |                      # True = all direct links, False = none
+    list[str] |                 # ["field1", "field2"] = specific fields
+    dict[str, "LinkConfig"]     # Nested configuration per field
+)
+
+# Special dict keys:
+# "__depth__": int         - Max recursion depth
+# "__cascade_recursive__"  - Self-referential cascade
+# "*": LinkConfig          - Wildcard (all fields)
+```
+
+### API Quick Reference
+
+```python
+# Fetching
+model = await Model.aget(key, fetch_links=True)           # All direct links
+model = await Model.aget(key, fetch_links=["author"])     # Specific links
+model = await Model.aget(key, fetch_links={               # Nested
+    "author": {"avatar": True}
+})
+
+# Deleting
+await model.adelete()                                      # Just this model
+await model.adelete(cascade_links=True)                   # + all direct links
+await model.adelete(cascade_links=["drafts"])             # + specific links
+await model.adelete(cascade_links={                       # Nested cascade
+    "drafts": {"attachments": True}
+})
+await model.adelete(cascade_links=True, dry_run=True)     # Preview
+
+# Seamless access after fetch
+model.link_field.nested_attribute  # Works directly!
+```
+
+### Redis Efficiency
+
+| Operation | Redis Round-Trips |
+|-----------|-------------------|
+| `aget(key)` | 1 |
+| `aget(key, fetch_links=True)` | 1 (Lua script) |
+| `aget(key, fetch_links={nested...})` | 1 (Lua script) |
+| `adelete()` | 1 |
+| `adelete(cascade_links={nested...})` | 1 (Lua script) |
+
+---
 
 Sources:
 - [Beanie ODM Relations](https://beanie-odm.dev/tutorial/relations/)
