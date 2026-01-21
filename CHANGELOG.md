@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.2.0]
+## [1.1.7]
 
 ### ✨ Added
 
@@ -10,6 +10,18 @@
   - Raises `KeyNotFound` if any key is missing in Redis
   - Raises `RapyerModelDoesntExistError` if a key refers to an unregistered model class
   - Example: `models = await rapyer.afind("UserModel:123", "OrderModel:456")`
+
+- **Pipeline Operations for Non-Redis-Native Types**: Added full pipeline support for `List[Any]` and `Dict[str, Any]` fields that store serialized data.
+  - Supports `append()`, `extend()`, `insert()`, index assignment for lists
+  - Supports `update()`, key assignment, `pop()` for dicts
+  - Direct field assignment within pipeline context (e.g., `redis_model.field = value`)
+  - All operations are atomic and only committed when the pipeline exits
+  - Example: `async with model.apipeline() as m: m.mixed_list.append({"key": "value"})`
+
+- **FakeRedis Support**: Added support for `fakeredis` library for unit testing without a real Redis instance.
+  - Supports `rapyer.afind()`, `rapyer.ainsert()`, `rapyer.aget()` with FakeRedis
+  - Supports pipeline operations with FakeRedis
+  - Enables faster test execution without Redis dependency
 
 ### 🐛 Fixed
 
