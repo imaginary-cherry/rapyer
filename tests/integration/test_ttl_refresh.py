@@ -1,17 +1,19 @@
 import asyncio
 
 import pytest
-
 import rapyer
 from rapyer import AtomicRedisModel
 from rapyer.types import RedisDict, RedisFloat, RedisInt, RedisList
 from rapyer.types.base import RedisType
 from tests.conftest import ttl_no_refresh_test_for, ttl_test_for
+from tests.models.complex_types import OuterModelWithRedisNested
 from tests.models.simple_types import (
     TTL_TEST_SECONDS,
+    USER_TTL,
     TTLRefreshTestModel as ModelWithTTL,
     UserModelWithoutTTL as ModelWithoutTTL,
     TTLRefreshDisabledModel as ModelWithTTLNoRefresh,
+    UserModelWithTTL,
 )
 
 SLEEP_BEFORE_REFRESH = 1
@@ -840,8 +842,6 @@ async def test_aset_ttl__sanity(real_redis_client, new_ttl):
 @pytest.mark.asyncio
 async def test_aset_ttl_on_inner_model__edge_case():
     # Arrange
-    from tests.models.complex_types import OuterModelWithRedisNested
-
     outer = OuterModelWithRedisNested()
     await outer.asave()
 
@@ -856,17 +856,23 @@ async def test_ttl_refresh_on_rapyer_afind_with_mixed_ttl_classes__sanity(
 ):
     # Arrange
     model_with_ttl = ModelWithTTL(name="mixed_ttl", age=25)
+    user_with_ttl = UserModelWithTTL(name="mixed_ttl", age=25)
     model_without_ttl = ModelWithoutTTL(name="mixed_no_ttl", age=30)
     await model_with_ttl.asave()
     await model_without_ttl.asave()
+    await user_with_ttl.asave()
     await asyncio.sleep(SLEEP_BEFORE_REFRESH)
 
     # Act
-    found_models = await rapyer.afind(model_with_ttl.key, model_without_ttl.key)
+    found_models = await rapyer.afind(
+        model_with_ttl.key, user_with_ttl.key, model_without_ttl.key
+    )
 
     # Assert
     ttl_with = await real_redis_client.ttl(model_with_ttl.key)
+    user_ttl_with = await real_redis_client.ttl(user_with_ttl.key)
     ttl_without = await real_redis_client.ttl(model_without_ttl.key)
     assert TTL_TEST_SECONDS - 2 < ttl_with <= TTL_TEST_SECONDS
+    assert USER_TTL - 2 < user_ttl_with <= USER_TTL
     assert ttl_without == -1  # No TTL set
-    assert len(found_models) == 2
+    assert len(found_models) == 3
