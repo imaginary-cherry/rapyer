@@ -6,7 +6,7 @@ from tests.models.simple_types import FloatModel
 
 class TestPipelineStringField:
     @pytest.mark.asyncio
-    async def test_assignment_changes_not_persisted_without_save_edge_case(self):
+    async def test_assignment_changes_persisted_after_pipeline_sanity(self):
         # Arrange
         model = AllTypesModel(str_field="initial")
         await model.asave()
@@ -19,10 +19,9 @@ class TestPipelineStringField:
             loaded_during_pipeline = await AllTypesModel.aget(model.key)
             assert loaded_during_pipeline.str_field == "initial"
 
-        # Assert - direct assignment without save() is not committed after pipeline
+        # Assert - direct assignment is committed after pipeline
         final_model = await AllTypesModel.aget(model.key)
-        # Assignment without save() doesn't persist
-        assert final_model.str_field == "initial"
+        assert final_model.str_field == "new_value"
 
     @pytest.mark.asyncio
     async def test_concatenation_changes_preserved_during_pipeline_committed_after_sanity(
@@ -68,7 +67,7 @@ class TestPipelineStringField:
 
 class TestPipelineIntegerField:
     @pytest.mark.asyncio
-    async def test_assignment_changes_not_persisted_without_save_edge_case(self):
+    async def test_assignment_changes_persisted_after_pipeline_sanity(self):
         # Arrange
         model = AllTypesModel(int_field=10)
         await model.asave()
@@ -81,9 +80,9 @@ class TestPipelineIntegerField:
             loaded_during_pipeline = await AllTypesModel.aget(model.key)
             assert loaded_during_pipeline.int_field == 10
 
-        # Assert - direct assignment without save() is not committed after pipeline
+        # Assert - direct assignment is committed after pipeline
         final_model = await AllTypesModel.aget(model.key)
-        assert final_model.int_field == 10  # Assignment without save() doesn't persist
+        assert final_model.int_field == 50
 
     @pytest.mark.asyncio
     async def test_addition_changes_preserved_during_pipeline_committed_after_sanity(
@@ -349,7 +348,7 @@ class TestPipelineDictField:
 
 class TestPipelineBoolField:
     @pytest.mark.asyncio
-    async def test_assignment_changes_not_persisted_without_save_edge_case(self):
+    async def test_assignment_changes_persisted_after_pipeline_sanity(self):
         # Arrange
         model = AllTypesModel(bool_field=False)
         await model.asave()
@@ -362,11 +361,9 @@ class TestPipelineBoolField:
             loaded_during_pipeline = await AllTypesModel.aget(model.key)
             assert loaded_during_pipeline.bool_field is False
 
-        # Assert - boolean assignment without save() is not committed after pipeline
+        # Assert - boolean assignment is committed after pipeline
         final_model = await AllTypesModel.aget(model.key)
-        assert (
-            final_model.bool_field is False
-        )  # Assignment without save() doesn't persist
+        assert final_model.bool_field is True
 
 
 class TestPipelineFloatField:
