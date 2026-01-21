@@ -257,7 +257,8 @@ async def test_pipeline_list_any__ainsert_various_positions__check_atomicity_san
 @pytest.mark.asyncio
 async def test_pipeline_list_any__extend_with_various_types__check_atomicity_sanity():
     # Arrange
-    model = MixedTypesModel()
+    initial_data = [{"existing": "item"}, [0, 0, 0]]
+    model = MixedTypesModel(mixed_list=initial_data.copy())
     await model.asave()
 
     # Act
@@ -276,11 +277,13 @@ async def test_pipeline_list_any__extend_with_various_types__check_atomicity_san
 
         # Assert - changes not visible during pipeline
         loaded = await MixedTypesModel.aget(model.key)
-        assert loaded.mixed_list == []
+        assert loaded.mixed_list == initial_data
 
-    # Assert - changes committed after pipeline
+    # Assert - changes committed after pipeline, initial data preserved
     final = await MixedTypesModel.aget(model.key)
     assert final.mixed_list == [
+        {"existing": "item"},
+        [0, 0, 0],
         {"dict": "value"},
         [1, 2, 3],
         None,
@@ -294,7 +297,11 @@ async def test_pipeline_list_any__extend_with_various_types__check_atomicity_san
 @pytest.mark.asyncio
 async def test_pipeline_dict_any__update_with_various_types__check_atomicity_sanity():
     # Arrange
-    model = MixedTypesModel()
+    initial_data = {
+        "existing_key": {"nested": "existing"},
+        "another_existing": [9, 8, 7],
+    }
+    model = MixedTypesModel(mixed_dict=initial_data.copy())
     await model.asave()
 
     # Act
@@ -313,11 +320,13 @@ async def test_pipeline_dict_any__update_with_various_types__check_atomicity_san
 
         # Assert - changes not visible during pipeline
         loaded = await MixedTypesModel.aget(model.key)
-        assert loaded.mixed_dict == {}
+        assert loaded.mixed_dict == initial_data
 
-    # Assert - changes committed after pipeline
+    # Assert - changes committed after pipeline, initial data preserved
     final = await MixedTypesModel.aget(model.key)
     assert final.mixed_dict == {
+        "existing_key": {"nested": "existing"},
+        "another_existing": [9, 8, 7],
         "dict_val": {"nested": "dict"},
         "list_val": [1, 2, 3],
         "none_val": None,
@@ -482,3 +491,49 @@ async def test_pipeline_list_any_append__various_types__check_atomicity_sanity(v
     # Assert - changes committed after pipeline
     final = await MixedTypesModel.aget(model.key)
     assert final.mixed_list == [value]
+
+
+@pytest.mark.asyncio
+async def test_pipeline_list_and_dict_any__sync_outside_vs_inside_pipeline__only_pipeline_actions_take_effect_sanity():
+    # Arrange
+    initial_list = [{"initial": "list_item"}]
+    initial_dict = {"initial_key": {"initial": "dict_value"}}
+    model = MixedTypesModel(
+        mixed_list=initial_list.copy(), mixed_dict=initial_dict.copy()
+    )
+    await model.asave()
+
+    # Act - do many sync actions outside the pipeline (these should NOT be persisted)
+    model.mixed_list.append({"outside_append": 1})
+    model.mixed_list.append({"outside_append": 2})
+    model.mixed_list.extend([{"outside_extend": 1}, {"outside_extend": 2}])
+    model.mixed_list.insert(0, {"outside_insert": "at_start"})
+    model.mixed_list[0] = {"outside_setitem": "replaced"}
+    model.mixed_dict["outside_key1"] = {"outside": "value1"}
+    model.mixed_dict["outside_key2"] = [1, 2, 3]
+    model.mixed_dict.update({"outside_update1": None, "outside_update2": True})
+
+    # Act - do some actions inside the pipeline (these SHOULD be persisted)
+    async with model.apipeline() as redis_model:
+        redis_model.mixed_list.append({"inside_append": "pipeline"})
+        redis_model.mixed_list.extend([{"inside_extend": 1}])
+        redis_model.mixed_dict["inside_key"] = {"inside": "pipeline_value"}
+        redis_model.mixed_dict.update({"inside_update": [4, 5, 6]})
+
+        # Assert - changes not visible during pipeline
+        loaded = await MixedTypesModel.aget(model.key)
+        assert loaded.mixed_list == initial_list
+        assert loaded.mixed_dict == initial_dict
+
+    # Assert - only pipeline actions took effect, sync actions outside were ignored
+    final = await MixedTypesModel.aget(model.key)
+    assert final.mixed_list == [
+        {"initial": "list_item"},
+        {"inside_append": "pipeline"},
+        {"inside_extend": 1},
+    ]
+    assert final.mixed_dict == {
+        "initial_key": {"initial": "dict_value"},
+        "inside_key": {"inside": "pipeline_value"},
+        "inside_update": [4, 5, 6],
+    }
