@@ -8,7 +8,14 @@ from tests.models.index_types import IndexTestModel, PersonModel, AddressModel
 @pytest.fixture
 def setup_fake_redis_for_models(fake_redis_client):
     original_clients = {}
-    models = [StrModel, IntModel, IndexTestModel, PersonModel, AddressModel, AtomicRedisModel]
+    models = [
+        StrModel,
+        IntModel,
+        IndexTestModel,
+        PersonModel,
+        AddressModel,
+        AtomicRedisModel,
+    ]
     for model in models:
         original_clients[model] = (model.Meta.redis, model.Meta.is_fake_redis)
         model.Meta.redis = fake_redis_client
