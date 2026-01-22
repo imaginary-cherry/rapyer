@@ -29,7 +29,9 @@ from rapyer.errors.base import (
 from rapyer.fields.expression import ExpressionField, AtomicField, Expression
 from rapyer.fields.index import IndexAnnotation
 from rapyer.fields.key import KeyAnnotation
+from rapyer.fields.priority_queue import PriorityQueueAnnotation
 from rapyer.fields.safe_load import SafeLoadAnnotation
+from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.links import REDIS_SUPPORTED_LINK
 from rapyer.scripts import handle_noscript_error
 from rapyer.types.base import RedisType, REDIS_DUMP_FLAG_NAME, FAILED_FIELDS_KEY
@@ -130,6 +132,7 @@ class AtomicRedisModel(BaseModel):
     Meta: ClassVar[RedisConfig] = RedisConfig()
     _key_field_name: ClassVar[str | None] = None
     _safe_load_fields: ClassVar[set[str]] = set()
+    _priority_queue_fields: ClassVar[set[str]] = set()
     _field_name: str = PrivateAttr(default="")
     model_config = ConfigDict(validate_assignment=True, validate_default=True)
 
@@ -244,13 +247,16 @@ class AtomicRedisModel(BaseModel):
         self._pk = value.split(":", maxsplit=1)[-1]
 
     def __init_subclass__(cls, **kwargs):
-        # Find fields with KeyAnnotation and SafeLoadAnnotation
+        # Find fields with KeyAnnotation, SafeLoadAnnotation, and PriorityQueueAnnotation
         cls._safe_load_fields = set()
+        cls._priority_queue_fields = set()
         for field_name, annotation in cls.__annotations__.items():
             if has_annotation(annotation, KeyAnnotation):
                 cls._key_field_name = field_name
             if has_annotation(annotation, SafeLoadAnnotation):
                 cls._safe_load_fields.add(field_name)
+            if has_annotation(annotation, PriorityQueueAnnotation):
+                cls._priority_queue_fields.add(field_name)
 
         # Redefine annotations to use redis types
         pydantic_annotation = get_all_pydantic_annotation(cls, AtomicRedisModel)
@@ -341,6 +347,11 @@ class AtomicRedisModel(BaseModel):
         if self.Meta.ttl is not None:
             nx = not self.Meta.refresh_ttl
             await self.Meta.redis.expire(self.key, self.Meta.ttl, nx=nx)
+        # Notify priority queue fields of save
+        for field_name in self._priority_queue_fields:
+            pq_field = getattr(self, field_name, None)
+            if isinstance(pq_field, RedisPriorityQueue):
+                await pq_field.on_model_save()
         return self
 
     def redis_dump(self):
@@ -550,6 +561,11 @@ class AtomicRedisModel(BaseModel):
     async def adelete(self):
         if self.is_inner_model():
             raise RuntimeError("Can only delete from inner model")
+        # Delete linked priority queue ZSET keys
+        for field_name in self._priority_queue_fields:
+            pq_field = getattr(self, field_name, None)
+            if isinstance(pq_field, RedisPriorityQueue):
+                await pq_field.on_model_delete()
         return await self.adelete_by_key(self.key)
 
     @classmethod
@@ -692,6 +708,9 @@ class AtomicRedisModel(BaseModel):
             attr = getattr(self, name)
             if isinstance(attr, RedisType):
                 attr._base_model_link = self
+            elif isinstance(attr, RedisPriorityQueue):
+                attr._base_model_link = self
+                attr.field_name = f".{name}"
 
     def __eq__(self, other):
         if not isinstance(other, BaseModel):
@@ -714,6 +733,9 @@ class AtomicRedisModel(BaseModel):
             attr = getattr(self, field_name)
             if isinstance(attr, RedisType) or isinstance(attr, AtomicRedisModel):
                 attr._base_model_link = self
+            elif isinstance(attr, RedisPriorityQueue):
+                attr._base_model_link = self
+                attr.field_name = f".{field_name}"
         return self
 
 

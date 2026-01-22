@@ -106,6 +106,14 @@ from tests.models.unknown_types import (
     ModelWithStrEnumInDict,
 )
 
+# Priority queue types
+from tests.models.priority_queue_types import (
+    TaskQueueModel,
+    MultiQueueModel,
+    IntQueueModel,
+    DictQueueModel,
+)
+
 
 @pytest_asyncio.fixture
 async def redis_client():
@@ -203,6 +211,11 @@ async def real_redis_client(redis_client):
         ModelWithIntEnumDefault,
         ModelWithStrEnumInList,
         ModelWithStrEnumInDict,
+        # Priority queue types
+        TaskQueueModel,
+        MultiQueueModel,
+        IntQueueModel,
+        DictQueueModel,
     ]
 
     # Configure Redis client for all models
