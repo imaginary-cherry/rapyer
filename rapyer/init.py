@@ -1,10 +1,11 @@
 import logging
 
 import redis.asyncio as redis_async
-from rapyer.base import REDIS_MODELS
-from rapyer.scripts import register_scripts
 from redis import ResponseError
 from redis.asyncio.client import Redis
+
+from rapyer.base import REDIS_MODELS
+from rapyer.scripts import register_scripts
 
 
 def is_fakeredis(client) -> bool:

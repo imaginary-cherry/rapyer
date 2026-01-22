@@ -13,7 +13,14 @@ class RedisStr(str, RedisType):
     def __iadd__(self, other):
         new_value = self + other
         if self.pipeline:
-            run_sha(self.pipeline, STR_APPEND_SCRIPT_NAME, 1, self.key, self.json_path, other)
+            run_sha(
+                self.pipeline,
+                STR_APPEND_SCRIPT_NAME,
+                1,
+                self.key,
+                self.json_path,
+                other,
+            )
         return self.__class__(new_value)
 
 
