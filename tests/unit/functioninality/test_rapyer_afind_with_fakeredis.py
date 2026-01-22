@@ -1,8 +1,6 @@
 import pytest
 
 import rapyer
-from rapyer.errors.base import KeyNotFound, RapyerModelDoesntExistError
-from tests.models.index_types import IndexTestModel
 from tests.models.simple_types import StrModel, IntModel
 
 
