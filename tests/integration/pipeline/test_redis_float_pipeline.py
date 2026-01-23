@@ -115,7 +115,9 @@ async def test_redis_float_ifloordiv_with_pipeline_sanity(
         [100.3, 9.0, pytest.approx(1.3)],
     ],
 )
-async def test_redis_float_imod_with_pipeline_sanity(initial_value, operand, expected):
+async def test_redis_float_imod_with_pipeline_sanity(
+    initial_value: float, operand, expected
+):
     # Arrange
     model = PipelineAllTypesTestModel(amount=initial_value)
     await model.asave()
