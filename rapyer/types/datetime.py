@@ -105,7 +105,7 @@ class RedisDatetimeTimestamp(RedisDatetime):
 
     def __iadd__(self, other: timedelta) -> "RedisDatetimeTimestamp":
         if not isinstance(other, timedelta):
-            return NotImplemented("You must add timedelta to datetime")
+            return NotImplemented
         new_dt = self + other
         new_value = RedisDatetimeTimestamp(new_dt)
         if self.pipeline:
@@ -116,7 +116,7 @@ class RedisDatetimeTimestamp(RedisDatetime):
 
     def __isub__(self, other: timedelta) -> "RedisDatetimeTimestamp":
         if not isinstance(other, timedelta):
-            return NotImplemented("You must subtract timedelta to datetime")
+            return NotImplemented
         new_dt = self - other
         new_value = RedisDatetimeTimestamp(new_dt)
         if self.pipeline:
