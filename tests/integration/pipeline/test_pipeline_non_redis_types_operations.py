@@ -229,7 +229,7 @@ async def test_pipeline_list_any__setitem_various_indices__check_atomicity_sanit
 
 
 @pytest.mark.asyncio
-async def test_pipeline_list_any__ainsert_various_positions__check_atomicity_sanity():
+async def test_pipeline_list_any__insert_various_positions__check_atomicity_sanity():
     # Arrange
     model = MixedTypesModel(mixed_list=[{"middle": "item"}])
     await model.asave()
