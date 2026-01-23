@@ -1,10 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, SerializationInfo
 from redis.commands.search.field import NumericField
 
+from rapyer.scripts import run_sha, DATETIME_ADD_SCRIPT_NAME
 from rapyer.types.base import RedisType, REDIS_DUMP_FLAG_NAME
 
 
@@ -30,6 +31,38 @@ class RedisDatetime(datetime, RedisType):
 
     def clone(self):
         return datetime.fromtimestamp(self.timestamp())
+
+    def __iadd__(self, other: timedelta) -> "RedisDatetime":
+        if not isinstance(other, timedelta):
+            return NotImplemented
+        new_dt = self + other
+        new_value = RedisDatetime(new_dt)
+        if self.pipeline:
+            run_sha(
+                self.pipeline,
+                DATETIME_ADD_SCRIPT_NAME,
+                1,
+                self.key,
+                self.json_path,
+                other.total_seconds(),
+            )
+        return new_value
+
+    def __isub__(self, other: timedelta) -> "RedisDatetime":
+        if not isinstance(other, timedelta):
+            return NotImplemented
+        new_dt = self - other
+        new_value = RedisDatetime(new_dt)
+        if self.pipeline:
+            run_sha(
+                self.pipeline,
+                DATETIME_ADD_SCRIPT_NAME,
+                1,
+                self.key,
+                self.json_path,
+                -other.total_seconds(),
+            )
+        return new_value
 
 
 class RedisDatetimeTimestamp(RedisDatetime):
@@ -69,6 +102,28 @@ class RedisDatetimeTimestamp(RedisDatetime):
     @classmethod
     def redis_schema(cls, field_name: str):
         return NumericField(f"$.{field_name}", as_name=field_name)
+
+    def __iadd__(self, other: timedelta) -> "RedisDatetimeTimestamp":
+        if not isinstance(other, timedelta):
+            return NotImplemented("You must add timedelta to datetime")
+        new_dt = self + other
+        new_value = RedisDatetimeTimestamp(new_dt)
+        if self.pipeline:
+            self.pipeline.json().numincrby(
+                self.key, self.json_path, other.total_seconds()
+            )
+        return new_value
+
+    def __isub__(self, other: timedelta) -> "RedisDatetimeTimestamp":
+        if not isinstance(other, timedelta):
+            return NotImplemented("You must subtract timedelta to datetime")
+        new_dt = self - other
+        new_value = RedisDatetimeTimestamp(new_dt)
+        if self.pipeline:
+            self.pipeline.json().numincrby(
+                self.key, self.json_path, -other.total_seconds()
+            )
+        return new_value
 
 
 if TYPE_CHECKING:
