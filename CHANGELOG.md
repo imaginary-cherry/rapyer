@@ -18,6 +18,12 @@
   - All operations are atomic and only committed when the pipeline exits
   - Example: `async with model.apipeline() as m: m.mixed_list.append({"key": "value"})`
 
+- **Enhanced Pipeline Operations for Redis-Native Types**: Added in-place arithmetic operations (`+=`, `-=`) within pipeline context for Redis-native types.
+  - `RedisDatetime` and `RedisDatetimeTimestamp`: Support `+=` and `-=` with `timedelta` for atomic date arithmetic
+  - `RedisFloat`: Support `+=`, `-=`, `*=`, `/=` for atomic numeric operations
+  - `RedisInt`: Support `+=`, `-=` for atomic increment/decrement operations
+  - `RedisStr`: Support `+=` for atomic string append operations
+
 - **FakeRedis Support**: Added support for `fakeredis` library for unit testing without a real Redis instance.
   - Supports `rapyer.afind()`, `rapyer.ainsert()`, `rapyer.aget()` with FakeRedis
   - Supports pipeline operations with FakeRedis
