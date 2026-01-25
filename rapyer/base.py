@@ -760,7 +760,7 @@ async def aget(redis_key: str) -> AtomicRedisModel:
     return await klass.aget(redis_key)
 
 
-async def afind(*redis_keys: str) -> list[AtomicRedisModel]:
+async def afind(*redis_keys: str, skip_missing: bool = False) -> list[AtomicRedisModel]:
     if not redis_keys:
         return []
 
@@ -784,7 +784,9 @@ async def afind(*redis_keys: str) -> list[AtomicRedisModel]:
 
     for data, key in zip(models_data, redis_keys):
         if data is None:
-            raise KeyNotFound(f"{key} is missing in redis")
+            if not skip_missing:
+                raise KeyNotFound(f"{key} is missing in redis")
+            continue
         klass = key_to_class[key]
         if not klass.Meta.is_fake_redis:
             data = data[0]
