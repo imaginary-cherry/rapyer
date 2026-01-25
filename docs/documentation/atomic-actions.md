@@ -44,16 +44,17 @@ The pipeline context manager supports atomic operations for all Redis types:
 
 **Redis-Native Types** (RedisList, RedisDict, RedisStr, RedisInt, RedisFloat, RedisBytes):
 
-- **List operations**: `append()`, `extend()`, `insert()`, `pop()`, `remove()`, `remove_range()`, `clear()`, index assignment (`list[i] = value`)
-- **Dictionary operations**: `update()`, item assignment (`dict[key] = value`), `pop()`, `clear()`
-- **String operations**: Direct assignment
-- **Integer/Float operations**: Direct assignment, arithmetic operations (`+=`, `-=`, `*=`, `/=`)
+- **List operations**: `append()`, `extend()`, `insert()`, `remove_range()`, `clear()`, index assignment (`list[i] = value`), `+=` operator
+- **Dictionary operations**: `update()`, item assignment (`dict[key] = value`), `clear()`
+- **String operations**: Direct assignment, `+=` (concatenation), `*=` (repetition)
+- **Integer operations**: Direct assignment, arithmetic operations (`+=`, `-=`, `*=`, `//=`, `%=`, `**=`)
+- **Float operations**: Direct assignment, arithmetic operations (`+=`, `-=`, `*=`, `/=`, `//=`, `%=`, `**=`)
 - **Bytes operations**: Direct assignment
 
 **Non-Redis-Native Types** (List[Any], Dict[str, Any], and other serialized fields):
 
-- **List[Any] operations**: `append()`, `extend()`, `insert()`, index assignment (`list[i] = value`)
-- **Dict[str, Any] operations**: `update()`, item assignment (`dict[key] = value`), `pop()`
+- **List[Any] operations**: `append()`, `extend()`, `insert()`, `clear()`, index assignment (`list[i] = value`), `+=` operator
+- **Dict[str, Any] operations**: `update()`, item assignment (`dict[key] = value`), `clear()`
 - **Direct field assignment**: Assign any serializable value directly to fields (`model.field = value`)
 
 ```python
