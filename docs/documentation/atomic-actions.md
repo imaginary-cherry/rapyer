@@ -42,11 +42,48 @@ async def update_user_progress(user: User, points: int, achievement: str):
 
 The pipeline context manager supports atomic operations for all Redis types:
 
-- **List operations**: `append()`, `extend()`, `insert()`, `pop()`, `remove()`, `clear()`
-- **Dictionary operations**: `update()`, item assignment (`dict[key] = value`), `pop()`, `clear()`
-- **String operations**: Direct assignment and modification
-- **Integer operations**: Direct assignment, arithmetic operations
-- **Bytes operations**: Direct assignment and modification
+**Redis-Native Types** (RedisList, RedisDict, RedisStr, RedisInt, RedisFloat, RedisBytes):
+
+- **List operations**: `append()`, `extend()`, `insert()`, `remove_range()`, `clear()`, index assignment (`list[i] = value`), `+=` operator
+- **Dictionary operations**: `update()`, item assignment (`dict[key] = value`), `clear()`
+- **String operations**: Direct assignment, `+=` (concatenation), `*=` (repetition)
+- **Integer operations**: Direct assignment, arithmetic operations (`+=`, `-=`, `*=`, `//=`, `%=`, `**=`)
+- **Float operations**: Direct assignment, arithmetic operations (`+=`, `-=`, `*=`, `/=`, `//=`, `%=`, `**=`)
+- **Bytes operations**: Direct assignment
+
+**Non-Redis-Native Types** (List[Any], Dict[str, Any], and other serialized fields):
+
+- **List[Any] operations**: `append()`, `extend()`, `insert()`, `clear()`, index assignment (`list[i] = value`), `+=` operator
+- **Dict[str, Any] operations**: `update()`, item assignment (`dict[key] = value`), `clear()`
+- **Direct field assignment**: Assign any serializable value directly to fields (`model.field = value`)
+
+```python
+from rapyer import AtomicRedisModel
+from typing import List, Dict, Any
+
+
+class MixedModel(AtomicRedisModel):
+    # Non-Redis-native types (serialized as JSON)
+    mixed_list: List[Any] = []
+    mixed_dict: Dict[str, Any] = {}
+    nested_data: Dict[str, List[int]] = {}
+
+
+async def update_mixed_types(model: MixedModel):
+    async with model.apipeline() as m:
+        # List[Any] operations
+        m.mixed_list.append({"key": "value"})
+        m.mixed_list.extend([[1, 2], [3, 4]])
+        m.mixed_list.insert(0, "first_item")
+        m.mixed_list[1] = {"replaced": True}
+
+        # Dict[str, Any] operations
+        m.mixed_dict["nested"] = {"deep": {"value": 123}}
+        m.mixed_dict.update({"bulk1": [1, 2, 3], "bulk2": None})
+
+        # Direct field assignment
+        m.nested_data = {"scores": [100, 200, 300]}
+```
 
 !!! warning "Inplace Operators and Concurrency"
     When using inplace operators like `+=`, `-=`, `*=`, etc. inside a pipeline, the data sent to Redis is computed as the current value in the Python process plus the new value. This means that if another process modifies the same field between when you entered the pipeline and when it executes, your operation will override those changes. For truly atomic increments/decrements that respect concurrent modifications, consider using the lock context manager instead.
@@ -116,18 +153,69 @@ async def update_user_settings(profile: UserProfile, new_email: str, theme: str)
         # Update email
         old_email = profile.email
         profile.email = new_email
-        
+
         # Update preferences
         profile.preferences["theme"] = theme
         profile.preferences["email_notifications"] = "enabled"
-        
+
         # Log the activity
         profile.activity_log.append(f"Email changed from {old_email} to {new_email}")
         profile.activity_log.append(f"Theme changed to {theme}")
-        
+
         # Update last login
         from datetime import datetime
         profile.last_login = datetime.now().isoformat()
+```
+
+#### Working with Complex Nested Data (Non-Redis-Native Types)
+
+```python
+from datetime import datetime
+from typing import List, Dict, Any
+
+
+class AnalyticsModel(AtomicRedisModel):
+    user_id: str
+    events: List[Dict[str, Any]] = []
+    aggregations: Dict[str, Any] = {}
+    raw_data: List[Any] = []
+
+
+async def track_user_event(analytics: AnalyticsModel, event_type: str, metadata: dict):
+    async with analytics.apipeline() as a:
+        # Append complex event object
+        a.events.append({
+            "type": event_type,
+            "timestamp": datetime.now().isoformat(),
+            "metadata": metadata
+        })
+
+        # Update nested aggregations
+        a.aggregations[event_type] = a.aggregations.get(event_type, {"count": 0})
+        a.aggregations[event_type]["last_seen"] = datetime.now().isoformat()
+
+        # Store raw data of any type
+        a.raw_data.extend([metadata, {"processed": True}])
+
+
+class ConfigModel(AtomicRedisModel):
+    name: str
+    settings: Dict[str, Any] = {}
+    feature_flags: List[Dict[str, bool]] = []
+
+
+async def update_config_atomically(config: ConfigModel, new_settings: dict):
+    async with config.apipeline() as c:
+        # Replace entire nested structure
+        c.settings = {
+            "database": {"host": "localhost", "port": 5432},
+            "cache": {"enabled": True, "ttl": 3600},
+            **new_settings
+        }
+
+        # Modify list of complex objects
+        c.feature_flags.append({"dark_mode": True, "beta_features": False})
+        c.feature_flags[0] = {"dark_mode": False, "beta_features": True}
 ```
 
 ### Error Handling
@@ -394,7 +482,7 @@ async def safe_account_operation(account_key: str, amount: int):
 | Feature | Pipeline | Lock |
 |---------|----------|------|
 | **Best for** | Batch operations, list/dict changes | Complex logic, conditional operations |
-| **Python operations** | Limited to supported types | Any Python code |
+| **Supported types** | All Redis types + List[Any], Dict[str, Any] | Any Python code |
 | **Concurrency** | High performance batching | Exclusive access with action-based concurrency |
 | **State refresh** | Automatic on entry | Automatic on entry |
 | **Use when** | Multiple related changes | Need current values for decisions |

@@ -1,6 +1,7 @@
 from typing import get_origin
 
 from pydantic import BaseModel, PrivateAttr, TypeAdapter
+
 from rapyer.types.base import RedisType
 from rapyer.utils.annotation import TypeConverter, DYNAMIC_CLASS_DOC
 from rapyer.utils.pythonic import safe_issubclass

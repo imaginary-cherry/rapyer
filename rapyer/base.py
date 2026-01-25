@@ -18,6 +18,11 @@ from pydantic import (
     ValidationError,
 )
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
+from redis.commands.search.index_definition import IndexDefinition, IndexType
+from redis.commands.search.query import Query
+from redis.exceptions import NoScriptError, ResponseError
+from typing_extensions import deprecated
+
 from rapyer.config import RedisConfig
 from rapyer.context import _context_var, _context_xx_pipe
 from rapyer.errors.base import (
@@ -52,10 +57,6 @@ from rapyer.utils.redis import (
     acquire_lock,
     update_keys_in_pipeline,
 )
-from redis.commands.search.index_definition import IndexDefinition, IndexType
-from redis.commands.search.query import Query
-from redis.exceptions import NoScriptError, ResponseError
-from typing_extensions import deprecated
 
 logger = logging.getLogger("rapyer")
 
@@ -457,7 +458,8 @@ class AtomicRedisModel(BaseModel):
     def create_redis_model(cls, model_dump: dict, key: str) -> Optional[Self]:
         context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
         try:
-            model = cls.model_validate(model_dump[0], context=context)
+            model = cls.model_validate(model_dump, context=context)
+            model.key = key
         except ValidationError as exc:
             logger.debug(
                 "Skipping key %s due to validation error during afind: %s",
@@ -513,6 +515,8 @@ class AtomicRedisModel(BaseModel):
                 if raise_on_missing:
                     raise KeyNotFound(f"{key} is missing in redis")
                 continue
+            if not cls.Meta.is_fake_redis:
+                model = model[0]
             model = cls.create_redis_model(model, key)
             if model is None:
                 continue
@@ -703,6 +707,16 @@ class AtomicRedisModel(BaseModel):
             if isinstance(attr, RedisType):
                 attr._base_model_link = self
 
+        pipeline = _context_var.get()
+        if pipeline is not None:
+            serialized = self.model_dump(
+                mode="json",
+                context={REDIS_DUMP_FLAG_NAME: True},
+                include={name},
+            )
+            json_path = f"{self.json_path}.{name}"
+            pipeline.json().set(self.key, json_path, serialized[name])
+
     def __eq__(self, other):
         if not isinstance(other, BaseModel):
             return False
@@ -761,9 +775,6 @@ async def afind(*redis_keys: str) -> list[AtomicRedisModel]:
             )
         key_to_class[key] = redis_model_mapping[class_name]
 
-    if not redis_keys:
-        return []
-
     models_data = await AtomicRedisModel.Meta.redis.json().mget(
         keys=redis_keys, path="$"
     )
@@ -775,6 +786,8 @@ async def afind(*redis_keys: str) -> list[AtomicRedisModel]:
         if data is None:
             raise KeyNotFound(f"{key} is missing in redis")
         klass = key_to_class[key]
+        if not klass.Meta.is_fake_redis:
+            data = data[0]
         model = klass.create_redis_model(data, key)
         if model is None:
             continue

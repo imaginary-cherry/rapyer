@@ -3,6 +3,13 @@ from typing import TypeAlias, TYPE_CHECKING
 from redis.commands.search.field import NumericField
 from typing_extensions import deprecated
 
+from rapyer.scripts import (
+    run_sha,
+    NUM_MUL_SCRIPT_NAME,
+    NUM_FLOORDIV_SCRIPT_NAME,
+    NUM_MOD_SCRIPT_NAME,
+    NUM_POW_SCRIPT_NAME,
+)
 from rapyer.types.base import RedisType
 
 
@@ -28,39 +35,52 @@ class RedisInt(int, RedisType):
         return int(self)
 
     def __iadd__(self, other):
-        new_value = self + other
         if self.pipeline:
-            self.pipeline.json().set(self.key, self.json_path, new_value)
+            self.pipeline.json().numincrby(self.key, self.json_path, other)
+        new_value = self + other
         return self.__class__(new_value)
 
     def __isub__(self, other):
-        new_value = self - other
         if self.pipeline:
-            self.pipeline.json().set(self.key, self.json_path, new_value)
+            self.pipeline.json().numincrby(self.key, self.json_path, -other)
+        new_value = self - other
         return self.__class__(new_value)
 
     def __imul__(self, other):
         new_value = self * other
         if self.pipeline:
-            self.pipeline.json().set(self.key, self.json_path, new_value)
+            run_sha(
+                self.pipeline, NUM_MUL_SCRIPT_NAME, 1, self.key, self.json_path, other
+            )
         return self.__class__(new_value)
 
     def __ifloordiv__(self, other):
         new_value = self // other
         if self.pipeline:
-            self.pipeline.json().set(self.key, self.json_path, new_value)
+            run_sha(
+                self.pipeline,
+                NUM_FLOORDIV_SCRIPT_NAME,
+                1,
+                self.key,
+                self.json_path,
+                other,
+            )
         return self.__class__(new_value)
 
     def __imod__(self, other):
         new_value = self % other
         if self.pipeline:
-            self.pipeline.json().set(self.key, self.json_path, new_value)
+            run_sha(
+                self.pipeline, NUM_MOD_SCRIPT_NAME, 1, self.key, self.json_path, other
+            )
         return self.__class__(new_value)
 
     def __ipow__(self, other):
         new_value = self**other
         if self.pipeline:
-            self.pipeline.json().set(self.key, self.json_path, new_value)
+            run_sha(
+                self.pipeline, NUM_POW_SCRIPT_NAME, 1, self.key, self.json_path, other
+            )
         return self.__class__(new_value)
 
 

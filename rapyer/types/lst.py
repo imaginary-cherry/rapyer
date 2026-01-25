@@ -41,7 +41,10 @@ class RedisList(list, GenericRedisType[T]):
 
     def __setitem__(self, key, value):
         if self.pipeline:
-            self.pipeline.json().set(self.key, self.json_field_path(key), value)
+            serialized = self._adapter.dump_python(
+                [value], mode="json", context={REDIS_DUMP_FLAG_NAME: True}
+            )
+            self.pipeline.json().set(self.key, self.json_field_path(key), serialized[0])
         new_val = self.create_new_value(key, value)
         return super().__setitem__(key, new_val)
 
@@ -51,21 +54,34 @@ class RedisList(list, GenericRedisType[T]):
 
     def append(self, __object):
         if self.pipeline:
-            self.pipeline.json().arrappend(self.key, self.json_path, __object)
+            serialized_object = self._adapter.dump_python(
+                [__object], mode="json", context={REDIS_DUMP_FLAG_NAME: True}
+            )
+            self.pipeline.json().arrappend(
+                self.key, self.json_path, serialized_object[0]
+            )
         key = len(self)
         new_val = self.create_new_value(key, __object)
         return super().append(new_val)
 
     def extend(self, new_lst):
         if self.pipeline and new_lst:
-            self.pipeline.json().arrappend(self.key, self.json_path, *new_lst)
+            serialized = self._adapter.dump_python(
+                list(new_lst), mode="json", context={REDIS_DUMP_FLAG_NAME: True}
+            )
+            self.pipeline.json().arrappend(self.key, self.json_path, *serialized)
         new_keys = range(len(self), len(self) + len(new_lst))
         new_vals = self.create_new_values(list(new_keys), new_lst)
         return super().extend(new_vals)
 
     def insert(self, index, __object):
         if self.pipeline:
-            self.pipeline.json().arrinsert(self.key, self.json_path, index, __object)
+            serialized = self._adapter.dump_python(
+                [__object], mode="json", context={REDIS_DUMP_FLAG_NAME: True}
+            )
+            self.pipeline.json().arrinsert(
+                self.key, self.json_path, index, serialized[0]
+            )
         new_val = self.create_new_value(index, __object)
         return super().insert(index, new_val)
 

@@ -1,12 +1,13 @@
 import pytest
 
+from tests.models.complex_types import InnerMostModel, MiddleModel, OuterModel
 from tests.models.functionality_types import AllTypesModel
 from tests.models.simple_types import FloatModel
 
 
 class TestPipelineStringField:
     @pytest.mark.asyncio
-    async def test_assignment_changes_not_persisted_without_save_edge_case(self):
+    async def test_assignment_changes_persisted_after_pipeline_sanity(self):
         # Arrange
         model = AllTypesModel(str_field="initial")
         await model.asave()
@@ -19,10 +20,9 @@ class TestPipelineStringField:
             loaded_during_pipeline = await AllTypesModel.aget(model.key)
             assert loaded_during_pipeline.str_field == "initial"
 
-        # Assert - direct assignment without save() is not committed after pipeline
+        # Assert - direct assignment is committed after pipeline
         final_model = await AllTypesModel.aget(model.key)
-        # Assignment without save() doesn't persist
-        assert final_model.str_field == "initial"
+        assert final_model.str_field == "new_value"
 
     @pytest.mark.asyncio
     async def test_concatenation_changes_preserved_during_pipeline_committed_after_sanity(
@@ -68,7 +68,7 @@ class TestPipelineStringField:
 
 class TestPipelineIntegerField:
     @pytest.mark.asyncio
-    async def test_assignment_changes_not_persisted_without_save_edge_case(self):
+    async def test_assignment_changes_persisted_after_pipeline_sanity(self):
         # Arrange
         model = AllTypesModel(int_field=10)
         await model.asave()
@@ -81,9 +81,9 @@ class TestPipelineIntegerField:
             loaded_during_pipeline = await AllTypesModel.aget(model.key)
             assert loaded_during_pipeline.int_field == 10
 
-        # Assert - direct assignment without save() is not committed after pipeline
+        # Assert - direct assignment is committed after pipeline
         final_model = await AllTypesModel.aget(model.key)
-        assert final_model.int_field == 10  # Assignment without save() doesn't persist
+        assert final_model.int_field == 50
 
     @pytest.mark.asyncio
     async def test_addition_changes_preserved_during_pipeline_committed_after_sanity(
@@ -349,7 +349,7 @@ class TestPipelineDictField:
 
 class TestPipelineBoolField:
     @pytest.mark.asyncio
-    async def test_assignment_changes_not_persisted_without_save_edge_case(self):
+    async def test_assignment_changes_persisted_after_pipeline_sanity(self):
         # Arrange
         model = AllTypesModel(bool_field=False)
         await model.asave()
@@ -362,11 +362,9 @@ class TestPipelineBoolField:
             loaded_during_pipeline = await AllTypesModel.aget(model.key)
             assert loaded_during_pipeline.bool_field is False
 
-        # Assert - boolean assignment without save() is not committed after pipeline
+        # Assert - boolean assignment is committed after pipeline
         final_model = await AllTypesModel.aget(model.key)
-        assert (
-            final_model.bool_field is False
-        )  # Assignment without save() doesn't persist
+        assert final_model.bool_field is True
 
 
 class TestPipelineFloatField:
@@ -536,3 +534,28 @@ class TestPipelineCrossType:
         assert "extend2" in final_model.list_field
         assert final_model.dict_field["dict_key"] == "dict_value"
         assert final_model.dict_field["update_key"] == "update_value"
+
+
+class TestPipelineNestedModelField:
+    @pytest.mark.asyncio
+    async def test_assignment_changes_persisted_after_pipeline_sanity(self):
+        # Arrange
+        model = OuterModel()
+        await model.asave()
+
+        new_middle = MiddleModel(
+            inner_model=InnerMostModel(lst=["new_item"], counter=99),
+            tags=["new_tag"],
+            metadata={"new_key": "new_value"},
+        )
+
+        # Act
+        async with model.apipeline() as redis_model:
+            redis_model.middle_model = new_middle
+
+        # Assert
+        final = await OuterModel.aget(model.key)
+        assert final.middle_model.inner_model.lst == ["new_item"]
+        assert final.middle_model.inner_model.counter == 99
+        assert final.middle_model.tags == ["new_tag"]
+        assert final.middle_model.metadata == {"new_key": "new_value"}

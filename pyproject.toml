@@ -69,6 +69,7 @@ Repository = "https://github.com/imaginary-cherry/rapyer"
 
 [tool.poetry]
 packages = [{include = "rapyer"}]
+include = ["rapyer/scripts/lua/**/*.lua"]
 
 
 [tool.poetry.group.dev.dependencies]
