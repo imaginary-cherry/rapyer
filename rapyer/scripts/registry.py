@@ -30,7 +30,10 @@ _REGISTERED_SCRIPT_SHAS: dict[str, str] = {}
 
 
 def _build_scripts(variant: str) -> dict[str, str]:
-    return {name: load_script(category, script, variant) for category, script, name in SCRIPT_REGISTRY}
+    return {
+        name: load_script(category, script, variant)
+        for category, script, name in SCRIPT_REGISTRY
+    }
 
 
 def get_scripts() -> dict[str, str]:
