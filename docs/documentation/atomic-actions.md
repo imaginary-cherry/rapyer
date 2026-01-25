@@ -191,7 +191,6 @@ async def track_user_event(analytics: AnalyticsModel, event_type: str, metadata:
 
         # Update nested aggregations
         a.aggregations[event_type] = a.aggregations.get(event_type, {"count": 0})
-        a.aggregations[event_type]["count"] += 1
         a.aggregations[event_type]["last_seen"] = datetime.now().isoformat()
 
         # Store raw data of any type
