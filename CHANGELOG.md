@@ -23,8 +23,8 @@
 ### 🛠️ Technical Improvements
 
 - **BREAKING - Lua Scripts for Dict Operations**: Extracted `pop()` and `popitem()` dict operations into registered Lua scripts for better maintainability and NOSCRIPT error recovery, these functions will no longer work without init_rapyer setup.
-  - Added `dict_pop` and `dict_popitem` scripts to the script registry
-  - Added `arun_sha()` function for executing registered scripts outside pipeline context
+  - Added `dict_pop` and `dict_popitem` scripts to the script registry.
+  - Added `arun_sha()` function for executing registered scripts outside pipeline context.
 
 - **Pipeline Transactions for `aupdate()`**: The `aupdate()` method now uses Redis MULTI/EXEC transactions for atomic execution.
 
