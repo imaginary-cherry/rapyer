@@ -382,7 +382,7 @@ class AtomicRedisModel(BaseModel):
             for field_name in kwargs.keys()
         }
 
-        async with self.Meta.redis.pipeline() as pipe:
+        async with self.Meta.redis.pipeline(transaction=True) as pipe:
             update_keys_in_pipeline(pipe, self.key, **json_path_kwargs)
             await pipe.execute()
         await self.refresh_ttl_if_needed()
