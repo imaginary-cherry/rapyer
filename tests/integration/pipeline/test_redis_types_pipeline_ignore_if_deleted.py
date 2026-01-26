@@ -14,14 +14,14 @@ from tests.models.functionality_types import AllTypesModel, MyTestEnum
     ],
 )
 @pytest.mark.asyncio
-async def test_redis_types_pipeline_ignore_if_deleted_true__model_not_saved_pipeline_actions_model_not_created_sanity(
+async def test_redis_types_pipeline_ignore_redis_error_true__model_not_saved_pipeline_actions_model_not_created_sanity(
     real_redis_client, field_name, test_value
 ):
     # Arrange
     model = AllTypesModel()
 
     # Act
-    async with model.apipeline(ignore_if_deleted=True) as redis_model:
+    async with model.apipeline(ignore_redis_error=True) as redis_model:
         field = getattr(redis_model, field_name)
         setattr(redis_model, field_name, test_value)
         await field.asave()
@@ -48,7 +48,7 @@ async def test_redis_types_pipeline_ignore_if_deleted_true__model_not_saved_pipe
     ],
 )
 @pytest.mark.asyncio
-async def test_redis_types_pipeline_ignore_if_deleted_false__model_not_saved_error_raised_edge_case(
+async def test_redis_types_pipeline_ignore_redis_error_false__model_not_saved_error_raised_edge_case(
     field_name, test_value
 ):
     # Arrange
@@ -56,21 +56,21 @@ async def test_redis_types_pipeline_ignore_if_deleted_false__model_not_saved_err
 
     # Act & Assert
     with pytest.raises(Exception):
-        async with model.apipeline(ignore_if_deleted=False) as redis_model:
+        async with model.apipeline(ignore_redis_error=False) as redis_model:
             field = getattr(redis_model, field_name)
             setattr(redis_model, field_name, test_value)
             await field.asave()
 
 
 @pytest.mark.asyncio
-async def test_redis_list_pipeline_ignore_if_deleted_true__model_not_saved_pipeline_actions_model_not_created_sanity(
+async def test_redis_list_pipeline_ignore_redis_error_true__model_not_saved_pipeline_actions_model_not_created_sanity(
     real_redis_client,
 ):
     # Arrange
     model = AllTypesModel()
 
     # Act
-    async with model.apipeline(ignore_if_deleted=True) as redis_model:
+    async with model.apipeline(ignore_redis_error=True) as redis_model:
         await redis_model.list_field.aappend("item1")
         await redis_model.list_field.aextend(["item2", "item3"])
 
@@ -84,25 +84,25 @@ async def test_redis_list_pipeline_ignore_if_deleted_true__model_not_saved_pipel
 
 
 @pytest.mark.asyncio
-async def test_redis_list_pipeline_ignore_if_deleted_false__model_not_saved_error_raised_edge_case():
+async def test_redis_list_pipeline_ignore_redis_error_false__model_not_saved_error_raised_edge_case():
     # Arrange
     model = AllTypesModel()
 
     # Act & Assert
     with pytest.raises(Exception):
-        async with model.apipeline(ignore_if_deleted=False) as redis_model:
+        async with model.apipeline(ignore_redis_error=False) as redis_model:
             redis_model.list_field.append("item1")
 
 
 @pytest.mark.asyncio
-async def test_redis_dict_pipeline_ignore_if_deleted_true__model_not_saved_pipeline_actions_model_not_created_sanity(
+async def test_redis_dict_pipeline_ignore_redis_error_true__model_not_saved_pipeline_actions_model_not_created_sanity(
     real_redis_client,
 ):
     # Arrange
     model = AllTypesModel()
 
     # Act
-    async with model.apipeline(ignore_if_deleted=True) as redis_model:
+    async with model.apipeline(ignore_redis_error=True) as redis_model:
         redis_model.dict_field["key1"] = "value1"
         redis_model.dict_field.update(key2="value2", key3="value3")
 

@@ -551,7 +551,7 @@ class AtomicRedisModel(BaseModel):
 
     @contextlib.asynccontextmanager
     async def apipeline(
-        self, ignore_if_deleted: bool = False
+        self, ignore_redis_error: bool = False
     ) -> AbstractAsyncContextManager[Self]:
         async with self.Meta.redis.pipeline(transaction=True) as pipe:
             try:
@@ -561,12 +561,12 @@ class AtomicRedisModel(BaseModel):
                 }
                 self.__dict__.update(unset_fields)
             except (TypeError, KeyNotFound):
-                if ignore_if_deleted:
+                if ignore_redis_error:
                     redis_model = self
                 else:
                     raise
             _context_var.set(pipe)
-            _context_xx_pipe.set(ignore_if_deleted)
+            _context_xx_pipe.set(ignore_redis_error)
             yield redis_model
             commands_backup = list(pipe.command_stack)
             noscript_on_first_attempt = False
@@ -579,10 +579,10 @@ class AtomicRedisModel(BaseModel):
             except NoScriptError:
                 noscript_on_first_attempt = True
             except ResponseError as exc:
-                if ignore_if_deleted:
+                if ignore_redis_error:
                     logger.warning(
                         "Swallowed ResponseError during pipeline.execute() with "
-                        "ignore_if_deleted=True for key %r: %s",
+                        "ignore_redis_error=True for key %r: %s",
                         getattr(self, "key", None),
                         exc,
                     )
