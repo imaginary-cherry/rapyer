@@ -15,6 +15,7 @@
   - `lock()` → use `alock()`
   - `lock_from_key()` → use `alock_from_key()`
   - `pipeline()` → use `apipeline()`
+  - `increase()` → use `aincrease()`
 
 - **BREAKING - Removed Backward Compatibility for Pickled JSON Fields**: Removed backward compatibility for loading old pickled data in JSON-serializable fields. Data must now be in JSON format.
 
