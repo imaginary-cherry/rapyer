@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.2.0]
+
+### 🔄 Changed
+
+- **BREAKING - Removed Deprecated Methods**: Removed all deprecated methods that were marked for removal in 1.2.0:
+  - `save()` → use `asave()`
+  - `load()` → use `aload()`
+  - `delete()` → use `adelete()`
+  - `get()` → use `aget()`
+  - `duplicate()` → use `aduplicate()`
+  - `duplicate_many()` → use `aduplicate_many()`
+  - `delete_by_key()` → use `adelete_by_key()`
+  - `lock()` → use `alock()`
+  - `lock_from_key()` → use `alock_from_key()`
+  - `pipeline()` → use `apipeline()`
+
+- **BREAKING - Removed Backward Compatibility for Pickled JSON Fields**: Removed backward compatibility for loading old pickled data in JSON-serializable fields. Data must now be in JSON format.
+
+- **Renamed `ignore_if_deleted` to `ignore_redis_error`**: The `apipeline()` parameter `ignore_if_deleted` has been renamed to `ignore_redis_error` for better accuracy.
+
+### 🛠️ Technical Improvements
+
+- **BREAKING - Lua Scripts for Dict Operations**: Extracted `pop()` and `popitem()` dict operations into registered Lua scripts for better maintainability and NOSCRIPT error recovery, these functions will no longer work without init_rapyer setup.
+  - Added `dict_pop` and `dict_popitem` scripts to the script registry
+  - Added `arun_sha()` function for executing registered scripts outside pipeline context
+
+- **Pipeline Transactions for `aupdate()`**: The `aupdate()` method now uses Redis MULTI/EXEC transactions for atomic execution.
+
+
 ## [1.1.7]
 
 ### ✨ Added
