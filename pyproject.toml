@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "rapyer"
-version = "1.1.6"
+version = "1.1.7"
 description = "Pydantic models with Redis as the backend"
 authors = [{name = "YedidyaHKfir", email = "yedidyakfir@gmail.com"}]
 readme = "README.md"
@@ -69,6 +69,7 @@ Repository = "https://github.com/imaginary-cherry/rapyer"
 
 [tool.poetry]
 packages = [{include = "rapyer"}]
+include = ["rapyer/scripts/lua/**/*.lua"]
 
 
 [tool.poetry.group.dev.dependencies]

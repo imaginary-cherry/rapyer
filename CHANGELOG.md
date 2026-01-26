@@ -1,5 +1,42 @@
 # Changelog
 
+## [1.1.7]
+
+### ✨ Added
+
+- **Global `rapyer.afind()` Function**: Added `rapyer.afind()` function to retrieve multiple models of different types by their keys in a single bulk operation.
+  - Supports fetching models of heterogeneous types in one call
+  - Automatically refreshes TTL for models with `refresh_ttl` enabled
+  - Raises `KeyNotFound` if any key is missing in Redis
+  - Raises `RapyerModelDoesntExistError` if a key refers to an unregistered model class
+  - Example: `models = await rapyer.afind("UserModel:123", "OrderModel:456")`
+
+- **Pipeline Operations for Non-Redis-Native Types**: Added full pipeline support for `List[Any]` and `Dict[str, Any]` fields that store serialized data.
+  - Supports `append()`, `extend()`, `insert()`, index assignment for lists
+  - Supports `update()`, key assignment, `pop()` for dicts
+  - Direct field assignment within pipeline context (e.g., `redis_model.field = value`)
+  - All operations are atomic and only committed when the pipeline exits
+  - Example: `async with model.apipeline() as m: m.mixed_list.append({"key": "value"})`
+
+- **Enhanced Pipeline Operations for Redis-Native Types**: Added in-place arithmetic operations (`+=`, `-=`) within pipeline context for Redis-native types.
+  - `RedisDatetime` and `RedisDatetimeTimestamp`: Support `+=` and `-=` with `timedelta` for atomic date arithmetic
+  - `RedisFloat`: Support `+=`, `-=`, `*=`, `/=` for atomic numeric operations
+  - `RedisInt`: Support `+=`, `-=` for atomic increment/decrement operations
+  - `RedisStr`: Support `+=` for atomic string append operations
+
+- **FakeRedis Support**: Added support for `fakeredis` library for unit testing without a real Redis instance.
+  - Supports `rapyer.afind()`, `rapyer.ainsert()`, `rapyer.aget()` with FakeRedis
+  - Supports pipeline operations with FakeRedis
+  - Enables faster test execution without Redis dependency
+
+### 🐛 Fixed
+
+- **TTL Support in `ainsert`**: The `ainsert()` method now automatically sets TTL on inserted models based on their model configuration.
+
+### 🔄 Changed
+
+- **`Model.afind()` Strict Key Validation**: When specific keys are passed to `Model.afind()`, it now raises `KeyNotFound` if any key is missing in Redis. Previously, missing keys were silently ignored.
+
 ## [1.1.6]
 
 ### ✨ Added

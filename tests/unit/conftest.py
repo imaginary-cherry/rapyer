@@ -10,6 +10,6 @@ pytest.register_assert_rewrite("tests.assertions")
 @pytest_asyncio.fixture
 async def fake_redis_client():
     client = fake_aioredis.FakeRedis(decode_responses=True)
-    await register_scripts(client)
+    await register_scripts(client, is_fakeredis=True)
     yield client
     await client.aclose()

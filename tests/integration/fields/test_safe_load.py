@@ -1,6 +1,6 @@
 import pytest
 
-from rapyer.errors.base import CantSerializeRedisValueError
+from rapyer.errors import CantSerializeRedisValueError
 from tests.models.complex_types import (
     OuterModelWithRedisNested,
     ContainerModel,

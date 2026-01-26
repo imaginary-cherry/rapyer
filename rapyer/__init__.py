@@ -3,6 +3,7 @@
 from rapyer.base import (
     AtomicRedisModel,
     aget,
+    afind,
     find_redis_models,
     ainsert,
     get,
@@ -15,6 +16,7 @@ __all__ = [
     "init_rapyer",
     "teardown_rapyer",
     "aget",
+    "afind",
     "get",
     "find_redis_models",
     "ainsert",

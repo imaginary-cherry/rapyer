@@ -5,6 +5,9 @@ from rapyer.errors.base import (
     RapyerError,
     ScriptsNotInitializedError,
     UnsupportedIndexedFieldError,
+    RapyerModelDoesntExistError,
+    CantSerializeRedisValueError,
+    KeyNotFound,
 )
 
 __all__ = [
@@ -12,6 +15,9 @@ __all__ = [
     "FindError",
     "PersistentNoScriptError",
     "RapyerError",
+    "KeyNotFound",
     "ScriptsNotInitializedError",
     "UnsupportedIndexedFieldError",
+    "RapyerModelDoesntExistError",
+    "CantSerializeRedisValueError",
 ]

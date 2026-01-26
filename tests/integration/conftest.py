@@ -1,9 +1,22 @@
 import os
+from dataclasses import dataclass
+from typing import Generic, TypeVar
 
 import pytest_asyncio
 
 import rapyer
 from rapyer.scripts import register_scripts
+
+REDUCED_TTL_SECONDS = 10
+
+T = TypeVar("T")
+
+
+@dataclass
+class SavedModelWithReducedTTL(Generic[T]):
+    model: T
+    initial_ttl: int
+
 
 # Collection types
 from tests.models.collection_types import (
@@ -215,3 +228,39 @@ async def real_redis_client(redis_client):
     yield redis_client
 
     await redis_client.aclose()
+
+
+@pytest_asyncio.fixture
+async def saved_model_with_reduced_ttl(real_redis_client):
+    model = TTLRefreshTestModel(
+        name="ttl_test",
+        age=25,
+        score=10.5,
+        tags=["tag1", "tag2"],
+        settings={"key1": "value1", "key2": "value2"},
+    )
+    await model.asave()
+    await real_redis_client.expire(model.key, REDUCED_TTL_SECONDS)
+    initial_ttl = await real_redis_client.ttl(model.key)
+
+    yield SavedModelWithReducedTTL(model=model, initial_ttl=initial_ttl)
+
+    await model.adelete()
+
+
+@pytest_asyncio.fixture
+async def saved_no_refresh_model_with_reduced_ttl(real_redis_client):
+    model = TTLRefreshDisabledModel(
+        name="ttl_no_refresh_test",
+        age=25,
+        score=10.5,
+        tags=["tag1", "tag2"],
+        settings={"key1": "value1", "key2": "value2"},
+    )
+    await model.asave()
+    await real_redis_client.expire(model.key, REDUCED_TTL_SECONDS)
+    initial_ttl = await real_redis_client.ttl(model.key)
+
+    yield SavedModelWithReducedTTL(model=model, initial_ttl=initial_ttl)
+
+    await model.adelete()
