@@ -20,6 +20,10 @@
 
 - **Renamed `ignore_if_deleted` to `ignore_redis_error`**: The `apipeline()` parameter `ignore_if_deleted` has been renamed to `ignore_redis_error` for better accuracy.
 
+### 🐛 Fixed
+
+- **Dict Operations Edge Case**: Fixed an edge case where dict operations would fail when the model reference was None.
+
 ### 🛠️ Technical Improvements
 
 - **BREAKING - Lua Scripts for Dict Operations**: Extracted `pop()` and `popitem()` dict operations into registered Lua scripts for better maintainability and NOSCRIPT error recovery, these functions will no longer work without init_rapyer setup.
@@ -27,6 +31,8 @@
   - Added `arun_sha()` function for executing registered scripts outside pipeline context.
 
 - **Pipeline Transactions for `aupdate()`**: The `aupdate()` method now uses Redis MULTI/EXEC transactions for atomic execution.
+
+- **Pipeline Support for `aset_ttl()`**: The `aset_ttl()` method now works correctly within pipeline context.
 
 
 ## [1.1.7]
