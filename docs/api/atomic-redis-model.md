@@ -73,10 +73,17 @@ success = await user.adelete()
 **Type:** `async` method
 **Parameters:**
 - `ttl` (int): Time-to-live in seconds
-**Description:** Sets the TTL for this model instance in Redis. Can only be called on top-level models.
+**Description:** Sets the TTL for this model instance in Redis. Can only be called on top-level models. Supports pipeline context for atomic TTL updates.
 
 ```python
+# Direct usage
 await user.aset_ttl(3600)  # Expire in 1 hour
+
+# Within pipeline context
+async with user.apipeline():
+    user.score += 100
+    await user.aset_ttl(7200)
+    await user2.aset_ttl(7200)  # TTL set atomically with other changes as part of the transaction
 ```
 
 #### `aduplicate()`
