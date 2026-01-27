@@ -366,7 +366,11 @@ class AtomicRedisModel(BaseModel):
     async def aset_ttl(self, ttl: int) -> None:
         if self.is_inner_model():
             raise RuntimeError("Can only set TTL from top level model")
-        await self.Meta.redis.expire(self.key, ttl)
+        pipeline = _context_var.get()
+        if pipeline is not None:
+            pipeline.expire(self.key, ttl)
+        else:
+            await self.Meta.redis.expire(self.key, ttl)
 
     @classmethod
     async def aget(cls, key: str) -> Self:
