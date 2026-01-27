@@ -2,12 +2,13 @@ import pytest
 
 from tests.models.simple_types import UserModelWithoutTTL
 
-
 TTL_SECONDS = 300
 
 
 @pytest.mark.asyncio
-async def test_pipeline_aset_ttl__multiple_models__check_ttl_set_atomically(real_redis_client):
+async def test_pipeline_aset_ttl__multiple_models__check_ttl_set_atomically(
+    real_redis_client,
+):
     # Arrange
     models = [
         UserModelWithoutTTL(name="user1", age=25),
