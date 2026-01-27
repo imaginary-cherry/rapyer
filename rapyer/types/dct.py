@@ -35,10 +35,13 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
 
     def update(self, m=None, /, **kwargs):
         if self.pipeline:
-            m_redis_val = self._adapter.dump_python(
-                m, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
+            m_redis_val = (
+                self._adapter.dump_python(
+                    m, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
+                )
+                if m
+                else {}
             )
-            m_redis_val = m_redis_val or {}
             kwargs_redis_val = self._adapter.dump_python(
                 kwargs, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
             )
