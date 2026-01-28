@@ -57,6 +57,10 @@ The pipeline context manager supports atomic operations for all Redis types:
 - **Dict[str, Any] operations**: `update()`, item assignment (`dict[key] = value`), `clear()`
 - **Direct field assignment**: Assign any serializable value directly to fields (`model.field = value`)
 
+**Model-Level Operations**:
+
+- **TTL management**: `aset_ttl(seconds)` - Set or update the model's time-to-live atomically
+
 ```python
 from rapyer import AtomicRedisModel
 from typing import List, Dict, Any

@@ -2,6 +2,7 @@ from typing import TypeVar, Generic, get_args, Any, TypeAlias, TYPE_CHECKING
 
 from pydantic_core import core_schema
 
+from rapyer.scripts import arun_sha, DICT_POP_SCRIPT_NAME, DICT_POPITEM_SCRIPT_NAME
 from rapyer.types.base import (
     GenericRedisType,
     RedisType,
@@ -11,80 +12,6 @@ from rapyer.types.base import (
 from rapyer.utils.redis import update_keys_in_pipeline
 
 T = TypeVar("T")
-
-# Redis Lua script for atomic get-and-delete operation
-POP_SCRIPT = """
-local key = KEYS[1]
-local path = ARGV[1]
-local target_key = ARGV[2]
-
--- Get the value from the JSON object
-local value = redis.call('JSON.GET', key, path .. '.' .. target_key)
-
-if value and value ~= '[]' and value ~= 'null' then
-    -- Delete the key from the JSON object
-    redis.call('JSON.DEL', key, path .. '.' .. target_key)
-
-    -- Parse and return the actual value
-    local parsed = cjson.decode(value)
-    return parsed[1]  -- Return first element if it's an array
-else
-    return nil
-end
-"""
-
-
-# Redis Lua script for atomic get-arbitrary-key-and-delete operation
-POPITEM_SCRIPT = """
-local key = KEYS[1]
-local path = ARGV[1]
-
--- Get all the keys from the JSON object
-local keys = redis.call('JSON.OBJKEYS', key, path)
-
--- Return nil if no keys exist
-if not keys or #keys == 0 then
-    return nil
-end
-
--- Handle nested arrays - Redis sometimes wraps results
-if type(keys[1]) == 'table' then
-    keys = keys[1]
-end
-
--- Check again after unwrapping
-if not keys or #keys == 0 then
-    return nil
-end
-
-local first_key = tostring(keys[1])
-
--- Get the value for this key
-local value = redis.call('JSON.GET', key, path .. '.' .. first_key)
-
--- Return nil if value doesn't exist
-if not value then
-    return nil
-end
-
--- Delete the key from the JSON object
-redis.call('JSON.DEL', key, path .. '.' .. first_key)
-
--- Parse the JSON string
-local parsed_value = cjson.decode(value)
-
--- If it's a table/object, return the first value
-if type(parsed_value) == 'table' then
-    for _, v in pairs(parsed_value) do
-        return {first_key, v}  -- Return first value found
-    end
-    -- If table is empty, return nil
-    return nil
-end
-
--- Otherwise return the parsed value as-is
-return {first_key, parsed_value}
-"""
 
 
 class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
@@ -108,10 +35,13 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
 
     def update(self, m=None, /, **kwargs):
         if self.pipeline:
-            m_redis_val = self._adapter.dump_python(
-                m, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
+            m_redis_val = (
+                self._adapter.dump_python(
+                    m, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
+                )
+                if m
+                else {}
             )
-            m_redis_val = m_redis_val or {}
             kwargs_redis_val = self._adapter.dump_python(
                 kwargs, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
             )
@@ -175,14 +105,13 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
             await self.refresh_ttl_if_needed()
 
     async def apop(self, key, default=None):
-        # Execute the script atomically
-        result = await self.client.eval(POP_SCRIPT, 1, self.key, self.json_path, key)
-        # Key exists in Redis, pop from local dict (it should exist there too)
+        result = await arun_sha(
+            self.client, DICT_POP_SCRIPT_NAME, 1, self.key, self.json_path, key
+        )
         super().pop(key, None)
         await self.refresh_ttl_if_needed()
 
         if result is None:
-            # Key doesn't exist in Redis
             return default
 
         return self._adapter.validate_python(
@@ -190,8 +119,9 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         )[key]
 
     async def apopitem(self):
-        # Execute the script atomically
-        result = await self.client.eval(POPITEM_SCRIPT, 1, self.key, self.json_path)
+        result = await arun_sha(
+            self.client, DICT_POPITEM_SCRIPT_NAME, 1, self.key, self.json_path
+        )
         await self.refresh_ttl_if_needed()
 
         if result is not None:

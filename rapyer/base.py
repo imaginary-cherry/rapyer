@@ -21,7 +21,6 @@ from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 from redis.exceptions import NoScriptError, ResponseError
-from typing_extensions import deprecated
 
 from rapyer.config import RedisConfig
 from rapyer.context import _context_var, _context_xx_pipe
@@ -102,25 +101,6 @@ def make_pickle_field_serializer(
     pickle_field_validator.__name__ = f"__deserialize_{field}"
 
     return pickle_field_serializer, pickle_field_validator
-
-
-# TODO: Remove in next major version (2.0) - backward compatibility for pickled data
-# This validator handles loading old pickled data for fields that are now JSON-serializable.
-# In 2.0, remove this function and the validator registration in __init_subclass__.
-def make_backward_compat_validator(field: str):
-    @field_validator(field, mode="before")
-    def backward_compat_validator(v, info: ValidationInfo):
-        ctx = info.context or {}
-        should_deserialize_redis = ctx.get(REDIS_DUMP_FLAG_NAME, False)
-        if should_deserialize_redis and isinstance(v, str):
-            try:
-                return pickle.loads(base64.b64decode(v))
-            except Exception:
-                pass
-        return v
-
-    backward_compat_validator.__name__ = f"__backward_compat_{field}"
-    return backward_compat_validator
 
 
 class AtomicRedisModel(BaseModel):
@@ -302,11 +282,6 @@ class AtomicRedisModel(BaseModel):
                     )
                     setattr(cls, serializer.__name__, serializer)
                     setattr(cls, validator.__name__, validator)
-                else:
-                    # TODO: Remove in 2.0 - backward compatibility for old pickled data
-                    validator = make_backward_compat_validator(attr_name)
-                    setattr(cls, validator.__name__, validator)
-                continue
 
         # Update the redis model list for initialization
         # Skip dynamically created classes from type conversion
@@ -335,12 +310,6 @@ class AtomicRedisModel(BaseModel):
     def is_inner_model(self) -> bool:
         return bool(self.field_name)
 
-    @deprecated(
-        f"save function is deprecated and will become sync function in rapyer 1.2.0, use asave() instead"
-    )
-    async def save(self):
-        return await self.asave()  # pragma: no cover
-
     async def asave(self) -> Self:
         model_dump = self.redis_dump()
         await self.Meta.redis.json().set(self.key, self.json_path, model_dump)
@@ -355,12 +324,6 @@ class AtomicRedisModel(BaseModel):
     def redis_dump_json(self):
         return self.model_dump_json(context={REDIS_DUMP_FLAG_NAME: True})
 
-    @deprecated(
-        "duplicate function is deprecated and will be removed in rapyer 1.2.0, use aduplicate instead"
-    )
-    async def duplicate(self) -> Self:
-        return await self.aduplicate()  # pragma: no cover
-
     async def aduplicate(self) -> Self:
         if self.is_inner_model():
             raise RuntimeError("Can only duplicate from top level model")
@@ -368,12 +331,6 @@ class AtomicRedisModel(BaseModel):
         duplicated = self.__class__(**self.model_dump())
         await duplicated.asave()
         return duplicated
-
-    @deprecated(
-        "duplicate_many function is deprecated and will be removed in rapyer 1.2.0, use aduplicate_many instead"
-    )
-    async def duplicate_many(self, num: int) -> list[Self]:
-        return await self.aduplicate_many(num)  # pragma: no cover
 
     async def aduplicate_many(self, num: int) -> list[Self]:
         if self.is_inner_model():
@@ -401,7 +358,7 @@ class AtomicRedisModel(BaseModel):
             for field_name in kwargs.keys()
         }
 
-        async with self.Meta.redis.pipeline() as pipe:
+        async with self.Meta.redis.pipeline(transaction=True) as pipe:
             update_keys_in_pipeline(pipe, self.key, **json_path_kwargs)
             await pipe.execute()
         await self.refresh_ttl_if_needed()
@@ -409,14 +366,11 @@ class AtomicRedisModel(BaseModel):
     async def aset_ttl(self, ttl: int) -> None:
         if self.is_inner_model():
             raise RuntimeError("Can only set TTL from top level model")
-        await self.Meta.redis.expire(self.key, ttl)
-
-    @classmethod
-    @deprecated(
-        "get() classmethod is deprecated and will be removed in rapyer 1.2.0, use aget instead"
-    )
-    async def get(cls, key: str) -> Self:
-        return await cls.aget(key)  # pragma: no cover
+        pipeline = _context_var.get()
+        if pipeline is not None:
+            pipeline.expire(self.key, ttl)
+        else:
+            await self.Meta.redis.expire(self.key, ttl)
 
     @classmethod
     async def aget(cls, key: str) -> Self:
@@ -434,12 +388,6 @@ class AtomicRedisModel(BaseModel):
         if cls.should_refresh():
             await cls.Meta.redis.expire(key, cls.Meta.ttl)
         return instance
-
-    @deprecated(
-        "load function is deprecated and will be removed in rapyer 1.2.0, use aload() instead"
-    )
-    async def load(self):
-        return await self.aload()  # pragma: no cover
 
     async def aload(self) -> Self:
         model_dump = await self.Meta.redis.json().get(self.key, self.json_path)
@@ -544,22 +492,9 @@ class AtomicRedisModel(BaseModel):
             await pipe.execute()
 
     @classmethod
-    @deprecated(
-        "function delete is deprecated and will be removed in rapyer 1.2.0, use adelete instead"
-    )
-    async def delete_by_key(cls, key: str) -> bool:
-        return await cls.adelete_by_key(key)  # pragma: no cover
-
-    @classmethod
     async def adelete_by_key(cls, key: str) -> bool:
         client = _context_var.get() or cls.Meta.redis
         return await client.delete(key) == 1
-
-    @deprecated(
-        "function delete is deprecated and will be removed in rapyer 1.2.0, use adelete instead"
-    )
-    async def delete(self):
-        return await self.adelete()  # pragma: no cover
 
     async def adelete(self):
         if self.is_inner_model():
@@ -574,19 +509,6 @@ class AtomicRedisModel(BaseModel):
 
     @classmethod
     @contextlib.asynccontextmanager
-    @deprecated(
-        "lock_from_key function is deprecated and will be removed in rapyer 1.2.0, use alock_from_key instead"
-    )
-    async def lock_from_key(
-        cls, key: str, action: str = "default", save_at_end: bool = False
-    ) -> AbstractAsyncContextManager[Self]:
-        async with cls.alock_from_key(  # pragma: no cover
-            key, action, save_at_end  # pragma: no cover
-        ) as redis_model:  # pragma: no cover
-            yield redis_model  # pragma: no cover
-
-    @classmethod
-    @contextlib.asynccontextmanager
     async def alock_from_key(
         cls, key: str, action: str = "default", save_at_end: bool = False
     ) -> AbstractAsyncContextManager[Self]:
@@ -595,18 +517,6 @@ class AtomicRedisModel(BaseModel):
             yield redis_model
             if save_at_end:
                 await redis_model.asave()
-
-    @contextlib.asynccontextmanager
-    @deprecated(
-        "lock function is deprecated and will be removed in rapyer 1.2.0, use alock instead"
-    )
-    async def lock(
-        self, action: str = "default", save_at_end: bool = False
-    ) -> AbstractAsyncContextManager[Self]:
-        async with self.alock_from_key(  # pragma: no cover
-            self.key, action, save_at_end  # pragma: no cover
-        ) as redis_model:  # pragma: no cover
-            yield redis_model  # pragma: no cover
 
     @contextlib.asynccontextmanager
     async def alock(
@@ -620,20 +530,8 @@ class AtomicRedisModel(BaseModel):
             yield redis_model
 
     @contextlib.asynccontextmanager
-    @deprecated(
-        "pipeline function is deprecated and will be removed in rapyer 1.2.0, use apipeline instead"
-    )
-    async def pipeline(
-        self, ignore_if_deleted: bool = False
-    ) -> AbstractAsyncContextManager[Self]:
-        async with self.apipeline(  # pragma: no cover
-            ignore_if_deleted=ignore_if_deleted  # pragma: no cover
-        ) as redis_model:  # pragma: no cover
-            yield redis_model  # pragma: no cover
-
-    @contextlib.asynccontextmanager
     async def apipeline(
-        self, ignore_if_deleted: bool = False
+        self, ignore_redis_error: bool = False
     ) -> AbstractAsyncContextManager[Self]:
         async with self.Meta.redis.pipeline(transaction=True) as pipe:
             try:
@@ -643,12 +541,12 @@ class AtomicRedisModel(BaseModel):
                 }
                 self.__dict__.update(unset_fields)
             except (TypeError, KeyNotFound):
-                if ignore_if_deleted:
+                if ignore_redis_error:
                     redis_model = self
                 else:
                     raise
             _context_var.set(pipe)
-            _context_xx_pipe.set(ignore_if_deleted)
+            _context_xx_pipe.set(ignore_redis_error)
             yield redis_model
             commands_backup = list(pipe.command_stack)
             noscript_on_first_attempt = False
@@ -661,10 +559,10 @@ class AtomicRedisModel(BaseModel):
             except NoScriptError:
                 noscript_on_first_attempt = True
             except ResponseError as exc:
-                if ignore_if_deleted:
+                if ignore_redis_error:
                     logger.warning(
                         "Swallowed ResponseError during pipeline.execute() with "
-                        "ignore_if_deleted=True for key %r: %s",
+                        "ignore_redis_error=True for key %r: %s",
                         getattr(self, "key", None),
                         exc,
                     )
@@ -742,13 +640,6 @@ class AtomicRedisModel(BaseModel):
 
 
 REDIS_MODELS: list[type[AtomicRedisModel]] = []
-
-
-@deprecated(
-    "get function is deprecated and will be removed in rapyer 1.2.0, use aget instead"
-)
-async def get(redis_key: str) -> AtomicRedisModel:
-    return await aget(redis_key)  # pragma: no cover
 
 
 async def aget(redis_key: str) -> AtomicRedisModel:

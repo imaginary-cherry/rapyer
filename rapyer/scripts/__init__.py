@@ -1,5 +1,7 @@
 from rapyer.scripts.constants import (
     DATETIME_ADD_SCRIPT_NAME,
+    DICT_POP_SCRIPT_NAME,
+    DICT_POPITEM_SCRIPT_NAME,
     NUM_FLOORDIV_SCRIPT_NAME,
     NUM_MOD_SCRIPT_NAME,
     NUM_MUL_SCRIPT_NAME,
@@ -12,6 +14,7 @@ from rapyer.scripts.constants import (
 )
 from rapyer.scripts.registry import (
     _REGISTERED_SCRIPT_SHAS,
+    arun_sha,
     get_scripts,
     get_scripts_fakeredis,
     handle_noscript_error,
@@ -24,6 +27,8 @@ SCRIPTS_FAKEREDIS = get_scripts_fakeredis()
 
 __all__ = [
     "DATETIME_ADD_SCRIPT_NAME",
+    "DICT_POP_SCRIPT_NAME",
+    "DICT_POPITEM_SCRIPT_NAME",
     "NUM_FLOORDIV_SCRIPT_NAME",
     "NUM_MOD_SCRIPT_NAME",
     "NUM_MUL_SCRIPT_NAME",
@@ -35,6 +40,7 @@ __all__ = [
     "SCRIPTS_FAKEREDIS",
     "STR_APPEND_SCRIPT_NAME",
     "STR_MUL_SCRIPT_NAME",
+    "arun_sha",
     "handle_noscript_error",
     "register_scripts",
     "run_sha",
