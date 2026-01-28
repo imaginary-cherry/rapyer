@@ -310,7 +310,7 @@ async with user.alock("settings_update", save_at_end=True) as locked_user:
 #### `apipeline(ignore_redis_error=False)`
 **Type:** `async` context manager  
 **Parameters:**
-- `ignore_redis_error` (bool): Continue if model was deleted during pipeline  
+- `ignore_redis_error` (bool): If `True`, suppresses `redis.exceptions.ResponseError` raised during pipeline execution (for example, if the model was deleted during the pipeline) and continues.  
 **Returns:** `AsyncGenerator[Self, None]`  
 **Description:** Batches all operations into a Redis pipeline for atomic execution.
 
