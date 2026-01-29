@@ -1,8 +1,7 @@
 from datetime import datetime, timezone
 
 import pytest
-
-from rapyer.types.datetime import RedisDatetime
+from rapyer.types.datetime import RedisDatetime, RedisDatetimeTimestamp
 
 
 @pytest.mark.parametrize(
@@ -51,3 +50,77 @@ def test_redis_datetime_new_with_datetime_instance_sanity(dt):
     assert result.second == dt.second
     assert result.microsecond == dt.microsecond
     assert result.tzinfo == dt.tzinfo
+
+
+@pytest.mark.parametrize(
+    ["invalid_value"],
+    [
+        [1],
+        ["string"],
+        [None],
+        [datetime(2024, 1, 1)],
+        [[1, 2, 3]],
+    ],
+)
+def test_redis_datetime_iadd_raises_error_for_non_timedelta(invalid_value):
+    # Arrange
+    dt = RedisDatetime(2024, 1, 15, 10, 30, 45)
+
+    # Act & Assert
+    with pytest.raises(TypeError):
+        dt += invalid_value
+
+
+@pytest.mark.parametrize(
+    ["invalid_value"],
+    [
+        [1],
+        ["string"],
+        [1.5],
+        [[1, 2, 3]],
+    ],
+)
+def test_redis_datetime_isub_raises_error_for_non_timedelta(invalid_value):
+    # Arrange
+    dt = RedisDatetime(2024, 1, 15, 10, 30, 45)
+
+    # Act & Assert
+    with pytest.raises(TypeError):
+        dt -= invalid_value
+
+
+@pytest.mark.parametrize(
+    ["invalid_value"],
+    [
+        [1],
+        ["string"],
+        [1.5],
+        [None],
+        [datetime(2024, 1, 1)],
+    ],
+)
+def test_redis_datetime_timestamp_iadd_raises_error_for_non_timedelta(invalid_value):
+    # Arrange
+    dt = RedisDatetimeTimestamp(2024, 1, 15, 10, 30, 45)
+
+    # Act & Assert
+    with pytest.raises(TypeError):
+        dt += invalid_value
+
+
+@pytest.mark.parametrize(
+    ["invalid_value"],
+    [
+        [1],
+        ["string"],
+        [None],
+        [[1, 2, 3]],
+    ],
+)
+def test_redis_datetime_timestamp_isub_raises_error_for_non_timedelta(invalid_value):
+    # Arrange
+    dt = RedisDatetimeTimestamp(2024, 1, 15, 10, 30, 45)
+
+    # Act & Assert
+    with pytest.raises(TypeError):
+        dt -= invalid_value

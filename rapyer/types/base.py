@@ -9,7 +9,6 @@ from pydantic import GetCoreSchemaHandler, TypeAdapter
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, CoreSchema, SerializationInfo
 from redis.commands.search.field import TextField
-from typing_extensions import deprecated
 
 from rapyer.context import _context_var
 from rapyer.errors.base import CantSerializeRedisValueError
@@ -74,12 +73,6 @@ class RedisType(ABC):
     def json_field_path(self, field_name: str):
         return f"${self.sub_field_path(field_name)}"
 
-    @deprecated(
-        f"save function is deprecated and will become sync function in rapyer 1.2.0, use asave() instead"
-    )
-    async def save(self):
-        return await self.asave()  # pragma: no cover
-
     async def asave(self) -> Self:
         model_dump = self._adapter.dump_python(
             self, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
@@ -89,12 +82,6 @@ class RedisType(ABC):
             nx = not self.Meta.refresh_ttl
             await self.client.expire(self.key, self.Meta.ttl, nx=nx)
         return self
-
-    @deprecated(
-        "load function is deprecated and will be removed in rapyer 1.2.0, use aload() instead"
-    )
-    async def load(self):
-        return await self.aload()  # pragma: no cover
 
     async def aload(self):
         redis_value = await self.client.json().get(self.key, self.field_path)

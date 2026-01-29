@@ -8,12 +8,32 @@ VARIANTS = {
         "EXTRACT_VALUE": "local value = tonumber(cjson.decode(current_json)[1])",
         "EXTRACT_STR": "local value = cjson.decode(current_json)[1]",
         "EXTRACT_DATETIME": "local value = cjson.decode(current_json)[1]",
+        "DICT_EXTRACT_VALUE": "local extracted = cjson.decode(value)[1]",
+        "DICT_EXTRACT_POPITEM": """local parsed = cjson.decode(value)
+if type(parsed) == 'table' then
+    for _, v in pairs(parsed) do
+        extracted = v
+        break
+    end
+else
+    extracted = parsed
+end""",
     },
     "fakeredis": {
         "EXTRACT_ARRAY": "local arr = cjson.decode(arr_json)",
         "EXTRACT_VALUE": "local value = tonumber(cjson.decode(current_json)[1])",
         "EXTRACT_STR": "local value = cjson.decode(current_json)[1]",
         "EXTRACT_DATETIME": "local value = cjson.decode(current_json)[1]",
+        "DICT_EXTRACT_VALUE": "local extracted = cjson.decode(value)[1]",
+        "DICT_EXTRACT_POPITEM": """local parsed = cjson.decode(value)
+if type(parsed) == 'table' then
+    for _, v in pairs(parsed) do
+        extracted = v
+        break
+    end
+else
+    extracted = parsed
+end""",
     },
 }
 

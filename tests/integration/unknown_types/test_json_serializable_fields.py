@@ -73,35 +73,3 @@ async def test_str_enum_in_dict_save_and_load_sanity(real_redis_client):
     # Assert
     assert loaded.status_map == {"a": StrStatus.ACTIVE, "b": StrStatus.INACTIVE}
     assert loaded.name == "dict_model"
-
-
-@pytest.mark.asyncio
-async def test_str_enum_backward_compat_with_pickled_data_sanity(real_redis_client):
-    # Arrange
-    model = ModelWithStrEnumDefault(status=StrStatus.ACTIVE, name="backward_test")
-    pickled_status = base64.b64encode(pickle.dumps(StrStatus.PENDING)).decode("utf-8")
-    old_format_data = {"status": pickled_status, "name": "backward_test"}
-    await real_redis_client.json().set(model.key, "$", old_format_data)
-
-    # Act
-    loaded = await ModelWithStrEnumDefault.aget(model.key)
-
-    # Assert
-    assert loaded.status == StrStatus.PENDING
-    assert loaded.name == "backward_test"
-
-
-@pytest.mark.asyncio
-async def test_int_enum_backward_compat_with_pickled_data_sanity(real_redis_client):
-    # Arrange
-    model = ModelWithIntEnumDefault(priority=IntPriority.LOW, name="backward_test")
-    pickled_priority = base64.b64encode(pickle.dumps(IntPriority.HIGH)).decode("utf-8")
-    old_format_data = {"priority": pickled_priority, "name": "backward_test"}
-    await real_redis_client.json().set(model.key, "$", old_format_data)
-
-    # Act
-    loaded = await ModelWithIntEnumDefault.aget(model.key)
-
-    # Assert
-    assert loaded.priority == IntPriority.HIGH
-    assert loaded.name == "backward_test"

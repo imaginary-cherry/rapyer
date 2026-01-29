@@ -341,7 +341,6 @@ async def test_mixed_operations_on_same_model_functionality():
     # Assert
     assert "string" in model.str_list
     assert 42 in model.int_list
-    # TODO - Sadly bool cant be inherited from. consider making it non redis type with special case
     assert model.bool_dict["active"]
     assert model.mixed_dict["complex"] == {"nested": "data"}
 

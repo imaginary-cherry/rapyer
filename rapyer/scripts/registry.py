@@ -1,6 +1,8 @@
 from rapyer.errors import ScriptsNotInitializedError
 from rapyer.scripts.constants import (
     DATETIME_ADD_SCRIPT_NAME,
+    DICT_POP_SCRIPT_NAME,
+    DICT_POPITEM_SCRIPT_NAME,
     NUM_FLOORDIV_SCRIPT_NAME,
     NUM_MOD_SCRIPT_NAME,
     NUM_MUL_SCRIPT_NAME,
@@ -24,6 +26,8 @@ SCRIPT_REGISTRY: list[tuple[str, str, str]] = [
     ("string", "append", STR_APPEND_SCRIPT_NAME),
     ("string", "mul", STR_MUL_SCRIPT_NAME),
     ("datetime", "add", DATETIME_ADD_SCRIPT_NAME),
+    ("dict", "pop", DICT_POP_SCRIPT_NAME),
+    ("dict", "popitem", DICT_POPITEM_SCRIPT_NAME),
 ]
 
 _REGISTERED_SCRIPT_SHAS: dict[str, str] = {}
@@ -52,13 +56,23 @@ async def register_scripts(redis_client, is_fakeredis: bool = False) -> None:
         _REGISTERED_SCRIPT_SHAS[name] = sha
 
 
-def run_sha(pipeline, script_name: str, keys: int, *args) -> None:
+def get_script(script_name: str):
     sha = _REGISTERED_SCRIPT_SHAS.get(script_name)
     if sha is None:
         raise ScriptsNotInitializedError(
             f"Script '{script_name}' not loaded. Did you forget to call init_rapyer()?"
         )
+    return sha
+
+
+def run_sha(pipeline, script_name: str, keys: int, *args):
+    sha = get_script(script_name)
     pipeline.evalsha(sha, keys, *args)
+
+
+async def arun_sha(client, script_name: str, keys: int, *args):
+    sha = get_script(script_name)
+    return await client.evalsha(sha, keys, *args)
 
 
 async def handle_noscript_error(redis_client) -> None:

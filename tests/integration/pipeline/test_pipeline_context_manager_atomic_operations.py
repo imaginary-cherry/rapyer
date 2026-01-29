@@ -19,7 +19,7 @@ async def test_pipeline_context_manager__dict_update_operations__check_atomic_ba
 
     # Act
     async with model.apipeline() as redis_model:
-        await redis_model.metadata.aupdate(key1="value1", key2="value2")
+        redis_model.metadata.update(key1="value1", key2="value2")
         await redis_model.metadata.aupdate(key3="value3", key4="value4")
 
         # Check that none of the operations have been applied to Redis yet
