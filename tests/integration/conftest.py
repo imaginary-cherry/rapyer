@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
-
 import rapyer
 from rapyer.scripts import register_scripts
 

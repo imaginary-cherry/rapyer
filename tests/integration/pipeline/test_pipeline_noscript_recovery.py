@@ -1,8 +1,6 @@
-from unittest.mock import AsyncMock, patch
-
 import pytest
+
 from rapyer.errors import PersistentNoScriptError
-from redis.exceptions import NoScriptError
 from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.simple_types import TTLRefreshTestModel, TTL_TEST_SECONDS
 
@@ -83,21 +81,3 @@ async def test_pipeline_raises_persistent_noscript_error_when_scripts_keep_faili
             redis_model.tags.remove_range(0, 1)
 
     assert "server-side" in str(exc_info.value).lower()
-
-
-@pytest.mark.asyncio
-async def test_dict_apop_raises_persistent_noscript_error_when_scripts_keep_failing_error(
-    disable_registry_noscript_recovery,
-):
-    # Arrange
-    model = ComprehensiveTestModel(metadata={"key1": "value1"})
-    await model.asave()
-
-    mock_evalsha = AsyncMock(side_effect=NoScriptError("NOSCRIPT"))
-
-    # Act & Assert
-    with patch.object(model.Meta.redis, "evalsha", mock_evalsha):
-        with pytest.raises(PersistentNoScriptError) as exc_info:
-            await model.metadata.apop("key1")
-
-        assert "server-side" in str(exc_info.value).lower()

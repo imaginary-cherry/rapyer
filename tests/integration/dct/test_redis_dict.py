@@ -1,8 +1,11 @@
 from datetime import datetime
+from unittest.mock import AsyncMock, patch
 
 import pytest
+from redis.exceptions import NoScriptError
 
 from rapyer.base import AtomicRedisModel
+from rapyer.errors import PersistentNoScriptError
 from rapyer.types.dct import RedisDict
 from tests.models.collection_types import (
     IntDictModel,
@@ -16,6 +19,7 @@ from tests.models.collection_types import (
     ListDictModel,
     NestedDictModel,
     BaseDictMetadataModel,
+    ComprehensiveTestModel,
 )
 from tests.models.common import Status, Person
 
@@ -541,3 +545,21 @@ async def test_redis_dict__apop_empty_redis__check_no_default_sanity(
 
     # Assert
     assert result is None
+
+
+@pytest.mark.asyncio
+async def test_redis_dict__apop_raises_persistent_noscript_error_when_scripts_keep_failing(
+    disable_registry_noscript_recovery,
+):
+    # Arrange
+    model = ComprehensiveTestModel(metadata={"key1": "value1"})
+    await model.asave()
+
+    mock_evalsha = AsyncMock(side_effect=NoScriptError("NOSCRIPT"))
+
+    # Act & Assert
+    with patch.object(model.Meta.redis, "evalsha", mock_evalsha):
+        with pytest.raises(PersistentNoScriptError) as exc_info:
+            await model.metadata.apop("key1")
+
+        assert "server-side" in str(exc_info.value).lower()
