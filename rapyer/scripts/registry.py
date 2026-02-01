@@ -82,12 +82,12 @@ async def arun_sha(client, script_name: str, keys: int, *args):
     sha = get_script(script_name)
     try:
         return await client.evalsha(sha, keys, *args)
-    except NoScriptError:
+    except NoScriptError as e:
         raise PersistentNoScriptError(
             "NOSCRIPT error persisted after re-registering scripts. "
             "This indicates a server-side problem with Redis."
-        )
+        ) from e
 
 
-async def handle_noscript_error(redis_client) -> None:
+async def handle_noscript_error(redis_client):
     await register_scripts(redis_client)
