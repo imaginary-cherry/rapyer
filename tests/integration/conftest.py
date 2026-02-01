@@ -249,6 +249,12 @@ async def saved_model_with_reduced_ttl(real_redis_client):
 
 
 @pytest_asyncio.fixture
+async def flush_scripts(real_redis_client):
+    await real_redis_client.execute_command("SCRIPT", "FLUSH")
+    yield
+
+
+@pytest_asyncio.fixture
 async def saved_no_refresh_model_with_reduced_ttl(real_redis_client):
     model = TTLRefreshDisabledModel(
         name="ttl_no_refresh_test",
