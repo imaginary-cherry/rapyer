@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.1]
+
+### 🛠️ Technical Improvements
+
+- **NOSCRIPT Error Recovery for Async Operations**: The `arun_sha()` function now automatically recovers from NOSCRIPT errors (e.g., after Redis restart) by re-registering Lua scripts and retrying.
+  - If scripts fail to execute after re-registration, raises `PersistentNoScriptError` indicating a server-side issue.
+
+
 ## [1.2.0]
 
 ### 🔄 Changed
