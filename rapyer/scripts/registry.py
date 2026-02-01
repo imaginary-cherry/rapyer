@@ -1,4 +1,4 @@
-from rapyer.errors import ScriptsNotInitializedError
+from rapyer.errors import PersistentNoScriptError, ScriptsNotInitializedError
 from rapyer.scripts.constants import (
     DATETIME_ADD_SCRIPT_NAME,
     DICT_POP_SCRIPT_NAME,
@@ -14,6 +14,7 @@ from rapyer.scripts.constants import (
     STR_MUL_SCRIPT_NAME,
 )
 from rapyer.scripts.loader import load_script
+from redis.exceptions import NoScriptError
 
 SCRIPT_REGISTRY: list[tuple[str, str, str]] = [
     ("list", "remove_range", REMOVE_RANGE_SCRIPT_NAME),
@@ -72,7 +73,20 @@ def run_sha(pipeline, script_name: str, keys: int, *args):
 
 async def arun_sha(client, script_name: str, keys: int, *args):
     sha = get_script(script_name)
-    return await client.evalsha(sha, keys, *args)
+    try:
+        return await client.evalsha(sha, keys, *args)
+    except NoScriptError:
+        pass
+
+    await handle_noscript_error(client)
+    sha = get_script(script_name)
+    try:
+        return await client.evalsha(sha, keys, *args)
+    except NoScriptError:
+        raise PersistentNoScriptError(
+            "NOSCRIPT error persisted after re-registering scripts. "
+            "This indicates a server-side problem with Redis."
+        )
 
 
 async def handle_noscript_error(redis_client) -> None:
