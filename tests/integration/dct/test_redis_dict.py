@@ -2,11 +2,10 @@ from datetime import datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from redis.exceptions import NoScriptError
-
 from rapyer.base import AtomicRedisModel
 from rapyer.errors import PersistentNoScriptError
 from rapyer.types.dct import RedisDict
+from redis.exceptions import NoScriptError
 from tests.models.collection_types import (
     IntDictModel,
     StrDictModel,
@@ -549,7 +548,7 @@ async def test_redis_dict__apop_empty_redis__check_no_default_sanity(
 
 @pytest.mark.asyncio
 async def test_redis_dict__apop_raises_persistent_noscript_error_when_scripts_keep_failing(
-    disable_registry_noscript_recovery,
+    disable_noscript_recovery,
 ):
     # Arrange
     model = ComprehensiveTestModel(metadata={"key1": "value1"})

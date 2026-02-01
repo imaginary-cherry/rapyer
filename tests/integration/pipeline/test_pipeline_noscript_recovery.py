@@ -69,7 +69,7 @@ async def test_pipeline_recovers_with_all_redis_types_after_script_flush_sanity(
 @pytest.mark.asyncio
 async def test_pipeline_raises_persistent_noscript_error_when_scripts_keep_failing_error(
     flush_scripts,
-    disable_base_noscript_recovery,
+    disable_noscript_recovery,
 ):
     # Arrange
     model = ComprehensiveTestModel(tags=["a", "b", "c"])

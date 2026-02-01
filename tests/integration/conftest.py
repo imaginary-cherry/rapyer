@@ -256,13 +256,7 @@ async def flush_scripts(real_redis_client):
 
 
 @pytest.fixture
-def disable_base_noscript_recovery():
-    with patch("rapyer.base.handle_noscript_error", new_callable=AsyncMock):
-        yield
-
-
-@pytest.fixture
-def disable_registry_noscript_recovery():
+def disable_noscript_recovery():
     with patch("rapyer.scripts.registry.handle_noscript_error", new_callable=AsyncMock):
         yield
 
