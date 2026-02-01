@@ -71,22 +71,24 @@ async def test_pipeline_recovers_with_all_redis_types_after_script_flush_sanity(
 @pytest.mark.asyncio
 async def test_pipeline_raises_persistent_noscript_error_when_scripts_keep_failing_error(
     flush_scripts,
+    disable_base_noscript_recovery,
 ):
     # Arrange
     model = ComprehensiveTestModel(tags=["a", "b", "c"])
     await model.asave()
 
     # Act & Assert
-    with patch("rapyer.base.handle_noscript_error", new_callable=AsyncMock):
-        with pytest.raises(PersistentNoScriptError) as exc_info:
-            async with model.apipeline() as redis_model:
-                redis_model.tags.remove_range(0, 1)
+    with pytest.raises(PersistentNoScriptError) as exc_info:
+        async with model.apipeline() as redis_model:
+            redis_model.tags.remove_range(0, 1)
 
-        assert "server-side" in str(exc_info.value).lower()
+    assert "server-side" in str(exc_info.value).lower()
 
 
 @pytest.mark.asyncio
-async def test_dict_apop_raises_persistent_noscript_error_when_scripts_keep_failing_error():
+async def test_dict_apop_raises_persistent_noscript_error_when_scripts_keep_failing_error(
+    disable_registry_noscript_recovery,
+):
     # Arrange
     model = ComprehensiveTestModel(metadata={"key1": "value1"})
     await model.asave()
@@ -95,10 +97,7 @@ async def test_dict_apop_raises_persistent_noscript_error_when_scripts_keep_fail
 
     # Act & Assert
     with patch.object(model.Meta.redis, "evalsha", mock_evalsha):
-        with patch(
-            "rapyer.scripts.registry.handle_noscript_error", new_callable=AsyncMock
-        ):
-            with pytest.raises(PersistentNoScriptError) as exc_info:
-                await model.metadata.apop("key1")
+        with pytest.raises(PersistentNoScriptError) as exc_info:
+            await model.metadata.apop("key1")
 
-            assert "server-side" in str(exc_info.value).lower()
+        assert "server-side" in str(exc_info.value).lower()

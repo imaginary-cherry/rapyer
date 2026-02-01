@@ -1,7 +1,9 @@
 import os
 from dataclasses import dataclass
 from typing import Generic, TypeVar
+from unittest.mock import AsyncMock, patch
 
+import pytest
 import pytest_asyncio
 
 import rapyer
@@ -252,6 +254,18 @@ async def saved_model_with_reduced_ttl(real_redis_client):
 async def flush_scripts(real_redis_client):
     await real_redis_client.execute_command("SCRIPT", "FLUSH")
     yield
+
+
+@pytest.fixture
+def disable_base_noscript_recovery():
+    with patch("rapyer.base.handle_noscript_error", new_callable=AsyncMock):
+        yield
+
+
+@pytest.fixture
+def disable_registry_noscript_recovery():
+    with patch("rapyer.scripts.registry.handle_noscript_error", new_callable=AsyncMock):
+        yield
 
 
 @pytest_asyncio.fixture
