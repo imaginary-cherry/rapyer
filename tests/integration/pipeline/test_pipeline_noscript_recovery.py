@@ -1,14 +1,16 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from rapyer.errors import PersistentNoScriptError
+from redis.exceptions import NoScriptError
 from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.simple_types import TTLRefreshTestModel, TTL_TEST_SECONDS
 
 
 @pytest.mark.asyncio
-async def test_pipeline_recovers_from_noscript_error_after_script_flush_sanity(flush_scripts):
+async def test_pipeline_recovers_from_noscript_error_after_script_flush_sanity(
+    flush_scripts,
+):
     # Arrange
     model = ComprehensiveTestModel(
         tags=["a", "b", "c", "d", "e"],
@@ -29,7 +31,9 @@ async def test_pipeline_recovers_from_noscript_error_after_script_flush_sanity(f
 
 
 @pytest.mark.asyncio
-async def test_pipeline_recovers_with_all_redis_types_after_script_flush_sanity(flush_scripts):
+async def test_pipeline_recovers_with_all_redis_types_after_script_flush_sanity(
+    flush_scripts,
+):
     # Arrange
     model = TTLRefreshTestModel(
         name="original",
@@ -65,7 +69,9 @@ async def test_pipeline_recovers_with_all_redis_types_after_script_flush_sanity(
 
 
 @pytest.mark.asyncio
-async def test_pipeline_raises_persistent_noscript_error_when_scripts_keep_failing_error(flush_scripts):
+async def test_pipeline_raises_persistent_noscript_error_when_scripts_keep_failing_error(
+    flush_scripts,
+):
     # Arrange
     model = ComprehensiveTestModel(tags=["a", "b", "c"])
     await model.asave()
@@ -77,3 +83,22 @@ async def test_pipeline_raises_persistent_noscript_error_when_scripts_keep_faili
                 redis_model.tags.remove_range(0, 1)
 
         assert "server-side" in str(exc_info.value).lower()
+
+
+@pytest.mark.asyncio
+async def test_dict_apop_raises_persistent_noscript_error_when_scripts_keep_failing_error():
+    # Arrange
+    model = ComprehensiveTestModel(metadata={"key1": "value1"})
+    await model.asave()
+
+    mock_evalsha = AsyncMock(side_effect=NoScriptError("NOSCRIPT"))
+
+    # Act & Assert
+    with patch.object(model.Meta.redis, "evalsha", mock_evalsha):
+        with patch(
+            "rapyer.scripts.registry.handle_noscript_error", new_callable=AsyncMock
+        ):
+            with pytest.raises(PersistentNoScriptError) as exc_info:
+                await model.metadata.apop("key1")
+
+            assert "server-side" in str(exc_info.value).lower()
