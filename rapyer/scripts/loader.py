@@ -1,9 +1,10 @@
 from functools import lru_cache
 from importlib import resources
 
+from rapyer.scripts.constants import FAKEREDIS_VARIANT, REDIS_VARIANT
 
 VARIANTS = {
-    "redis": {
+    REDIS_VARIANT: {
         "EXTRACT_ARRAY": "local arr = cjson.decode(arr_json)[1]",
         "EXTRACT_VALUE": "local value = tonumber(cjson.decode(current_json)[1])",
         "EXTRACT_STR": "local value = cjson.decode(current_json)[1]",
@@ -19,7 +20,7 @@ else
     extracted = parsed
 end""",
     },
-    "fakeredis": {
+    FAKEREDIS_VARIANT: {
         "EXTRACT_ARRAY": "local arr = cjson.decode(arr_json)",
         "EXTRACT_VALUE": "local value = tonumber(cjson.decode(current_json)[1])",
         "EXTRACT_STR": "local value = cjson.decode(current_json)[1]",
@@ -45,7 +46,7 @@ def _load_template(category: str, name: str) -> str:
     return resources.files(package).joinpath(filename).read_text()
 
 
-def load_script(category: str, name: str, variant: str = "redis") -> str:
+def load_script(category: str, name: str, variant: str = REDIS_VARIANT) -> str:
     template = _load_template(category, name)
     replacements = VARIANTS[variant]
     result = template

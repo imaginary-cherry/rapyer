@@ -1,3 +1,6 @@
+REDIS_VARIANT = "redis"
+FAKEREDIS_VARIANT = "fakeredis"
+
 REMOVE_RANGE_SCRIPT_NAME = "remove_range"
 NUM_MUL_SCRIPT_NAME = "num_mul"
 NUM_FLOORDIV_SCRIPT_NAME = "num_floordiv"

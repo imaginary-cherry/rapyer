@@ -3,12 +3,14 @@ from rapyer.scripts.constants import (
     DATETIME_ADD_SCRIPT_NAME,
     DICT_POP_SCRIPT_NAME,
     DICT_POPITEM_SCRIPT_NAME,
+    FAKEREDIS_VARIANT,
     NUM_FLOORDIV_SCRIPT_NAME,
     NUM_MOD_SCRIPT_NAME,
     NUM_MUL_SCRIPT_NAME,
     NUM_POW_FLOAT_SCRIPT_NAME,
     NUM_POW_SCRIPT_NAME,
     NUM_TRUEDIV_SCRIPT_NAME,
+    REDIS_VARIANT,
     REMOVE_RANGE_SCRIPT_NAME,
     STR_APPEND_SCRIPT_NAME,
     STR_MUL_SCRIPT_NAME,
@@ -42,15 +44,15 @@ def _build_scripts(variant: str) -> dict[str, str]:
 
 
 def get_scripts() -> dict[str, str]:
-    return _build_scripts("redis")
+    return _build_scripts(REDIS_VARIANT)
 
 
 def get_scripts_fakeredis() -> dict[str, str]:
-    return _build_scripts("fakeredis")
+    return _build_scripts(FAKEREDIS_VARIANT)
 
 
 async def register_scripts(redis_client, is_fakeredis: bool = False) -> None:
-    variant = "fakeredis" if is_fakeredis else "redis"
+    variant = FAKEREDIS_VARIANT if is_fakeredis else REDIS_VARIANT
     scripts = _build_scripts(variant)
     for name, script_text in scripts.items():
         sha = await redis_client.script_load(script_text)
