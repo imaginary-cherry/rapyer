@@ -570,7 +570,7 @@ class AtomicRedisModel(BaseModel):
                     raise
 
             if noscript_on_first_attempt:
-                await scripts_registry.handle_noscript_error(self.Meta.redis)
+                await scripts_registry.handle_noscript_error(self.Meta.redis, self.Meta)
                 evalsha_commands = [
                     (args, options)
                     for args, options in commands_backup

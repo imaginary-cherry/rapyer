@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from rapyer.errors import PersistentNoScriptError, ScriptsNotInitializedError
 from rapyer.scripts.constants import (
     DATETIME_ADD_SCRIPT_NAME,
@@ -17,6 +19,9 @@ from rapyer.scripts.constants import (
 )
 from rapyer.scripts.loader import load_script
 from redis.exceptions import NoScriptError
+
+if TYPE_CHECKING:
+    from rapyer.config import RedisConfig
 
 SCRIPT_REGISTRY: list[tuple[str, str, str]] = [
     ("list", "remove_range", REMOVE_RANGE_SCRIPT_NAME),
@@ -73,14 +78,16 @@ def run_sha(pipeline, script_name: str, keys: int, *args):
     pipeline.evalsha(sha, keys, *args)
 
 
-async def arun_sha(client, script_name: str, keys: int, *args):
+async def arun_sha(
+    client, redis_config: "RedisConfig", script_name: str, keys: int, *args
+):
     sha = get_script(script_name)
     try:
         return await client.evalsha(sha, keys, *args)
     except NoScriptError:
         pass
 
-    await handle_noscript_error(client)
+    await handle_noscript_error(client, redis_config)
     sha = get_script(script_name)
     try:
         return await client.evalsha(sha, keys, *args)
@@ -91,5 +98,5 @@ async def arun_sha(client, script_name: str, keys: int, *args):
         ) from e
 
 
-async def handle_noscript_error(redis_client):
-    await register_scripts(redis_client)
+async def handle_noscript_error(redis_client, redis_config: "RedisConfig"):
+    await register_scripts(redis_client, is_fakeredis=redis_config.is_fake_redis)
