@@ -1,7 +1,6 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from rapyer.errors import ScriptsNotInitializedError
 from rapyer.scripts import (
     run_sha,
@@ -52,13 +51,31 @@ async def test_handle_noscript_error_reloads_scripts_sanity(clear_script_state):
     # Arrange
     mock_redis = AsyncMock()
     mock_redis.script_load = AsyncMock(return_value="new_sha_456")
+    mock_config = MagicMock()
+    mock_config.is_fake_redis = False
 
     # Act
-    await handle_noscript_error(mock_redis)
+    await handle_noscript_error(mock_redis, mock_config)
 
     # Assert
     mock_redis.script_load.assert_called()
     assert _REGISTERED_SCRIPT_SHAS.get(REMOVE_RANGE_SCRIPT_NAME) == "new_sha_456"
+
+
+@pytest.mark.asyncio
+async def test_handle_noscript_error_reloads_scripts_with_fakeredis(clear_script_state):
+    # Arrange
+    mock_redis = AsyncMock()
+    mock_redis.script_load = AsyncMock(return_value="fakeredis_sha_789")
+    mock_config = MagicMock()
+    mock_config.is_fake_redis = True
+
+    # Act
+    await handle_noscript_error(mock_redis, mock_config)
+
+    # Assert
+    mock_redis.script_load.assert_called()
+    assert _REGISTERED_SCRIPT_SHAS.get(REMOVE_RANGE_SCRIPT_NAME) == "fakeredis_sha_789"
 
 
 @pytest.mark.asyncio

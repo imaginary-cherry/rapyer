@@ -1,4 +1,5 @@
 import pytest
+import pytest_asyncio
 
 from tests.models.redis_types import DirectRedisDictModel
 
@@ -32,6 +33,47 @@ async def test_redis_dict_apop_with_fakeredis_sanity(setup_fake_redis):
 
 @pytest.mark.asyncio
 async def test_redis_dict_apopitem_with_fakeredis_sanity(setup_fake_redis):
+    # Arrange
+    model = DirectRedisDictModel(metadata={"only_key": "only_value"})
+    await model.asave()
+
+    # Act
+    result = await model.metadata.apopitem()
+
+    # Assert
+    assert result == "only_value"
+    loaded = await DirectRedisDictModel.aget(model.key)
+    assert len(loaded.metadata) == 0
+
+
+@pytest_asyncio.fixture
+async def flush_fakeredis_scripts(setup_fake_redis):
+    await DirectRedisDictModel.Meta.redis.execute_command("SCRIPT", "FLUSH")
+    yield
+
+
+@pytest.mark.asyncio
+async def test_redis_dict_apop_recovers_from_noscript_with_fakeredis(
+    flush_fakeredis_scripts,
+):
+    # Arrange
+    model = DirectRedisDictModel(metadata={"key1": "value1", "key2": "value2"})
+    await model.asave()
+
+    # Act
+    result = await model.metadata.apop("key1")
+
+    # Assert
+    assert result == "value1"
+    loaded = await DirectRedisDictModel.aget(model.key)
+    assert "key1" not in loaded.metadata
+    assert loaded.metadata["key2"] == "value2"
+
+
+@pytest.mark.asyncio
+async def test_redis_dict_apopitem_recovers_from_noscript_with_fakeredis(
+    flush_fakeredis_scripts,
+):
     # Arrange
     model = DirectRedisDictModel(metadata={"only_key": "only_value"})
     await model.asave()
