@@ -1,19 +1,27 @@
-from rapyer.errors import ScriptsNotInitializedError
+from typing import TYPE_CHECKING
+
+from rapyer.errors import PersistentNoScriptError, ScriptsNotInitializedError
 from rapyer.scripts.constants import (
     DATETIME_ADD_SCRIPT_NAME,
     DICT_POP_SCRIPT_NAME,
     DICT_POPITEM_SCRIPT_NAME,
+    FAKEREDIS_VARIANT,
     NUM_FLOORDIV_SCRIPT_NAME,
     NUM_MOD_SCRIPT_NAME,
     NUM_MUL_SCRIPT_NAME,
     NUM_POW_FLOAT_SCRIPT_NAME,
     NUM_POW_SCRIPT_NAME,
     NUM_TRUEDIV_SCRIPT_NAME,
+    REDIS_VARIANT,
     REMOVE_RANGE_SCRIPT_NAME,
     STR_APPEND_SCRIPT_NAME,
     STR_MUL_SCRIPT_NAME,
 )
 from rapyer.scripts.loader import load_script
+from redis.exceptions import NoScriptError
+
+if TYPE_CHECKING:
+    from rapyer.config import RedisConfig
 
 SCRIPT_REGISTRY: list[tuple[str, str, str]] = [
     ("list", "remove_range", REMOVE_RANGE_SCRIPT_NAME),
@@ -41,15 +49,15 @@ def _build_scripts(variant: str) -> dict[str, str]:
 
 
 def get_scripts() -> dict[str, str]:
-    return _build_scripts("redis")
+    return _build_scripts(REDIS_VARIANT)
 
 
 def get_scripts_fakeredis() -> dict[str, str]:
-    return _build_scripts("fakeredis")
+    return _build_scripts(FAKEREDIS_VARIANT)
 
 
 async def register_scripts(redis_client, is_fakeredis: bool = False) -> None:
-    variant = "fakeredis" if is_fakeredis else "redis"
+    variant = FAKEREDIS_VARIANT if is_fakeredis else REDIS_VARIANT
     scripts = _build_scripts(variant)
     for name, script_text in scripts.items():
         sha = await redis_client.script_load(script_text)
@@ -70,10 +78,25 @@ def run_sha(pipeline, script_name: str, keys: int, *args):
     pipeline.evalsha(sha, keys, *args)
 
 
-async def arun_sha(client, script_name: str, keys: int, *args):
+async def arun_sha(
+    client, redis_config: "RedisConfig", script_name: str, keys: int, *args
+):
     sha = get_script(script_name)
-    return await client.evalsha(sha, keys, *args)
+    try:
+        return await client.evalsha(sha, keys, *args)
+    except NoScriptError:
+        pass
+
+    await handle_noscript_error(client, redis_config)
+    sha = get_script(script_name)
+    try:
+        return await client.evalsha(sha, keys, *args)
+    except NoScriptError as e:
+        raise PersistentNoScriptError(
+            "NOSCRIPT error persisted after re-registering scripts. "
+            "This indicates a server-side problem with Redis."
+        ) from e
 
 
-async def handle_noscript_error(redis_client) -> None:
-    await register_scripts(redis_client)
+async def handle_noscript_error(redis_client, redis_config: "RedisConfig"):
+    await register_scripts(redis_client, is_fakeredis=redis_config.is_fake_redis)

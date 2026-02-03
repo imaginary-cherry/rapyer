@@ -36,7 +36,7 @@ from rapyer.fields.index import IndexAnnotation
 from rapyer.fields.key import KeyAnnotation
 from rapyer.fields.safe_load import SafeLoadAnnotation
 from rapyer.links import REDIS_SUPPORTED_LINK
-from rapyer.scripts import handle_noscript_error
+from rapyer.scripts import registry as scripts_registry
 from rapyer.types.base import RedisType, REDIS_DUMP_FLAG_NAME, FAILED_FIELDS_KEY
 from rapyer.types.convert import RedisConverter
 from rapyer.typing_support import Self, Unpack
@@ -570,7 +570,7 @@ class AtomicRedisModel(BaseModel):
                     raise
 
             if noscript_on_first_attempt:
-                await handle_noscript_error(self.Meta.redis)
+                await scripts_registry.handle_noscript_error(self.Meta.redis, self.Meta)
                 evalsha_commands = [
                     (args, options)
                     for args, options in commands_backup
