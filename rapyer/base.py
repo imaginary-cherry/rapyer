@@ -420,7 +420,7 @@ class AtomicRedisModel(BaseModel):
         return model
 
     @classmethod
-    async def afind(cls, *args):
+    async def afind(cls, *args) -> list[Self]:
         # Separate keys (str) from expressions (Expression)
         provided_keys = [arg for arg in args if isinstance(arg, str)]
         expressions = [arg for arg in args if isinstance(arg, Expression)]
@@ -479,7 +479,7 @@ class AtomicRedisModel(BaseModel):
         return instances
 
     @classmethod
-    async def afind_keys(cls):
+    async def afind_keys(cls) -> list[str]:
         return await cls.Meta.redis.keys(f"{cls.class_key_initials()}:*")
 
     @classmethod
