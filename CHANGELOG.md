@@ -2,6 +2,10 @@
 
 ## [1.2.1]
 
+### 🐛 Fixed
+
+- **Inherited Model Field Assignment in Pipeline**: Fixed `__setattr__` to check all model fields (including inherited fields) instead of only the current class's annotations, ensuring proper field handling for inherited models.
+
 ### 🛠️ Technical Improvements
 
 - **NOSCRIPT Error Recovery for Async Operations**: The `arun_sha()` function now automatically recovers from NOSCRIPT errors (e.g., after Redis restart) by re-registering Lua scripts and retrying.
