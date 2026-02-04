@@ -150,6 +150,10 @@ class AtomicRedisModel(BaseModel):
         field_path = self.field_path
         return f"${field_path}" if field_path else "$"
 
+    @property
+    def client(self):
+        return _context_var.get() or self.redis
+
     @classmethod
     def should_refresh(cls):
         return cls.Meta.refresh_ttl and cls.Meta.ttl is not None
@@ -312,10 +316,10 @@ class AtomicRedisModel(BaseModel):
 
     async def asave(self) -> Self:
         model_dump = self.redis_dump()
-        await self.Meta.redis.json().set(self.key, self.json_path, model_dump)
+        await self.client.json().set(self.key, self.json_path, model_dump)
         if self.Meta.ttl is not None:
             nx = not self.Meta.refresh_ttl
-            await self.Meta.redis.expire(self.key, self.Meta.ttl, nx=nx)
+            await self.client.expire(self.key, self.Meta.ttl, nx=nx)
         return self
 
     def redis_dump(self):
