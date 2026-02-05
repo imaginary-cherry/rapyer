@@ -2,6 +2,14 @@
 
 ## [1.2.1]
 
+### ✨ Added
+
+- **Global `rapyer.apipeline()` Function**: Added a global `apipeline()` context manager that enables batched Redis operations across multiple models without requiring a specific model instance.
+
+### 🐛 Fixed
+- **Nested Pipeline Support**: Pipelines can now be properly nested, with each pipeline executing its commands independently when exiting its context.
+  - Inner pipelines commit changes when they exit, while outer pipeline changes remain pending until the outer context exits
+
 ### 🛠️ Technical Improvements
 
 - **Pipeline Support for `asave()`**: The `asave()` method now works correctly within pipeline context, allowing batched save operations.
