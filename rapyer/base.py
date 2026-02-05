@@ -536,7 +536,9 @@ class AtomicRedisModel(BaseModel):
     async def apipeline(
         self, ignore_redis_error: bool = False
     ) -> AbstractAsyncContextManager[Self]:
-        async with apipeline(ignore_redis_error=ignore_redis_error) as pipe:
+        async with apipeline(
+            ignore_redis_error=ignore_redis_error, _meta=cls.Meta
+        ) as pipe:
             try:
                 redis_model = await self.__class__.aget(self.key)
                 unset_fields = {
@@ -685,8 +687,11 @@ async def alock_from_key(
 
 
 @contextlib.asynccontextmanager
-async def apipeline(ignore_redis_error: bool = False) -> AbstractAsyncContextManager:
-    redis = AtomicRedisModel.Meta.redis
+async def apipeline(
+    ignore_redis_error: bool = False, _meta: RedisConfig = None
+) -> AbstractAsyncContextManager:
+    _meta = _meta or AtomicRedisModel.Meta
+    redis = _meta.redis
     async with redis.pipeline(transaction=True) as pipe:
         pipe_prev = _context_var.set(pipe)
         yield pipe
@@ -709,7 +714,7 @@ async def apipeline(ignore_redis_error: bool = False) -> AbstractAsyncContextMan
                 raise
 
         if noscript_on_first_attempt:
-            await scripts_registry.handle_noscript_error(redis, AtomicRedisModel.Meta)
+            await scripts_registry.handle_noscript_error(redis, _meta)
             evalsha_commands = [
                 (args, options)
                 for args, options in commands_backup
