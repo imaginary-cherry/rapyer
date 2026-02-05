@@ -549,7 +549,7 @@ class AtomicRedisModel(BaseModel):
                     redis_model = self
                 else:
                     raise
-            _context_var.set(pipe)
+            pipe_prev = _context_var.set(pipe)
             _context_xx_pipe.set(ignore_redis_error)
             yield redis_model
             commands_backup = list(pipe.command_stack)
@@ -595,7 +595,7 @@ class AtomicRedisModel(BaseModel):
                     "This indicates a server-side problem with Redis."
                 )
 
-            _context_var.set(None)
+            _context_var.reset(pipe_prev)
             _context_xx_pipe.set(False)
 
     def __setattr__(self, name: str, value: Any) -> None:
