@@ -21,6 +21,7 @@ async def test_pipeline__multiple_model_asave__commands_batched_in_single_pipeli
     async with rapyer.apipeline():
         await model1.asave()
         is_model1_saved = await real_redis_client.exists(model1_key)
+        # Check that model1 is not saved yet
         assert is_model1_saved == 0
 
         await model2.asave()
