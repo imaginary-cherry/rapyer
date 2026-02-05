@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.2.1]
+
+### ✨ Added
+
+- **Global `rapyer.apipeline()` Function**: Added a global `apipeline()` context manager that enables batched Redis operations across multiple models without requiring a specific model instance.
+
+### 🐛 Fixed
+- **Nested Pipeline Support**: Pipelines can now be properly nested, with each pipeline executing its commands independently when exiting its context.
+  - Inner pipelines commit changes when they exit, while outer pipeline changes remain pending until the outer context exits
+- **Inherited Model Field Assignment in Pipeline**: Fixed `__setattr__` to check all model fields (including inherited fields) instead of only the current class's annotations, ensuring proper field handling for inherited models.
+
+### 🛠️ Technical Improvements
+
+- **Pipeline Support for `asave()`**: The `asave()` method now works correctly within pipeline context, allowing batched save operations.
+  - Example: `async with model.apipeline() as m: await m.asave()`
+
+- **NOSCRIPT Error Recovery for Async Operations**: The `arun_sha()` function now automatically recovers from NOSCRIPT errors (e.g., after Redis restart) by re-registering Lua scripts and retrying.
+  - If scripts fail to execute after re-registration, raises `PersistentNoScriptError` indicating a server-side issue.
+
+
 ## [1.2.0]
 
 ### 🔄 Changed

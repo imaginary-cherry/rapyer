@@ -6,6 +6,11 @@ Rapyer provides powerful atomic operations that ensure data consistency and prev
 
 The pipeline is a context manager that batches all Redis operations performed on a model into a single atomic transaction. When you enter the pipeline context, the model is automatically loaded to its current state, and all changes are applied atomically when the context exits.
 
+Rapyer provides two ways to use pipelines:
+
+- **Model pipeline**: `model.apipeline()` - Works with a specific model instance
+- **Global pipeline**: `rapyer.apipeline()` - Batches operations across multiple models
+
 ### Basic Usage
 
 ```python
@@ -37,7 +42,6 @@ async def update_user_progress(user: User, points: int, achievement: str):
 2. **Atomicity**: All operations succeed or fail together
 3. **Auto-loading**: Model state is refreshed when entering the context
 4. **Performance**: Multiple operations batched into single Redis transaction
-
 ### Supported Operations
 
 The pipeline context manager supports atomic operations for all Redis types:

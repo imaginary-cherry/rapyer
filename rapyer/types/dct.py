@@ -106,7 +106,13 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
 
     async def apop(self, key, default=None):
         result = await arun_sha(
-            self.client, DICT_POP_SCRIPT_NAME, 1, self.key, self.json_path, key
+            self.client,
+            self.Meta,
+            DICT_POP_SCRIPT_NAME,
+            1,
+            self.key,
+            self.json_path,
+            key,
         )
         super().pop(key, None)
         await self.refresh_ttl_if_needed()
@@ -120,7 +126,12 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
 
     async def apopitem(self):
         result = await arun_sha(
-            self.client, DICT_POPITEM_SCRIPT_NAME, 1, self.key, self.json_path
+            self.client,
+            self.Meta,
+            DICT_POPITEM_SCRIPT_NAME,
+            1,
+            self.key,
+            self.json_path,
         )
         await self.refresh_ttl_if_needed()
 
