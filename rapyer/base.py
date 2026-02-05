@@ -537,7 +537,7 @@ class AtomicRedisModel(BaseModel):
         self, ignore_redis_error: bool = False
     ) -> AbstractAsyncContextManager[Self]:
         async with apipeline(
-            ignore_redis_error=ignore_redis_error, _meta=cls.Meta
+            ignore_redis_error=ignore_redis_error, _meta=self.Meta
         ) as pipe:
             try:
                 redis_model = await self.__class__.aget(self.key)
