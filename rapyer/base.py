@@ -724,3 +724,54 @@ async def alock_from_key(
         yield redis_model
         if save_at_end and redis_model is not None:
             await redis_model.asave()
+
+
+@contextlib.asynccontextmanager
+async def apipeline() -> AbstractAsyncContextManager:
+    async with self.Meta.redis.pipeline(transaction=True) as pipe:
+        pipe_prev = _context_var.set(pipe)
+        yield redis_model
+        commands_backup = list(pipe.command_stack)
+        noscript_on_first_attempt = False
+        noscript_on_retry = False
+
+        try:
+            if self.should_refresh():
+                pipe.expire(self.key, self.Meta.ttl)
+            await pipe.execute()
+        except NoScriptError:
+            noscript_on_first_attempt = True
+        except ResponseError as exc:
+            if ignore_redis_error:
+                logger.warning(
+                    "Swallowed ResponseError during pipeline.execute() with "
+                    "ignore_redis_error=True for key %r: %s",
+                    getattr(self, "key", None),
+                    exc,
+                )
+            else:
+                raise
+
+        if noscript_on_first_attempt:
+            await scripts_registry.handle_noscript_error(self.Meta.redis, self.Meta)
+            evalsha_commands = [
+                (args, options)
+                for args, options in commands_backup
+                if args[0] == "EVALSHA"
+            ]
+            # Retry execute the pipeline actions
+            async with self.Meta.redis.pipeline(transaction=True) as retry_pipe:
+                for args, options in evalsha_commands:
+                    retry_pipe.execute_command(*args, **options)
+                try:
+                    await retry_pipe.execute()
+                except NoScriptError:
+                    noscript_on_retry = True
+
+        if noscript_on_retry:
+            raise PersistentNoScriptError(
+                "NOSCRIPT error persisted after re-registering scripts. "
+                "This indicates a server-side problem with Redis."
+            )
+
+        _context_var.set(pipe_prev)
