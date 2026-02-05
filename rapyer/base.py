@@ -686,7 +686,8 @@ async def alock_from_key(
 
 @contextlib.asynccontextmanager
 async def apipeline(ignore_redis_error: bool = False) -> AbstractAsyncContextManager:
-    async with AtomicRedisModel.Meta.redis.pipeline(transaction=True) as pipe:
+    redis = AtomicRedisModel.Meta.redis
+    async with redis.pipeline(transaction=True) as pipe:
         pipe_prev = _context_var.set(pipe)
         yield pipe
         commands_backup = list(pipe.command_stack)
@@ -701,22 +702,21 @@ async def apipeline(ignore_redis_error: bool = False) -> AbstractAsyncContextMan
             if ignore_redis_error:
                 logger.warning(
                     "Swallowed ResponseError during pipeline.execute() with "
-                    "ignore_redis_error=True for key %r: %s",
-                    getattr(self, "key", None),
+                    "ignore_redis_error=True: %s",
                     exc,
                 )
             else:
                 raise
 
         if noscript_on_first_attempt:
-            await scripts_registry.handle_noscript_error(self.Meta.redis, self.Meta)
+            await scripts_registry.handle_noscript_error(redis, AtomicRedisModel.Meta)
             evalsha_commands = [
                 (args, options)
                 for args, options in commands_backup
                 if args[0] == "EVALSHA"
             ]
             # Retry execute the pipeline actions
-            async with self.Meta.redis.pipeline(transaction=True) as retry_pipe:
+            async with redis.pipeline(transaction=True) as retry_pipe:
                 for args, options in evalsha_commands:
                     retry_pipe.execute_command(*args, **options)
                 try:
