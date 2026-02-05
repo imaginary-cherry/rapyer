@@ -18,12 +18,8 @@ from pydantic import (
     ValidationError,
 )
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
-from redis.commands.search.index_definition import IndexDefinition, IndexType
-from redis.commands.search.query import Query
-from redis.exceptions import NoScriptError, ResponseError
-
 from rapyer.config import RedisConfig
-from rapyer.context import _context_var, _context_xx_pipe
+from rapyer.context import _context_var
 from rapyer.errors.base import (
     KeyNotFound,
     PersistentNoScriptError,
@@ -56,6 +52,9 @@ from rapyer.utils.redis import (
     acquire_lock,
     update_keys_in_pipeline,
 )
+from redis.commands.search.index_definition import IndexDefinition, IndexType
+from redis.commands.search.query import Query
+from redis.exceptions import NoScriptError, ResponseError
 
 logger = logging.getLogger("rapyer")
 
@@ -550,7 +549,6 @@ class AtomicRedisModel(BaseModel):
                 else:
                     raise
             pipe_prev = _context_var.set(pipe)
-            _context_xx_pipe.set(ignore_redis_error)
             yield redis_model
             commands_backup = list(pipe.command_stack)
             noscript_on_first_attempt = False
@@ -596,7 +594,6 @@ class AtomicRedisModel(BaseModel):
                 )
 
             _context_var.reset(pipe_prev)
-            _context_xx_pipe.set(False)
 
     def __setattr__(self, name: str, value: Any) -> None:
         if name not in self.__annotations__ or value is None:
