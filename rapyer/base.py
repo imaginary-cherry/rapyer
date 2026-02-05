@@ -556,7 +556,7 @@ class AtomicRedisModel(BaseModel):
                 pipe.expire(self.key, self.Meta.ttl)
 
     def __setattr__(self, name: str, value: Any) -> None:
-        if name not in self.__annotations__ or value is None:
+        if name not in self.__class__.model_fields or value is None:
             super().__setattr__(name, value)
             return
 

@@ -9,6 +9,7 @@
 ### 🐛 Fixed
 - **Nested Pipeline Support**: Pipelines can now be properly nested, with each pipeline executing its commands independently when exiting its context.
   - Inner pipelines commit changes when they exit, while outer pipeline changes remain pending until the outer context exits
+- **Inherited Model Field Assignment in Pipeline**: Fixed `__setattr__` to check all model fields (including inherited fields) instead of only the current class's annotations, ensuring proper field handling for inherited models.
 
 ### 🛠️ Technical Improvements
 
