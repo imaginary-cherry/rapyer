@@ -728,16 +728,14 @@ async def alock_from_key(
 
 @contextlib.asynccontextmanager
 async def apipeline() -> AbstractAsyncContextManager:
-    async with self.Meta.redis.pipeline(transaction=True) as pipe:
+    async with AtomicRedisModel.Meta.redis.pipeline(transaction=True) as pipe:
         pipe_prev = _context_var.set(pipe)
-        yield redis_model
+        yield
         commands_backup = list(pipe.command_stack)
         noscript_on_first_attempt = False
         noscript_on_retry = False
 
         try:
-            if self.should_refresh():
-                pipe.expire(self.key, self.Meta.ttl)
             await pipe.execute()
         except NoScriptError:
             noscript_on_first_attempt = True
