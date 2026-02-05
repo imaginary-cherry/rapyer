@@ -152,7 +152,7 @@ class AtomicRedisModel(BaseModel):
 
     @property
     def client(self):
-        return _context_var.get() or self.redis
+        return _context_var.get() or self.Meta.redis
 
     @classmethod
     def should_refresh(cls):
