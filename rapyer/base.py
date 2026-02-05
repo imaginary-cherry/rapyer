@@ -18,6 +18,8 @@ from pydantic import (
     ValidationError,
 )
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
+from redis.client import Pipeline
+
 from rapyer.config import RedisConfig
 from rapyer.context import _context_var
 from rapyer.errors.base import (
@@ -689,11 +691,12 @@ async def alock_from_key(
 @contextlib.asynccontextmanager
 async def apipeline(
     ignore_redis_error: bool = False, _meta: RedisConfig = None
-) -> AbstractAsyncContextManager:
+) -> AbstractAsyncContextManager[Pipeline]:
     _meta = _meta or AtomicRedisModel.Meta
     redis = _meta.redis
     async with redis.pipeline(transaction=True) as pipe:
         pipe_prev = _context_var.set(pipe)
+    try:
         yield pipe
         commands_backup = list(pipe.command_stack)
         noscript_on_first_attempt = False
@@ -734,5 +737,5 @@ async def apipeline(
                 "NOSCRIPT error persisted after re-registering scripts. "
                 "This indicates a server-side problem with Redis."
             )
-
+    finally:
         _context_var.reset(pipe_prev)
