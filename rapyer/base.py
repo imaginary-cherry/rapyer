@@ -342,7 +342,7 @@ class AtomicRedisModel(BaseModel):
             raise RuntimeError("Can only duplicate from top level model")
 
         duplicated_models = [self.__class__(**self.model_dump()) for _ in range(num)]
-        await asyncio.gather(*[model.asave() for model in duplicated_models])
+        await self.ainsert(*duplicated_models)
         return duplicated_models
 
     def update(self, **kwargs):
