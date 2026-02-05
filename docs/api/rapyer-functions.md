@@ -166,6 +166,76 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+## apipeline()
+
+```python
+async def apipeline(ignore_redis_error: bool = False)
+```
+
+Creates a pipeline context manager for batching Redis operations across multiple models.
+
+### Parameters
+
+- **ignore_redis_error** (`bool`, optional): If True, suppresses `ResponseError` exceptions during pipeline execution. Default is False.
+
+### Description
+
+The global `rapyer.apipeline()` function creates a Redis pipeline that batches all operations performed within its context into a single atomic transaction. Unlike the model-specific `model.apipeline()`, this global function:
+
+- Works without a specific model instance
+- Allows saving multiple models of different types in a single transaction
+- Supports nested pipelines (each pipeline commits independently when exiting)
+
+All `asave()` calls and field modifications within the pipeline are queued and executed together when the context exits.
+
+### Example
+
+```python
+import rapyer
+from rapyer import AtomicRedisModel
+
+
+class User(AtomicRedisModel):
+    name: str
+    balance: int = 0
+
+
+class Order(AtomicRedisModel):
+    user_id: str
+    total: float
+
+
+async def create_order_with_user(name: str, order_total: float):
+    user = User(name=name, balance=100)
+    order = Order(user_id=user.key, total=order_total)
+
+    # Both models saved in a single atomic transaction
+    async with rapyer.apipeline():
+        await user.asave()
+        await order.asave()
+```
+
+### Nested Pipelines
+
+Pipelines can be nested. Each pipeline commits its changes when its context exits:
+
+```python
+async def nested_example():
+    user = User(name="Alice", balance=100)
+    order = Order(user_id=user.key, total=50.0)
+    await user.asave()
+    await order.asave()
+
+    async with user.apipeline() as u:
+        u.balance -= 50
+
+        async with order.apipeline() as o:
+            o.total = 75.0
+        # Order changes committed here
+
+    # User changes committed here
+```
+
 ## alock_from_key()
 
 ```python

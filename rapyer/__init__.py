@@ -7,6 +7,7 @@ from rapyer.base import (
     find_redis_models,
     ainsert,
     alock_from_key,
+    apipeline,
 )
 from rapyer.init import init_rapyer, teardown_rapyer
 
@@ -19,4 +20,5 @@ __all__ = [
     "find_redis_models",
     "ainsert",
     "alock_from_key",
+    "apipeline",
 ]
