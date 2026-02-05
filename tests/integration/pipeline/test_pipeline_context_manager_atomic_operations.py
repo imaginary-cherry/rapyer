@@ -1,5 +1,5 @@
 import pytest
-
+from rapyer.context import _context_var
 from tests.models.collection_types import PipelineTestModel, ComprehensiveTestModel
 
 
@@ -136,8 +136,6 @@ async def test_pipeline_context_manager__pipeline_context_cleanup__check_context
     # Arrange
     model = PipelineTestModel(metadata={"test": "value"})
     await model.asave()
-
-    from rapyer.context import _context_var
 
     # Act & Assert - Context should be None before a pipeline
     assert _context_var.get() is None
