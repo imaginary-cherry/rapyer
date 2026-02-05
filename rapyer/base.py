@@ -730,4 +730,4 @@ async def apipeline(ignore_redis_error: bool = False) -> AbstractAsyncContextMan
                 "This indicates a server-side problem with Redis."
             )
 
-        _context_var.set(pipe_prev)
+        _context_var.reset(pipe_prev)
