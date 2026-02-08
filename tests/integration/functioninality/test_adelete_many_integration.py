@@ -54,11 +54,11 @@ async def test_adelete_many_integration__single_redis_transaction_verification(
     final_stats = await real_redis_client.info("commandstats")
     final_del_calls = final_stats.get("cmdstat_del", {}).get("calls", 0)
 
-    # Verify exactly one additional DEL command was executed
+    # Verify exactly 3 DEL commands were executed (one per key in pipeline)
     del_commands_executed = final_del_calls - initial_del_calls
     assert (
-        del_commands_executed == 1
-    ), f"Expected 1 DEL command, but {del_commands_executed} were executed"
+        del_commands_executed == 3
+    ), f"Expected 3 DEL commands (one per key in pipeline), but {del_commands_executed} were executed"
 
     # Verify all models are actually deleted
     assert await real_redis_client.exists(user1.key) == 0

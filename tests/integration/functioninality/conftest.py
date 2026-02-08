@@ -18,3 +18,10 @@ def test_models():
 async def inserted_test_models(test_models):
     await IndexTestModel.ainsert(*test_models)
     return test_models
+
+
+@pytest_asyncio.fixture
+async def create_index(redis_client):
+    await IndexTestModel.acreate_index()
+    yield
+    await IndexTestModel.adelete_index()
