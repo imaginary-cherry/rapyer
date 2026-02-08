@@ -19,8 +19,10 @@ from pydantic import (
 )
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
 from redis.client import Pipeline
+from redis.commands.search.aggregation import AggregateRequest, Cursor
 
 from rapyer.config import RedisConfig
+from rapyer.result import DeleteResult
 from rapyer.context import _context_var
 from rapyer.errors.base import (
     KeyNotFound,
@@ -508,10 +510,51 @@ class AtomicRedisModel(BaseModel):
         return await self.adelete_by_key(self.key)
 
     @classmethod
-    async def adelete_many(cls, *args: Unpack[Self | str]):
-        await cls.Meta.redis.delete(
-            *[model if isinstance(model, str) else model.key for model in args]
-        )
+    async def adelete_many(cls, *args: Unpack[Self | str | Expression]) -> "DeleteResult":
+        provided_keys = [arg for arg in args if isinstance(arg, str)]
+        model_instances = [arg for arg in args if isinstance(arg, AtomicRedisModel)]
+        expressions = [arg for arg in args if isinstance(arg, Expression)]
+
+        if not args:
+            raise TypeError("adelete_many requires at least one argument")
+
+        if expressions and (provided_keys or model_instances):
+            raise TypeError("Cannot mix expressions with keys or model instances in adelete_many")
+
+        if provided_keys or model_instances:
+            model_keys = [m.key for m in model_instances]
+            prefixed_keys = [
+                k if ":" in k else f"{cls.class_key_initials()}:{k}"
+                for k in provided_keys
+            ]
+            targeted_keys = model_keys + prefixed_keys
+        elif expressions:
+            combined_expression = functools.reduce(lambda a, b: a & b, expressions)
+            query_string = combined_expression.create_filter()
+
+            agg_request = AggregateRequest(query_string).load("@__key").cursor(count=1000)
+            index_name = cls.index_name()
+            targeted_keys = []
+
+            result = await cls.Meta.redis.ft(index_name).aggregate(agg_request)
+            targeted_keys.extend([row[1] for row in result.rows])
+
+            while result.cursor and result.cursor.cid != 0:
+                result = await cls.Meta.redis.ft(index_name).aggregate(result.cursor)
+                targeted_keys.extend([row[1] for row in result.rows])
+        else:
+            targeted_keys = []
+
+        if not targeted_keys:
+            return DeleteResult(count=0)
+
+        async with cls.Meta.redis.pipeline() as pipe:
+            for key in targeted_keys:
+                pipe.delete(key)
+            results = await pipe.execute()
+
+        count = sum(results)
+        return DeleteResult(count=count)
 
     @classmethod
     @contextlib.asynccontextmanager
