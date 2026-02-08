@@ -431,6 +431,7 @@ class AtomicRedisModel(BaseModel):
         expressions = [arg for arg in args if isinstance(arg, Expression)]
         raise_on_missing = bool(provided_keys)
 
+        # TODO - in 1.3.0 this should raise an error
         if provided_keys and expressions:
             logger.warning(
                 "afind called with both keys and expressions; expressions ignored"
