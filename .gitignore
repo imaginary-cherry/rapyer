@@ -127,3 +127,4 @@ git-flow-plus.config
 /scripts/
 .jbeval
 .claude/
+.planning/
