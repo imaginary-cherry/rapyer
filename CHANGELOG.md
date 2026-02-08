@@ -1,11 +1,30 @@
 # Changelog
 
-## [1.2.1]
+## [1.2.2]
 
 ### 🛠️ Technical Improvements
 
-- **NOSCRIPT Error Recovery for Async Operations**: The `arun_sha()` function now automatically recovers from NOSCRIPT errors (e.g., after Redis restart) by re-registering Lua scripts and retrying.
-  - If scripts fail to execute after re-registration, raises `PersistentNoScriptError` indicating a server-side issue.
+- **Optimized `aduplicate_many()`**: The `aduplicate_many()` method now uses bulk `ainsert()` instead of individual `asave()` calls for better performance.
+
+
+## [1.2.1]
+
+### ✨ Added
+
+- **Global `rapyer.apipeline()` Function**: Added a global `apipeline()` context manager that enables batched Redis operations across multiple models without requiring a specific model instance.
+
+### 🐛 Fixed
+- **Nested Pipeline Support**: Pipelines can now be properly nested, with each pipeline executing its commands independently when exiting its context.
+  - Inner pipelines commit changes when they exit, while outer pipeline changes remain pending until the outer context exits
+- **Atmoic mocdel field assignments in Pipeline**: Fixed `__setattr__` to check all model fields (including inherited fields) instead of only the current class's annotations, ensuring proper field handling for inherited models.
+- **Bug when apipeline raises an error**: Fix an error when apipeline failed that causes future redis action to have no effect 
+
+### 🛠️ Technical Improvements
+
+- **Pipeline Support for `asave()`**: The `asave()` method now works correctly within pipeline context, allowing batched save operations.
+  - Example: `async with model.apipeline() as m: await m.asave()`
+
+- **NOSCRIPT Error Recovery for Async Operations**: Recover scripts for redis action when script was deleted (for apop and apop_item functions). 
 
 
 ## [1.2.0]

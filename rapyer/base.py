@@ -18,12 +18,10 @@ from pydantic import (
     ValidationError,
 )
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
-from redis.commands.search.index_definition import IndexDefinition, IndexType
-from redis.commands.search.query import Query
-from redis.exceptions import NoScriptError, ResponseError
+from redis.client import Pipeline
 
 from rapyer.config import RedisConfig
-from rapyer.context import _context_var, _context_xx_pipe
+from rapyer.context import _context_var
 from rapyer.errors.base import (
     KeyNotFound,
     PersistentNoScriptError,
@@ -56,6 +54,9 @@ from rapyer.utils.redis import (
     acquire_lock,
     update_keys_in_pipeline,
 )
+from redis.commands.search.index_definition import IndexDefinition, IndexType
+from redis.commands.search.query import Query
+from redis.exceptions import NoScriptError, ResponseError
 
 logger = logging.getLogger("rapyer")
 
@@ -149,6 +150,10 @@ class AtomicRedisModel(BaseModel):
     def json_path(self):
         field_path = self.field_path
         return f"${field_path}" if field_path else "$"
+
+    @property
+    def client(self):
+        return _context_var.get() or self.Meta.redis
 
     @classmethod
     def should_refresh(cls):
@@ -312,10 +317,10 @@ class AtomicRedisModel(BaseModel):
 
     async def asave(self) -> Self:
         model_dump = self.redis_dump()
-        await self.Meta.redis.json().set(self.key, self.json_path, model_dump)
+        await self.client.json().set(self.key, self.json_path, model_dump)
         if self.Meta.ttl is not None:
             nx = not self.Meta.refresh_ttl
-            await self.Meta.redis.expire(self.key, self.Meta.ttl, nx=nx)
+            await self.client.expire(self.key, self.Meta.ttl, nx=nx)
         return self
 
     def redis_dump(self):
@@ -337,7 +342,7 @@ class AtomicRedisModel(BaseModel):
             raise RuntimeError("Can only duplicate from top level model")
 
         duplicated_models = [self.__class__(**self.model_dump()) for _ in range(num)]
-        await asyncio.gather(*[model.asave() for model in duplicated_models])
+        await self.ainsert(*duplicated_models)
         return duplicated_models
 
     def update(self, **kwargs):
@@ -533,7 +538,9 @@ class AtomicRedisModel(BaseModel):
     async def apipeline(
         self, ignore_redis_error: bool = False
     ) -> AbstractAsyncContextManager[Self]:
-        async with self.Meta.redis.pipeline(transaction=True) as pipe:
+        async with apipeline(
+            ignore_redis_error=ignore_redis_error, _meta=self.Meta
+        ) as pipe:
             try:
                 redis_model = await self.__class__.aget(self.key)
                 unset_fields = {
@@ -545,57 +552,13 @@ class AtomicRedisModel(BaseModel):
                     redis_model = self
                 else:
                     raise
-            _context_var.set(pipe)
-            _context_xx_pipe.set(ignore_redis_error)
             yield redis_model
-            commands_backup = list(pipe.command_stack)
-            noscript_on_first_attempt = False
-            noscript_on_retry = False
 
-            try:
-                if self.should_refresh():
-                    pipe.expire(self.key, self.Meta.ttl)
-                await pipe.execute()
-            except NoScriptError:
-                noscript_on_first_attempt = True
-            except ResponseError as exc:
-                if ignore_redis_error:
-                    logger.warning(
-                        "Swallowed ResponseError during pipeline.execute() with "
-                        "ignore_redis_error=True for key %r: %s",
-                        getattr(self, "key", None),
-                        exc,
-                    )
-                else:
-                    raise
-
-            if noscript_on_first_attempt:
-                await scripts_registry.handle_noscript_error(self.Meta.redis, self.Meta)
-                evalsha_commands = [
-                    (args, options)
-                    for args, options in commands_backup
-                    if args[0] == "EVALSHA"
-                ]
-                # Retry execute the pipeline actions
-                async with self.Meta.redis.pipeline(transaction=True) as retry_pipe:
-                    for args, options in evalsha_commands:
-                        retry_pipe.execute_command(*args, **options)
-                    try:
-                        await retry_pipe.execute()
-                    except NoScriptError:
-                        noscript_on_retry = True
-
-            if noscript_on_retry:
-                raise PersistentNoScriptError(
-                    "NOSCRIPT error persisted after re-registering scripts. "
-                    "This indicates a server-side problem with Redis."
-                )
-
-            _context_var.set(None)
-            _context_xx_pipe.set(False)
+            if self.should_refresh():
+                pipe.expire(self.key, self.Meta.ttl)
 
     def __setattr__(self, name: str, value: Any) -> None:
-        if name not in self.__annotations__ or value is None:
+        if name not in self.__class__.model_fields or value is None:
             super().__setattr__(name, value)
             return
 
@@ -723,3 +686,56 @@ async def alock_from_key(
         yield redis_model
         if save_at_end and redis_model is not None:
             await redis_model.asave()
+
+
+@contextlib.asynccontextmanager
+async def apipeline(
+    ignore_redis_error: bool = False, _meta: RedisConfig = None
+) -> AbstractAsyncContextManager[Pipeline]:
+    _meta = _meta or AtomicRedisModel.Meta
+    redis = _meta.redis
+    async with redis.pipeline(transaction=True) as pipe:
+        pipe_prev = _context_var.set(pipe)
+    try:
+        yield pipe
+        commands_backup = list(pipe.command_stack)
+        noscript_on_first_attempt = False
+        noscript_on_retry = False
+
+        try:
+            await pipe.execute()
+        except NoScriptError:
+            noscript_on_first_attempt = True
+        except ResponseError as exc:
+            if ignore_redis_error:
+                logger.warning(
+                    "Swallowed ResponseError during pipeline.execute() with "
+                    "ignore_redis_error=True: %s",
+                    exc,
+                )
+            else:
+                raise
+
+        if noscript_on_first_attempt:
+            await scripts_registry.handle_noscript_error(redis, _meta)
+            evalsha_commands = [
+                (args, options)
+                for args, options in commands_backup
+                if args[0] == "EVALSHA"
+            ]
+            # Retry execute the pipeline actions
+            async with redis.pipeline(transaction=True) as retry_pipe:
+                for args, options in evalsha_commands:
+                    retry_pipe.execute_command(*args, **options)
+                try:
+                    await retry_pipe.execute()
+                except NoScriptError:
+                    noscript_on_retry = True
+
+        if noscript_on_retry:
+            raise PersistentNoScriptError(
+                "NOSCRIPT error persisted after re-registering scripts. "
+                "This indicates a server-side problem with Redis."
+            )
+    finally:
+        _context_var.reset(pipe_prev)
