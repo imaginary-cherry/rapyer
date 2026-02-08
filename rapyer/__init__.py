@@ -10,6 +10,7 @@ from rapyer.base import (
     apipeline,
 )
 from rapyer.init import init_rapyer, teardown_rapyer
+from rapyer.result import DeleteResult
 
 __all__ = [
     "AtomicRedisModel",
@@ -21,4 +22,5 @@ __all__ = [
     "ainsert",
     "alock_from_key",
     "apipeline",
+    "DeleteResult",
 ]
