@@ -659,7 +659,6 @@ class AtomicRedisModel(BaseModel):
 
 
 REDIS_MODELS: list[type[AtomicRedisModel]] = []
-RapyerDeleteResult.model_rebuild()
 
 
 async def aget(redis_key: str) -> AtomicRedisModel:
