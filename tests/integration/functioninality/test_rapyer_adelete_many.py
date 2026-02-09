@@ -1,6 +1,6 @@
 import pytest
 import rapyer
-from rapyer import ModuleDeleteResult
+from rapyer import RapyerDeleteResult
 from rapyer.errors import RapyerModelDoesntExistError
 from tests.models.simple_types import StrModel, IntModel
 from tests.models.specialized import UserModel
@@ -21,7 +21,7 @@ async def test_rapyer_adelete_many__string_keys_sanity(real_redis_client):
     result = await rapyer.adelete_many(str_model.key, int_model.key)
 
     # Assert
-    assert isinstance(result, ModuleDeleteResult)
+    assert isinstance(result, RapyerDeleteResult)
     assert result.count == 2
     assert result.by_model == {StrModel: 1, IntModel: 1}
     assert await real_redis_client.exists(str_model.key) == 0
@@ -43,7 +43,7 @@ async def test_rapyer_adelete_many__model_instances_sanity(real_redis_client):
     result = await rapyer.adelete_many(str_model, int_model)
 
     # Assert
-    assert isinstance(result, ModuleDeleteResult)
+    assert isinstance(result, RapyerDeleteResult)
     assert result.count == 2
     assert result.by_model == {StrModel: 1, IntModel: 1}
     assert await real_redis_client.exists(str_model.key) == 0
@@ -68,7 +68,7 @@ async def test_rapyer_adelete_many__mixed_keys_and_instances(real_redis_client):
     result = await rapyer.adelete_many(str_model.key, int_model, user_model.key)
 
     # Assert
-    assert isinstance(result, ModuleDeleteResult)
+    assert isinstance(result, RapyerDeleteResult)
     assert result.count == 3
     assert result.by_model == {StrModel: 1, IntModel: 1, UserModel: 1}
     assert await real_redis_client.exists(str_model.key) == 0
@@ -94,7 +94,7 @@ async def test_rapyer_adelete_many__multiple_same_class(real_redis_client):
     result = await rapyer.adelete_many(user1, user2, user3)
 
     # Assert
-    assert isinstance(result, ModuleDeleteResult)
+    assert isinstance(result, RapyerDeleteResult)
     assert result.count == 3
     assert result.by_model == {UserModel: 3}
     assert await real_redis_client.exists(user1.key) == 0
@@ -128,7 +128,7 @@ async def test_rapyer_adelete_many__nonexistent_key_silent_skip(real_redis_clien
     result = await rapyer.adelete_many(nonexistent_key)
 
     # Assert
-    assert isinstance(result, ModuleDeleteResult)
+    assert isinstance(result, RapyerDeleteResult)
     assert result.count == 0
     assert result.by_model == {}
 
@@ -146,13 +146,15 @@ async def test_rapyer_adelete_many__stale_model_silent_skip(real_redis_client):
     result = await rapyer.adelete_many(user)
 
     # Assert
-    assert isinstance(result, ModuleDeleteResult)
+    assert isinstance(result, RapyerDeleteResult)
     assert result.count == 0
     assert result.by_model == {}
 
 
 @pytest.mark.asyncio
-async def test_rapyer_adelete_many__returns_module_delete_result_type(real_redis_client):
+async def test_rapyer_adelete_many__returns_module_delete_result_type(
+    real_redis_client,
+):
     # Arrange
     str_model = StrModel(name="test", description="test")
     await str_model.asave()
@@ -161,7 +163,7 @@ async def test_rapyer_adelete_many__returns_module_delete_result_type(real_redis
     result = await rapyer.adelete_many(str_model.key)
 
     # Assert
-    assert isinstance(result, ModuleDeleteResult)
+    assert isinstance(result, RapyerDeleteResult)
     assert result.count == 1
     assert result.by_model == {StrModel: 1}
 
@@ -189,7 +191,7 @@ async def test_rapyer_adelete_many__per_model_breakdown_only_counts_deleted(
     result = await rapyer.adelete_many(str_model1.key, str_model2.key, int_model.key)
 
     # Assert
-    assert isinstance(result, ModuleDeleteResult)
+    assert isinstance(result, RapyerDeleteResult)
     assert result.count == 2
     assert result.by_model == {StrModel: 1, IntModel: 1}
     assert await real_redis_client.exists(str_model1.key) == 0

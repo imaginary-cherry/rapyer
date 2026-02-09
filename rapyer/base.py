@@ -22,7 +22,7 @@ from redis.client import Pipeline
 from redis.commands.search.aggregation import AggregateRequest, Cursor
 
 from rapyer.config import RedisConfig
-from rapyer.result import DeleteResult, ModuleDeleteResult
+from rapyer.result import DeleteResult, RapyerDeleteResult
 from rapyer.context import _context_var
 from rapyer.errors.base import (
     KeyNotFound,
@@ -510,7 +510,9 @@ class AtomicRedisModel(BaseModel):
         return await self.adelete_by_key(self.key)
 
     @classmethod
-    async def adelete_many(cls, *args: Unpack[Self | str | Expression]) -> "DeleteResult":
+    async def adelete_many(
+        cls, *args: Unpack[Self | str | Expression]
+    ) -> "DeleteResult":
         provided_keys = [arg for arg in args if isinstance(arg, str)]
         model_instances = [arg for arg in args if isinstance(arg, AtomicRedisModel)]
         expressions = [arg for arg in args if isinstance(arg, Expression)]
@@ -519,7 +521,9 @@ class AtomicRedisModel(BaseModel):
             raise TypeError("adelete_many requires at least one argument")
 
         if expressions and (provided_keys or model_instances):
-            raise TypeError("Cannot mix expressions with keys or model instances in adelete_many")
+            raise TypeError(
+                "Cannot mix expressions with keys or model instances in adelete_many"
+            )
 
         if provided_keys or model_instances:
             model_keys = [m.key for m in model_instances]
@@ -532,7 +536,9 @@ class AtomicRedisModel(BaseModel):
             combined_expression = functools.reduce(lambda a, b: a & b, expressions)
             query_string = combined_expression.create_filter()
 
-            agg_request = AggregateRequest(query_string).load("@__key").cursor(count=1000)
+            agg_request = (
+                AggregateRequest(query_string).load("@__key").cursor(count=1000)
+            )
             index_name = cls.index_name()
             targeted_keys = []
 
@@ -647,7 +653,7 @@ class AtomicRedisModel(BaseModel):
 
 
 REDIS_MODELS: list[type[AtomicRedisModel]] = []
-ModuleDeleteResult.model_rebuild()
+RapyerDeleteResult.model_rebuild()
 
 
 async def aget(redis_key: str) -> AtomicRedisModel:
@@ -719,7 +725,7 @@ async def ainsert(*models: Unpack[AtomicRedisModel]) -> list[AtomicRedisModel]:
     return models
 
 
-async def adelete_many(*args: str | AtomicRedisModel) -> ModuleDeleteResult:
+async def adelete_many(*args: str | AtomicRedisModel) -> RapyerDeleteResult:
     if not args:
         raise TypeError("adelete_many requires at least one argument")
 
@@ -758,7 +764,7 @@ async def adelete_many(*args: str | AtomicRedisModel) -> ModuleDeleteResult:
             per_class_count[klass] = per_class_count.get(klass, 0) + 1
 
     total = sum(per_class_count.values())
-    return ModuleDeleteResult(count=total, by_model=per_class_count)
+    return RapyerDeleteResult(count=total, by_model=per_class_count)
 
 
 @contextlib.asynccontextmanager

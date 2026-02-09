@@ -11,7 +11,7 @@ from rapyer.base import (
     apipeline,
 )
 from rapyer.init import init_rapyer, teardown_rapyer
-from rapyer.result import DeleteResult, ModuleDeleteResult
+from rapyer.result import DeleteResult, RapyerDeleteResult
 
 __all__ = [
     "AtomicRedisModel",
@@ -25,5 +25,5 @@ __all__ = [
     "alock_from_key",
     "apipeline",
     "DeleteResult",
-    "ModuleDeleteResult",
+    "RapyerDeleteResult",
 ]

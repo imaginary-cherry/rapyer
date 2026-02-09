@@ -12,7 +12,7 @@ class DeleteResult(BaseModel):
     count: int
 
 
-class ModuleDeleteResult(BaseModel):
+class RapyerDeleteResult(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     count: int
