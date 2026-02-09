@@ -1,5 +1,6 @@
 import pytest
 
+import rapyer
 from rapyer import DeleteResult
 from tests.models.index_types import IndexTestModel
 from tests.models.specialized import UserModel
@@ -13,14 +14,7 @@ async def test_adelete_many_integration__delete_multiple_models_sanity(
     user1 = UserModel(tags=["tag1"])
     user2 = UserModel(tags=["tag2"])
     user3 = UserModel(tags=["tag3"])
-
-    await user1.asave()
-    await user2.asave()
-    await user3.asave()
-
-    assert await real_redis_client.exists(user1.key) == 1
-    assert await real_redis_client.exists(user2.key) == 1
-    assert await real_redis_client.exists(user3.key) == 1
+    await rapyer.ainsert(user1, user2, user3)
 
     # Act
     result = await UserModel.adelete_many(user1, user2.key, user3)
@@ -41,10 +35,7 @@ async def test_adelete_many_integration__single_redis_transaction_verification(
     user1 = UserModel(tags=["tag1"])
     user2 = UserModel(tags=["tag2"])
     user3 = UserModel(tags=["tag3"])
-
-    await user1.asave()
-    await user2.asave()
-    await user3.asave()
+    await rapyer.ainsert(user1, user2, user3)
 
     initial_stats = await real_redis_client.info("commandstats")
     initial_del_calls = initial_stats.get("cmdstat_del", {}).get("calls", 0)
@@ -162,9 +153,7 @@ async def test_adelete_many__mixed_expressions_and_keys_raises_type_error(
 async def test_adelete_many__key_auto_prefix(real_redis_client):
     # Arrange
     user = UserModel(tags=["test"])
-    await user.asave()
-
-    assert await real_redis_client.exists(user.key) == 1
+    await rapyer.ainsert(user)
 
     # Act
     result = await UserModel.adelete_many(user.pk)
@@ -179,9 +168,7 @@ async def test_adelete_many__key_auto_prefix(real_redis_client):
 async def test_adelete_many__full_key_no_prefix(real_redis_client):
     # Arrange
     user = UserModel(tags=["test"])
-    await user.asave()
-
-    assert await real_redis_client.exists(user.key) == 1
+    await rapyer.ainsert(user)
 
     # Act
     result = await UserModel.adelete_many(user.key)
@@ -207,7 +194,7 @@ async def test_adelete_many__missing_key_silent_skip(real_redis_client):
 async def test_adelete_many__stale_model_silent_skip(real_redis_client):
     # Arrange
     user = UserModel(tags=["test"])
-    await user.asave()
+    await rapyer.ainsert(user)
     await real_redis_client.delete(user.key)
 
     # Act
@@ -224,10 +211,7 @@ async def test_adelete_many__models_and_keys_mixed(real_redis_client):
     user1 = UserModel(tags=["tag1"])
     user2 = UserModel(tags=["tag2"])
     user3 = UserModel(tags=["tag3"])
-
-    await user1.asave()
-    await user2.asave()
-    await user3.asave()
+    await rapyer.ainsert(user1, user2, user3)
 
     # Act
     result = await UserModel.adelete_many(user1, user2.key, user3.pk)
@@ -244,7 +228,7 @@ async def test_adelete_many__models_and_keys_mixed(real_redis_client):
 async def test_adelete_many__returns_delete_result_type(real_redis_client):
     # Arrange
     user = UserModel(tags=["test"])
-    await user.asave()
+    await rapyer.ainsert(user)
 
     # Act
     result = await UserModel.adelete_many(user.key)

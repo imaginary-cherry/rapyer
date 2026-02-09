@@ -11,11 +11,7 @@ async def test_rapyer_adelete_many__string_keys_sanity(real_redis_client):
     # Arrange
     str_model = StrModel(name="test_str", description="test description")
     int_model = IntModel(count=42, score=100)
-    await str_model.asave()
-    await int_model.asave()
-
-    assert await real_redis_client.exists(str_model.key) == 1
-    assert await real_redis_client.exists(int_model.key) == 1
+    await rapyer.ainsert(str_model, int_model)
 
     # Act
     result = await rapyer.adelete_many(str_model.key, int_model.key)
@@ -33,11 +29,7 @@ async def test_rapyer_adelete_many__model_instances_sanity(real_redis_client):
     # Arrange
     str_model = StrModel(name="test_str", description="test description")
     int_model = IntModel(count=42, score=100)
-    await str_model.asave()
-    await int_model.asave()
-
-    assert await real_redis_client.exists(str_model.key) == 1
-    assert await real_redis_client.exists(int_model.key) == 1
+    await rapyer.ainsert(str_model, int_model)
 
     # Act
     result = await rapyer.adelete_many(str_model, int_model)
@@ -56,13 +48,7 @@ async def test_rapyer_adelete_many__mixed_keys_and_instances(real_redis_client):
     str_model = StrModel(name="test_str", description="test description")
     int_model = IntModel(count=42, score=100)
     user_model = UserModel(tags=["tag1", "tag2"])
-    await str_model.asave()
-    await int_model.asave()
-    await user_model.asave()
-
-    assert await real_redis_client.exists(str_model.key) == 1
-    assert await real_redis_client.exists(int_model.key) == 1
-    assert await real_redis_client.exists(user_model.key) == 1
+    await rapyer.ainsert(str_model, int_model, user_model)
 
     # Act
     result = await rapyer.adelete_many(str_model.key, int_model, user_model.key)
@@ -82,13 +68,7 @@ async def test_rapyer_adelete_many__multiple_same_class(real_redis_client):
     user1 = UserModel(tags=["tag1"])
     user2 = UserModel(tags=["tag2"])
     user3 = UserModel(tags=["tag3"])
-    await user1.asave()
-    await user2.asave()
-    await user3.asave()
-
-    assert await real_redis_client.exists(user1.key) == 1
-    assert await real_redis_client.exists(user2.key) == 1
-    assert await real_redis_client.exists(user3.key) == 1
+    await rapyer.ainsert(user1, user2, user3)
 
     # Act
     result = await rapyer.adelete_many(user1, user2, user3)
@@ -122,7 +102,6 @@ async def test_rapyer_adelete_many__unknown_class_raises_error():
 async def test_rapyer_adelete_many__nonexistent_key_silent_skip(real_redis_client):
     # Arrange
     nonexistent_key = "StrModel:nonexistent_key_12345"
-    assert await real_redis_client.exists(nonexistent_key) == 0
 
     # Act
     result = await rapyer.adelete_many(nonexistent_key)
@@ -137,10 +116,8 @@ async def test_rapyer_adelete_many__nonexistent_key_silent_skip(real_redis_clien
 async def test_rapyer_adelete_many__stale_model_silent_skip(real_redis_client):
     # Arrange
     user = UserModel(tags=["test"])
-    await user.asave()
-    assert await real_redis_client.exists(user.key) == 1
+    await rapyer.ainsert(user)
     await real_redis_client.delete(user.key)
-    assert await real_redis_client.exists(user.key) == 0
 
     # Act
     result = await rapyer.adelete_many(user)
@@ -157,7 +134,7 @@ async def test_rapyer_adelete_many__returns_module_delete_result_type(
 ):
     # Arrange
     str_model = StrModel(name="test", description="test")
-    await str_model.asave()
+    await rapyer.ainsert(str_model)
 
     # Act
     result = await rapyer.adelete_many(str_model.key)
@@ -176,16 +153,8 @@ async def test_rapyer_adelete_many__per_model_breakdown_only_counts_deleted(
     str_model1 = StrModel(name="str1", description="test1")
     str_model2 = StrModel(name="str2", description="test2")
     int_model = IntModel(count=42, score=100)
-    await str_model1.asave()
-    await str_model2.asave()
-    await int_model.asave()
-
-    assert await real_redis_client.exists(str_model1.key) == 1
-    assert await real_redis_client.exists(str_model2.key) == 1
-    assert await real_redis_client.exists(int_model.key) == 1
-
+    await rapyer.ainsert(str_model1, str_model2, int_model)
     await real_redis_client.delete(str_model2.key)
-    assert await real_redis_client.exists(str_model2.key) == 0
 
     # Act
     result = await rapyer.adelete_many(str_model1.key, str_model2.key, int_model.key)
