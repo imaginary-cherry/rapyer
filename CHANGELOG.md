@@ -2,6 +2,14 @@
 
 ## [1.2.2]
 
+### ✨ Added
+
+- **Delete with Expressions**: `Model.adelete_many()` now supports filter expressions, allowing bulk deletion of models matching specific criteria.
+  - Example: `await Model.adelete_many(Model.age > 30, Model.active == False)`
+- **Global `adelete_many()`**: Added `rapyer.adelete_many()` function to delete models of different types in a single bulk operation.
+  - Accepts both string keys and model instances of any type
+  - Example: `result = await rapyer.adelete_many("UserModel:123", order_instance)`
+
 ### 🛠️ Technical Improvements
 
 - **Optimized `aduplicate_many()`**: The `aduplicate_many()` method now uses bulk `ainsert()` instead of individual `asave()` calls for better performance.
