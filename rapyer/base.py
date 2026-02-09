@@ -647,6 +647,7 @@ class AtomicRedisModel(BaseModel):
 
 
 REDIS_MODELS: list[type[AtomicRedisModel]] = []
+ModuleDeleteResult.model_rebuild()
 
 
 async def aget(redis_key: str) -> AtomicRedisModel:
@@ -744,7 +745,7 @@ async def adelete_many(*args: str | AtomicRedisModel) -> ModuleDeleteResult:
         key_to_class[key] = instance.__class__
         validated_keys.append(key)
 
-    per_class_count: dict[str, int] = {}
+    per_class_count: dict[type[AtomicRedisModel], int] = {}
 
     async with AtomicRedisModel.Meta.redis.pipeline() as pipe:
         for key in validated_keys:
@@ -753,8 +754,8 @@ async def adelete_many(*args: str | AtomicRedisModel) -> ModuleDeleteResult:
 
     for key, deleted in zip(validated_keys, results):
         if deleted:
-            class_name = key_to_class[key].__name__
-            per_class_count[class_name] = per_class_count.get(class_name, 0) + 1
+            klass = key_to_class[key]
+            per_class_count[klass] = per_class_count.get(klass, 0) + 1
 
     total = sum(per_class_count.values())
     return ModuleDeleteResult(count=total, by_model=per_class_count)

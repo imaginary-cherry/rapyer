@@ -23,7 +23,7 @@ async def test_rapyer_adelete_many__string_keys_sanity(real_redis_client):
     # Assert
     assert isinstance(result, ModuleDeleteResult)
     assert result.count == 2
-    assert result.by_model == {"StrModel": 1, "IntModel": 1}
+    assert result.by_model == {StrModel: 1, IntModel: 1}
     assert await real_redis_client.exists(str_model.key) == 0
     assert await real_redis_client.exists(int_model.key) == 0
 
@@ -45,7 +45,7 @@ async def test_rapyer_adelete_many__model_instances_sanity(real_redis_client):
     # Assert
     assert isinstance(result, ModuleDeleteResult)
     assert result.count == 2
-    assert result.by_model == {"StrModel": 1, "IntModel": 1}
+    assert result.by_model == {StrModel: 1, IntModel: 1}
     assert await real_redis_client.exists(str_model.key) == 0
     assert await real_redis_client.exists(int_model.key) == 0
 
@@ -70,7 +70,7 @@ async def test_rapyer_adelete_many__mixed_keys_and_instances(real_redis_client):
     # Assert
     assert isinstance(result, ModuleDeleteResult)
     assert result.count == 3
-    assert result.by_model == {"StrModel": 1, "IntModel": 1, "UserModel": 1}
+    assert result.by_model == {StrModel: 1, IntModel: 1, UserModel: 1}
     assert await real_redis_client.exists(str_model.key) == 0
     assert await real_redis_client.exists(int_model.key) == 0
     assert await real_redis_client.exists(user_model.key) == 0
@@ -96,7 +96,7 @@ async def test_rapyer_adelete_many__multiple_same_class(real_redis_client):
     # Assert
     assert isinstance(result, ModuleDeleteResult)
     assert result.count == 3
-    assert result.by_model == {"UserModel": 3}
+    assert result.by_model == {UserModel: 3}
     assert await real_redis_client.exists(user1.key) == 0
     assert await real_redis_client.exists(user2.key) == 0
     assert await real_redis_client.exists(user3.key) == 0
@@ -163,7 +163,7 @@ async def test_rapyer_adelete_many__returns_module_delete_result_type(real_redis
     # Assert
     assert isinstance(result, ModuleDeleteResult)
     assert result.count == 1
-    assert result.by_model == {"StrModel": 1}
+    assert result.by_model == {StrModel: 1}
 
 
 @pytest.mark.asyncio
@@ -191,7 +191,7 @@ async def test_rapyer_adelete_many__per_model_breakdown_only_counts_deleted(
     # Assert
     assert isinstance(result, ModuleDeleteResult)
     assert result.count == 2
-    assert result.by_model == {"StrModel": 1, "IntModel": 1}
+    assert result.by_model == {StrModel: 1, IntModel: 1}
     assert await real_redis_client.exists(str_model1.key) == 0
     assert await real_redis_client.exists(str_model2.key) == 0
     assert await real_redis_client.exists(int_model.key) == 0
