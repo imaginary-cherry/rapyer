@@ -554,6 +554,12 @@ class AtomicRedisModel(BaseModel):
         if not targeted_keys:
             return DeleteResult(count=0)
 
+        client = _context_var.get()
+        if client is not None:
+            for key in targeted_keys:
+                client.delete(key)
+            return DeleteResult(count=len(targeted_keys))
+
         async with cls.Meta.redis.pipeline() as pipe:
             for key in targeted_keys:
                 pipe.delete(key)
@@ -752,6 +758,15 @@ async def adelete_many(*args: str | AtomicRedisModel) -> RapyerDeleteResult:
         validated_keys.append(key)
 
     per_class_count: dict[type[AtomicRedisModel], int] = {}
+
+    client = _context_var.get()
+    if client is not None:
+        for key in validated_keys:
+            client.delete(key)
+        for key in validated_keys:
+            klass = key_to_class[key]
+            per_class_count[klass] = per_class_count.get(klass, 0) + 1
+        return RapyerDeleteResult(count=len(validated_keys), by_model=per_class_count)
 
     async with AtomicRedisModel.Meta.redis.pipeline() as pipe:
         for key in validated_keys:
