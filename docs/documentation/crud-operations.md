@@ -431,48 +431,62 @@ if __name__ == "__main__":
 
 ### Bulk Model Deletion - `adelete_many()`
 
-For better performance when deleting multiple models, use the `adelete_many()` classmethod which performs all deletions in a single Redis transaction. You can pass either model instances or Redis keys directly:
+Delete multiple models in a single Redis transaction using model instances, Redis keys, or filter expressions. Returns a `DeleteResult` with the number of deleted models.
 
 ```python
 async def bulk_delete_example():
-    # Create and save multiple users
     users = [
         User(name="Alice", age=25, email="alice@example.com"),
         User(name="Bob", age=30, email="bob@example.com"),
         User(name="Charlie", age=35, email="charlie@example.com"),
         User(name="Diana", age=28, email="diana@example.com")
     ]
-    
-    # Save all users
     await User.ainsert(*users)
-    print(f"Created {len(users)} users")
-    
-    # Method 1: Bulk delete using model instances
-    await User.adelete_many(*users)
-    print(f"Successfully deleted {len(users)} users in one transaction")
-    
-    # Method 2: Bulk delete using Redis keys
-    user_keys = ["User:123", "User:456", "User:789"]
-    await User.adelete_many(*user_keys)
-    print(f"Successfully deleted users by keys")
-    
-    # Method 3: Mix models and keys
-    await User.adelete_many(users[0], "User:xyz", users[1].key)
-    print(f"Successfully deleted using mixed inputs")
-    
-    # Verify all users were deleted
-    remaining_users = await User.afind()
-    print(f"Remaining users in Redis: {len(remaining_users)}")
 
-if __name__ == "__main__":
-    asyncio.run(bulk_delete_example())
+    # Delete using model instances
+    result = await User.adelete_many(*users)
+    print(result.count)  # 4
+
+    # Delete using Redis keys
+    result = await User.adelete_many("User:123", "User:456")
+
+    # Mix models and keys
+    result = await User.adelete_many(users[0], "User:xyz", users[1].key)
 ```
+
+#### Deleting with Expressions
+
+Pass filter expressions to `adelete_many()` to delete models matching specific criteria. Fields must be annotated with `Index` (see [Indexing Fields](indexing-fields.md)).
+
+```python
+from rapyer import AtomicRedisModel, Index
+from typing import Annotated
+
+
+class User(AtomicRedisModel):
+    name: Annotated[str, Index]
+    age: Annotated[int, Index]
+    status: Annotated[str, Index] = "active"
+
+
+async def delete_with_filters():
+    # Delete all inactive users
+    result = await User.adelete_many(User.status == "inactive")
+    print(f"Deleted {result.count} inactive users")
+
+    # Combine expressions
+    result = await User.adelete_many((User.age < 18) & (User.status == "pending"))
+    print(f"Deleted {result.count} underage pending users")
+```
+
+!!! warning "Cannot Mix Expressions with Keys or Instances"
+    Passing expressions together with keys or model instances raises a `TypeError`. Use one approach per call.
 
 **Why `adelete_many()` is Better Than Individual `delete()` Calls:**
 
 - **Transactional**: All models are deleted atomically - either all succeed or all fail
 - **Performance**: Single Redis operation instead of multiple round trips
-- **Network Efficiency**: Reduces network latency by batching operations
+- **Expression Support**: Delete by filter criteria without loading models first
 
 ### Performance Comparison: `adelete_many()` vs Individual `delete()` Operations
 

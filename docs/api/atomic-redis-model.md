@@ -245,24 +245,27 @@ await User.ainsert(user1, user2, user3)
 ```
 
 #### `adelete_many(*args)`
-**Type:** `async` class method  
-**Parameters:** 
-- `*args` (Self | str): Variable number of model instances or Redis keys to delete   
-**Description:** Deletes multiple model instances from Redis in a single atomic transaction. Accepts both model instances and Redis key strings, making it flexible for different use cases. This is significantly more efficient than calling `delete()` on each model individually, as it uses Redis batch deletion.
+**Type:** `async` class method
+**Parameters:**
+- `*args` (Self | str | Expression): Model instances, Redis keys, or filter expressions
+**Returns:** `DeleteResult` - contains `count` (number of deleted models)
+**Raises:** `TypeError` if no arguments provided, or if expressions are mixed with keys/instances
+**Description:** Deletes multiple model instances from Redis in a single pipeline. Supports three input modes: model instances, Redis key strings, or filter expressions (requires `Index` fields).
 
 ```python
 # Delete using model instances
-await User.adelete_many(*users)
+result = await User.adelete_many(*users)
+print(result.count)  # 4
 
 # Delete using Redis keys
-await User.adelete_many("User:123", "User:456", "User:789")
+result = await User.adelete_many("User:123", "User:456")
 
 # Mix models and keys
-await User.adelete_many(user1, "User:xyz", user2.key, user3)
+result = await User.adelete_many(user1, "User:xyz", user2.key)
 
-# Delete all instances of a model
-all_users = await User.afind()
-await User.adelete_many(*all_users)
+# Delete with filter expressions (requires indexed fields)
+result = await User.adelete_many(User.status == "inactive")
+result = await User.adelete_many((User.age < 18) & (User.status == "pending"))
 ```
 
 #### `class_key_initials()`
