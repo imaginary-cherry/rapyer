@@ -93,7 +93,7 @@ async def comparison_example():
 ## adelete_many()
 
 ```python
-async def adelete_many(*args: str | AtomicRedisModel) -> ModuleDeleteResult
+async def adelete_many(*args: str | AtomicRedisModel) -> RapyerDeleteResult
 ```
 
 Deletes multiple models of different types in a single pipeline. Unlike the class method `Model.adelete_many()`, this global function works across model types and tracks deletions per model class.
@@ -104,7 +104,7 @@ Deletes multiple models of different types in a single pipeline. Unlike the clas
 
 ### Returns
 
-- **ModuleDeleteResult**: Contains:
+- **RapyerDeleteResult**: Contains:
     - `count` (`int`): Total number of deleted models
     - `by_model` (`dict`): Deletion count per model class
 
