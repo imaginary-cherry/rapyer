@@ -22,7 +22,7 @@ from redis.client import Pipeline
 from redis.commands.search.aggregation import AggregateRequest, Cursor
 
 from rapyer.config import RedisConfig
-from rapyer.result import DeleteResult
+from rapyer.result import DeleteResult, ModuleDeleteResult
 from rapyer.context import _context_var
 from rapyer.errors.base import (
     KeyNotFound,
@@ -716,6 +716,48 @@ async def ainsert(*models: Unpack[AtomicRedisModel]) -> list[AtomicRedisModel]:
                 pipe.expire(model.key, model.Meta.ttl)
         await pipe.execute()
     return models
+
+
+async def adelete_many(*args: str | AtomicRedisModel) -> ModuleDeleteResult:
+    if not args:
+        raise TypeError("adelete_many requires at least one argument")
+
+    string_keys = [arg for arg in args if isinstance(arg, str)]
+    model_instances = [arg for arg in args if isinstance(arg, AtomicRedisModel)]
+
+    redis_model_mapping = {klass.__name__: klass for klass in REDIS_MODELS}
+
+    key_to_class: dict[str, type[AtomicRedisModel]] = {}
+    validated_keys = []
+
+    for key in string_keys:
+        class_name = key.split(":")[0]
+        if class_name not in redis_model_mapping:
+            raise RapyerModelDoesntExistError(
+                class_name, f"Unknown model class: {class_name}"
+            )
+        key_to_class[key] = redis_model_mapping[class_name]
+        validated_keys.append(key)
+
+    for instance in model_instances:
+        key = instance.key
+        key_to_class[key] = instance.__class__
+        validated_keys.append(key)
+
+    per_class_count: dict[str, int] = {}
+
+    async with AtomicRedisModel.Meta.redis.pipeline() as pipe:
+        for key in validated_keys:
+            pipe.delete(key)
+        results = await pipe.execute()
+
+    for key, deleted in zip(validated_keys, results):
+        if deleted:
+            class_name = key_to_class[key].__name__
+            per_class_count[class_name] = per_class_count.get(class_name, 0) + 1
+
+    total = sum(per_class_count.values())
+    return ModuleDeleteResult(count=total, by_model=per_class_count)
 
 
 @contextlib.asynccontextmanager
