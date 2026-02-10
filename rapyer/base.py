@@ -1,4 +1,3 @@
-import asyncio
 import base64
 import contextlib
 import functools
@@ -18,12 +17,8 @@ from pydantic import (
     ValidationError,
 )
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
-from redis.client import Pipeline
-from redis.commands.search.aggregation import AggregateRequest, Cursor
-
 from rapyer.config import RedisConfig
-from rapyer.result import DeleteResult, RapyerDeleteResult
-from rapyer.context import _context_var
+from rapyer.context import _context_var, with_pipe_context
 from rapyer.errors.base import (
     KeyNotFound,
     PersistentNoScriptError,
@@ -36,6 +31,7 @@ from rapyer.fields.index import IndexAnnotation
 from rapyer.fields.key import KeyAnnotation
 from rapyer.fields.safe_load import SafeLoadAnnotation
 from rapyer.links import REDIS_SUPPORTED_LINK
+from rapyer.result import DeleteResult, RapyerDeleteResult
 from rapyer.scripts import registry as scripts_registry
 from rapyer.types.base import RedisType, REDIS_DUMP_FLAG_NAME, FAILED_FIELDS_KEY
 from rapyer.types.convert import RedisConverter
@@ -56,6 +52,8 @@ from rapyer.utils.redis import (
     acquire_lock,
     update_keys_in_pipeline,
 )
+from redis.client import Pipeline
+from redis.commands.search.aggregation import AggregateRequest
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 from redis.exceptions import NoScriptError, ResponseError
@@ -802,47 +800,44 @@ async def apipeline(
     _meta = _meta or AtomicRedisModel.Meta
     redis = _meta.redis
     async with redis.pipeline(transaction=True) as pipe:
-        pipe_prev = _context_var.set(pipe)
-    try:
-        yield pipe
-        commands_backup = list(pipe.command_stack)
-        noscript_on_first_attempt = False
-        noscript_on_retry = False
+        with with_pipe_context(pipe):
+            yield pipe
+            commands_backup = list(pipe.command_stack)
+            noscript_on_first_attempt = False
+            noscript_on_retry = False
 
-        try:
-            await pipe.execute()
-        except NoScriptError:
-            noscript_on_first_attempt = True
-        except ResponseError as exc:
-            if ignore_redis_error:
-                logger.warning(
-                    "Swallowed ResponseError during pipeline.execute() with "
-                    "ignore_redis_error=True: %s",
-                    exc,
+            try:
+                await pipe.execute()
+            except NoScriptError:
+                noscript_on_first_attempt = True
+            except ResponseError as exc:
+                if ignore_redis_error:
+                    logger.warning(
+                        "Swallowed ResponseError during pipeline.execute() with "
+                        "ignore_redis_error=True: %s",
+                        exc,
+                    )
+                else:
+                    raise
+
+            if noscript_on_first_attempt:
+                await scripts_registry.handle_noscript_error(redis, _meta)
+                evalsha_commands = [
+                    (args, options)
+                    for args, options in commands_backup
+                    if args[0] == "EVALSHA"
+                ]
+                # Retry execute the pipeline actions
+                async with redis.pipeline(transaction=True) as retry_pipe:
+                    for args, options in evalsha_commands:
+                        retry_pipe.execute_command(*args, **options)
+                    try:
+                        await retry_pipe.execute()
+                    except NoScriptError:
+                        noscript_on_retry = True
+
+            if noscript_on_retry:
+                raise PersistentNoScriptError(
+                    "NOSCRIPT error persisted after re-registering scripts. "
+                    "This indicates a server-side problem with Redis."
                 )
-            else:
-                raise
-
-        if noscript_on_first_attempt:
-            await scripts_registry.handle_noscript_error(redis, _meta)
-            evalsha_commands = [
-                (args, options)
-                for args, options in commands_backup
-                if args[0] == "EVALSHA"
-            ]
-            # Retry execute the pipeline actions
-            async with redis.pipeline(transaction=True) as retry_pipe:
-                for args, options in evalsha_commands:
-                    retry_pipe.execute_command(*args, **options)
-                try:
-                    await retry_pipe.execute()
-                except NoScriptError:
-                    noscript_on_retry = True
-
-        if noscript_on_retry:
-            raise PersistentNoScriptError(
-                "NOSCRIPT error persisted after re-registering scripts. "
-                "This indicates a server-side problem with Redis."
-            )
-    finally:
-        _context_var.reset(pipe_prev)
