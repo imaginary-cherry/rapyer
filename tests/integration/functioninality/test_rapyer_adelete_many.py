@@ -1,7 +1,8 @@
 import pytest
 import rapyer
 from rapyer import RapyerDeleteResult
-from rapyer.errors import RapyerModelDoesntExistError
+from rapyer.errors import RapyerModelDoesntExistError, MissingParameterError
+from rapyer.fields import RapyerKey
 from tests.models.simple_types import StrModel, IntModel
 from tests.models.specialized import UserModel
 
@@ -86,7 +87,9 @@ async def test_rapyer_adelete_many__multiple_same_class(real_redis_client):
 async def test_rapyer_adelete_many__no_args_raises_type_error():
     # Arrange
     # Act & Assert
-    with pytest.raises(TypeError, match="adelete_many requires at least one argument"):
+    with pytest.raises(
+        MissingParameterError, match="adelete_many requires at least one argument"
+    ):
         await rapyer.adelete_many()
 
 
@@ -95,13 +98,13 @@ async def test_rapyer_adelete_many__unknown_class_raises_error():
     # Arrange
     # Act & Assert
     with pytest.raises(RapyerModelDoesntExistError):
-        await rapyer.adelete_many("UnknownClass:some_id")
+        await rapyer.adelete_many(RapyerKey("UnknownClass:some_id"))
 
 
 @pytest.mark.asyncio
 async def test_rapyer_adelete_many__nonexistent_key_silent_skip(real_redis_client):
     # Arrange
-    nonexistent_key = "StrModel:nonexistent_key_12345"
+    nonexistent_key = RapyerKey("StrModel:nonexistent_key_12345")
 
     # Act
     result = await rapyer.adelete_many(nonexistent_key)

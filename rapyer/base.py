@@ -128,7 +128,7 @@ class AtomicRedisModel(BaseModel):
     def pk(self):
         if self._key_field_name:
             return self.model_dump(include={self._key_field_name})[self._key_field_name]
-        return self._pk
+        return RapyerKey(self._pk)
 
     @pk.setter
     def pk(self, value: str):
@@ -578,7 +578,7 @@ class AtomicRedisModel(BaseModel):
         if batches is None:
             return DeleteResult(count=0)
 
-        count = await delete_in_batches(batches)
+        count = await delete_in_batches(cls.Meta.redis, batches)
         return DeleteResult(count=count)
 
     @classmethod

@@ -1,6 +1,7 @@
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager
 
+from rapyer.context import _context_var
 from redis.asyncio import Redis
 
 
@@ -16,13 +17,9 @@ def update_keys_in_pipeline(pipeline, redis_key: str, **kwargs):
         pipeline.json().set(redis_key, json_path, value)
 
 
-try:
-    from itertools import batched
-except ImportError:
-
-    def batched(iterable, n):
-        for i in range(0, len(iterable), n):
-            yield iterable[i : i + n]
+async def batched(iterable, n):
+    for i in range(0, len(iterable), n):
+        yield iterable[i : i + n]
 
 
 async def execute_delete_batch(redis: Redis, keys: list[str]) -> int:
@@ -32,7 +29,9 @@ async def execute_delete_batch(redis: Redis, keys: list[str]) -> int:
     return sum(results)
 
 
-async def delete_in_batches(batch_iterator: AsyncIterator[list[str]]) -> int:
+async def delete_in_batches(
+    redis: Redis, batch_iterator: AsyncIterator[list[str]]
+) -> int:
     client = _context_var.get()
     if client is not None:
         count = 0
@@ -43,5 +42,5 @@ async def delete_in_batches(batch_iterator: AsyncIterator[list[str]]) -> int:
 
     total = 0
     async for batch in batch_iterator:
-        total += await execute_delete_batch(batch)
+        total += await execute_delete_batch(redis, batch)
     return total

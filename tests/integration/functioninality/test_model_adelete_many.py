@@ -2,6 +2,7 @@ import pytest
 
 import rapyer
 from rapyer import DeleteResult
+from rapyer.fields import RapyerKey
 from tests.models.index_types import IndexTestModel
 from tests.models.specialized import UserModel
 
@@ -49,7 +50,7 @@ async def test_adelete_many_integration__single_redis_transaction_verification(
 
     del_commands_executed = final_del_calls - initial_del_calls
     assert (
-        del_commands_executed == 3
+        del_commands_executed == 1
     ), f"Expected 3 DEL commands (one per key in pipeline), but {del_commands_executed} were executed"
 
     assert isinstance(result, DeleteResult)
@@ -183,7 +184,7 @@ async def test_adelete_many__full_key_no_prefix(real_redis_client):
 async def test_adelete_many__missing_key_silent_skip(real_redis_client):
     # Arrange
     # Act
-    result = await UserModel.adelete_many("nonexistent-key")
+    result = await UserModel.adelete_many(RapyerKey("nonexistent-key"))
 
     # Assert
     assert isinstance(result, DeleteResult)

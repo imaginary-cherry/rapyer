@@ -2,6 +2,7 @@ import pytest
 
 import rapyer
 from rapyer.errors.find import UnsupportArgumentTypeError
+from tests.models.index_types import IndexTestModel
 
 
 @pytest.mark.asyncio
