@@ -26,6 +26,7 @@ from rapyer.errors import (
     CantSerializeRedisValueError,
     RapyerModelDoesntExistError,
     UnsupportArgumentTypeError,
+    MissingParameterError,
 )
 from rapyer.fields.expression import ExpressionField, AtomicField, Expression
 from rapyer.fields.index import IndexAnnotation
@@ -738,12 +739,21 @@ async def ainsert(*models: Unpack[AtomicRedisModel]) -> list[AtomicRedisModel]:
     return models
 
 
-async def adelete_many(*args: str | AtomicRedisModel) -> RapyerDeleteResult:
+async def adelete_many(*args: RapyerKey | AtomicRedisModel) -> RapyerDeleteResult:
     if not args:
-        raise TypeError("adelete_many requires at least one argument")
+        raise MissingParameterError("adelete_many requires at least one argument")
 
-    string_keys = [arg for arg in args if isinstance(arg, str)]
-    model_instances = [arg for arg in args if isinstance(arg, AtomicRedisModel)]
+    string_keys = []
+    model_instances = []
+    for arg in args:
+        if isinstance(arg, RapyerKey):
+            string_keys.append(arg)
+        elif isinstance(arg, AtomicRedisModel):
+            model_instances.append(arg)
+        else:
+            raise UnsupportArgumentTypeError(
+                f"{arg} is not a valid for adelete_many, see {ATOMIC_MODEL_API_REF_LINK}"
+            )
 
     redis_model_mapping = {klass.__name__: klass for klass in REDIS_MODELS}
 

@@ -2,6 +2,7 @@ from rapyer.errors.base import (
     RapyerError,
     RapyerModelDoesntExistError,
     KeyNotFound,
+    MissingParameterError,
 )
 from rapyer.errors.find import (
     BadFilterError,
@@ -23,4 +24,5 @@ __all__ = [
     "UnsupportedIndexedFieldError",
     "RapyerModelDoesntExistError",
     "CantSerializeRedisValueError",
+    "MissingParameterError",
 ]

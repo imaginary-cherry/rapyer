@@ -16,3 +16,7 @@ class RapyerModelDoesntExistError(RapyerError):
     def __init__(self, model_name: str, *args):
         super().__init__(*args)
         self.model_name = model_name
+
+
+class MissingParameterError(RapyerError):
+    """Raised when a required parameter is missing."""
