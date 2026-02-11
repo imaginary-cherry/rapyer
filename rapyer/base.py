@@ -515,6 +515,13 @@ class AtomicRedisModel(BaseModel):
         return await self.adelete_by_key(self.key)
 
     @classmethod
+    async def _search_keys_by_query(cls, query_string: str) -> list[str]:
+        query = Query(query_string).no_content()
+        index_name = cls.index_name()
+        search_result = await cls.Meta.redis.ft(index_name).search(query)
+        return [doc.id for doc in search_result.docs]
+
+    @classmethod
     async def iter_filter_batches(
         cls, query_string: str, batch_size: int
     ) -> AsyncIterator[list[str]]:
@@ -574,8 +581,15 @@ class AtomicRedisModel(BaseModel):
         elif expressions:
             combined_expression = functools.reduce(lambda a, b: a & b, expressions)
             query_string = combined_expression.create_filter()
-            cursor_count = max_batch if should_batch else 1000
-            batches = cls.iter_filter_batches(query_string, cursor_count)
+            if should_batch:
+                batches = cls.iter_filter_batches(query_string, max_batch)
+            else:
+                query = Query(query_string).no_content()
+                index_name = cls.index_name()
+                search_result = await cls.Meta.redis.ft(index_name).search(query)
+                targeted_keys = [doc.id for doc in search_result.docs]
+                if targeted_keys:
+                    batches = batched(targeted_keys, len(targeted_keys))
 
         if batches is None:
             return DeleteResult(count=0)
