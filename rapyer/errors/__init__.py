@@ -1,13 +1,16 @@
 from rapyer.errors.base import (
+    RapyerError,
+    RapyerModelDoesntExistError,
+    KeyNotFound,
+)
+from rapyer.errors.find import (
     BadFilterError,
     FindError,
     PersistentNoScriptError,
-    RapyerError,
     ScriptsNotInitializedError,
     UnsupportedIndexedFieldError,
-    RapyerModelDoesntExistError,
     CantSerializeRedisValueError,
-    KeyNotFound,
+    UnsupportArgumentTypeError,
 )
 
 __all__ = [

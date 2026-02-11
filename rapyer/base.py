@@ -19,18 +19,19 @@ from pydantic import (
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
 from rapyer.config import RedisConfig
 from rapyer.context import _context_var
-from rapyer.errors.base import (
+from rapyer.errors import (
     KeyNotFound,
     PersistentNoScriptError,
     UnsupportedIndexedFieldError,
     CantSerializeRedisValueError,
     RapyerModelDoesntExistError,
+    UnsupportArgumentTypeError,
 )
 from rapyer.fields.expression import ExpressionField, AtomicField, Expression
 from rapyer.fields.index import IndexAnnotation
 from rapyer.fields.key import KeyAnnotation, RapyerKey
 from rapyer.fields.safe_load import SafeLoadAnnotation
-from rapyer.links import REDIS_SUPPORTED_LINK
+from rapyer.links import REDIS_SUPPORTED_LINK, ATOMIC_MODEL_API_REF_LINK
 from rapyer.scripts import registry as scripts_registry
 from rapyer.types.base import RedisType, REDIS_DUMP_FLAG_NAME, FAILED_FIELDS_KEY
 from rapyer.types.convert import RedisConverter
@@ -508,10 +509,21 @@ class AtomicRedisModel(BaseModel):
         return await self.adelete_by_key(self.key)
 
     @classmethod
-    async def adelete_many(cls, *args: Self | str | Expression) -> DeleteResult:
-        provided_keys = [arg for arg in args if isinstance(arg, str)]
-        model_instances = [arg for arg in args if isinstance(arg, AtomicRedisModel)]
-        expressions = [arg for arg in args if isinstance(arg, Expression)]
+    async def adelete_many(cls, *args: Self | RapyerKey | Expression) -> DeleteResult:
+        provided_keys = []
+        model_instances = []
+        expressions = []
+        for arg in args:
+            if isinstance(arg, RapyerKey):
+                provided_keys.append(arg)
+            elif isinstance(arg, AtomicRedisModel):
+                model_instances.append(arg)
+            elif isinstance(arg, Expression):
+                expressions.append(arg)
+            else:
+                raise UnsupportArgumentTypeError(
+                    f"{arg} is not a valid for adelete_many, see {ATOMIC_MODEL_API_REF_LINK}"
+                )
 
         if not args:
             raise TypeError("adelete_many requires at least one argument")
