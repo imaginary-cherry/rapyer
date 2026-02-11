@@ -4,6 +4,7 @@ import pytest
 import rapyer
 from rapyer.errors import KeyNotFound
 from rapyer.fields import RapyerKey
+from rapyer.fields import RapyerKey
 from tests.models.collection_types import (
     ListModel,
     DictModel,
@@ -245,6 +246,7 @@ async def test_rapyer_get_functionality_sanity(model_instance):
 
     # Assert
     assert retrieved_model == model_instance
+    assert isinstance(retrieved_model.key, RapyerKey)
     assert isinstance(retrieved_model.key, RapyerKey)
 
 

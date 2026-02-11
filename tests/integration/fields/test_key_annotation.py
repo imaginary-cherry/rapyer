@@ -61,3 +61,4 @@ async def test_extract_saved_model_using_key_field_value_directly_sanity():
     assert loaded_user == original_user
     assert loaded_user.user_id == user_id
     assert loaded_user.pk == user_id
+    assert isinstance(loaded_user.key, RapyerKey)
