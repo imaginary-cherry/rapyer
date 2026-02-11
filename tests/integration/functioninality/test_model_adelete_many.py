@@ -142,9 +142,7 @@ async def test_adelete_many__mixed_expressions_and_keys_raises_type_error(
     with pytest.raises(UnsupportArgumentTypeError):
         await IndexTestModel.adelete_many(alice, IndexTestModel.age > 30)
 
-    with pytest.raises(
-        TypeError, match="Cannot mix expressions with keys or model instances"
-    ):
+    with pytest.raises(UnsupportArgumentTypeError):
         await IndexTestModel.adelete_many(alice.key, IndexTestModel.age > 30)
 
 
