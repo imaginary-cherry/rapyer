@@ -41,6 +41,9 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+!!! note "RapyerKey"
+    The `.key` property returns a `RapyerKey` — a `str` subclass that marks the value as a Rapyer-managed Redis key. It behaves exactly like a regular string.
+
 ### Bulk Model Insert - `ainsert()`
 
 For better performance when saving multiple models, use the `ainsert()` classmethod which performs all insertions in a single Redis transaction:

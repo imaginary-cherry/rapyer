@@ -18,8 +18,8 @@ print(user.pk)  # Returns UUID if no key field defined
 ```
 
 #### `key`
-**Type:** `str`  
-**Description:** The Redis key used to store this model instance. Format: `{ClassName}:{pk}`
+**Type:** `RapyerKey`
+**Description:** The Redis key used to store this model instance. Format: `{ClassName}:{pk}`. Returns a `RapyerKey`, a `str` subclass that identifies the value as a Rapyer-managed key.
 
 ```python
 user = User(name="John")
@@ -208,8 +208,8 @@ filtered = await User.afind(
 ```
 
 #### `afind_keys()`
-**Type:** `async` class method  
-**Returns:** `list[str]`  
+**Type:** `async` class method
+**Returns:** `list[RapyerKey]`
 **Description:** Retrieves all Redis keys for instances of this model class.
 
 ```python
