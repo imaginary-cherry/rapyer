@@ -1,7 +1,7 @@
 import pytest
-
 import rapyer
 from rapyer import DeleteResult
+from rapyer.errors import UnsupportArgumentTypeError
 from rapyer.fields import RapyerKey
 from tests.models.index_types import IndexTestModel
 from tests.models.specialized import UserModel
@@ -126,7 +126,7 @@ async def test_adelete_many__expression_no_match_returns_zero(
 async def test_adelete_many__no_args_raises_type_error():
     # Arrange
     # Act & Assert
-    with pytest.raises(TypeError, match="adelete_many requires at least one argument"):
+    with pytest.raises(UnsupportArgumentTypeError):
         await IndexTestModel.adelete_many()
 
 
@@ -139,9 +139,7 @@ async def test_adelete_many__mixed_expressions_and_keys_raises_type_error(
     alice, bob, charlie, david = inserted_test_models
 
     # Act & Assert
-    with pytest.raises(
-        TypeError, match="Cannot mix expressions with keys or model instances"
-    ):
+    with pytest.raises(UnsupportArgumentTypeError):
         await IndexTestModel.adelete_many(alice, IndexTestModel.age > 30)
 
     with pytest.raises(
