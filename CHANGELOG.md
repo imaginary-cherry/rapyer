@@ -2,6 +2,10 @@
 
 ## [1.2.2]
 
+### ✨ Added
+
+- **`RapyerKey` Type**: From now on, the key value will be of type `RapyerKey`, RapyerKey is still a string, but now you can identify the string as rapyer key by type.
+
 ### 🛠️ Technical Improvements
 
 - **Optimized `aduplicate_many()`**: The `aduplicate_many()` method now uses bulk `ainsert()` instead of individual `asave()` calls for better performance.
