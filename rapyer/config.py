@@ -30,3 +30,5 @@ class RedisConfig:
     prefer_normal_json_dump: bool = False
     # Set to True when using FakeRedis to normalize JSON responses
     is_fake_redis: bool = False
+    # Maximum number of keys to delete per pipeline transaction in adelete_many
+    max_delete_per_transaction: int | None = 1000
