@@ -223,7 +223,7 @@ class AtomicRedisModel(BaseModel):
         return self.class_key_initials()
 
     @property
-    def key(self):
+    def key(self) -> RapyerKey:
         if self._base_model_link:
             return self._base_model_link.key
         return RapyerKey(f"{self.key_initials}:{self.pk}")
