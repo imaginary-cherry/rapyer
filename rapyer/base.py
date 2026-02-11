@@ -578,8 +578,8 @@ class AtomicRedisModel(BaseModel):
         if batches is None:
             return DeleteResult(count=0)
 
-        count = await delete_in_batches(cls.Meta.redis, batches)
-        return DeleteResult(count=count)
+        count, was_commited = await delete_in_batches(cls.Meta.redis, batches)
+        return DeleteResult(count=count, was_commited=was_commited)
 
     @classmethod
     @contextlib.asynccontextmanager

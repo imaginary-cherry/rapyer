@@ -31,16 +31,16 @@ async def execute_delete_batch(redis: Redis, keys: list[str]) -> int:
 
 async def delete_in_batches(
     redis: Redis, batch_iterator: AsyncIterator[list[str]]
-) -> int:
+) -> tuple[int, bool]:
     client = _context_var.get()
     if client is not None:
         count = 0
         async for batch in batch_iterator:
             client.delete(*batch)
             count += len(batch)
-        return count
+        return count, False
 
     total = 0
     async for batch in batch_iterator:
         total += await execute_delete_batch(redis, batch)
-    return total
+    return total, True

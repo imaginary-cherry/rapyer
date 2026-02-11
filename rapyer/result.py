@@ -10,16 +10,18 @@ if TYPE_CHECKING:
 
 class DeleteResult(BaseModel):
     count: int
+    was_commited: bool = True
 
 
-class RapyerDeleteResult(BaseModel):
+class RapyerDeleteResult(DeleteResult):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    count: int
     by_model: dict[type[AtomicRedisModel], int]
 
 
 def resolve_forward_refs():
     from rapyer.base import AtomicRedisModel
 
-    RapyerDeleteResult.model_rebuild(_types_namespace={"AtomicRedisModel": AtomicRedisModel})
+    RapyerDeleteResult.model_rebuild(
+        _types_namespace={"AtomicRedisModel": AtomicRedisModel}
+    )
