@@ -33,6 +33,7 @@ from rapyer.fields.index import IndexAnnotation
 from rapyer.fields.key import KeyAnnotation, RapyerKey
 from rapyer.fields.safe_load import SafeLoadAnnotation
 from rapyer.links import REDIS_SUPPORTED_LINK, ATOMIC_MODEL_API_REF_LINK
+from rapyer.result import DeleteResult, RapyerDeleteResult
 from rapyer.scripts import registry as scripts_registry
 from rapyer.types.base import RedisType, REDIS_DUMP_FLAG_NAME, FAILED_FIELDS_KEY
 from rapyer.types.convert import RedisConverter
