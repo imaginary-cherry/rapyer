@@ -2,6 +2,7 @@ from datetime import datetime
 
 import pytest
 
+from rapyer.fields import RapyerKey
 from tests.models.common import UserWithKeyModel, EventWithDatetimeKeyModel
 
 
@@ -20,6 +21,7 @@ async def test_store_and_load_user_with_key_annotation_sanity():
     # Assert
     assert loaded_user == original_user
     assert loaded_user.pk == user_id
+    assert isinstance(loaded_user.key, RapyerKey)
 
 
 @pytest.mark.asyncio
@@ -40,6 +42,7 @@ async def test_store_and_load_event_with_datetime_key_annotation_sanity():
     # Assert
     assert loaded_event == original_event
     assert loaded_event.pk == created_at
+    assert isinstance(loaded_event.key, RapyerKey)
 
 
 @pytest.mark.asyncio
