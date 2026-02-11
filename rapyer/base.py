@@ -4,6 +4,7 @@ import functools
 import logging
 import pickle
 import uuid
+from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager
 from typing import ClassVar, Any, get_origin, Optional
 
@@ -18,7 +19,7 @@ from pydantic import (
 )
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
 from rapyer.config import RedisConfig
-from rapyer.context import _context_var
+from rapyer.context import _context_var, with_pipe_context
 from rapyer.errors import (
     KeyNotFound,
     PersistentNoScriptError,
@@ -53,8 +54,11 @@ from rapyer.utils.pythonic import safe_issubclass
 from rapyer.utils.redis import (
     acquire_lock,
     update_keys_in_pipeline,
+    delete_in_batches,
+    batched,
 )
 from redis.client import Pipeline
+from redis.commands.search.aggregation import AggregateRequest
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 from redis.exceptions import NoScriptError, ResponseError
@@ -511,6 +515,22 @@ class AtomicRedisModel(BaseModel):
         return await self.adelete_by_key(self.key)
 
     @classmethod
+    async def iter_filter_batches(
+        cls, query_string: str, batch_size: int
+    ) -> AsyncIterator[list[str]]:
+        agg_request = (
+            AggregateRequest(query_string).load("@__key").cursor(count=batch_size)
+        )
+        index_name = cls.index_name()
+        result = await cls.Meta.redis.ft(index_name).aggregate(agg_request)
+        if result.rows:
+            yield [row[1] for row in result.rows]
+        while result.cursor and result.cursor.cid != 0:
+            result = await cls.Meta.redis.ft(index_name).aggregate(result.cursor)
+            if result.rows:
+                yield [row[1] for row in result.rows]
+
+    @classmethod
     async def adelete_many(cls, *args: Self | RapyerKey | Expression) -> DeleteResult:
         provided_keys = []
         model_instances = []
@@ -535,6 +555,10 @@ class AtomicRedisModel(BaseModel):
                 "Cannot mix expressions with keys or model instances in adelete_many"
             )
 
+        max_batch = cls.Meta.max_delete_per_transaction
+        should_batch = _context_var.get() is None and max_batch is not None
+        batches = None
+
         if provided_keys or model_instances:
             model_keys = [m.key for m in model_instances]
             prefixed_keys = [
@@ -542,40 +566,19 @@ class AtomicRedisModel(BaseModel):
                 for k in provided_keys
             ]
             targeted_keys = model_keys + prefixed_keys
+            if targeted_keys:
+                batch_size = max_batch if should_batch else len(targeted_keys)
+                batches = batched(targeted_keys, batch_size)
         elif expressions:
             combined_expression = functools.reduce(lambda a, b: a & b, expressions)
             query_string = combined_expression.create_filter()
+            cursor_count = max_batch if should_batch else 1000
+            batches = cls.iter_filter_batches(query_string, cursor_count)
 
-            agg_request = (
-                AggregateRequest(query_string).load("@__key").cursor(count=1000)
-            )
-            index_name = cls.index_name()
-            targeted_keys = []
-
-            result = await cls.Meta.redis.ft(index_name).aggregate(agg_request)
-            targeted_keys.extend([row[1] for row in result.rows])
-
-            while result.cursor and result.cursor.cid != 0:
-                result = await cls.Meta.redis.ft(index_name).aggregate(result.cursor)
-                targeted_keys.extend([row[1] for row in result.rows])
-        else:
-            targeted_keys = []
-
-        if not targeted_keys:
+        if batches is None:
             return DeleteResult(count=0)
 
-        client = _context_var.get()
-        if client is not None:
-            for key in targeted_keys:
-                client.delete(key)
-            return DeleteResult(count=len(targeted_keys))
-
-        async with cls.Meta.redis.pipeline() as pipe:
-            for key in targeted_keys:
-                pipe.delete(key)
-            results = await pipe.execute()
-
-        count = sum(results)
+        count = await delete_in_batches(batches)
         return DeleteResult(count=count)
 
     @classmethod
