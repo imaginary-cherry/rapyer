@@ -453,12 +453,9 @@ class AtomicRedisModel(BaseModel):
             # Case 2: Extract by expressions
             combined_expression = functools.reduce(lambda a, b: a & b, expressions)
             query_string = combined_expression.create_filter()
-            query = Query(query_string).no_content()
-            index_name = cls.index_name()
-            search_result = await cls.Meta.redis.ft(index_name).search(query)
-            if not search_result.docs:
+            targeted_keys = await cls._search_keys_by_query(query_string)
+            if not targeted_keys:
                 return []
-            targeted_keys = [doc.id for doc in search_result.docs]
         else:
             # Case 3: Extract all
             targeted_keys = await cls.afind_keys()
@@ -584,10 +581,7 @@ class AtomicRedisModel(BaseModel):
             if should_batch:
                 batches = cls.iter_filter_batches(query_string, max_batch)
             else:
-                query = Query(query_string).no_content()
-                index_name = cls.index_name()
-                search_result = await cls.Meta.redis.ft(index_name).search(query)
-                targeted_keys = [doc.id for doc in search_result.docs]
+                targeted_keys = await cls._search_keys_by_query(query_string)
                 if targeted_keys:
                     batches = batched(targeted_keys, len(targeted_keys))
 
