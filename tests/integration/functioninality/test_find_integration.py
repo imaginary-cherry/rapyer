@@ -2,6 +2,7 @@ from uuid import uuid4
 
 import pytest
 
+from rapyer.fields import RapyerKey
 from tests.models.simple_types import StrModel, IntModel, BoolModel, BytesModel
 
 
@@ -33,14 +34,17 @@ async def test_find_isolation_between_different_model_classes_sanity():
     assert len(found_str_models) == 3
     for model in str_models:
         assert model in found_str_models
+    assert all(isinstance(m.key, RapyerKey) for m in found_str_models)
 
     assert len(found_int_models) == 2
     for model in int_models:
         assert model in found_int_models
+    assert all(isinstance(m.key, RapyerKey) for m in found_int_models)
 
     assert len(found_bool_models) == 4
     for model in bool_models:
         assert model in found_bool_models
+    assert all(isinstance(m.key, RapyerKey) for m in found_bool_models)
 
     assert another_str_model not in found_str_models
     assert empty_bytes_models == []

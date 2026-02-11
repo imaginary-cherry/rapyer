@@ -5,6 +5,7 @@ import pytest
 import pytest_asyncio
 
 from rapyer.errors import BadFilterError
+from rapyer.fields import RapyerKey
 from tests.models.index_types import (
     IndexTestModel,
     BaseIndexModel,
@@ -41,6 +42,7 @@ async def test_afind_with_single_expression_sanity(
     for model in models:
         if model.age > 30:
             assert model in found_models
+    assert all(isinstance(m.key, RapyerKey) for m in found_models)
 
 
 @pytest.mark.asyncio
@@ -126,6 +128,7 @@ async def test_afind_without_expressions_returns_all_sanity(inserted_three_test_
     assert len(found_models) == 3
     for model in models:
         assert model in found_models
+    assert all(isinstance(m.key, RapyerKey) for m in found_models)
 
 
 @pytest.mark.asyncio
