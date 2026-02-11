@@ -548,10 +548,12 @@ class AtomicRedisModel(BaseModel):
                 )
 
         if not args:
-            raise TypeError("adelete_many requires at least one argument")
+            raise UnsupportArgumentTypeError(
+                f"adelete_many requires at least one argument, see {ATOMIC_MODEL_API_REF_LINK}"
+            )
 
         if expressions and (provided_keys or model_instances):
-            raise TypeError(
+            raise UnsupportArgumentTypeError(
                 "Cannot mix expressions with keys or model instances in adelete_many"
             )
 
