@@ -1,4 +1,3 @@
-import asyncio
 import base64
 import contextlib
 import functools
@@ -18,8 +17,6 @@ from pydantic import (
     ValidationError,
 )
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
-from redis.client import Pipeline
-
 from rapyer.config import RedisConfig
 from rapyer.context import _context_var
 from rapyer.errors.base import (
@@ -31,7 +28,7 @@ from rapyer.errors.base import (
 )
 from rapyer.fields.expression import ExpressionField, AtomicField, Expression
 from rapyer.fields.index import IndexAnnotation
-from rapyer.fields.key import KeyAnnotation
+from rapyer.fields.key import KeyAnnotation, RapyerKey
 from rapyer.fields.safe_load import SafeLoadAnnotation
 from rapyer.links import REDIS_SUPPORTED_LINK
 from rapyer.scripts import registry as scripts_registry
@@ -54,6 +51,7 @@ from rapyer.utils.redis import (
     acquire_lock,
     update_keys_in_pipeline,
 )
+from redis.client import Pipeline
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 from redis.exceptions import NoScriptError, ResponseError
@@ -225,10 +223,10 @@ class AtomicRedisModel(BaseModel):
         return self.class_key_initials()
 
     @property
-    def key(self):
+    def key(self) -> RapyerKey:
         if self._base_model_link:
             return self._base_model_link.key
-        return f"{self.key_initials}:{self.pk}"
+        return RapyerKey(f"{self.key_initials}:{self.pk}")
 
     @key.setter
     def key(self, value: str):
@@ -379,6 +377,7 @@ class AtomicRedisModel(BaseModel):
 
     @classmethod
     async def aget(cls, key: str) -> Self:
+        # In case we get the field of Key[]
         if cls._key_field_name and ":" not in key:
             key = f"{cls.class_key_initials()}:{key}"
         model_dump = await cls.Meta.redis.json().get(key, "$")
@@ -484,8 +483,9 @@ class AtomicRedisModel(BaseModel):
         return instances
 
     @classmethod
-    async def afind_keys(cls):
-        return await cls.Meta.redis.keys(f"{cls.class_key_initials()}:*")
+    async def afind_keys(cls) -> list[RapyerKey]:
+        keys = await cls.Meta.redis.keys(f"{cls.class_key_initials()}:*")
+        return [RapyerKey(k) for k in keys]
 
     @classmethod
     async def ainsert(cls, *models: Unpack[Self]):
