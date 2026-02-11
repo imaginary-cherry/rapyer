@@ -1,6 +1,6 @@
 import pytest
 
-from rapyer.fields.key import RapyerKey
+from rapyer.fields import RapyerKey
 from tests.models.common import UserWithKeyModel
 from tests.models.simple_types import StrModel
 
