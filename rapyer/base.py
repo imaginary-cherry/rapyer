@@ -380,9 +380,6 @@ class AtomicRedisModel(BaseModel):
         # In case we get the field of Key[]
         if cls._key_field_name and ":" not in key:
             key = f"{cls.class_key_initials()}:{key}"
-        # Ensure this is a RapyerKey
-        if not isinstance(key, RapyerKey):
-            key = RapyerKey(key)
         model_dump = await cls.Meta.redis.json().get(key, "$")
         if not model_dump:
             raise KeyNotFound(f"{key} is missing in redis")
