@@ -5,7 +5,7 @@ import logging
 import pickle
 import uuid
 from contextlib import AbstractAsyncContextManager
-from typing import ClassVar, Any, get_origin, Optional
+from typing import ClassVar, Any, get_origin, Optional, Union
 
 from pydantic import (
     BaseModel,
@@ -508,9 +508,7 @@ class AtomicRedisModel(BaseModel):
         return await self.adelete_by_key(self.key)
 
     @classmethod
-    async def adelete_many(
-        cls, *args: Unpack[Self | str | Expression]
-    ) -> "DeleteResult":
+    async def adelete_many(cls, *args: Self | str | Expression) -> DeleteResult:
         provided_keys = [arg for arg in args if isinstance(arg, str)]
         model_instances = [arg for arg in args if isinstance(arg, AtomicRedisModel)]
         expressions = [arg for arg in args if isinstance(arg, Expression)]
