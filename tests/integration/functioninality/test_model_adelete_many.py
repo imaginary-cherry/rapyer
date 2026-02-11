@@ -236,3 +236,26 @@ async def test_adelete_many__returns_delete_result_type(real_redis_client):
     # Assert
     assert isinstance(result, DeleteResult)
     assert result.count == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("record_count", [1001, 2500])
+async def test_adelete_many__expression_with_cursor_pagination(
+    real_redis_client, create_index, record_count
+):
+    # Arrange
+    IndexTestModel.init_class()
+    models = [
+        IndexTestModel(name=f"user_{i}", age=50, description=f"desc_{i}")
+        for i in range(record_count)
+    ]
+    await IndexTestModel.ainsert(*models)
+
+    # Act
+    result = await IndexTestModel.adelete_many(IndexTestModel.age == 50)
+
+    # Assert
+    assert isinstance(result, DeleteResult)
+    assert result.count == record_count
+    for model in models[:5] + models[-5:]:
+        assert await real_redis_client.exists(model.key) == 0
