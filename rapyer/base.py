@@ -682,7 +682,7 @@ def categorize_delete_args(
     for arg in args:
         if isinstance(arg, RapyerKey):
             keys.append(arg)
-        if isinstance(arg, str):
+        elif isinstance(arg, str):
             keys.append(RapyerKey(arg))
         elif isinstance(arg, AtomicRedisModel):
             model_instances.append(arg)
