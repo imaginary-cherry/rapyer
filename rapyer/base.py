@@ -541,7 +541,7 @@ class AtomicRedisModel(BaseModel):
                 f"adelete_many requires at least one argument, see {ATOMIC_MODEL_API_REF_LINK}"
             )
 
-        provided_keys, model_instances, expressions = _categorize_delete_args(
+        provided_keys, model_instances, expressions = categorize_delete_args(
             args, allow_expressions=True
         )
 
@@ -673,7 +673,7 @@ class AtomicRedisModel(BaseModel):
 REDIS_MODELS: list[type[AtomicRedisModel]] = []
 
 
-def _categorize_delete_args(
+def categorize_delete_args(
     args: tuple, allow_expressions: bool = False
 ) -> tuple[list[RapyerKey], list[AtomicRedisModel], list[Expression]]:
     keys, model_instances, expressions = [], [], []
@@ -764,7 +764,7 @@ async def adelete_many(*args: RapyerKey | AtomicRedisModel) -> RapyerDeleteResul
     if not args:
         raise MissingParameterError("adelete_many requires at least one argument")
 
-    string_keys, model_instances, _ = _categorize_delete_args(args)
+    string_keys, model_instances, _ = categorize_delete_args(args)
 
     redis_model_mapping = {klass.__name__: klass for klass in REDIS_MODELS}
 
