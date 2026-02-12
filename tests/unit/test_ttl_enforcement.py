@@ -24,6 +24,8 @@ EXCLUDED_METHODS = [
     AtomicRedisModel.aset_ttl,
     AtomicRedisModel.refresh_ttl_if_needed,
     RedisType.refresh_ttl_if_needed,
+    # Inner methods
+    AtomicRedisModel._search_keys_by_query,
 ]
 
 

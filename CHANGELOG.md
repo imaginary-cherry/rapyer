@@ -5,6 +5,11 @@
 ### ✨ Added
 
 - **`RapyerKey` Type**: From now on, the key value will be of type `RapyerKey`, RapyerKey is still a string, but now you can identify the string as rapyer key by type.
+- **Delete with Expressions**: `Model.adelete_many()` now supports filter expressions, allowing bulk deletion of models matching specific criteria.
+  - Example: `await Model.adelete_many(Model.age > 30, Model.active == False)`
+- **Global `adelete_many()`**: Added `rapyer.adelete_many()` function to delete models of different types in a single bulk operation.
+  - Accepts both string keys and model instances of any type
+  - Example: `result = await rapyer.adelete_many(model2.key, order_instance)`
 
 ### 🛠️ Technical Improvements
 

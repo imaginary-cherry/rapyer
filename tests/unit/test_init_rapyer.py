@@ -6,6 +6,7 @@ from redis import ResponseError
 from redis.asyncio.client import Redis
 
 from rapyer.init import init_rapyer, teardown_rapyer
+from rapyer.result import RapyerDeleteResult
 from rapyer.scripts import SCRIPTS
 from tests.models.collection_types import IntListModel, ProductListModel, StrListModel
 from tests.models.index_types import IndexTestModel
@@ -240,3 +241,12 @@ async def test_init_rapyer_without_logger_does_not_modify_rapyer_logger_sanity()
     # Assert
     assert rapyer_logger.level == original_level
     assert rapyer_logger.handlers == original_handlers
+
+
+@pytest.mark.asyncio
+async def test_init_rapyer_resolves_rapyer_delete_result_forward_refs_sanity():
+    # Act
+    await init_rapyer()
+
+    # Assert
+    assert RapyerDeleteResult.__pydantic_complete__ is True

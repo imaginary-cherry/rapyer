@@ -245,24 +245,28 @@ await User.ainsert(user1, user2, user3)
 ```
 
 #### `adelete_many(*args)`
-**Type:** `async` class method  
-**Parameters:** 
-- `*args` (Self | str): Variable number of model instances or Redis keys to delete   
-**Description:** Deletes multiple model instances from Redis in a single atomic transaction. Accepts both model instances and Redis key strings, making it flexible for different use cases. This is significantly more efficient than calling `delete()` on each model individually, as it uses Redis batch deletion.
+**Type:** `async` class method
+**Parameters:**
+- `*args` (Self | RapyerKey | str | Expression): Model instances, keys obtained from `.key`/`.pk`, or filter expressions
+**Returns:** `DeleteResult` - contains `count` (number of deleted keys) and `was_committed` (`bool`)
+**Raises:** `UnsupportArgumentTypeError` if no arguments provided, if expressions are mixed with keys/instances, or if an unsupported type is passed
+
+Deletes multiple model instances from Redis. Supports three input modes: model instances, `RapyerKey` strings (from `.key` or `.pk`), or filter expressions (requires `Index` fields). Large deletes are automatically batched based on `max_delete_per_transaction`.
 
 ```python
 # Delete using model instances
-await User.adelete_many(*users)
+result = await User.adelete_many(*users)
+print(result.count)  # 4
 
-# Delete using Redis keys
-await User.adelete_many("User:123", "User:456", "User:789")
+# Delete using keys from .key or .pk or a string
+result = await User.adelete_many(users[0].key, users[1].pk, "User:123")
 
 # Mix models and keys
-await User.adelete_many(user1, "User:xyz", user2.key, user3)
+result = await User.adelete_many(user1, user2.key, user3.pk)
 
-# Delete all instances of a model
-all_users = await User.afind()
-await User.adelete_many(*all_users)
+# Delete with filter expressions (requires indexed fields)
+result = await User.adelete_many(User.status == "inactive")
+result = await User.adelete_many((User.age < 18) & (User.status == "pending"))
 ```
 
 #### `class_key_initials()`
@@ -342,6 +346,7 @@ class User(AtomicRedisModel):
 - `refresh_ttl` - Refresh TTL on read/write (default: `True`)
 - `safe_load_all` - Treat all non-Redis fields as SafeLoad (default: `False`)
 - `prefer_normal_json_dump` - Use JSON serialization for compatible fields instead of pickle (default: `False`)
+- `max_delete_per_transaction` - Maximum keys deleted per pipeline transaction in `adelete_many()` (default: `1000`, set to `None` to disable batching)
 
 ### Special Behaviors
 

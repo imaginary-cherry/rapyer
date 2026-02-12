@@ -4,7 +4,6 @@ import pytest
 import rapyer
 from rapyer.errors import KeyNotFound
 from rapyer.fields import RapyerKey
-from rapyer.fields import RapyerKey
 from tests.models.collection_types import (
     ListModel,
     DictModel,

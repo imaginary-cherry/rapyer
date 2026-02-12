@@ -6,7 +6,9 @@ from unittest.mock import AsyncMock, patch
 import pytest
 import pytest_asyncio
 import rapyer
+from rapyer.result import resolve_forward_refs
 from rapyer.scripts import register_scripts
+
 
 REDUCED_TTL_SECONDS = 10
 
@@ -67,7 +69,11 @@ from tests.models.functionality_types import (
 )
 
 # Index types
-from tests.models.index_types import ParentWithIndexModel, ChildWithParentModel
+from tests.models.index_types import (
+    ParentWithIndexModel,
+    ChildWithParentModel,
+    IndexTestModel,
+)
 
 # Inheritance types
 from tests.models.inheritance_types import (
@@ -212,12 +218,15 @@ async def real_redis_client(redis_client):
         # Index types
         ParentWithIndexModel,
         ChildWithParentModel,
+        IndexTestModel,
         # Unknown types (JSON serializable enums)
         ModelWithStrEnumDefault,
         ModelWithIntEnumDefault,
         ModelWithStrEnumInList,
         ModelWithStrEnumInDict,
     ]
+
+    resolve_forward_refs()
 
     # Configure Redis client for all models
     for model in redis_models:

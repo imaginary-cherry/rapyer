@@ -5,6 +5,7 @@ from redis import ResponseError
 from redis.asyncio.client import Redis
 
 from rapyer.base import REDIS_MODELS
+from rapyer.result import resolve_forward_refs
 from rapyer.scripts import register_scripts
 
 
@@ -25,6 +26,8 @@ async def init_rapyer(
         rapyer_logger.handlers.clear()
         for handler in logger.handlers:
             rapyer_logger.addHandler(handler)
+
+    resolve_forward_refs()
 
     if isinstance(redis, str):
         redis = redis_async.from_url(redis, decode_responses=True, max_connections=20)
