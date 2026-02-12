@@ -183,7 +183,7 @@ async def test_rapyer_adelete_many__was_commited_true_outside_pipeline(
     result = await rapyer.adelete_many(str_model.key)
 
     # Assert
-    assert result.was_commited is True
+    assert result.was_committed is True
 
 
 @pytest.mark.asyncio
@@ -199,7 +199,7 @@ async def test_rapyer_adelete_many__was_commited_false_inside_pipeline(
         result = await rapyer.adelete_many(str_model.key)
 
     # Assert
-    assert result.was_commited is False
+    assert result.was_committed is False
 
 
 @pytest.mark.asyncio

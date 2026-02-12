@@ -24,7 +24,7 @@ async def test_adelete_many__batched_keys_deletion(real_redis_client):
     for model in models:
         assert await real_redis_client.exists(model.key) == 0
 
-    assert result.was_commited
+    assert result.was_committed
 
     UserModel.Meta.max_delete_per_transaction = original_max
 
@@ -50,7 +50,7 @@ async def test_adelete_many__batched_filter_deletion(real_redis_client, create_i
     for model in models[:5] + models[-5:]:
         assert await real_redis_client.exists(model.key) == 0
 
-    assert result.was_commited
+    assert result.was_committed
 
     IndexTestModel.Meta.max_delete_per_transaction = original_max
 
@@ -71,7 +71,7 @@ async def test_adelete_many__no_batching_when_none(real_redis_client):
     assert result.count == 10
     for model in models:
         assert await real_redis_client.exists(model.key) == 0
-    assert result.was_commited
+    assert result.was_committed
     UserModel.Meta.max_delete_per_transaction = original_max
 
 
@@ -115,5 +115,5 @@ async def test_adelete_many__pipeline_context_skips_batching(real_redis_client):
     assert result.count == 5
     for model in models:
         assert await real_redis_client.exists(model.key) == 0
-    assert not result.was_commited
+    assert not result.was_committed
     UserModel.Meta.max_delete_per_transaction = original_max

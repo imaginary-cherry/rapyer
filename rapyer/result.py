@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 class DeleteResult(BaseModel):
     count: int
-    was_commited: bool = True
+    was_committed: bool = True
 
 
 class RapyerDeleteResult(DeleteResult):

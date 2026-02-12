@@ -129,7 +129,7 @@ async def test_pipeline_rapyer_adelete_many__deferred_until_execute(real_redis_c
     # Assert
     assert isinstance(result, RapyerDeleteResult)
     assert result.count == 2
-    assert result.was_commited is False
+    assert result.was_committed is False
     assert result.by_model == {StrModel: 1, IntModel: 1}
     assert await real_redis_client.exists(model1.key) == 0
     assert await real_redis_client.exists(model2.key) == 0
@@ -154,7 +154,7 @@ async def test_pipeline_rapyer_adelete_many__with_model_instances(real_redis_cli
     # Assert
     assert isinstance(result, RapyerDeleteResult)
     assert result.count == 2
-    assert result.was_commited is False
+    assert result.was_committed is False
     assert result.by_model == {StrModel: 1, IntModel: 1}
     assert await real_redis_client.exists(model1.key) == 0
     assert await real_redis_client.exists(model2.key) == 0

@@ -578,7 +578,7 @@ class AtomicRedisModel(BaseModel):
             return DeleteResult(count=0)
 
         count, was_commited = await delete_in_batches(cls.Meta.redis, batches)
-        return DeleteResult(count=count, was_commited=was_commited)
+        return DeleteResult(count=count, was_committed=was_commited)
 
     @classmethod
     @contextlib.asynccontextmanager
@@ -799,7 +799,7 @@ async def adelete_many(*args: RapyerKey | AtomicRedisModel) -> RapyerDeleteResul
         per_class_count[klass] = per_class_count.get(klass, 0) + 1
 
     return RapyerDeleteResult(
-        count=count, by_model=per_class_count, was_commited=was_commited
+        count=count, by_model=per_class_count, was_committed=was_commited
     )
 
 
