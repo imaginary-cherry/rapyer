@@ -21,7 +21,7 @@ async def inserted_test_models(test_models):
 
 
 @pytest_asyncio.fixture
-async def create_index(redis_client):
+async def create_index(real_redis_client):
     await IndexTestModel.acreate_index()
     yield
     await IndexTestModel.adelete_index()
