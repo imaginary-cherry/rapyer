@@ -536,25 +536,14 @@ class AtomicRedisModel(BaseModel):
 
     @classmethod
     async def adelete_many(cls, *args: Self | RapyerKey | Expression) -> DeleteResult:
-        provided_keys = []
-        model_instances = []
-        expressions = []
-        for arg in args:
-            if isinstance(arg, RapyerKey):
-                provided_keys.append(arg)
-            elif isinstance(arg, AtomicRedisModel):
-                model_instances.append(arg)
-            elif isinstance(arg, Expression):
-                expressions.append(arg)
-            else:
-                raise UnsupportArgumentTypeError(
-                    f"{arg} is not a valid for adelete_many, see {ATOMIC_MODEL_API_REF_LINK}"
-                )
-
         if not args:
             raise UnsupportArgumentTypeError(
                 f"adelete_many requires at least one argument, see {ATOMIC_MODEL_API_REF_LINK}"
             )
+
+        provided_keys, model_instances, expressions = _categorize_delete_args(
+            args, allow_expressions=True
+        )
 
         if expressions and (provided_keys or model_instances):
             raise UnsupportArgumentTypeError(
@@ -684,6 +673,24 @@ class AtomicRedisModel(BaseModel):
 REDIS_MODELS: list[type[AtomicRedisModel]] = []
 
 
+def _categorize_delete_args(
+    args: tuple, allow_expressions: bool = False
+) -> tuple[list[RapyerKey], list[AtomicRedisModel], list[Expression]]:
+    keys, model_instances, expressions = [], [], []
+    for arg in args:
+        if isinstance(arg, RapyerKey):
+            keys.append(arg)
+        elif isinstance(arg, AtomicRedisModel):
+            model_instances.append(arg)
+        elif allow_expressions and isinstance(arg, Expression):
+            expressions.append(arg)
+        else:
+            raise UnsupportArgumentTypeError(
+                f"{arg} is not a valid for adelete_many, see {ATOMIC_MODEL_API_REF_LINK}"
+            )
+    return keys, model_instances, expressions
+
+
 async def aget(redis_key: str) -> AtomicRedisModel:
     redis_model_mapping = {klass.__name__: klass for klass in REDIS_MODELS}
     class_name = redis_key.split(":")[0]
@@ -757,17 +764,7 @@ async def adelete_many(*args: RapyerKey | AtomicRedisModel) -> RapyerDeleteResul
     if not args:
         raise MissingParameterError("adelete_many requires at least one argument")
 
-    string_keys = []
-    model_instances = []
-    for arg in args:
-        if isinstance(arg, RapyerKey):
-            string_keys.append(arg)
-        elif isinstance(arg, AtomicRedisModel):
-            model_instances.append(arg)
-        else:
-            raise UnsupportArgumentTypeError(
-                f"{arg} is not a valid for adelete_many, see {ATOMIC_MODEL_API_REF_LINK}"
-            )
+    string_keys, model_instances, _ = _categorize_delete_args(args)
 
     redis_model_mapping = {klass.__name__: klass for klass in REDIS_MODELS}
 
@@ -788,29 +785,22 @@ async def adelete_many(*args: RapyerKey | AtomicRedisModel) -> RapyerDeleteResul
         key_to_class[key] = instance.__class__
         validated_keys.append(key)
 
+    redis = AtomicRedisModel.Meta.redis
+    max_batch = AtomicRedisModel.Meta.max_delete_per_transaction
+    should_batch = _context_var.get() is None and max_batch is not None
+
+    batch_size = max_batch if should_batch else len(validated_keys)
+    batches = batched(validated_keys, batch_size)
+    count, was_commited = await delete_in_batches(redis, batches)
+
     per_class_count: dict[type[AtomicRedisModel], int] = {}
+    for key in validated_keys:
+        klass = key_to_class[key]
+        per_class_count[klass] = per_class_count.get(klass, 0) + 1
 
-    client = _context_var.get()
-    if client is not None:
-        for key in validated_keys:
-            client.delete(key)
-        for key in validated_keys:
-            klass = key_to_class[key]
-            per_class_count[klass] = per_class_count.get(klass, 0) + 1
-        return RapyerDeleteResult(count=len(validated_keys), by_model=per_class_count)
-
-    async with AtomicRedisModel.Meta.redis.pipeline() as pipe:
-        for key in validated_keys:
-            pipe.delete(key)
-        results = await pipe.execute()
-
-    for key, deleted in zip(validated_keys, results):
-        if deleted:
-            klass = key_to_class[key]
-            per_class_count[klass] = per_class_count.get(klass, 0) + 1
-
-    total = sum(per_class_count.values())
-    return RapyerDeleteResult(count=total, by_model=per_class_count)
+    return RapyerDeleteResult(
+        count=count, by_model=per_class_count, was_commited=was_commited
+    )
 
 
 @contextlib.asynccontextmanager
