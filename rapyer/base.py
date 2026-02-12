@@ -19,7 +19,7 @@ from pydantic import (
 )
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
 from rapyer.config import RedisConfig
-from rapyer.context import _context_var, with_pipe_context
+from rapyer.context import _context_pipe, with_pipe_context
 from rapyer.errors import (
     KeyNotFound,
     PersistentNoScriptError,
@@ -158,7 +158,7 @@ class AtomicRedisModel(BaseModel):
 
     @property
     def client(self):
-        return _context_var.get() or self.Meta.redis
+        return _context_pipe.get() or self.Meta.redis
 
     @classmethod
     def should_refresh(cls):
@@ -376,7 +376,7 @@ class AtomicRedisModel(BaseModel):
     async def aset_ttl(self, ttl: int) -> None:
         if self.is_inner_model():
             raise RuntimeError("Can only set TTL from top level model")
-        pipeline = _context_var.get()
+        pipeline = _context_pipe.get()
         if pipeline is not None:
             pipeline.expire(self.key, ttl)
         else:
@@ -503,7 +503,7 @@ class AtomicRedisModel(BaseModel):
 
     @classmethod
     async def adelete_by_key(cls, key: str) -> bool:
-        client = _context_var.get() or cls.Meta.redis
+        client = _context_pipe.get() or cls.Meta.redis
         return await client.delete(key) == 1
 
     async def adelete(self):
@@ -553,7 +553,7 @@ class AtomicRedisModel(BaseModel):
             )
 
         max_batch = cls.Meta.max_delete_per_transaction
-        should_batch = _context_var.get() is None and max_batch is not None
+        should_batch = _context_pipe.get() is None and max_batch is not None
         batches = None
 
         if provided_keys or model_instances:
@@ -638,7 +638,7 @@ class AtomicRedisModel(BaseModel):
             if isinstance(attr, RedisType):
                 attr._base_model_link = self
 
-        pipeline = _context_var.get()
+        pipeline = _context_pipe.get()
         if pipeline is not None:
             serialized = self.model_dump(
                 mode="json",
@@ -791,7 +791,7 @@ async def adelete_many(*args: RapyerKey | str | AtomicRedisModel) -> RapyerDelet
 
     redis = AtomicRedisModel.Meta.redis
     max_batch = AtomicRedisModel.Meta.max_delete_per_transaction
-    should_batch = _context_var.get() is None and max_batch is not None
+    should_batch = _context_pipe.get() is None and max_batch is not None
 
     batch_size = max_batch if should_batch else len(validated_keys)
     batches = batched(validated_keys, batch_size)

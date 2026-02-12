@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager
 
-from rapyer.context import _context_var
+from rapyer.context import _context_pipe
 from redis.asyncio import Redis
 
 
@@ -32,7 +32,7 @@ async def execute_delete_batch(redis: Redis, keys: list[str]) -> int:
 async def delete_in_batches(
     redis: Redis, batch_iterator: AsyncIterator[list[str]]
 ) -> tuple[int, bool]:
-    client = _context_var.get()
+    client = _context_pipe.get()
     if client is not None:
         count = 0
         async for batch in batch_iterator:
