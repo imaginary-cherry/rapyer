@@ -9,6 +9,7 @@ import rapyer
 from rapyer.result import resolve_forward_refs
 from rapyer.scripts import register_scripts
 
+
 REDUCED_TTL_SECONDS = 10
 
 T = TypeVar("T")
@@ -68,7 +69,11 @@ from tests.models.functionality_types import (
 )
 
 # Index types
-from tests.models.index_types import ParentWithIndexModel, ChildWithParentModel, IndexTestModel
+from tests.models.index_types import (
+    ParentWithIndexModel,
+    ChildWithParentModel,
+    IndexTestModel,
+)
 
 # Inheritance types
 from tests.models.inheritance_types import (
