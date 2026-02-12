@@ -1,6 +1,6 @@
 import pytest
 
-from rapyer.context import _context_var
+from rapyer.context import _context_pipe
 from rapyer.errors import PersistentNoScriptError
 from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.simple_types import TTLRefreshTestModel, TTL_TEST_SECONDS
@@ -81,5 +81,5 @@ async def test_pipeline_raises_persistent_noscript_error_when_scripts_keep_faili
         async with model.apipeline() as redis_model:
             redis_model.tags.remove_range(0, 1)
 
-    assert _context_var.get() is None
+    assert _context_pipe.get() is None
     assert "server-side" in str(exc_info.value).lower()

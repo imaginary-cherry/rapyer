@@ -1,10 +1,10 @@
-import asyncio
 import base64
 import contextlib
 import functools
 import logging
 import pickle
 import uuid
+from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager
 from typing import ClassVar, Any, get_origin, Optional
 
@@ -18,22 +18,23 @@ from pydantic import (
     ValidationError,
 )
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
-from redis.client import Pipeline
-
 from rapyer.config import RedisConfig
-from rapyer.context import _context_var
-from rapyer.errors.base import (
+from rapyer.context import _context_pipe, with_pipe_context
+from rapyer.errors import (
     KeyNotFound,
     PersistentNoScriptError,
     UnsupportedIndexedFieldError,
     CantSerializeRedisValueError,
     RapyerModelDoesntExistError,
+    UnsupportArgumentTypeError,
+    MissingParameterError,
 )
 from rapyer.fields.expression import ExpressionField, AtomicField, Expression
 from rapyer.fields.index import IndexAnnotation
-from rapyer.fields.key import KeyAnnotation
+from rapyer.fields.key import KeyAnnotation, RapyerKey
 from rapyer.fields.safe_load import SafeLoadAnnotation
-from rapyer.links import REDIS_SUPPORTED_LINK
+from rapyer.links import REDIS_SUPPORTED_LINK, ATOMIC_MODEL_API_REF_LINK
+from rapyer.result import DeleteResult, RapyerDeleteResult
 from rapyer.scripts import registry as scripts_registry
 from rapyer.types.base import RedisType, REDIS_DUMP_FLAG_NAME, FAILED_FIELDS_KEY
 from rapyer.types.convert import RedisConverter
@@ -53,7 +54,11 @@ from rapyer.utils.pythonic import safe_issubclass
 from rapyer.utils.redis import (
     acquire_lock,
     update_keys_in_pipeline,
+    delete_in_batches,
+    batched,
 )
+from redis.client import Pipeline
+from redis.commands.search.aggregation import AggregateRequest
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 from redis.exceptions import NoScriptError, ResponseError
@@ -123,7 +128,7 @@ class AtomicRedisModel(BaseModel):
     def pk(self):
         if self._key_field_name:
             return self.model_dump(include={self._key_field_name})[self._key_field_name]
-        return self._pk
+        return RapyerKey(self._pk)
 
     @pk.setter
     def pk(self, value: str):
@@ -153,7 +158,7 @@ class AtomicRedisModel(BaseModel):
 
     @property
     def client(self):
-        return _context_var.get() or self.Meta.redis
+        return _context_pipe.get() or self.Meta.redis
 
     @classmethod
     def should_refresh(cls):
@@ -225,10 +230,10 @@ class AtomicRedisModel(BaseModel):
         return self.class_key_initials()
 
     @property
-    def key(self):
+    def key(self) -> RapyerKey:
         if self._base_model_link:
             return self._base_model_link.key
-        return f"{self.key_initials}:{self.pk}"
+        return RapyerKey(f"{self.key_initials}:{self.pk}")
 
     @key.setter
     def key(self, value: str):
@@ -342,7 +347,7 @@ class AtomicRedisModel(BaseModel):
             raise RuntimeError("Can only duplicate from top level model")
 
         duplicated_models = [self.__class__(**self.model_dump()) for _ in range(num)]
-        await asyncio.gather(*[model.asave() for model in duplicated_models])
+        await self.ainsert(*duplicated_models)
         return duplicated_models
 
     def update(self, **kwargs):
@@ -371,7 +376,7 @@ class AtomicRedisModel(BaseModel):
     async def aset_ttl(self, ttl: int) -> None:
         if self.is_inner_model():
             raise RuntimeError("Can only set TTL from top level model")
-        pipeline = _context_var.get()
+        pipeline = _context_pipe.get()
         if pipeline is not None:
             pipeline.expire(self.key, ttl)
         else:
@@ -379,6 +384,7 @@ class AtomicRedisModel(BaseModel):
 
     @classmethod
     async def aget(cls, key: str) -> Self:
+        # In case we get the field of Key[]
         if cls._key_field_name and ":" not in key:
             key = f"{cls.class_key_initials()}:{key}"
         model_dump = await cls.Meta.redis.json().get(key, "$")
@@ -425,12 +431,13 @@ class AtomicRedisModel(BaseModel):
         return model
 
     @classmethod
-    async def afind(cls, *args):
+    async def afind(cls, *args) -> list[Self]:
         # Separate keys (str) from expressions (Expression)
         provided_keys = [arg for arg in args if isinstance(arg, str)]
         expressions = [arg for arg in args if isinstance(arg, Expression)]
         raise_on_missing = bool(provided_keys)
 
+        # TODO - in 1.3.0 this should raise an error
         if provided_keys and expressions:
             logger.warning(
                 "afind called with both keys and expressions; expressions ignored"
@@ -446,12 +453,9 @@ class AtomicRedisModel(BaseModel):
             # Case 2: Extract by expressions
             combined_expression = functools.reduce(lambda a, b: a & b, expressions)
             query_string = combined_expression.create_filter()
-            query = Query(query_string).no_content()
-            index_name = cls.index_name()
-            search_result = await cls.Meta.redis.ft(index_name).search(query)
-            if not search_result.docs:
+            targeted_keys = await cls._search_keys_by_query(query_string)
+            if not targeted_keys:
                 return []
-            targeted_keys = [doc.id for doc in search_result.docs]
         else:
             # Case 3: Extract all
             targeted_keys = await cls.afind_keys()
@@ -484,8 +488,9 @@ class AtomicRedisModel(BaseModel):
         return instances
 
     @classmethod
-    async def afind_keys(cls):
-        return await cls.Meta.redis.keys(f"{cls.class_key_initials()}:*")
+    async def afind_keys(cls) -> list[RapyerKey]:
+        keys = await cls.Meta.redis.keys(f"{cls.class_key_initials()}:*")
+        return [RapyerKey(k) for k in keys]
 
     @classmethod
     async def ainsert(cls, *models: Unpack[Self]):
@@ -498,7 +503,7 @@ class AtomicRedisModel(BaseModel):
 
     @classmethod
     async def adelete_by_key(cls, key: str) -> bool:
-        client = _context_var.get() or cls.Meta.redis
+        client = _context_pipe.get() or cls.Meta.redis
         return await client.delete(key) == 1
 
     async def adelete(self):
@@ -507,10 +512,75 @@ class AtomicRedisModel(BaseModel):
         return await self.adelete_by_key(self.key)
 
     @classmethod
-    async def adelete_many(cls, *args: Unpack[Self | str]):
-        await cls.Meta.redis.delete(
-            *[model if isinstance(model, str) else model.key for model in args]
+    async def _search_keys_by_query(cls, query_string: str) -> list[str]:
+        query = Query(query_string).no_content()
+        index_name = cls.index_name()
+        search_result = await cls.Meta.redis.ft(index_name).search(query)
+        return [doc.id for doc in search_result.docs]
+
+    @classmethod
+    async def iter_filter_batches(
+        cls, query_string: str, batch_size: int
+    ) -> AsyncIterator[list[str]]:
+        agg_request = (
+            AggregateRequest(query_string).load("@__key").cursor(count=batch_size)
         )
+        index_name = cls.index_name()
+        result = await cls.Meta.redis.ft(index_name).aggregate(agg_request)
+        if result.rows:
+            yield [row[1] for row in result.rows]
+        while result.cursor and result.cursor.cid != 0:
+            result = await cls.Meta.redis.ft(index_name).aggregate(result.cursor)
+            if result.rows:
+                yield [row[1] for row in result.rows]
+
+    @classmethod
+    async def adelete_many(
+        cls, *args: Self | RapyerKey | str | Expression
+    ) -> DeleteResult:
+        if not args:
+            raise UnsupportArgumentTypeError(
+                f"adelete_many requires at least one argument, see {ATOMIC_MODEL_API_REF_LINK}"
+            )
+
+        provided_keys, model_instances, expressions = categorize_delete_args(
+            args, allow_expressions=True
+        )
+
+        if expressions and (provided_keys or model_instances):
+            raise UnsupportArgumentTypeError(
+                "Cannot mix expressions with keys or model instances in adelete_many"
+            )
+
+        max_batch = cls.Meta.max_delete_per_transaction
+        should_batch = _context_pipe.get() is None and max_batch is not None
+        batches = None
+
+        if provided_keys or model_instances:
+            model_keys = [m.key for m in model_instances]
+            prefixed_keys = [
+                k if ":" in k else f"{cls.class_key_initials()}:{k}"
+                for k in provided_keys
+            ]
+            targeted_keys = model_keys + prefixed_keys
+            if targeted_keys:
+                batch_size = max_batch if should_batch else len(targeted_keys)
+                batches = batched(targeted_keys, batch_size)
+        elif expressions:
+            combined_expression = functools.reduce(lambda a, b: a & b, expressions)
+            query_string = combined_expression.create_filter()
+            if should_batch:
+                batches = cls.iter_filter_batches(query_string, max_batch)
+            else:
+                targeted_keys = await cls._search_keys_by_query(query_string)
+                if targeted_keys:
+                    batches = batched(targeted_keys, len(targeted_keys))
+
+        if batches is None:
+            return DeleteResult(count=0)
+
+        count, was_commited = await delete_in_batches(cls.Meta.redis, batches)
+        return DeleteResult(count=count, was_committed=was_commited)
 
     @classmethod
     @contextlib.asynccontextmanager
@@ -568,7 +638,7 @@ class AtomicRedisModel(BaseModel):
             if isinstance(attr, RedisType):
                 attr._base_model_link = self
 
-        pipeline = _context_var.get()
+        pipeline = _context_pipe.get()
         if pipeline is not None:
             serialized = self.model_dump(
                 mode="json",
@@ -603,6 +673,26 @@ class AtomicRedisModel(BaseModel):
 
 
 REDIS_MODELS: list[type[AtomicRedisModel]] = []
+
+
+def categorize_delete_args(
+    args: tuple, allow_expressions: bool = False
+) -> tuple[list[RapyerKey], list[AtomicRedisModel], list[Expression]]:
+    keys, model_instances, expressions = [], [], []
+    for arg in args:
+        if isinstance(arg, RapyerKey):
+            keys.append(arg)
+        elif isinstance(arg, str):
+            keys.append(RapyerKey(arg))
+        elif isinstance(arg, AtomicRedisModel):
+            model_instances.append(arg)
+        elif allow_expressions and isinstance(arg, Expression):
+            expressions.append(arg)
+        else:
+            raise UnsupportArgumentTypeError(
+                f"{arg} is not a valid for adelete_many, see {ATOMIC_MODEL_API_REF_LINK}"
+            )
+    return keys, model_instances, expressions
 
 
 async def aget(redis_key: str) -> AtomicRedisModel:
@@ -674,6 +764,49 @@ async def ainsert(*models: Unpack[AtomicRedisModel]) -> list[AtomicRedisModel]:
     return models
 
 
+async def adelete_many(*args: RapyerKey | str | AtomicRedisModel) -> RapyerDeleteResult:
+    if not args:
+        raise MissingParameterError("adelete_many requires at least one argument")
+
+    string_keys, model_instances, _ = categorize_delete_args(args)
+
+    redis_model_mapping = {klass.__name__: klass for klass in REDIS_MODELS}
+
+    key_to_class: dict[str, type[AtomicRedisModel]] = {}
+    validated_keys = []
+
+    for key in string_keys:
+        class_name = key.split(":")[0]
+        if class_name not in redis_model_mapping:
+            raise RapyerModelDoesntExistError(
+                class_name, f"Unknown model class: {class_name}"
+            )
+        key_to_class[key] = redis_model_mapping[class_name]
+        validated_keys.append(key)
+
+    for instance in model_instances:
+        key = instance.key
+        key_to_class[key] = instance.__class__
+        validated_keys.append(key)
+
+    redis = AtomicRedisModel.Meta.redis
+    max_batch = AtomicRedisModel.Meta.max_delete_per_transaction
+    should_batch = _context_pipe.get() is None and max_batch is not None
+
+    batch_size = max_batch if should_batch else len(validated_keys)
+    batches = batched(validated_keys, batch_size)
+    count, was_commited = await delete_in_batches(redis, batches)
+
+    per_class_count: dict[type[AtomicRedisModel], int] = {}
+    for key in validated_keys:
+        klass = key_to_class[key]
+        per_class_count[klass] = per_class_count.get(klass, 0) + 1
+
+    return RapyerDeleteResult(
+        count=count, by_model=per_class_count, was_committed=was_commited
+    )
+
+
 @contextlib.asynccontextmanager
 async def alock_from_key(
     key: str, action: str = "default", save_at_end: bool = False
@@ -695,47 +828,44 @@ async def apipeline(
     _meta = _meta or AtomicRedisModel.Meta
     redis = _meta.redis
     async with redis.pipeline(transaction=True) as pipe:
-        pipe_prev = _context_var.set(pipe)
-    try:
-        yield pipe
-        commands_backup = list(pipe.command_stack)
-        noscript_on_first_attempt = False
-        noscript_on_retry = False
+        with with_pipe_context(pipe):
+            yield pipe
+            commands_backup = list(pipe.command_stack)
+            noscript_on_first_attempt = False
+            noscript_on_retry = False
 
-        try:
-            await pipe.execute()
-        except NoScriptError:
-            noscript_on_first_attempt = True
-        except ResponseError as exc:
-            if ignore_redis_error:
-                logger.warning(
-                    "Swallowed ResponseError during pipeline.execute() with "
-                    "ignore_redis_error=True: %s",
-                    exc,
+            try:
+                await pipe.execute()
+            except NoScriptError:
+                noscript_on_first_attempt = True
+            except ResponseError as exc:
+                if ignore_redis_error:
+                    logger.warning(
+                        "Swallowed ResponseError during pipeline.execute() with "
+                        "ignore_redis_error=True: %s",
+                        exc,
+                    )
+                else:
+                    raise
+
+            if noscript_on_first_attempt:
+                await scripts_registry.handle_noscript_error(redis, _meta)
+                evalsha_commands = [
+                    (args, options)
+                    for args, options in commands_backup
+                    if args[0] == "EVALSHA"
+                ]
+                # Retry execute the pipeline actions
+                async with redis.pipeline(transaction=True) as retry_pipe:
+                    for args, options in evalsha_commands:
+                        retry_pipe.execute_command(*args, **options)
+                    try:
+                        await retry_pipe.execute()
+                    except NoScriptError:
+                        noscript_on_retry = True
+
+            if noscript_on_retry:
+                raise PersistentNoScriptError(
+                    "NOSCRIPT error persisted after re-registering scripts. "
+                    "This indicates a server-side problem with Redis."
                 )
-            else:
-                raise
-
-        if noscript_on_first_attempt:
-            await scripts_registry.handle_noscript_error(redis, _meta)
-            evalsha_commands = [
-                (args, options)
-                for args, options in commands_backup
-                if args[0] == "EVALSHA"
-            ]
-            # Retry execute the pipeline actions
-            async with redis.pipeline(transaction=True) as retry_pipe:
-                for args, options in evalsha_commands:
-                    retry_pipe.execute_command(*args, **options)
-                try:
-                    await retry_pipe.execute()
-                except NoScriptError:
-                    noscript_on_retry = True
-
-        if noscript_on_retry:
-            raise PersistentNoScriptError(
-                "NOSCRIPT error persisted after re-registering scripts. "
-                "This indicates a server-side problem with Redis."
-            )
-    finally:
-        _context_var.reset(pipe_prev)

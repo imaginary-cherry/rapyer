@@ -1,5 +1,5 @@
 import pytest
-from rapyer.context import _context_var
+from rapyer.context import _context_pipe
 from tests.models.collection_types import PipelineTestModel, ComprehensiveTestModel
 
 
@@ -138,15 +138,15 @@ async def test_pipeline_context_manager__pipeline_context_cleanup__check_context
     await model.asave()
 
     # Act & Assert - Context should be None before a pipeline
-    assert _context_var.get() is None
+    assert _context_pipe.get() is None
 
     async with model.apipeline() as redis_model:
         # Context should be set to pipeline inside context
-        assert _context_var.get() is not None
+        assert _context_pipe.get() is not None
         await redis_model.metadata.aupdate(updated="true")
 
     # Context should be cleared after a pipeline
-    assert _context_var.get() is None
+    assert _context_pipe.get() is None
 
     # Verify operation was executed
     final_model = await PipelineTestModel.aget(model.key)

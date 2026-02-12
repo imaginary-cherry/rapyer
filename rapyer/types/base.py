@@ -8,11 +8,10 @@ from typing import get_args, Any, TypeVar, Generic
 from pydantic import GetCoreSchemaHandler, TypeAdapter
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, CoreSchema, SerializationInfo
-from redis.commands.search.field import TextField
-
-from rapyer.context import _context_var
-from rapyer.errors.base import CantSerializeRedisValueError
+from rapyer.context import _context_pipe
+from rapyer.errors import CantSerializeRedisValueError
 from rapyer.typing_support import Self
+from redis.commands.search.field import TextField
 
 logger = logging.getLogger("rapyer")
 
@@ -48,11 +47,11 @@ class RedisType(ABC):
 
     @property
     def pipeline(self):
-        return _context_var.get()
+        return _context_pipe.get()
 
     @property
     def client(self):
-        return _context_var.get() or self.redis
+        return _context_pipe.get() or self.redis
 
     @property
     def json_path(self):

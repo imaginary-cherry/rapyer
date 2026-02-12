@@ -6,10 +6,12 @@ from rapyer.base import (
     afind,
     find_redis_models,
     ainsert,
+    adelete_many,
     alock_from_key,
     apipeline,
 )
 from rapyer.init import init_rapyer, teardown_rapyer
+from rapyer.result import DeleteResult, RapyerDeleteResult
 
 __all__ = [
     "AtomicRedisModel",
@@ -19,6 +21,9 @@ __all__ = [
     "afind",
     "find_redis_models",
     "ainsert",
+    "adelete_many",
     "alock_from_key",
     "apipeline",
+    "DeleteResult",
+    "RapyerDeleteResult",
 ]

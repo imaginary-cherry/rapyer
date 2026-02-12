@@ -2,11 +2,12 @@ import pytest
 import pytest_asyncio
 
 from rapyer.errors import KeyNotFound
+from rapyer.fields import RapyerKey
 from tests.models.index_types import IndexTestModel
 
 
 @pytest_asyncio.fixture
-async def create_index(redis_client):
+async def create_index(real_redis_client):
     await IndexTestModel.acreate_index()
     yield
     await IndexTestModel.adelete_index()
@@ -24,6 +25,7 @@ async def test_afind_with_single_key_sanity(redis_client, inserted_test_models):
     # Assert
     assert len(found_models) == 1
     assert found_models[0] == model
+    assert isinstance(found_models[0].key, RapyerKey)
 
 
 @pytest.mark.asyncio
@@ -39,6 +41,7 @@ async def test_afind_with_multiple_keys_sanity(redis_client, inserted_test_model
     assert len(found_models) == 2
     for model in models:
         assert model in found_models
+    assert all(isinstance(m.key, RapyerKey) for m in found_models)
 
 
 @pytest.mark.asyncio
@@ -55,6 +58,7 @@ async def test_afind_with_keys_without_prefix_sanity(
     # Assert
     assert len(found_models) == 1
     assert found_models[0] == model
+    assert isinstance(found_models[0].key, RapyerKey)
 
 
 @pytest.mark.asyncio

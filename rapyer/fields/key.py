@@ -25,3 +25,7 @@ Key = _KeyType
 
 if TYPE_CHECKING:
     Key: TypeAlias = Annotated[T, KeyAnnotation()]  # pragma: no cover
+
+
+class RapyerKey(str):
+    pass
