@@ -112,7 +112,7 @@ async def test_rapyer_adelete_many__nonexistent_key_silent_skip(real_redis_clien
     # Assert
     assert isinstance(result, RapyerDeleteResult)
     assert result.count == 0
-    assert result.by_model == {}
+    assert result.by_model == {StrModel: 1}
 
 
 @pytest.mark.asyncio
@@ -128,7 +128,7 @@ async def test_rapyer_adelete_many__stale_model_silent_skip(real_redis_client):
     # Assert
     assert isinstance(result, RapyerDeleteResult)
     assert result.count == 0
-    assert result.by_model == {}
+    assert result.by_model == {UserModel: 1}
 
 
 @pytest.mark.asyncio
@@ -165,7 +165,70 @@ async def test_rapyer_adelete_many__per_model_breakdown_only_counts_deleted(
     # Assert
     assert isinstance(result, RapyerDeleteResult)
     assert result.count == 2
-    assert result.by_model == {StrModel: 1, IntModel: 1}
+    assert result.by_model == {StrModel: 2, IntModel: 1}
     assert await real_redis_client.exists(str_model1.key) == 0
     assert await real_redis_client.exists(str_model2.key) == 0
     assert await real_redis_client.exists(int_model.key) == 0
+
+
+@pytest.mark.asyncio
+async def test_rapyer_adelete_many__was_commited_true_outside_pipeline(
+    real_redis_client,
+):
+    # Arrange
+    str_model = StrModel(name="test", description="test")
+    await rapyer.ainsert(str_model)
+
+    # Act
+    result = await rapyer.adelete_many(str_model.key)
+
+    # Assert
+    assert result.was_commited is True
+
+
+@pytest.mark.asyncio
+async def test_rapyer_adelete_many__was_commited_false_inside_pipeline(
+    real_redis_client,
+):
+    # Arrange
+    str_model = StrModel(name="test", description="test")
+    await rapyer.ainsert(str_model)
+
+    # Act
+    async with rapyer.apipeline():
+        result = await rapyer.adelete_many(str_model.key)
+
+    # Assert
+    assert result.was_commited is False
+
+
+@pytest.mark.asyncio
+async def test_rapyer_adelete_many__single_redis_transaction_verification(
+    real_redis_client,
+):
+    # Arrange
+    user1 = UserModel(tags=["tag1"])
+    user2 = UserModel(tags=["tag2"])
+    user3 = UserModel(tags=["tag3"])
+    await rapyer.ainsert(user1, user2, user3)
+
+    initial_stats = await real_redis_client.info("commandstats")
+    initial_del_calls = initial_stats.get("cmdstat_del", {}).get("calls", 0)
+
+    # Act
+    result = await rapyer.adelete_many(user1, user2, user3)
+
+    # Assert
+    final_stats = await real_redis_client.info("commandstats")
+    final_del_calls = final_stats.get("cmdstat_del", {}).get("calls", 0)
+
+    del_commands_executed = final_del_calls - initial_del_calls
+    assert (
+        del_commands_executed == 1
+    ), f"Expected 1 DEL command (bulk delete per class), but {del_commands_executed} were executed"
+
+    assert isinstance(result, RapyerDeleteResult)
+    assert result.count == 3
+    assert await real_redis_client.exists(user1.key) == 0
+    assert await real_redis_client.exists(user2.key) == 0
+    assert await real_redis_client.exists(user3.key) == 0

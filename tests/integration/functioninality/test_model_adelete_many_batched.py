@@ -76,6 +76,26 @@ async def test_adelete_many__no_batching_when_none(real_redis_client):
 
 
 @pytest.mark.asyncio
+async def test_adelete_many__no_match_filter_with_no_batching(
+    real_redis_client, create_index, inserted_test_models
+):
+    # Arrange
+    original_max = IndexTestModel.Meta.max_delete_per_transaction
+    IndexTestModel.Meta.max_delete_per_transaction = None
+
+    # Act
+    result = await IndexTestModel.adelete_many(IndexTestModel.age > 100)
+
+    # Assert
+    assert isinstance(result, DeleteResult)
+    assert result.count == 0
+    for model in inserted_test_models:
+        assert await real_redis_client.exists(model.key) == 1
+
+    IndexTestModel.Meta.max_delete_per_transaction = original_max
+
+
+@pytest.mark.asyncio
 async def test_adelete_many__pipeline_context_skips_batching(real_redis_client):
     # Arrange
     original_max = UserModel.Meta.max_delete_per_transaction
