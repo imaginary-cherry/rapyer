@@ -535,7 +535,9 @@ class AtomicRedisModel(BaseModel):
                 yield [row[1] for row in result.rows]
 
     @classmethod
-    async def adelete_many(cls, *args: Self | RapyerKey | Expression) -> DeleteResult:
+    async def adelete_many(
+        cls, *args: Self | RapyerKey | str | Expression
+    ) -> DeleteResult:
         if not args:
             raise UnsupportArgumentTypeError(
                 f"adelete_many requires at least one argument, see {ATOMIC_MODEL_API_REF_LINK}"
@@ -680,6 +682,8 @@ def categorize_delete_args(
     for arg in args:
         if isinstance(arg, RapyerKey):
             keys.append(arg)
+        if isinstance(arg, str):
+            keys.append(RapyerKey(arg))
         elif isinstance(arg, AtomicRedisModel):
             model_instances.append(arg)
         elif allow_expressions and isinstance(arg, Expression):
@@ -760,7 +764,7 @@ async def ainsert(*models: Unpack[AtomicRedisModel]) -> list[AtomicRedisModel]:
     return models
 
 
-async def adelete_many(*args: RapyerKey | AtomicRedisModel) -> RapyerDeleteResult:
+async def adelete_many(*args: RapyerKey | str | AtomicRedisModel) -> RapyerDeleteResult:
     if not args:
         raise MissingParameterError("adelete_many requires at least one argument")
 

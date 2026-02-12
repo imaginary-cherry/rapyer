@@ -64,7 +64,7 @@ async def test_adelete_many__no_batching_when_none(real_redis_client):
     await rapyer.ainsert(*models)
 
     # Act
-    result = await UserModel.adelete_many(*[m.key for m in models])
+    result = await UserModel.adelete_many(*[str(m.key) for m in models])
 
     # Assert
     assert isinstance(result, DeleteResult)
