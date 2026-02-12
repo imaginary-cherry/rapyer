@@ -450,11 +450,11 @@ async def bulk_delete_example():
     result = await User.adelete_many(*users)
     print(result.count)  # 4
 
-    # Delete using Redis keys
-    result = await User.adelete_many("User:123", "User:456")
+    # Delete using keys from .key or .pk
+    result = await User.adelete_many(users[0].key, users[1].key)
 
     # Mix models and keys
-    result = await User.adelete_many(users[0], "User:xyz", users[1].key)
+    result = await User.adelete_many(users[0], users[1].key, users[2].pk)
 ```
 
 #### Deleting with Expressions
@@ -483,11 +483,38 @@ async def delete_with_filters():
 ```
 
 !!! warning "Cannot Mix Expressions with Keys or Instances"
-    Passing expressions together with keys or model instances raises a `TypeError`. Use one approach per call.
+    Passing expressions together with keys or model instances raises an `UnsupportArgumentTypeError`. Use one approach per call.
+
+#### DeleteResult
+
+`adelete_many()` returns a `DeleteResult` with:
+
+- `count` (`int`): Number of keys actually deleted
+- `was_committed` (`bool`): `True` when the deletion was executed immediately. `False` when called inside an `apipeline()` context — the delete is queued and committed when the pipeline exits.
+
+```python
+async def pipeline_delete_example():
+    async with rapyer.apipeline():
+        result = await User.adelete_many(User.status == "inactive")
+        print(result.was_committed)  # False — queued, not yet executed
+```
+
+#### Batching
+
+Large deletes are automatically split into batches. Configure the batch size via `max_delete_per_transaction` in `Meta`:
+
+```python
+class User(AtomicRedisModel):
+    name: str
+
+    Meta = RedisConfig(redis=redis_client, max_delete_per_transaction=500)
+```
+
+The default is `1000`. Set to `None` to disable batching. Batching only applies outside a pipeline context.
 
 **Why `adelete_many()` is Better Than Individual `delete()` Calls:**
 
-- **Transactional**: All models are deleted atomically - either all succeed or all fail
+- **Transactional**: All models are deleted atomically per batch
 - **Performance**: Single Redis operation instead of multiple round trips
 - **Expression Support**: Delete by filter criteria without loading models first
 

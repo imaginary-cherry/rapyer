@@ -2,7 +2,7 @@ from rapyer import AtomicRedisModel
 
 # Rapyer Functions
 
-This page documents the global functions available in the rapyer package for working with Redis models.
+This page documents the global functions and result types available in the rapyer package for working with Redis models.
 
 ## ainsert()
 
@@ -93,24 +93,25 @@ async def comparison_example():
 ## adelete_many()
 
 ```python
-async def adelete_many(*args: str | AtomicRedisModel) -> RapyerDeleteResult
+async def adelete_many(*args: RapyerKey | str | AtomicRedisModel) -> RapyerDeleteResult
 ```
 
 Deletes multiple models of different types in a single pipeline. Unlike the class method `Model.adelete_many()`, this global function works across model types and tracks deletions per model class.
 
 ### Parameters
 
-- **args** (`str | AtomicRedisModel`): Redis keys (must include the class prefix, e.g. `"User:123"`) or model instances
+- **args** (`RapyerKey | str | AtomicRedisModel`): Keys obtained from `.key` (must include the class prefix, e.g. `model.key`) or model instances
 
 ### Returns
 
 - **RapyerDeleteResult**: Contains:
-    - `count` (`int`): Total number of deleted models
+    - `count` (`int`): Total number of deleted keys
     - `by_model` (`dict`): Deletion count per model class
+    - `was_committed` (`bool`): `True` when executed immediately, `False` inside a pipeline context
 
 ### Raises
 
-- **TypeError**: If no arguments are provided
+- **MissingParameterError**: If no arguments are provided
 - **RapyerModelDoesntExistError**: If a key refers to an unregistered model class
 
 ### Example
@@ -138,7 +139,7 @@ async def main():
     print(result.by_model)  # {User: 1, Order: 1}
 
     # Delete by keys
-    result = await rapyer.adelete_many("User:abc123", "Order:def456")
+    result = await rapyer.adelete_many(user.key, order.key)
 ```
 
 ## aget()

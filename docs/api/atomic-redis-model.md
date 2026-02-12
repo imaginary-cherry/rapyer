@@ -247,21 +247,22 @@ await User.ainsert(user1, user2, user3)
 #### `adelete_many(*args)`
 **Type:** `async` class method
 **Parameters:**
-- `*args` (Self | str | Expression): Model instances, Redis keys, or filter expressions
-**Returns:** `DeleteResult` - contains `count` (number of deleted models)
-**Raises:** `TypeError` if no arguments provided, or if expressions are mixed with keys/instances
-**Description:** Deletes multiple model instances from Redis in a single pipeline. Supports three input modes: model instances, Redis key strings, or filter expressions (requires `Index` fields).
+- `*args` (Self | RapyerKey | str | Expression): Model instances, keys obtained from `.key`/`.pk`, or filter expressions
+**Returns:** `DeleteResult` - contains `count` (number of deleted keys) and `was_committed` (`bool`)
+**Raises:** `UnsupportArgumentTypeError` if no arguments provided, if expressions are mixed with keys/instances, or if an unsupported type is passed
+
+Deletes multiple model instances from Redis. Supports three input modes: model instances, `RapyerKey` strings (from `.key` or `.pk`), or filter expressions (requires `Index` fields). Large deletes are automatically batched based on `max_delete_per_transaction`.
 
 ```python
 # Delete using model instances
 result = await User.adelete_many(*users)
 print(result.count)  # 4
 
-# Delete using Redis keys
-result = await User.adelete_many("User:123", "User:456")
+# Delete using keys from .key or .pk or a string
+result = await User.adelete_many(users[0].key, users[1].pk, "User:123")
 
 # Mix models and keys
-result = await User.adelete_many(user1, "User:xyz", user2.key)
+result = await User.adelete_many(user1, user2.key, user3.pk)
 
 # Delete with filter expressions (requires indexed fields)
 result = await User.adelete_many(User.status == "inactive")
@@ -345,6 +346,7 @@ class User(AtomicRedisModel):
 - `refresh_ttl` - Refresh TTL on read/write (default: `True`)
 - `safe_load_all` - Treat all non-Redis fields as SafeLoad (default: `False`)
 - `prefer_normal_json_dump` - Use JSON serialization for compatible fields instead of pickle (default: `False`)
+- `max_delete_per_transaction` - Maximum keys deleted per pipeline transaction in `adelete_many()` (default: `1000`, set to `None` to disable batching)
 
 ### Special Behaviors
 
