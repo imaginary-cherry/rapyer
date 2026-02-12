@@ -9,7 +9,7 @@
   - Example: `await Model.adelete_many(Model.age > 30, Model.active == False)`
 - **Global `adelete_many()`**: Added `rapyer.adelete_many()` function to delete models of different types in a single bulk operation.
   - Accepts both string keys and model instances of any type
-  - Example: `result = await rapyer.adelete_many("UserModel:123", order_instance)`
+  - Example: `result = await rapyer.adelete_many(model2.key, order_instance)`
 
 ### 🛠️ Technical Improvements
 
