@@ -162,7 +162,7 @@ await user.scores.aappend(95)               # Native Redis operation
 | **⚡ Performance** | ✅ Optimized operations                          | ✅ Good performance | ✅ Standard | ✅ Rust-optimized |
 | **🔧 Nested Model Support** | ✅ Full Redis functionality preserved            | ⚠️ Limited nesting | ✅ Advanced relationships | ⚠️ Basic support |
 | **🎛️ Custom Primary Keys** | ✅ Field annotations                             | ❌ ULIDs only | ✅ Custom fields | ✅ Custom fields |
-| **🧪 Extensive Test Coverage** | ✅ 90%+ comprehensive tests with CI              | ⚠️ Basic testing with CI | ⚠️ Limited test coverage | ⚠️ Basic test suite |
+| **🧪 Extensive Test Coverage** | ✅ 100%+ comprehensive tests with CI             | ⚠️ Basic testing with CI | ⚠️ Limited test coverage | ⚠️ Basic test suite |
 
 <!-- --8<-- [end:comparison] -->
 
