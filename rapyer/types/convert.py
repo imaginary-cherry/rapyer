@@ -21,7 +21,7 @@ class RedisConverter(TypeConverter):
 
     def is_redis_type(self, type_to_check: type) -> bool:
         origin = get_origin(type_to_check) or type_to_check
-        if issubclass(origin, RapyerKey):
+        if safe_issubclass(origin, RapyerKey):
             return True
         if safe_issubclass(origin, RedisType):
             return True
