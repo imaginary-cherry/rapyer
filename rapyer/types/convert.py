@@ -5,6 +5,7 @@ from pydantic import BaseModel, PrivateAttr, TypeAdapter
 from rapyer.types.base import RedisType
 from rapyer.utils.annotation import TypeConverter, DYNAMIC_CLASS_DOC
 from rapyer.utils.pythonic import safe_issubclass
+from rapyer.fields.key import RapyerKey
 
 
 class RedisConverter(TypeConverter):
@@ -20,6 +21,8 @@ class RedisConverter(TypeConverter):
 
     def is_redis_type(self, type_to_check: type) -> bool:
         origin = get_origin(type_to_check) or type_to_check
+        if issubclass(origin, RapyerKey):
+            return True
         if safe_issubclass(origin, RedisType):
             return True
         from rapyer.base import AtomicRedisModel
