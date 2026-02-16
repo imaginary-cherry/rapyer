@@ -62,8 +62,10 @@ class AnnotatedDirectRedisTypesModel(AtomicRedisModel):
 
 class RapyerKeyFieldModel(AtomicRedisModel):
     single_key: RapyerKey
-    key_list: list[RapyerKey]
-    key_dict: dict[str, RapyerKey]
+    key_list: RedisList[RapyerKey]
+    key_dict: RedisDict[RapyerKey]
+    plain_key_list: list[RapyerKey]
+    plain_key_dict: dict[str, RapyerKey]
 
 
 class PipelineAllTypesTestModel(AtomicRedisModel):
