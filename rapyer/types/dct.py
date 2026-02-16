@@ -24,7 +24,17 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
     @classmethod
     def find_inner_type(cls, type_):
         args = get_args(type_)
-        return args[1] if len(args) >= 2 else Any
+        if len(args) >= 2:
+            return args[1]
+        elif args:
+            return args[0]
+        return Any
+
+    @classmethod
+    def build_typed_original(cls, source_args):
+        if len(source_args) == 1:
+            return dict[str, source_args[0]]
+        return dict[tuple(source_args)]
 
     def validate_dict(self, dct: dict):
         new_dct = self._adapter.validate_python(dct)
