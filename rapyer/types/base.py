@@ -137,11 +137,13 @@ class GenericRedisType(RedisType, Generic[T], ABC):
     @classmethod
     def build_typed_original(cls, source_args):
         base_type = get_origin(cls.original_type) or cls.original_type
-        return (
-            base_type[tuple(source_args)]
-            if len(source_args) > 1
-            else base_type[source_args[0]]
-        )
+        # When reconstructing a parameterized type, avoid wrapping the type
+        # arguments in a new tuple; `source_args` already has the correct shape.
+        if not source_args:
+            return base_type
+        if len(source_args) == 1:
+            return base_type[source_args[0]]
+        return base_type[source_args]
 
     @classmethod
     def try_deserialize_item(cls, item, identifier):
