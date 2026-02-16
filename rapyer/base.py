@@ -722,6 +722,13 @@ async def aget(redis_key: str) -> AtomicRedisModel:
     return await klass.aget(redis_key)
 
 
+async def afind_one(redis_key: str) -> Optional[AtomicRedisModel]:
+    try:
+        return await aget(redis_key)
+    except KeyNotFound:
+        return None
+
+
 async def afind(*redis_keys: str, skip_missing: bool = False) -> list[AtomicRedisModel]:
     if not redis_keys:
         return []
