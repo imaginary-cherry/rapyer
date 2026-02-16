@@ -163,10 +163,11 @@ user = await User.aget("User:abc-123")
 success = await User.adelete_by_key("User:abc-123")
 ```
 
-#### `afind(*args)`
+#### `afind(*args, max_results=None)`
 **Type:** `async` class method
 **Parameters:**
 - `*args` (str | Expression): Keys (strings) or filter expressions
+- `max_results` (int | None): Maximum number of models to return. `None` returns all matches.
 **Returns:** `list of redis models`
 **Raises:** `CantSerializeRedisValueError` if a value in Redis cannot be deserialized  (Corruption or missing resources)
 **Description:** Retrieves model instances from Redis. Supports three modes:
@@ -205,15 +206,34 @@ adult_users = await User.afind(User.age >= 18)
 filtered = await User.afind(
     (User.age > 18) & (User.status == "active") | (User.role == "admin")
 )
+
+# Limit results
+top_5 = await User.afind(max_results=5)
+recent_active = await User.afind(User.status == "active", max_results=10)
 ```
 
-#### `afind_keys()`
+#### `afind_one(*args)`
 **Type:** `async` class method
+**Parameters:**
+- `*args` (str | Expression): Keys (strings) or filter expressions (same as `afind()`)
+**Description:** Retrieves a single model instance. Returns `None` when no match is found. Equivalent to calling `afind(*args, max_results=1)` and returning the first result.
+
+```python
+user = await User.afind_one(User.name == "Alice")
+if user is not None:
+    print(user.name)
+```
+
+#### `afind_keys(max_results=None)`
+**Type:** `async` class method
+**Parameters:**
+- `max_results` (int | None): Maximum number of keys to return. `None` returns all keys.
 **Returns:** `list[RapyerKey]`
-**Description:** Retrieves all Redis keys for instances of this model class.
+**Description:** Retrieves Redis keys for instances of this model class.
 
 ```python
 user_keys = await User.afind_keys()  # Returns ["User:123", "User:456", ...]
+first_10 = await User.afind_keys(max_results=10)
 ```
 
 #### `ainsert(*models)`
