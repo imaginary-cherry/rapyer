@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.3]
+
+### ✨ Added
+
+- **`afind_one()` Method**: Added `afind_one()` classmethod to `AtomicRedisModel` for retrieving a single model instance matching the given criteria.
+  - Returns the first matching model or `None` if no match is found
+  - Supports keys, expressions, and no-argument usage (returns any single instance)
+  - Example: `user = await User.afind_one(User.age >= 30)`
+- **`max_results` Parameter for `afind()`**: Added optional `max_results` parameter to `afind()` to limit the number of returned results.
+  - Works with all query modes: keys, expressions, and full scan
+  - Uses efficient Redis SCAN for key-based limiting and query paging for expression-based limiting
+  - Example: `top_5 = await User.afind(User.active == True, max_results=5)`
+
+
 ## [1.2.2]
 
 ### ✨ Added
