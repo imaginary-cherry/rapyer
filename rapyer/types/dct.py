@@ -32,11 +32,9 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
 
     @classmethod
     def build_typed_original(cls, source_args):
-        return (
-            dict[str, source_args[0]]
-            if len(source_args) == 1
-            else dict[tuple(source_args)]
-        )
+        if len(source_args) == 1:
+            return dict[str, source_args[0]]
+        return dict[tuple(source_args)]
 
     def validate_dict(self, dct: dict):
         new_dct = self._adapter.validate_python(dct)
