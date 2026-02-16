@@ -135,6 +135,15 @@ class GenericRedisType(RedisType, Generic[T], ABC):
         return args[0] if args else Any
 
     @classmethod
+    def build_typed_original(cls, source_args):
+        base_type = get_origin(cls.original_type) or cls.original_type
+        return (
+            base_type[tuple(source_args)]
+            if len(source_args) > 1
+            else base_type[source_args[0]]
+        )
+
+    @classmethod
     def try_deserialize_item(cls, item, identifier):
         try:
             return cls.deserialize_unknown(item)
@@ -194,12 +203,7 @@ class GenericRedisType(RedisType, Generic[T], ABC):
         else:
             # Normal serialization for concrete types — preserve inner type args
             args = get_args(source_type)
-            if args:
-                base_type = get_origin(cls.original_type) or cls.original_type
-                args = tuple(args) if len(args) > 1 else args[0]
-                inner_type = base_type[args]
-            else:
-                inner_type = cls.original_type
+            inner_type = cls.build_typed_original(args) if args else cls.original_type
             return core_schema.no_info_after_validator_function(
                 cls, handler(inner_type)
             )
