@@ -3,7 +3,7 @@ import base64
 import logging
 import pickle
 from abc import ABC
-from typing import get_args, Any, TypeVar, Generic
+from typing import get_args, get_origin, Any, TypeVar, Generic
 
 from pydantic import GetCoreSchemaHandler, TypeAdapter
 from pydantic_core import core_schema
@@ -135,6 +135,17 @@ class GenericRedisType(RedisType, Generic[T], ABC):
         return args[0] if args else Any
 
     @classmethod
+    def build_typed_original(cls, source_args):
+        base_type = get_origin(cls.original_type) or cls.original_type
+        # When reconstructing a parameterized type, avoid wrapping the type
+        # arguments in a new tuple; `source_args` already has the correct shape.
+        if not source_args:
+            return base_type
+        if len(source_args) == 1:
+            return base_type[source_args[0]]
+        return base_type[source_args]
+
+    @classmethod
     def try_deserialize_item(cls, item, identifier):
         try:
             return cls.deserialize_unknown(item)
@@ -192,7 +203,9 @@ class GenericRedisType(RedisType, Generic[T], ABC):
                 ),
             )
         else:
-            # Normal serialization for concrete types
+            # Normal serialization for concrete types — preserve inner type args
+            args = get_args(source_type)
+            inner_type = cls.build_typed_original(args) if args else cls.original_type
             return core_schema.no_info_after_validator_function(
-                cls, handler(cls.original_type)
+                cls, handler(inner_type)
             )

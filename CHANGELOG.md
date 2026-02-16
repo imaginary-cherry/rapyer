@@ -12,6 +12,13 @@
   - Works with all query modes: keys, expressions, and full scan
   - Uses efficient Redis SCAN for key-based limiting and query paging for expression-based limiting
   - Example: `top_5 = await User.afind(User.active == True, max_results=5)`
+- **`RapyerKey` as a Model Field Type**: `RapyerKey` can now be used directly as a field type in models, including inside `RedisList[RapyerKey]`, `RedisDict[RapyerKey]`, `list[RapyerKey]`, and `dict[str, RapyerKey]`.
+  - Values are stored as plain strings in Redis (no pickling), and deserialized back as `RapyerKey` instances on load
+  - Example: `single_key: RapyerKey`, `key_list: RedisList[RapyerKey]`, `key_dict: dict[str, RapyerKey]`
+
+### 🐛 Fixed
+
+- **Serialization for Nested Generic Types**: Fixed Pydantic schema generation for generic Redis types (e.g., `RedisList[RapyerKey]`, `RedisDict[RapyerKey]`) to correctly preserve inner type arguments during serialization.
 
 
 ## [1.2.2]
