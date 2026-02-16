@@ -19,9 +19,7 @@ async def test_afind_one_with_expression_returns_single_model(
 
 
 @pytest.mark.asyncio
-async def test_afind_one_with_no_match_returns_none(
-    create_index, inserted_test_models
-):
+async def test_afind_one_with_no_match_returns_none(create_index, inserted_test_models):
     # Arrange
     IndexTestModel.init_class()
 
