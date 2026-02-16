@@ -56,6 +56,7 @@ from rapyer.utils.redis import (
     update_keys_in_pipeline,
     delete_in_batches,
     batched,
+    scan_keys,
 )
 from redis.client import Pipeline
 from redis.commands.search.aggregation import AggregateRequest
@@ -431,7 +432,7 @@ class AtomicRedisModel(BaseModel):
         return model
 
     @classmethod
-    async def afind(cls, *args) -> list[Self]:
+    async def afind(cls, *args, max_results: Optional[int] = None) -> list[Self]:
         # Separate keys (str) from expressions (Expression)
         provided_keys = [arg for arg in args if isinstance(arg, str)]
         expressions = [arg for arg in args if isinstance(arg, Expression)]
@@ -449,16 +450,18 @@ class AtomicRedisModel(BaseModel):
                 k if ":" in k else f"{cls.class_key_initials()}:{k}"
                 for k in provided_keys
             ]
+            if max_results is not None:
+                targeted_keys = targeted_keys[:max_results]
         elif expressions:
             # Case 2: Extract by expressions
             combined_expression = functools.reduce(lambda a, b: a & b, expressions)
             query_string = combined_expression.create_filter()
-            targeted_keys = await cls._search_keys_by_query(query_string)
+            targeted_keys = await cls._search_keys_by_query(query_string, max_results)
             if not targeted_keys:
                 return []
         else:
             # Case 3: Extract all
-            targeted_keys = await cls.afind_keys()
+            targeted_keys = await cls.afind_keys(max_results)
 
         if not targeted_keys:
             return []
@@ -488,8 +491,17 @@ class AtomicRedisModel(BaseModel):
         return instances
 
     @classmethod
-    async def afind_keys(cls) -> list[RapyerKey]:
-        keys = await cls.Meta.redis.keys(f"{cls.class_key_initials()}:*")
+    async def afind_one(cls, *args) -> Optional[Self]:
+        results = await cls.afind(*args, max_results=1)
+        return results[0] if results else None
+
+    @classmethod
+    async def afind_keys(cls, max_results: Optional[int] = None) -> list[RapyerKey]:
+        pattern = f"{cls.class_key_initials()}:*"
+        if max_results is None:
+            keys = await cls.Meta.redis.keys(pattern)
+        else:
+            keys = await scan_keys(cls.Meta.redis, pattern, max_results)
         return [RapyerKey(k) for k in keys]
 
     @classmethod
@@ -512,8 +524,12 @@ class AtomicRedisModel(BaseModel):
         return await self.adelete_by_key(self.key)
 
     @classmethod
-    async def _search_keys_by_query(cls, query_string: str) -> list[str]:
+    async def _search_keys_by_query(
+        cls, query_string: str, max_results: Optional[int] = None
+    ) -> list[str]:
         query = Query(query_string).no_content()
+        if max_results is not None:
+            query = query.paging(0, max_results)
         index_name = cls.index_name()
         search_result = await cls.Meta.redis.ft(index_name).search(query)
         return [doc.id for doc in search_result.docs]
