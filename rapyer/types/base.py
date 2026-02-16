@@ -3,7 +3,7 @@ import base64
 import logging
 import pickle
 from abc import ABC
-from typing import get_args, Any, TypeVar, Generic
+from typing import get_args, get_origin, Any, TypeVar, Generic
 
 from pydantic import GetCoreSchemaHandler, TypeAdapter
 from pydantic_core import core_schema
@@ -192,7 +192,14 @@ class GenericRedisType(RedisType, Generic[T], ABC):
                 ),
             )
         else:
-            # Normal serialization for concrete types
+            # Normal serialization for concrete types — preserve inner type args
+            args = get_args(source_type)
+            if args:
+                base_type = get_origin(cls.original_type) or cls.original_type
+                args = tuple(args) if len(args) > 1 else args[0]
+                inner_type = base_type[args]
+            else:
+                inner_type = cls.original_type
             return core_schema.no_info_after_validator_function(
-                cls, handler(cls.original_type)
+                cls, handler(inner_type)
             )
