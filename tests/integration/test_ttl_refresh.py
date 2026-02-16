@@ -539,6 +539,43 @@ async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_afind__sanity(
     assert 0 < final_ttl <= REDUCED_TTL_SECONDS
 
 
+@ttl_test_for(AtomicRedisModel.afind_one)
+@pytest.mark.asyncio
+async def test_ttl_refresh_on_afind_one__sanity(
+    real_redis_client, saved_model_with_reduced_ttl
+):
+    # Arrange
+    model = saved_model_with_reduced_ttl.model
+    initial_ttl = saved_model_with_reduced_ttl.initial_ttl
+
+    # Act
+    found_model = await ModelWithTTL.afind_one()
+
+    # Assert
+    final_ttl = await real_redis_client.ttl(model.key)
+    assert final_ttl > initial_ttl
+    assert TTL_TEST_SECONDS - 2 < final_ttl <= TTL_TEST_SECONDS
+    assert found_model is not None
+
+
+@ttl_no_refresh_test_for(AtomicRedisModel.afind_one)
+@pytest.mark.asyncio
+async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_afind_one__sanity(
+    real_redis_client, saved_no_refresh_model_with_reduced_ttl
+):
+    # Arrange
+    model = saved_no_refresh_model_with_reduced_ttl.model
+    initial_ttl = saved_no_refresh_model_with_reduced_ttl.initial_ttl
+
+    # Act
+    await ModelWithTTLNoRefresh.afind_one()
+
+    # Assert
+    final_ttl = await real_redis_client.ttl(model.key)
+    assert final_ttl <= initial_ttl
+    assert 0 < final_ttl <= REDUCED_TTL_SECONDS
+
+
 @ttl_no_refresh_test_for(AtomicRedisModel.ainsert)
 @pytest.mark.asyncio
 async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_ainsert__sanity(
