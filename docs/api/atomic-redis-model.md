@@ -216,6 +216,7 @@ recent_active = await User.afind(User.status == "active", max_results=10)
 **Type:** `async` class method
 **Parameters:**
 - `*args` (str | Expression): Keys (strings) or filter expressions (same as `afind()`)
+**Returns:** `Self | None` - Returns a single model instance or `None` if no match is found.
 **Description:** Retrieves a single model instance. Returns `None` when no match is found. Equivalent to calling `afind(*args, max_results=1)` and returning the first result.
 
 ```python
