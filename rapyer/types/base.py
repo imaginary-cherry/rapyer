@@ -137,7 +137,7 @@ class GenericRedisType(RedisType, Generic[T], ABC):
     @classmethod
     @abc.abstractmethod
     def build_typed_original(cls, source_args):
-        pass
+        pass  # pragma: no cover
 
     @classmethod
     def try_deserialize_item(cls, item, identifier):
