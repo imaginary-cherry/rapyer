@@ -9,7 +9,6 @@ import rapyer
 from rapyer.result import resolve_forward_refs
 from rapyer.scripts import register_scripts
 
-
 REDUCED_TTL_SECONDS = 10
 
 T = TypeVar("T")
