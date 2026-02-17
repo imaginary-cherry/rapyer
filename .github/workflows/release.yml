@@ -1,12 +1,14 @@
 name: New Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_run:
+    workflows: ["Publish to PyPI"]
+    types:
+      - completed
 
 jobs:
   create-github-release:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     environment:
       name: create-release
     runs-on: ubuntu-22.04
@@ -15,19 +17,25 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
-    
-    - name: Extract version from pyproject.toml
+      with:
+        fetch-depth: 0  # Need full history for tag lookup
+
+    - name: Get latest v* tag
       id: version
       run: |
-        VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
-        TAG=${GITHUB_REF#refs/tags/}
+        git fetch --tags
+        TAG=$(git tag -l 'v*' --sort=-v:refname | head -n 1)
+        if [ -z "$TAG" ]; then
+          echo "Error: No v* tag found"
+          exit 1
+        fi
+        VERSION=${TAG#v}
         RELEASE_DATE=$(date +%Y-%m-%d)
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "tag=$TAG" >> $GITHUB_OUTPUT
         echo "release_date=$RELEASE_DATE" >> $GITHUB_OUTPUT
-        echo "Extracted version: $VERSION from pyproject.toml"
-        echo "Git tag: $TAG"
-        echo "Release date: $RELEASE_DATE"
+        echo "Latest tag: $TAG"
+        echo "Version: $VERSION"
 
     - name: Extract release notes
       id: release_notes
