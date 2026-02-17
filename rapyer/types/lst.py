@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import TypeVar, TYPE_CHECKING
+from typing import TypeVar, TYPE_CHECKING, get_origin
 
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, SerializationInfo
@@ -34,6 +34,13 @@ class RedisList(list, GenericRedisType[T]):
     def create_new_value(self, key, value):
         new_val = self.create_new_values([key], [value])[0]
         return new_val
+
+    @classmethod
+    def build_typed_original(cls, source_args):
+        base_type = get_origin(cls.original_type) or cls.original_type
+        # When reconstructing a parameterized type, avoid wrapping the type
+        # arguments in a new tuple; `source_args` already has the correct shape.
+        return base_type[source_args[0]]
 
     def sub_field_path(self, key: str):
         return f"{self.field_path}[{key}]"
