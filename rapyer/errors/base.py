@@ -20,3 +20,7 @@ class RapyerModelDoesntExistError(RapyerError):
 
 class MissingParameterError(RapyerError):
     """Raised when a required parameter is missing."""
+
+
+class UnsupportedArgumentValueError(RapyerError):
+    pass

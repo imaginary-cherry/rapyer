@@ -28,6 +28,7 @@ from rapyer.errors import (
     RapyerModelDoesntExistError,
     UnsupportArgumentTypeError,
     MissingParameterError,
+    UnsupportedArgumentValueError,
 )
 from rapyer.fields.expression import ExpressionField, AtomicField, Expression
 from rapyer.fields.index import IndexAnnotation
@@ -435,6 +436,10 @@ class AtomicRedisModel(BaseModel):
 
     @classmethod
     async def afind(cls, *args, max_results: Optional[int] = None) -> list[Self]:
+        if max_results < 0:
+            raise UnsupportedArgumentValueError(
+                f"max_results must be >= 0, got {max_results}"
+            )
         # Separate keys (str) from expressions (Expression)
         provided_keys = [arg for arg in args if isinstance(arg, str)]
         expressions = [arg for arg in args if isinstance(arg, Expression)]
