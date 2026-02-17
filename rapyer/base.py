@@ -436,7 +436,7 @@ class AtomicRedisModel(BaseModel):
 
     @classmethod
     async def afind(cls, *args, max_results: Optional[int] = None) -> list[Self]:
-        if max_results < 0:
+        if max_results is not None and max_results < 0:
             raise UnsupportedArgumentValueError(
                 f"max_results must be >= 0, got {max_results}"
             )
