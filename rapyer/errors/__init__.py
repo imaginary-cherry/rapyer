@@ -26,4 +26,5 @@ __all__ = [
     "RapyerModelDoesntExistError",
     "CantSerializeRedisValueError",
     "MissingParameterError",
+    "UnsupportedArgumentValueError",
 ]
