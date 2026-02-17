@@ -3,6 +3,7 @@ from rapyer.errors.base import (
     RapyerModelDoesntExistError,
     KeyNotFound,
     MissingParameterError,
+    UnsupportedArgumentValueError,
 )
 from rapyer.errors.find import (
     BadFilterError,

@@ -1,7 +1,7 @@
 from unittest.mock import AsyncMock
 
 import pytest
-
+from rapyer.errors.base import UnsupportedArgumentValueError
 from tests.models.simple_types import StrModel
 
 
@@ -38,3 +38,11 @@ async def test_scan_keys_caps_when_cumulative_batches_exceed_max_results(
 
     # Assert
     assert len(result) == 5
+
+
+@pytest.mark.parametrize(["max_results"], [[-1], [-10], [-100]])
+@pytest.mark.asyncio
+async def test_model_afind_with_negative_max_results_raises_error(max_results):
+    # Act & Assert
+    with pytest.raises(UnsupportedArgumentValueError):
+        await StrModel.afind(max_results=max_results)
