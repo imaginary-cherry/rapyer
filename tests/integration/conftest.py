@@ -118,7 +118,11 @@ from tests.models.simple_types import (
 from tests.models.specialized import UserModel
 
 # Redis types
-from tests.models.redis_types import RapyerKeyFieldModel
+from tests.models.redis_types import (
+    RapyerKeyFieldModel,
+    ListOfDictsRapyerKeyModel,
+    DictOfListsRapyerKeyModel,
+)
 
 # Unknown types (JSON serializable enums)
 from tests.models.unknown_types import (
@@ -228,6 +232,8 @@ async def real_redis_client(redis_client):
         ModelWithStrEnumInDict,
         # Redis types
         RapyerKeyFieldModel,
+        ListOfDictsRapyerKeyModel,
+        DictOfListsRapyerKeyModel,
     ]
 
     resolve_forward_refs()
