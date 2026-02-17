@@ -75,6 +75,7 @@ include = ["rapyer/scripts/lua/**/*.lua"]
 [tool.poetry.group.dev.dependencies]
 black = "^25.9.0"
 mypy = "^1.0.0"
+ty = "^0.0.17"
 
 [tool.bandit]
 exclude_dirs = ["tests"]

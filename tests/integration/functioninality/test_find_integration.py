@@ -1,7 +1,6 @@
 from uuid import uuid4
 
 import pytest
-
 from rapyer.fields import RapyerKey
 from tests.models.simple_types import StrModel, IntModel, BoolModel, BytesModel
 

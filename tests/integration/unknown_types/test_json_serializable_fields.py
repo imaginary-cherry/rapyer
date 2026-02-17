@@ -1,6 +1,3 @@
-import base64
-import pickle
-
 import pytest
 
 from tests.models.unknown_types import (

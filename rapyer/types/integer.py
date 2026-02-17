@@ -1,7 +1,5 @@
 from typing import TypeAlias, TYPE_CHECKING
 
-from redis.commands.search.field import NumericField
-
 from rapyer.scripts import (
     run_sha,
     NUM_MUL_SCRIPT_NAME,
@@ -10,6 +8,7 @@ from rapyer.scripts import (
     NUM_POW_SCRIPT_NAME,
 )
 from rapyer.types.base import RedisType
+from redis.commands.search.field import NumericField
 
 
 class RedisInt(int, RedisType):

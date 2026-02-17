@@ -3,7 +3,6 @@ from datetime import datetime
 import pytest
 import pytest_asyncio
 from pydantic import ValidationError
-
 from rapyer.types.byte import RedisBytes
 from rapyer.types.datetime import RedisDatetime
 from rapyer.types.dct import RedisDict
