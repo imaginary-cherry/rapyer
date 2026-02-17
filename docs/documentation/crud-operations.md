@@ -327,9 +327,10 @@ async def performance_example():
 
 ### Finding vs. Loading Individual Models
 
-- Use `afind()` when you need all instances of a model class
-- Use `get()` when you know the specific key you want to retrieve
-- Use `afind_keys()` if you only need the Redis keys without loading the full models
+- Use `afind()` when you need multiple instances
+- Use `afind_one()` when you expect a single result
+- Use `aget()` when you know the exact key
+- Use `afind_keys()` if you only need the Redis keys without loading models
 
 ```python
 async def main():
@@ -340,6 +341,9 @@ async def main():
     # Get all user instances
     users = await User.afind()
     print(f"Loaded {len(users)} users")
+
+    # Get a single user by expression
+    alice = await User.afind_one(User.name == "Alice")
 
     # Get specific user by key
     specific_user = await User.aget(user_keys[0])

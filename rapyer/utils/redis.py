@@ -29,6 +29,19 @@ async def execute_delete_batch(redis: Redis, keys: list[str]) -> int:
     return sum(results)
 
 
+async def scan_keys(redis: Redis, pattern: str, max_results: int) -> list[str]:
+    keys: list[str] = []
+    cursor = 0
+    while len(keys) < max_results:
+        cursor, batch = await redis.scan(
+            cursor=cursor, match=pattern, count=max_results - len(keys)
+        )
+        keys.extend(batch[: max_results - len(keys)])
+        if cursor == 0:
+            break
+    return keys
+
+
 async def delete_in_batches(
     redis: Redis, batch_iterator: AsyncIterator[list[str]]
 ) -> tuple[int, bool]:

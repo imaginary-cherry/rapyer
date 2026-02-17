@@ -9,7 +9,6 @@ import rapyer
 from rapyer.result import resolve_forward_refs
 from rapyer.scripts import register_scripts
 
-
 REDUCED_TTL_SECONDS = 10
 
 T = TypeVar("T")
@@ -118,6 +117,9 @@ from tests.models.simple_types import (
 # Specialized types
 from tests.models.specialized import UserModel
 
+# Redis types
+from tests.models.redis_types import RapyerKeyFieldModel
+
 # Unknown types (JSON serializable enums)
 from tests.models.unknown_types import (
     ModelWithStrEnumDefault,
@@ -224,6 +226,8 @@ async def real_redis_client(redis_client):
         ModelWithIntEnumDefault,
         ModelWithStrEnumInList,
         ModelWithStrEnumInDict,
+        # Redis types
+        RapyerKeyFieldModel,
     ]
 
     resolve_forward_refs()

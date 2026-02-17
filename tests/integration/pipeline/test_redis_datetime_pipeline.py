@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 
 import pytest
-
 import rapyer
 from tests.models.simple_types import DatetimeModel, DatetimeTimestampModel
 

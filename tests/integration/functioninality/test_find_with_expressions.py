@@ -3,7 +3,6 @@ from uuid import uuid4
 
 import pytest
 import pytest_asyncio
-
 from rapyer.errors import BadFilterError
 from rapyer.fields import RapyerKey
 from tests.models.index_types import (
