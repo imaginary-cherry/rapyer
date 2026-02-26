@@ -651,18 +651,19 @@ class AtomicRedisModel(BaseModel):
                 pipe.expire(self.key, self.Meta.ttl)
 
     def __setattr__(self, name: str, value: Any) -> None:
+        super().__setattr__(name, value)
         if name not in self.__class__.model_fields or value is None:
-            super().__setattr__(name, value)
             return
 
-        super().__setattr__(name, value)
         if value is not None:
             attr = getattr(self, name)
-            if isinstance(attr, RedisType):
+            is_redis_type = isinstance(attr, RedisType)
+            if is_redis_type:
                 attr._base_model_link = self
 
         pipeline = _context_pipe.get()
-        if pipeline is not None:
+        # We need to update the redis only for non redis type - redis types update themselves
+        if pipeline is not None and not is_redis_type:
             serialized = self.model_dump(
                 mode="json",
                 context={REDIS_DUMP_FLAG_NAME: True},
