@@ -1,5 +1,6 @@
 import pytest
 
+import rapyer
 from tests.models.collection_types import ComprehensiveTestModel
 
 
@@ -149,10 +150,9 @@ async def test_redis_int_iadd_with_pipeline_after_external_change():
     # Act - Modify the model externally before using += in pipeline
     external_model = await ComprehensiveTestModel.aget(model.key)
     external_model.counter = 50
-    await external_model.asave()
 
-    async with model.apipeline() as redis_model:
-        redis_model.counter += 5
+    async with rapyer.apipeline():
+        external_model.counter += 5
 
     # Assert - Pipeline should increment from the externally-set value (10 + 5 = 55)
     final_model = await ComprehensiveTestModel.aget(model.key)
