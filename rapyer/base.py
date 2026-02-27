@@ -663,7 +663,7 @@ class AtomicRedisModel(BaseModel):
 
         pipeline = _context_pipe.get()
         # We need to update the redis only for non redis type - redis types update themselves
-        if pipeline is not None and not is_redis_type:
+        if pipeline is not None:
             serialized = self.model_dump(
                 mode="json",
                 context={REDIS_DUMP_FLAG_NAME: True},
