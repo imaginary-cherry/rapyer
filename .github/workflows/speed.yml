@@ -1,21 +1,13 @@
 name: CodSpeed Benchmarks
 
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types:
-      - completed
-    branches:
-      - main
+  pull_request:
   # `workflow_dispatch` allows CodSpeed to trigger backtest
   # performance analysis in order to generate initial data.
   workflow_dispatch:
 
 jobs:
   benchmarks:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
-    environment:
-      name: benchmark
     name: Run benchmarks
     runs-on: codspeed-macro
     services:
@@ -46,7 +38,6 @@ jobs:
         uses: CodSpeedHQ/action@v4
         with:
           mode: walltime
-          token: ${{ secrets.CODSPEED_TOKEN }}
           run: poetry run pytest benchmarks/ --codspeed
         env:
           REDIS_DB: 0
