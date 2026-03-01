@@ -11,7 +11,6 @@ from tests.models.collection_types import (
     DictDictModel,
     BaseModelDictSetitemModel,
     BytesDictModel,
-    DatetimeDictModel,
     EnumDictModel,
     AnyDictModel,
     BaseModelDictModel,
@@ -48,6 +47,11 @@ from tests.models.inheritance_types import (
     DiamondChildModel,
 )
 from tests.models.pickle_types import ModelWithUnserializableFields
+from tests.models.redis_types import (
+    RapyerKeyFieldModel,
+    ListOfDictsRapyerKeyModel,
+    DictOfListsRapyerKeyModel,
+)
 from tests.models.safe_load_types import (
     ModelWithSafeLoadField,
     ModelWithMultipleSafeLoadFields,
@@ -75,11 +79,6 @@ from tests.models.simple_types import (
     TTLRefreshDisabledModel,
 )
 from tests.models.specialized import UserModel
-from tests.models.redis_types import (
-    RapyerKeyFieldModel,
-    ListOfDictsRapyerKeyModel,
-    DictOfListsRapyerKeyModel,
-)
 from tests.models.unknown_types import (
     ModelWithStrEnumDefault,
     ModelWithIntEnumDefault,
@@ -103,7 +102,6 @@ REDIS_MODELS = [
     DictDictModel,
     BaseModelDictSetitemModel,
     BytesDictModel,
-    DatetimeDictModel,
     EnumDictModel,
     AnyDictModel,
     BaseModelDictModel,
