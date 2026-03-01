@@ -10,6 +10,7 @@ from rapyer.types.base import (
     RedisType,
     REDIS_DUMP_FLAG_NAME,
     SKIP_SENTINEL,
+    marks_redis_updated,
 )
 from typing_extensions import TypeAlias
 
@@ -54,6 +55,7 @@ class RedisList(list, GenericRedisType[T]):
         new_val = self.create_new_value(key, value)
         return super().__setitem__(key, new_val)
 
+    @marks_redis_updated
     def __iadd__(self, other):
         self.extend(other)
         return self

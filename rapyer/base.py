@@ -651,6 +651,11 @@ class AtomicRedisModel(BaseModel):
                 pipe.expire(self.key, self.Meta.ttl)
 
     def __setattr__(self, name: str, value: Any) -> None:
+        skip_redis_set = False
+        if isinstance(value, RedisType):
+            skip_redis_set = value._redis_updated
+            value._redis_updated = False
+
         super().__setattr__(name, value)
         if name not in self.__class__.model_fields or value is None:
             return
@@ -660,6 +665,9 @@ class AtomicRedisModel(BaseModel):
             is_redis_type = isinstance(attr, RedisType)
             if is_redis_type:
                 attr._base_model_link = self
+
+        if skip_redis_set:
+            return
 
         pipeline = _context_pipe.get()
         # We need to update the redis only for non redis type - redis types update themselves

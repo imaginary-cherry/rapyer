@@ -1,5 +1,6 @@
 import abc
 import base64
+import functools
 import logging
 import pickle
 from abc import ABC
@@ -18,6 +19,16 @@ logger = logging.getLogger("rapyer")
 REDIS_DUMP_FLAG_NAME = "__rapyer_dumped__"
 FAILED_FIELDS_KEY = "__rapyer_failed_fields__"
 SKIP_SENTINEL = object()
+
+
+def marks_redis_updated(method):
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        result = method(self, *args, **kwargs)
+        if result is not NotImplemented and _context_pipe.get() is not None:
+            result._redis_updated = True
+        return result
+    return wrapper
 
 
 class RedisType(ABC):
@@ -60,6 +71,7 @@ class RedisType(ABC):
     def __init__(self, *args, **kwargs):
         # Note: This should be overridden in the base class AtomicRedisModel, it would allow me to get access to a redis key
         self._base_model_link = None
+        self._redis_updated = False
 
     def init_redis_field(self, key, val):
         if hasattr(val, "_base_model_link"):

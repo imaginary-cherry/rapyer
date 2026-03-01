@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, SerializationInfo
 from rapyer.scripts import run_sha, DATETIME_ADD_SCRIPT_NAME
-from rapyer.types.base import RedisType, REDIS_DUMP_FLAG_NAME
+from rapyer.types.base import RedisType, REDIS_DUMP_FLAG_NAME, marks_redis_updated
 from redis.commands.search.field import NumericField
 
 
@@ -31,6 +31,7 @@ class RedisDatetime(datetime, RedisType):
     def clone(self):
         return datetime.fromtimestamp(self.timestamp())
 
+    @marks_redis_updated
     def __iadd__(self, other: timedelta) -> "RedisDatetime":
         if not isinstance(other, timedelta):
             return NotImplemented
@@ -47,6 +48,7 @@ class RedisDatetime(datetime, RedisType):
             )
         return new_value
 
+    @marks_redis_updated
     def __isub__(self, other: timedelta) -> "RedisDatetime":
         if not isinstance(other, timedelta):
             return NotImplemented
@@ -102,6 +104,7 @@ class RedisDatetimeTimestamp(RedisDatetime):
     def redis_schema(cls, field_name: str):
         return NumericField(f"$.{field_name}", as_name=field_name)
 
+    @marks_redis_updated
     def __iadd__(self, other: timedelta) -> "RedisDatetimeTimestamp":
         if not isinstance(other, timedelta):
             return NotImplemented
@@ -113,6 +116,7 @@ class RedisDatetimeTimestamp(RedisDatetime):
             )
         return new_value
 
+    @marks_redis_updated
     def __isub__(self, other: timedelta) -> "RedisDatetimeTimestamp":
         if not isinstance(other, timedelta):
             return NotImplemented
