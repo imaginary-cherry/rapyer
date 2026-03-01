@@ -863,10 +863,9 @@ dev = ["argcomplete", "attrs (>=19.2)", "hypothesis (>=3.56)", "mock", "requests
 name = "pytest-asyncio"
 version = "0.25.3"
 description = "Pytest support for asyncio"
-optional = true
+optional = false
 python-versions = ">=3.9"
-groups = ["main"]
-markers = "extra == \"test\""
+groups = ["main", "benchmark"]
 files = [
     {file = "pytest_asyncio-0.25.3-py3-none-any.whl", hash = "sha256:9e89518e0f9bd08928f97a3482fdc4e244df17529460bc038291ccaf8f85c7c3"},
     {file = "pytest_asyncio-0.25.3.tar.gz", hash = "sha256:fc1da2cf9f125ada7e710b4ddad05518d4cee187ae9412e9ac9271003497f07a"},
@@ -1136,4 +1135,4 @@ test = ["fakeredis", "pytest", "pytest-asyncio", "pytest-cov"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.14"
-content-hash = "1fb4b8fcb65e46e3c7d71655ea29e057d0b3b32b882542de5c6c175f090493d3"
+content-hash = "46234e7abb2211ead9046d7e4ef544d4bcc6b844e895256e05202e587540fd56"
