@@ -24,7 +24,6 @@ def redis_client(event_loop):
     )
     event_loop.run_until_complete(redis.flushdb())
     yield redis
-    event_loop.run_until_complete(redis.flushdb())
 
 
 @pytest.fixture(scope="session", autouse=True)
