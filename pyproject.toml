@@ -84,7 +84,6 @@ skips = ["B101"]  # assert_used - valid in test files
 
 [tool.poetry.group.benchmark.dependencies]
 pytest = "^8.4.2"
-pytest-asyncio = "^0.25.0"
 pytest-benchmark = "^5.2.3"
 pytest-codspeed = "^4.2.0"
 
