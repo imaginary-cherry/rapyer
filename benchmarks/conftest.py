@@ -10,6 +10,7 @@ from tests.models.collection_types import (  # noqa: F401
     SimpleListModel,
     StrDictModel,
 )
+from tests.models.index_types import IndexTestModel  # noqa: F401
 from tests.models.redis_types import DirectRedisIntModel  # noqa: F401
 from tests.models.simple_types import FloatModel, StrModel  # noqa: F401
 
