@@ -4,9 +4,7 @@ import os
 import pytest
 
 import rapyer
-from rapyer.result import resolve_forward_refs
-from rapyer.scripts import register_scripts
-from tests.models.registry import REDIS_MODELS
+from rapyer.init import init_rapyer, teardown_rapyer
 
 
 @pytest.fixture(scope="session")
@@ -30,13 +28,8 @@ def redis_client(event_loop):
 
 @pytest.fixture(autouse=True)
 def real_redis_client(redis_client, event_loop):
-    resolve_forward_refs()
-
-    for model in REDIS_MODELS:
-        model.Meta.redis = redis_client
-
-    event_loop.run_until_complete(register_scripts(redis_client))
+    event_loop.run_until_complete(init_rapyer(redis=redis_client))
 
     yield redis_client
 
-    event_loop.run_until_complete(redis_client.aclose())
+    event_loop.run_until_complete(teardown_rapyer())
