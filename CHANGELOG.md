@@ -6,6 +6,10 @@
 
 - **Pipeline Operations for Redis Types**: Fixed pipeline using `SET` instead of atomic operations (e.g., `INCRBY`) for Redis-native types. When modifying a `RedisInt` with `+= 5` inside a pipeline, it previously overwrote the value with `SET` instead of using `INCRBY`. Non-Redis-type fields are now correctly updated via pipeline while Redis-native types manage their own updates.
 
+### ✨ Added
+
+- **CodSpeed benchmarks**: Added CodSpeed benchmarks for Redis operations.
+
 ## [1.2.3]
 
 ### ✨ Added
