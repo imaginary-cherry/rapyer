@@ -5,6 +5,13 @@ import pytest
 
 import rapyer
 from rapyer.init import init_rapyer, teardown_rapyer
+from tests.models.collection_types import (  # noqa: F401
+    ComprehensiveTestModel,
+    SimpleListModel,
+    StrDictModel,
+)
+from tests.models.redis_types import DirectRedisIntModel  # noqa: F401
+from tests.models.simple_types import FloatModel, StrModel  # noqa: F401
 
 
 @pytest.fixture(scope="session")
