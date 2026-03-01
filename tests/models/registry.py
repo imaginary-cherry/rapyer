@@ -86,7 +86,7 @@ from tests.models.unknown_types import (
     ModelWithStrEnumInDict,
 )
 
-REDIS_MODELS = [
+TESTED_REDIS_MODELS = [
     # Collection types - List models
     UserListModel,
     ProductListModel,

@@ -9,7 +9,7 @@ import pytest_asyncio
 import rapyer
 from rapyer.result import resolve_forward_refs
 from rapyer.scripts import register_scripts
-from tests.models.registry import REDIS_MODELS
+from tests.models.registry import TESTED_REDIS_MODELS
 from tests.models.simple_types import TTLRefreshDisabledModel, TTLRefreshTestModel
 
 REDUCED_TTL_SECONDS = 10
@@ -40,7 +40,7 @@ async def real_redis_client(redis_client):
     resolve_forward_refs()
 
     # Configure Redis client for all models
-    for model in REDIS_MODELS:
+    for model in TESTED_REDIS_MODELS:
         model.Meta.redis = redis_client
 
     # Register Lua scripts
