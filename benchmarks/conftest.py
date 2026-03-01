@@ -34,3 +34,9 @@ def real_redis_client(redis_client, event_loop):
     yield redis_client
 
     event_loop.run_until_complete(teardown_rapyer())
+
+
+@pytest.fixture(autouse=True)
+def flush_db(redis_client, event_loop):
+    yield
+    event_loop.run_until_complete(redis_client.flushdb())
