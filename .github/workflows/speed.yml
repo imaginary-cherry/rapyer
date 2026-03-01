@@ -10,6 +10,16 @@ jobs:
   benchmarks:
     name: Run benchmarks
     runs-on: codspeed-macro
+    services:
+      redis:
+        image: redis/redis-stack-server:latest
+        ports:
+          - 6370:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v5
       - name: Install poetry
@@ -22,22 +32,6 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version-file: pyproject.toml
-      - name: Start Redis
-        run: |
-          cd tests/integration
-          docker compose -f docker-compose.redis.yml up -d
-      - name: Wait for Redis to be ready
-        run: |
-          echo "Waiting for Redis to be ready..."
-          for i in {1..30}; do
-            if docker exec $(docker ps -q --filter "name=redis") redis-cli ping > /dev/null 2>&1; then
-              echo "Redis is ready!"
-              exit 0
-            fi
-            echo "Waiting for Redis... ($i/30)"
-            sleep 2
-          done
-          exit 1
       - name: Install dependencies
         run: poetry install --with benchmark
       - name: Run the benchmarks
@@ -47,8 +41,3 @@ jobs:
           run: poetry run pytest benchmarks/ --codspeed
         env:
           REDIS_DB: 0
-      - name: Stop Redis
-        if: always()
-        run: |
-          cd tests/integration
-          docker compose -f docker-compose.redis.yml down
