@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import pytest
+
 from tests.models.inheritance_types import AdminUserModel, UserRole, DiamondChildModel
 
 

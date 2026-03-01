@@ -1,6 +1,7 @@
 from unittest.mock import AsyncMock
 
 import pytest
+
 from rapyer.errors.base import UnsupportedArgumentValueError
 from tests.models.simple_types import StrModel
 

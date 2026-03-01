@@ -4,7 +4,12 @@ import pytest
 
 import rapyer
 from tests.models.collection_types import ComprehensiveTestModel
-from tests.models.simple_types import FloatModel, BytesModel, DatetimeModel, DatetimeTimestampModel
+from tests.models.simple_types import (
+    FloatModel,
+    BytesModel,
+    DatetimeModel,
+    DatetimeTimestampModel,
+)
 
 
 # ===== RedisInt tests (ComprehensiveTestModel.counter) =====
@@ -245,7 +250,9 @@ async def test_redis_str_imul_with_pipeline_after_external_change():
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="RedisBytes.__iadd__ uses JSON.SET with local value instead of atomic append")
+@pytest.mark.xfail(
+    reason="RedisBytes.__iadd__ uses JSON.SET with local value instead of atomic append"
+)
 async def test_redis_bytes_iadd_with_pipeline_after_external_change():
     model = BytesModel(data=b"hello")
     await model.asave()

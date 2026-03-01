@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
+
 import rapyer
 from rapyer.result import resolve_forward_refs
 from rapyer.scripts import register_scripts

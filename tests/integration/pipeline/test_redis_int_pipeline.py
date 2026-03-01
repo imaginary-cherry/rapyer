@@ -1,6 +1,5 @@
 import pytest
 
-import rapyer
 from tests.models.collection_types import ComprehensiveTestModel
 
 

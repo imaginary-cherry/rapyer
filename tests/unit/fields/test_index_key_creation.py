@@ -1,6 +1,7 @@
 from typing import Annotated, get_args, get_origin
 
 import pytest
+
 from rapyer.fields.index import Index, IndexAnnotation
 from rapyer.fields.key import Key, KeyAnnotation
 
