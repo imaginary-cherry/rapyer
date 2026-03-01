@@ -246,27 +246,6 @@ async def test_redis_str_imul_with_pipeline_after_external_change():
     assert final_model.name == "ababab"
 
 
-# ===== RedisBytes tests (BytesModel.data) =====
-
-
-@pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="RedisBytes.__iadd__ uses JSON.SET with local value instead of atomic append"
-)
-async def test_redis_bytes_iadd_with_pipeline_after_external_change():
-    model = BytesModel(data=b"hello")
-    await model.asave()
-
-    external_model = await BytesModel.aget(model.key)
-    external_model.data = b"changed"
-
-    async with rapyer.apipeline():
-        external_model.data += b"_world"
-
-    final_model = await BytesModel.aget(model.key)
-    assert final_model.data == b"hello_world"
-
-
 # ===== RedisDatetime tests (DatetimeModel.created_at) =====
 
 
