@@ -13,7 +13,7 @@ jobs:
   validate-branch-target:
     runs-on: ubuntu-22.04
     if: github.event_name == 'pull_request'
-    
+
     steps:
     - name: Validate PR target branch
       run: |
@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-22.04
     needs: [validate-branch-target]
     if: always() && (needs.validate-branch-target.result == 'success' || needs.validate-branch-target.result == 'skipped')
-    
+
     steps:
     - uses: actions/checkout@v4
     
@@ -45,7 +45,7 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: "3.11"
-    
+
     - name: Cache pip packages
       uses: actions/cache@v3
       with:
@@ -53,7 +53,7 @@ jobs:
         key: pip-static-${{ runner.os }}-${{ hashFiles('**/pyproject.toml') }}
         restore-keys: |
           pip-static-${{ runner.os }}-
-    
+
     - name: Install Poetry
       uses: snok/install-poetry@v1
       with:
@@ -113,7 +113,7 @@ jobs:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
         redis-version: ["6.0", "6.1", "6.2", "6.3", "6.4"]
         pydantic-version: ["2.11", "2.12"]
-    
+
     services:
       redis:
         image: redis/redis-stack-server:latest
@@ -124,7 +124,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    
+
     steps:
     - uses: actions/checkout@v4
     
@@ -141,7 +141,7 @@ jobs:
         restore-keys: |
           pip-test-${{ runner.os }}-${{ matrix.python-version }}-
           pip-test-${{ runner.os }}-
-    
+
     - name: Cache tox environments
       uses: actions/cache@v3
       with:

@@ -1,5 +1,7 @@
 from typing import TypeAlias, TYPE_CHECKING
 
+from redis.commands.search.field import NumericField
+
 from rapyer.scripts import (
     run_sha,
     NUM_MUL_SCRIPT_NAME,
@@ -7,8 +9,7 @@ from rapyer.scripts import (
     NUM_MOD_SCRIPT_NAME,
     NUM_POW_SCRIPT_NAME,
 )
-from rapyer.types.base import RedisType
-from redis.commands.search.field import NumericField
+from rapyer.types.base import RedisType, marks_redis_updated
 
 
 class RedisInt(int, RedisType):
@@ -26,18 +27,21 @@ class RedisInt(int, RedisType):
     def clone(self):
         return int(self)
 
+    @marks_redis_updated
     def __iadd__(self, other):
         if self.pipeline:
             self.pipeline.json().numincrby(self.key, self.json_path, other)
         new_value = self + other
         return self.__class__(new_value)
 
+    @marks_redis_updated
     def __isub__(self, other):
         if self.pipeline:
             self.pipeline.json().numincrby(self.key, self.json_path, -other)
         new_value = self - other
         return self.__class__(new_value)
 
+    @marks_redis_updated
     def __imul__(self, other):
         new_value = self * other
         if self.pipeline:
@@ -46,6 +50,7 @@ class RedisInt(int, RedisType):
             )
         return self.__class__(new_value)
 
+    @marks_redis_updated
     def __ifloordiv__(self, other):
         new_value = self // other
         if self.pipeline:
@@ -59,6 +64,7 @@ class RedisInt(int, RedisType):
             )
         return self.__class__(new_value)
 
+    @marks_redis_updated
     def __imod__(self, other):
         new_value = self % other
         if self.pipeline:
@@ -67,6 +73,7 @@ class RedisInt(int, RedisType):
             )
         return self.__class__(new_value)
 
+    @marks_redis_updated
     def __ipow__(self, other):
         new_value = self**other
         if self.pipeline:

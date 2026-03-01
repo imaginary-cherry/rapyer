@@ -68,6 +68,14 @@ class RapyerKeyFieldModel(AtomicRedisModel):
     plain_key_dict: dict[str, RapyerKey]
 
 
+class ListOfDictsRapyerKeyModel(AtomicRedisModel):
+    items: list[dict[str, RapyerKey]] = Field(default_factory=list)
+
+
+class DictOfListsRapyerKeyModel(AtomicRedisModel):
+    items: dict[str, list[RapyerKey]] = Field(default_factory=dict)
+
+
 class PipelineAllTypesTestModel(AtomicRedisModel):
     counter: int = 0
     amount: float = 0.0

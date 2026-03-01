@@ -1,23 +1,36 @@
 import abc
 import base64
+import functools
 import logging
 import pickle
 from abc import ABC
-from typing import get_args, get_origin, Any, TypeVar, Generic
+from typing import get_args, Any, TypeVar, Generic
 
 from pydantic import GetCoreSchemaHandler, TypeAdapter
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, CoreSchema, SerializationInfo
+from redis.commands.search.field import TextField
+
 from rapyer.context import _context_pipe
 from rapyer.errors import CantSerializeRedisValueError
 from rapyer.typing_support import Self
-from redis.commands.search.field import TextField
 
 logger = logging.getLogger("rapyer")
 
 REDIS_DUMP_FLAG_NAME = "__rapyer_dumped__"
 FAILED_FIELDS_KEY = "__rapyer_failed_fields__"
 SKIP_SENTINEL = object()
+
+
+def marks_redis_updated(method):
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        result = method(self, *args, **kwargs)
+        if result is not NotImplemented and _context_pipe.get() is not None:
+            result._redis_updated = True
+        return result
+
+    return wrapper
 
 
 class RedisType(ABC):
@@ -60,6 +73,7 @@ class RedisType(ABC):
     def __init__(self, *args, **kwargs):
         # Note: This should be overridden in the base class AtomicRedisModel, it would allow me to get access to a redis key
         self._base_model_link = None
+        self._redis_updated = False
 
     def init_redis_field(self, key, val):
         if hasattr(val, "_base_model_link"):
@@ -135,15 +149,9 @@ class GenericRedisType(RedisType, Generic[T], ABC):
         return args[0] if args else Any
 
     @classmethod
+    @abc.abstractmethod
     def build_typed_original(cls, source_args):
-        base_type = get_origin(cls.original_type) or cls.original_type
-        # When reconstructing a parameterized type, avoid wrapping the type
-        # arguments in a new tuple; `source_args` already has the correct shape.
-        if not source_args:
-            return base_type
-        if len(source_args) == 1:
-            return base_type[source_args[0]]
-        return base_type[source_args]
+        pass  # pragma: no cover
 
     @classmethod
     def try_deserialize_item(cls, item, identifier):
@@ -205,7 +213,7 @@ class GenericRedisType(RedisType, Generic[T], ABC):
         else:
             # Normal serialization for concrete types — preserve inner type args
             args = get_args(source_type)
-            inner_type = cls.build_typed_original(args) if args else cls.original_type
+            inner_type = cls.build_typed_original(args)
             return core_schema.no_info_after_validator_function(
                 cls, handler(inner_type)
             )

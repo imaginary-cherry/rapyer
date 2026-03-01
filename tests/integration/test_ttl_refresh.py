@@ -1,4 +1,5 @@
 import pytest
+
 import rapyer
 from rapyer import AtomicRedisModel
 from rapyer.types import RedisDict, RedisFloat, RedisInt, RedisList

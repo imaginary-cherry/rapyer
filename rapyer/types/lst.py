@@ -1,17 +1,19 @@
 import json
 import logging
-from typing import TypeVar, TYPE_CHECKING
+from typing import TypeVar, TYPE_CHECKING, get_origin
 
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, SerializationInfo
+from typing_extensions import TypeAlias
+
 from rapyer.scripts import run_sha, REMOVE_RANGE_SCRIPT_NAME
 from rapyer.types.base import (
     GenericRedisType,
     RedisType,
     REDIS_DUMP_FLAG_NAME,
     SKIP_SENTINEL,
+    marks_redis_updated,
 )
-from typing_extensions import TypeAlias
 
 logger = logging.getLogger("rapyer")
 
@@ -35,6 +37,13 @@ class RedisList(list, GenericRedisType[T]):
         new_val = self.create_new_values([key], [value])[0]
         return new_val
 
+    @classmethod
+    def build_typed_original(cls, source_args):
+        base_type = get_origin(cls.original_type) or cls.original_type
+        # When reconstructing a parameterized type, avoid wrapping the type
+        # arguments in a new tuple; `source_args` already has the correct shape.
+        return base_type[source_args[0]]
+
     def sub_field_path(self, key: str):
         return f"{self.field_path}[{key}]"
 
@@ -47,6 +56,7 @@ class RedisList(list, GenericRedisType[T]):
         new_val = self.create_new_value(key, value)
         return super().__setitem__(key, new_val)
 
+    @marks_redis_updated
     def __iadd__(self, other):
         self.extend(other)
         return self

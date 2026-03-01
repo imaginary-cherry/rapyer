@@ -3,7 +3,11 @@ import pytest
 from rapyer.fields import RapyerKey
 from rapyer.types.dct import RedisDict
 from rapyer.types.lst import RedisList
-from tests.models.redis_types import RapyerKeyFieldModel
+from tests.models.redis_types import (
+    RapyerKeyFieldModel,
+    ListOfDictsRapyerKeyModel,
+    DictOfListsRapyerKeyModel,
+)
 
 
 @pytest.fixture
@@ -68,3 +72,55 @@ async def test_rapyer_key_field_model__save_and_get__data_persisted(
     assert raw["key_dict"] == {"ref1": "ModelB:10", "ref2": "ModelB:20"}
     assert raw["plain_key_list"] == ["ModelC:1", "ModelC:2"]
     assert raw["plain_key_dict"] == {"ref1": "ModelD:10", "ref2": "ModelD:20"}
+
+
+@pytest.mark.asyncio
+async def test_list_of_dicts_rapyer_key__save_and_get__items_are_rapyer_keys(
+    real_redis_client,
+):
+    # Arrange
+    model = ListOfDictsRapyerKeyModel(
+        items=[
+            {"a": RapyerKey("ModelA:1"), "b": RapyerKey("ModelA:2")},
+            {"c": RapyerKey("ModelB:3")},
+        ]
+    )
+
+    # Act
+    await model.asave()
+    loaded = await ListOfDictsRapyerKeyModel.aget(model.key)
+
+    # Assert
+    assert loaded.items == [{"a": "ModelA:1", "b": "ModelA:2"}, {"c": "ModelB:3"}]
+    assert all(isinstance(v, RapyerKey) for d in loaded.items for v in d.values())
+    raw = (await real_redis_client.json().get(model.key, "$"))[0]
+    assert raw["items"] == [{"a": "ModelA:1", "b": "ModelA:2"}, {"c": "ModelB:3"}]
+
+
+@pytest.mark.asyncio
+async def test_dict_of_lists_rapyer_key__save_and_get__items_are_rapyer_keys(
+    real_redis_client,
+):
+    # Arrange
+    model = DictOfListsRapyerKeyModel(
+        items={
+            "group1": [RapyerKey("ModelA:1"), RapyerKey("ModelA:2")],
+            "group2": [RapyerKey("ModelB:3")],
+        }
+    )
+
+    # Act
+    await model.asave()
+    loaded = await DictOfListsRapyerKeyModel.aget(model.key)
+
+    # Assert
+    assert loaded.items == {
+        "group1": ["ModelA:1", "ModelA:2"],
+        "group2": ["ModelB:3"],
+    }
+    assert all(isinstance(v, RapyerKey) for lst in loaded.items.values() for v in lst)
+    raw = (await real_redis_client.json().get(model.key, "$"))[0]
+    assert raw["items"] == {
+        "group1": ["ModelA:1", "ModelA:2"],
+        "group2": ["ModelB:3"],
+    }

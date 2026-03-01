@@ -1,4 +1,5 @@
 import pytest
+
 from rapyer import AtomicRedisModel
 from tests.models.index_types import IndexTestModel, PersonModel, AddressModel
 from tests.models.simple_types import StrModel, IntModel

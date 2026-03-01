@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import pytest
+
 import rapyer
 from rapyer.errors import KeyNotFound
 from rapyer.fields import RapyerKey

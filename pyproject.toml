@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "rapyer"
-version = "1.2.3"
+version = "1.2.4"
 description = "Pydantic models with Redis as the backend"
 authors = [{name = "YedidyaHKfir", email = "yedidyakfir@gmail.com"}]
 readme = "README.md"
@@ -80,6 +80,15 @@ ty = "^0.0.17"
 [tool.bandit]
 exclude_dirs = ["tests"]
 skips = ["B101"]  # assert_used - valid in test files
+
+
+[tool.poetry.group.benchmark.dependencies]
+pytest = "^8.4.2"
+pytest-benchmark = "^5.2.3"
+pytest-codspeed = "^4.2.0"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.coverage.run]
 source = ["rapyer"]
