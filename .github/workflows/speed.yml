@@ -13,6 +13,9 @@ on:
 
 jobs:
   benchmarks:
+    permissions:
+      contents: read
+      id-token: write
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     environment:
       name: benchmark
