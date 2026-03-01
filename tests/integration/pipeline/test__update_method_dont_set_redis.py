@@ -6,7 +6,6 @@ import rapyer
 from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.simple_types import (
     FloatModel,
-    BytesModel,
     DatetimeModel,
     DatetimeTimestampModel,
 )
