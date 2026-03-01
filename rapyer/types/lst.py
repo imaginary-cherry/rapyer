@@ -4,6 +4,8 @@ from typing import TypeVar, TYPE_CHECKING, get_origin
 
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, SerializationInfo
+from typing_extensions import TypeAlias
+
 from rapyer.scripts import run_sha, REMOVE_RANGE_SCRIPT_NAME
 from rapyer.types.base import (
     GenericRedisType,
@@ -12,7 +14,6 @@ from rapyer.types.base import (
     SKIP_SENTINEL,
     marks_redis_updated,
 )
-from typing_extensions import TypeAlias
 
 logger = logging.getLogger("rapyer")
 

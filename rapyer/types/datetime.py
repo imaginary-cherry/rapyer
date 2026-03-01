@@ -3,9 +3,10 @@ from typing import TYPE_CHECKING
 
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, SerializationInfo
+from redis.commands.search.field import NumericField
+
 from rapyer.scripts import run_sha, DATETIME_ADD_SCRIPT_NAME
 from rapyer.types.base import RedisType, REDIS_DUMP_FLAG_NAME, marks_redis_updated
-from redis.commands.search.field import NumericField
 
 
 class RedisDatetime(datetime, RedisType):

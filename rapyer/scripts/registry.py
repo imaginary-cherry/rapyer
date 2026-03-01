@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING
 
+from redis.exceptions import NoScriptError
+
 from rapyer.errors import PersistentNoScriptError, ScriptsNotInitializedError
 from rapyer.scripts.constants import (
     DATETIME_ADD_SCRIPT_NAME,
@@ -18,7 +20,6 @@ from rapyer.scripts.constants import (
     STR_MUL_SCRIPT_NAME,
 )
 from rapyer.scripts.loader import load_script
-from redis.exceptions import NoScriptError
 
 if TYPE_CHECKING:  # pragma: no cover
     from rapyer.config import RedisConfig

@@ -4,15 +4,16 @@ import functools
 import logging
 import pickle
 from abc import ABC
-from typing import get_args, get_origin, Any, TypeVar, Generic
+from typing import get_args, Any, TypeVar, Generic
 
 from pydantic import GetCoreSchemaHandler, TypeAdapter
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, CoreSchema, SerializationInfo
+from redis.commands.search.field import TextField
+
 from rapyer.context import _context_pipe
 from rapyer.errors import CantSerializeRedisValueError
 from rapyer.typing_support import Self
-from redis.commands.search.field import TextField
 
 logger = logging.getLogger("rapyer")
 
@@ -28,6 +29,7 @@ def marks_redis_updated(method):
         if result is not NotImplemented and _context_pipe.get() is not None:
             result._redis_updated = True
         return result
+
     return wrapper
 
 

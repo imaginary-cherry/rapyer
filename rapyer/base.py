@@ -18,6 +18,12 @@ from pydantic import (
     ValidationError,
 )
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
+from redis.client import Pipeline
+from redis.commands.search.aggregation import AggregateRequest
+from redis.commands.search.index_definition import IndexDefinition, IndexType
+from redis.commands.search.query import Query
+from redis.exceptions import NoScriptError, ResponseError
+
 from rapyer.config import RedisConfig
 from rapyer.context import _context_pipe, with_pipe_context
 from rapyer.errors import (
@@ -59,11 +65,6 @@ from rapyer.utils.redis import (
     batched,
     scan_keys,
 )
-from redis.client import Pipeline
-from redis.commands.search.aggregation import AggregateRequest
-from redis.commands.search.index_definition import IndexDefinition, IndexType
-from redis.commands.search.query import Query
-from redis.exceptions import NoScriptError, ResponseError
 
 logger = logging.getLogger("rapyer")
 
