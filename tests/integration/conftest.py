@@ -9,6 +9,8 @@ import pytest_asyncio
 import rapyer
 from rapyer.result import resolve_forward_refs
 from rapyer.scripts import register_scripts
+from tests.models.registry import REDIS_MODELS
+from tests.models.simple_types import TTLRefreshDisabledModel, TTLRefreshTestModel
 
 REDUCED_TTL_SECONDS = 10
 
@@ -19,119 +21,6 @@ T = TypeVar("T")
 class SavedModelWithReducedTTL(Generic[T]):
     model: T
     initial_ttl: int
-
-
-# Collection types
-from tests.models.collection_types import (
-    UserListModel,
-    ProductListModel,
-    IntListModel,
-    StrListModel,
-    DictListModel,
-    BaseModelListModel,
-    ListModel,
-    IntDictModel,
-    StrDictModel,
-    DictDictModel,
-    BaseModelDictSetitemModel,
-    BytesDictModel,
-    DatetimeDictModel,
-    EnumDictModel,
-    AnyDictModel,
-    BaseModelDictModel,
-    BoolDictModel,
-    ListDictModel,
-    NestedDictModel,
-    DictModel,
-    MixedTypesModel,
-    PipelineTestModel,
-    ComprehensiveTestModel,
-    BaseDictMetadataModel,
-)
-
-# Common types with key annotations
-from tests.models.common import UserWithKeyModel, EventWithDatetimeKeyModel
-
-# Complex types
-from tests.models.complex_types import (
-    OuterModel,
-    InnerRedisModel,
-    OuterModelWithRedisNested,
-    TestRedisModel,
-)
-
-# Functionality types
-from tests.models.functionality_types import (
-    LockSaveTestModel,
-    LockUpdateTestModel,
-    RichModel,
-    AllTypesModel,
-)
-
-# Index types
-from tests.models.index_types import (
-    ParentWithIndexModel,
-    ChildWithParentModel,
-    IndexTestModel,
-)
-
-# Inheritance types
-from tests.models.inheritance_types import (
-    BaseUserModel,
-    AdminUserModel,
-    DiamondChildModel,
-)
-
-# Pickle types
-from tests.models.pickle_types import ModelWithUnserializableFields
-
-# SafeLoad types
-from tests.models.safe_load_types import (
-    ModelWithSafeLoadField,
-    ModelWithMultipleSafeLoadFields,
-    ModelWithMixedFields,
-    ModelWithSafeLoadAllConfig,
-    ModelWithSafeLoadListOfAny,
-    ModelWithSafeLoadDictOfAny,
-    ModelWithUnsafeListOfAny,
-    ModelWithUnsafeDictOfAny,
-)
-
-# Simple types
-from tests.models.simple_types import (
-    IntModel,
-    FloatModel,
-    BoolModel,
-    StrModel,
-    BytesModel,
-    DatetimeModel,
-    DatetimeListModel,
-    DatetimeDictModel,
-    UserModelWithTTL,
-    UserModelWithoutTTL,
-    TaskModel,
-    NoneTestModel,
-    TTLRefreshTestModel,
-    TTLRefreshDisabledModel,
-)
-
-# Specialized types
-from tests.models.specialized import UserModel
-
-# Redis types
-from tests.models.redis_types import (
-    RapyerKeyFieldModel,
-    ListOfDictsRapyerKeyModel,
-    DictOfListsRapyerKeyModel,
-)
-
-# Unknown types (JSON serializable enums)
-from tests.models.unknown_types import (
-    ModelWithStrEnumDefault,
-    ModelWithIntEnumDefault,
-    ModelWithStrEnumInList,
-    ModelWithStrEnumInDict,
-)
 
 
 @pytest_asyncio.fixture
@@ -148,99 +37,10 @@ async def redis_client():
 
 @pytest_asyncio.fixture(autouse=True)
 async def real_redis_client(redis_client):
-    # All Redis models that need the client configured
-    redis_models = [
-        # Collection types - List models
-        UserListModel,
-        ProductListModel,
-        IntListModel,
-        StrListModel,
-        DictListModel,
-        BaseModelListModel,
-        ListModel,
-        # Collection types - Dict models
-        BaseDictMetadataModel,
-        IntDictModel,
-        StrDictModel,
-        DictDictModel,
-        BaseModelDictSetitemModel,
-        BytesDictModel,
-        DatetimeDictModel,
-        EnumDictModel,
-        AnyDictModel,
-        BaseModelDictModel,
-        BoolDictModel,
-        ListDictModel,
-        NestedDictModel,
-        DictModel,
-        # Collection types - Mixed and pipeline models
-        MixedTypesModel,
-        PipelineTestModel,
-        ComprehensiveTestModel,
-        # Simple types
-        IntModel,
-        FloatModel,
-        BoolModel,
-        StrModel,
-        BytesModel,
-        DatetimeModel,
-        DatetimeListModel,
-        DatetimeDictModel,
-        UserModelWithTTL,
-        UserModelWithoutTTL,
-        TaskModel,
-        NoneTestModel,
-        TTLRefreshTestModel,
-        TTLRefreshDisabledModel,
-        # Functionality types
-        LockSaveTestModel,
-        LockUpdateTestModel,
-        RichModel,
-        AllTypesModel,
-        # Specialized types
-        UserModel,
-        # Pickle types
-        ModelWithUnserializableFields,
-        # SafeLoad types
-        ModelWithSafeLoadField,
-        ModelWithMultipleSafeLoadFields,
-        ModelWithMixedFields,
-        ModelWithSafeLoadAllConfig,
-        ModelWithSafeLoadListOfAny,
-        ModelWithSafeLoadDictOfAny,
-        ModelWithUnsafeListOfAny,
-        ModelWithUnsafeDictOfAny,
-        # Inheritance types
-        BaseUserModel,
-        AdminUserModel,
-        DiamondChildModel,
-        # Complex types
-        OuterModel,
-        InnerRedisModel,
-        OuterModelWithRedisNested,
-        TestRedisModel,
-        # Common types with key annotations
-        UserWithKeyModel,
-        EventWithDatetimeKeyModel,
-        # Index types
-        ParentWithIndexModel,
-        ChildWithParentModel,
-        IndexTestModel,
-        # Unknown types (JSON serializable enums)
-        ModelWithStrEnumDefault,
-        ModelWithIntEnumDefault,
-        ModelWithStrEnumInList,
-        ModelWithStrEnumInDict,
-        # Redis types
-        RapyerKeyFieldModel,
-        ListOfDictsRapyerKeyModel,
-        DictOfListsRapyerKeyModel,
-    ]
-
     resolve_forward_refs()
 
     # Configure Redis client for all models
-    for model in redis_models:
+    for model in REDIS_MODELS:
         model.Meta.redis = redis_client
 
     # Register Lua scripts

@@ -38,6 +38,6 @@ jobs:
         uses: CodSpeedHQ/action@v4
         with:
           mode: walltime
-          run: poetry run pytest benchmarks/ --codspeed --override-ini="norecursedirs=tests"
+          run: poetry run pytest benchmarks/ --codspeed
         env:
           REDIS_DB: 0
