@@ -81,6 +81,15 @@ ty = "^0.0.17"
 exclude_dirs = ["tests"]
 skips = ["B101"]  # assert_used - valid in test files
 
+
+[tool.poetry.group.benchmark.dependencies]
+pytest = "^8.4.2"
+pytest-benchmark = "^5.2.3"
+pytest-codspeed = "^4.2.0"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.coverage.run]
 source = ["rapyer"]
 omit = ["*/tests/*", "*/test_*"]
