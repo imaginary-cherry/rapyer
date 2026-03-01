@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 import pytest
+
 from tests.models.redis_types import PipelineAllTypesTestModel
 from tests.models.simple_types import DatetimeModel, DatetimeTimestampModel
 

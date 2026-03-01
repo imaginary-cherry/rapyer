@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import pytest
+
 from rapyer.fields import RapyerKey
 from tests.models.common import UserWithKeyModel, EventWithDatetimeKeyModel
 

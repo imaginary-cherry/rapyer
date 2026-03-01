@@ -1,4 +1,5 @@
 import pytest
+
 import rapyer
 from rapyer import DeleteResult
 from rapyer.errors import UnsupportArgumentTypeError

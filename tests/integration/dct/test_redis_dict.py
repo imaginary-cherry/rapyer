@@ -2,10 +2,11 @@ from datetime import datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from redis.exceptions import NoScriptError
+
 from rapyer.base import AtomicRedisModel
 from rapyer.errors import PersistentNoScriptError
 from rapyer.types.dct import RedisDict
-from redis.exceptions import NoScriptError
 from tests.models.collection_types import (
     IntDictModel,
     StrDictModel,

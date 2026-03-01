@@ -18,6 +18,12 @@ from pydantic import (
     ValidationError,
 )
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
+from redis.client import Pipeline
+from redis.commands.search.aggregation import AggregateRequest
+from redis.commands.search.index_definition import IndexDefinition, IndexType
+from redis.commands.search.query import Query
+from redis.exceptions import NoScriptError, ResponseError
+
 from rapyer.config import RedisConfig
 from rapyer.context import _context_pipe, with_pipe_context
 from rapyer.errors import (
@@ -59,11 +65,6 @@ from rapyer.utils.redis import (
     batched,
     scan_keys,
 )
-from redis.client import Pipeline
-from redis.commands.search.aggregation import AggregateRequest
-from redis.commands.search.index_definition import IndexDefinition, IndexType
-from redis.commands.search.query import Query
-from redis.exceptions import NoScriptError, ResponseError
 
 logger = logging.getLogger("rapyer")
 
@@ -651,17 +652,26 @@ class AtomicRedisModel(BaseModel):
                 pipe.expire(self.key, self.Meta.ttl)
 
     def __setattr__(self, name: str, value: Any) -> None:
-        if name not in self.__class__.model_fields or value is None:
-            super().__setattr__(name, value)
-            return
+        skip_redis_set = False
+        if isinstance(value, RedisType):
+            skip_redis_set = value._redis_updated
+            value._redis_updated = False
 
         super().__setattr__(name, value)
+        if name not in self.__class__.model_fields or value is None:
+            return
+
         if value is not None:
             attr = getattr(self, name)
-            if isinstance(attr, RedisType):
+            is_redis_type = isinstance(attr, RedisType)
+            if is_redis_type:
                 attr._base_model_link = self
 
+        if skip_redis_set:
+            return
+
         pipeline = _context_pipe.get()
+        # We need to update the redis only for non redis type - redis types update themselves
         if pipeline is not None:
             serialized = self.model_dump(
                 mode="json",

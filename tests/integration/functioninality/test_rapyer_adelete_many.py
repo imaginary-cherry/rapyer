@@ -1,4 +1,5 @@
 import pytest
+
 import rapyer
 from rapyer import RapyerDeleteResult
 from rapyer.errors import RapyerModelDoesntExistError, MissingParameterError
