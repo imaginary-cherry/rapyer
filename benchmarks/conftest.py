@@ -14,7 +14,7 @@ def event_loop():
     loop.close()
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def redis_client(event_loop):
     meta_redis = rapyer.AtomicRedisModel.Meta.redis
     db_num = os.getenv("REDIS_DB", "0")
@@ -26,7 +26,7 @@ def redis_client(event_loop):
     event_loop.run_until_complete(redis.flushdb())
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(scope="session", autouse=True)
 def real_redis_client(redis_client, event_loop):
     event_loop.run_until_complete(init_rapyer(redis=redis_client))
 
