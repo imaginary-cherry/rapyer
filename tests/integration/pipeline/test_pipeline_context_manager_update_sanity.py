@@ -1,6 +1,8 @@
 import pytest
 
 from rapyer.types import RedisStr, RedisInt, RedisList
+from tests.models.collection_types import AnyDictModel
+from tests.models.common import Person
 from tests.models.functionality_types import LockUpdateTestModel as PipelineTestModel
 
 
@@ -39,3 +41,25 @@ async def test_pipeline_context_manager_updates_model_with_new_data_sanity():
             pipelined_model.tags.json_path == original_model.tags.json_path == "$.tags"
         )
         assert pipelined_model.tags == ["tag1", "tag2"] == original_model.tags
+
+
+@pytest.mark.asyncio
+async def test_pipeline_context_manager_updates_dict_with_non_redis_type_using_update():
+    # Arrange
+    original_model = AnyDictModel(
+        metadata={"alice": Person(name="Alice", age=30, email="alice@example.com")}
+    )
+    await original_model.asave()
+
+    # Act
+    async with original_model.apipeline() as pipelined_model:
+        pipelined_model.metadata.update(
+            bob=Person(name="Bob", age=25, email="bob@example.com")
+        )
+
+    # Assert
+    loaded_model = await AnyDictModel.aget(original_model.key)
+    assert loaded_model.metadata == {
+        "alice": Person(name="Alice", age=30, email="alice@example.com"),
+        "bob": Person(name="Bob", age=25, email="bob@example.com"),
+    }

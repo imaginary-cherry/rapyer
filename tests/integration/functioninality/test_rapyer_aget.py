@@ -1,7 +1,10 @@
 from datetime import datetime
 
 import pytest
+
 import rapyer
+from rapyer.errors import KeyNotFound
+from rapyer.fields import RapyerKey
 from tests.models.collection_types import (
     ListModel,
     DictModel,
@@ -243,3 +246,15 @@ async def test_rapyer_get_functionality_sanity(model_instance):
 
     # Assert
     assert retrieved_model == model_instance
+    assert isinstance(retrieved_model.key, RapyerKey)
+    assert isinstance(retrieved_model.key, RapyerKey)
+
+
+@pytest.mark.asyncio
+async def test_rapyer_aget_with_key_without_class_name_edge_case():
+    # Arrange
+    key_without_class = "12345"  # No class name prefix
+
+    # Act & Assert
+    with pytest.raises(KeyNotFound) as exc_info:
+        await rapyer.aget(key_without_class)

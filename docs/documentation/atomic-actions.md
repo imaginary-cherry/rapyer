@@ -6,6 +6,11 @@ Rapyer provides powerful atomic operations that ensure data consistency and prev
 
 The pipeline is a context manager that batches all Redis operations performed on a model into a single atomic transaction. When you enter the pipeline context, the model is automatically loaded to its current state, and all changes are applied atomically when the context exits.
 
+Rapyer provides two ways to use pipelines:
+
+- **Model pipeline**: `model.apipeline()` - Works with a specific model instance
+- **Global pipeline**: `rapyer.apipeline()` - Batches operations across multiple models
+
 ### Basic Usage
 
 ```python
@@ -37,16 +42,59 @@ async def update_user_progress(user: User, points: int, achievement: str):
 2. **Atomicity**: All operations succeed or fail together
 3. **Auto-loading**: Model state is refreshed when entering the context
 4. **Performance**: Multiple operations batched into single Redis transaction
-
 ### Supported Operations
 
 The pipeline context manager supports atomic operations for all Redis types:
 
-- **List operations**: `append()`, `extend()`, `insert()`, `pop()`, `remove()`, `clear()`
-- **Dictionary operations**: `update()`, item assignment (`dict[key] = value`), `pop()`, `clear()`
-- **String operations**: Direct assignment and modification
-- **Integer operations**: Direct assignment, arithmetic operations
-- **Bytes operations**: Direct assignment and modification
+**Redis-Native Types** (RedisList, RedisDict, RedisStr, RedisInt, RedisFloat, RedisBytes):
+
+- **List operations**: `append()`, `extend()`, `insert()`, `remove_range()`, `clear()`, index assignment (`list[i] = value`), `+=` operator
+- **Dictionary operations**: `update()`, item assignment (`dict[key] = value`), `clear()`
+- **String operations**: Direct assignment, `+=` (concatenation), `*=` (repetition)
+- **Integer operations**: Direct assignment, arithmetic operations (`+=`, `-=`, `*=`, `//=`, `%=`, `**=`)
+- **Float operations**: Direct assignment, arithmetic operations (`+=`, `-=`, `*=`, `/=`, `//=`, `%=`, `**=`)
+- **Bytes operations**: Direct assignment
+
+**Non-Redis-Native Types** (List[Any], Dict[str, Any], and other serialized fields):
+
+- **List[Any] operations**: `append()`, `extend()`, `insert()`, `clear()`, index assignment (`list[i] = value`), `+=` operator
+- **Dict[str, Any] operations**: `update()`, item assignment (`dict[key] = value`), `clear()`
+- **Direct field assignment**: Assign any serializable value directly to fields (`model.field = value`)
+
+**Model-Level Operations**:
+
+- **TTL management**: `aset_ttl(seconds)` - Set or update the model's time-to-live atomically
+
+```python
+from rapyer import AtomicRedisModel
+from typing import List, Dict, Any
+
+
+class MixedModel(AtomicRedisModel):
+    # Non-Redis-native types (serialized as JSON)
+    mixed_list: List[Any] = []
+    mixed_dict: Dict[str, Any] = {}
+    nested_data: Dict[str, List[int]] = {}
+
+
+async def update_mixed_types(model: MixedModel):
+    async with model.apipeline() as m:
+        # List[Any] operations
+        m.mixed_list.append({"key": "value"})
+        m.mixed_list.extend([[1, 2], [3, 4]])
+        m.mixed_list.insert(0, "first_item")
+        m.mixed_list[1] = {"replaced": True}
+
+        # Dict[str, Any] operations
+        m.mixed_dict["nested"] = {"deep": {"value": 123}}
+        m.mixed_dict.update({"bulk1": [1, 2, 3], "bulk2": None})
+
+        # Direct field assignment
+        m.nested_data = {"scores": [100, 200, 300]}
+```
+
+!!! warning "Inplace Operators and Concurrency"
+    When using inplace operators like `+=`, `-=`, `*=`, etc. inside a pipeline, the data sent to Redis is computed as the current value in the Python process plus the new value. This means that if another process modifies the same field between when you entered the pipeline and when it executes, your operation will override those changes. For truly atomic increments/decrements that respect concurrent modifications, consider using the lock context manager instead.
 
 ### Real-World Examples
 
@@ -113,18 +161,69 @@ async def update_user_settings(profile: UserProfile, new_email: str, theme: str)
         # Update email
         old_email = profile.email
         profile.email = new_email
-        
+
         # Update preferences
         profile.preferences["theme"] = theme
         profile.preferences["email_notifications"] = "enabled"
-        
+
         # Log the activity
         profile.activity_log.append(f"Email changed from {old_email} to {new_email}")
         profile.activity_log.append(f"Theme changed to {theme}")
-        
+
         # Update last login
         from datetime import datetime
         profile.last_login = datetime.now().isoformat()
+```
+
+#### Working with Complex Nested Data (Non-Redis-Native Types)
+
+```python
+from datetime import datetime
+from typing import List, Dict, Any
+
+
+class AnalyticsModel(AtomicRedisModel):
+    user_id: str
+    events: List[Dict[str, Any]] = []
+    aggregations: Dict[str, Any] = {}
+    raw_data: List[Any] = []
+
+
+async def track_user_event(analytics: AnalyticsModel, event_type: str, metadata: dict):
+    async with analytics.apipeline() as a:
+        # Append complex event object
+        a.events.append({
+            "type": event_type,
+            "timestamp": datetime.now().isoformat(),
+            "metadata": metadata
+        })
+
+        # Update nested aggregations
+        a.aggregations[event_type] = a.aggregations.get(event_type, {"count": 0})
+        a.aggregations[event_type]["last_seen"] = datetime.now().isoformat()
+
+        # Store raw data of any type
+        a.raw_data.extend([metadata, {"processed": True}])
+
+
+class ConfigModel(AtomicRedisModel):
+    name: str
+    settings: Dict[str, Any] = {}
+    feature_flags: List[Dict[str, bool]] = []
+
+
+async def update_config_atomically(config: ConfigModel, new_settings: dict):
+    async with config.apipeline() as c:
+        # Replace entire nested structure
+        c.settings = {
+            "database": {"host": "localhost", "port": 5432},
+            "cache": {"enabled": True, "ttl": 3600},
+            **new_settings
+        }
+
+        # Modify list of complex objects
+        c.feature_flags.append({"dark_mode": True, "beta_features": False})
+        c.feature_flags[0] = {"dark_mode": False, "beta_features": True}
 ```
 
 ### Error Handling
@@ -391,7 +490,7 @@ async def safe_account_operation(account_key: str, amount: int):
 | Feature | Pipeline | Lock |
 |---------|----------|------|
 | **Best for** | Batch operations, list/dict changes | Complex logic, conditional operations |
-| **Python operations** | Limited to supported types | Any Python code |
+| **Supported types** | All Redis types + List[Any], Dict[str, Any] | Any Python code |
 | **Concurrency** | High performance batching | Exclusive access with action-based concurrency |
 | **State refresh** | Automatic on entry | Automatic on entry |
 | **Use when** | Multiple related changes | Need current values for decisions |
@@ -418,3 +517,58 @@ async with user.alock("score_update") as locked_user:
 ```
 
 The lock context manager provides the flexibility to perform any Python operations while ensuring data consistency and preventing race conditions through exclusive access control.
+
+## Global alock_from_key Function
+
+In addition to the class method `Model.alock_from_key()`, Rapyer provides a global `rapyer.alock_from_key()` function that allows you to create locks without needing to know the specific model class. This is particularly useful when working with keys from different model types or when the model class is not available in the current context.
+
+### Global Function Usage
+
+```python
+from rapyer import alock_from_key
+
+async def generic_lock_operation(redis_key: str):
+    # Lock any Redis key without knowing its model class
+    async with alock_from_key(redis_key, "operation") as model:
+        if model is not None:
+            # Model exists - work with it
+            # The model will be the correct type based on the key
+            model.some_field = "updated value"
+            # Changes saved automatically when context exits
+        else:
+            # Key doesn't exist in Redis
+            print(f"No model found for key: {redis_key}")
+```
+
+### Key Differences from Class Method
+
+The global `alock_from_key` function differs from the class method in a few important ways:
+
+1. **Model Discovery**: Automatically determines the correct model type from the key
+2. **Handles Missing Keys**: Returns `None` if the key doesn't exist (doesn't raise KeyNotFound)
+3. **Type Flexibility**: Works with any AtomicRedisModel subclass
+
+### Example: Cross-Model Operations
+
+```python
+from rapyer import alock_from_key
+
+async def transfer_ownership(old_owner_key: str, new_owner_key: str, asset_key: str):
+    # Lock multiple models of potentially different types
+    async with alock_from_key(old_owner_key, "transfer") as old_owner:
+        async with alock_from_key(new_owner_key, "transfer") as new_owner:
+            async with alock_from_key(asset_key, "transfer") as asset:
+                # Check all models exist
+                if not all([old_owner, new_owner, asset]):
+                    raise ValueError("One or more keys not found")
+                
+                # Perform transfer (models can be different types)
+                if hasattr(asset, 'owner_id'):
+                    asset.owner_id = new_owner.id
+                
+                if hasattr(old_owner, 'assets'):
+                    old_owner.assets.remove(asset_key)
+                
+                if hasattr(new_owner, 'assets'):
+                    new_owner.assets.append(asset_key)
+```

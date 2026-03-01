@@ -1,9 +1,20 @@
 from datetime import datetime
+from typing import ClassVar
 
 from pydantic import Field
+
 from rapyer.base import AtomicRedisModel, RedisConfig
-from rapyer.types import RedisFloat, RedisDatetimeTimestamp
+from rapyer.types import (
+    RedisFloat,
+    RedisDatetimeTimestamp,
+    RedisInt,
+    RedisList,
+    RedisDict,
+)
 from tests.models.common import TaskStatus, Priority
+
+TTL_TEST_SECONDS = 24
+USER_TTL = 300
 
 
 class StrModel(AtomicRedisModel):
@@ -62,7 +73,7 @@ class UserModelWithTTL(AtomicRedisModel):
     tags: list[str] = Field(default_factory=list)
     settings: dict[str, str] = Field(default_factory=dict)
 
-    Meta = RedisConfig(ttl=300)
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=USER_TTL)
 
 
 class UserModelWithoutTTL(AtomicRedisModel):
@@ -77,3 +88,23 @@ class NoneTestModel(AtomicRedisModel):
     optional_bytes: bytes | None = None
     optional_list: list[str] | None = None
     optional_dict: dict[str, str] | None = None
+
+
+class TTLRefreshTestModel(AtomicRedisModel):
+    name: str = "test"
+    age: RedisInt = 25
+    score: RedisFloat = 0.0
+    tags: RedisList[str] = Field(default_factory=list)
+    settings: RedisDict[str, str] = Field(default_factory=dict)
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=TTL_TEST_SECONDS)
+
+
+class TTLRefreshDisabledModel(AtomicRedisModel):
+    name: str = "test"
+    age: RedisInt = 25
+    score: RedisFloat = 0.0
+    tags: RedisList[str] = Field(default_factory=list)
+    settings: RedisDict[str, str] = Field(default_factory=dict)
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=TTL_TEST_SECONDS, refresh_ttl=False)

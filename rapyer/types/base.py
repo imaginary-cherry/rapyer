@@ -1,5 +1,7 @@
 import abc
 import base64
+import functools
+import logging
 import pickle
 from abc import ABC
 from typing import get_args, Any, TypeVar, Generic
@@ -7,12 +9,28 @@ from typing import get_args, Any, TypeVar, Generic
 from pydantic import GetCoreSchemaHandler, TypeAdapter
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, CoreSchema, SerializationInfo
-from rapyer.context import _context_var
-from rapyer.typing_support import Self
-from rapyer.typing_support import deprecated
 from redis.commands.search.field import TextField
 
+from rapyer.context import _context_pipe
+from rapyer.errors import CantSerializeRedisValueError
+from rapyer.typing_support import Self
+
+logger = logging.getLogger("rapyer")
+
 REDIS_DUMP_FLAG_NAME = "__rapyer_dumped__"
+FAILED_FIELDS_KEY = "__rapyer_failed_fields__"
+SKIP_SENTINEL = object()
+
+
+def marks_redis_updated(method):
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        result = method(self, *args, **kwargs)
+        if result is not NotImplemented and _context_pipe.get() is not None:
+            result._redis_updated = True
+        return result
+
+    return wrapper
 
 
 class RedisType(ABC):
@@ -32,6 +50,9 @@ class RedisType(ABC):
     def Meta(self):
         return self._base_model_link.Meta
 
+    async def refresh_ttl_if_needed(self):
+        await self._base_model_link.refresh_ttl_if_needed()
+
     @property
     def field_path(self) -> str:
         base_path = self._base_model_link.field_path
@@ -39,11 +60,11 @@ class RedisType(ABC):
 
     @property
     def pipeline(self):
-        return _context_var.get()
+        return _context_pipe.get()
 
     @property
     def client(self):
-        return _context_var.get() or self.redis
+        return _context_pipe.get() or self.redis
 
     @property
     def json_path(self):
@@ -52,6 +73,7 @@ class RedisType(ABC):
     def __init__(self, *args, **kwargs):
         # Note: This should be overridden in the base class AtomicRedisModel, it would allow me to get access to a redis key
         self._base_model_link = None
+        self._redis_updated = False
 
     def init_redis_field(self, key, val):
         if hasattr(val, "_base_model_link"):
@@ -64,38 +86,30 @@ class RedisType(ABC):
     def json_field_path(self, field_name: str):
         return f"${self.sub_field_path(field_name)}"
 
-    @deprecated(
-        f"save function is deprecated and will become sync function in rapyer 1.2.0, use asave() instead"
-    )
-    async def save(self):
-        return await self.asave()
-
     async def asave(self) -> Self:
         model_dump = self._adapter.dump_python(
             self, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
         )
         await self.client.json().set(self.key, self.json_path, model_dump)
         if self.Meta.ttl is not None:
-            await self.client.expire(self.key, self.Meta.ttl)
+            nx = not self.Meta.refresh_ttl
+            await self.client.expire(self.key, self.Meta.ttl, nx=nx)
         return self
-
-    @deprecated(
-        "load function is deprecated and will be removed in rapyer 1.2.0, use aload() instead"
-    )
-    async def load(self):
-        return await self.aload()
 
     async def aload(self):
         redis_value = await self.client.json().get(self.key, self.field_path)
         if redis_value is None:
             return None
-        return self._adapter.validate_python(
+        result = self._adapter.validate_python(
             redis_value, context={REDIS_DUMP_FLAG_NAME: True}
         )
 
+        await self.refresh_ttl_if_needed()
+        return result
+
     @abc.abstractmethod
     def clone(self):
-        pass
+        pass  # pragma: no cover
 
     @classmethod
     def redis_schema(cls, field_name: str):
@@ -122,6 +136,8 @@ T = TypeVar("T")
 
 
 class GenericRedisType(RedisType, Generic[T], ABC):
+    safe_load: bool = False
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for key, val in self.iterate_items():
@@ -132,24 +148,41 @@ class GenericRedisType(RedisType, Generic[T], ABC):
         args = get_args(type_)
         return args[0] if args else Any
 
+    @classmethod
+    @abc.abstractmethod
+    def build_typed_original(cls, source_args):
+        pass  # pragma: no cover
+
+    @classmethod
+    def try_deserialize_item(cls, item, identifier):
+        try:
+            return cls.deserialize_unknown(item)
+        except Exception as e:
+            if cls.safe_load:
+                logger.warning(
+                    "SafeLoad: Failed to deserialize item at '%s'.", identifier
+                )
+                return SKIP_SENTINEL
+            raise CantSerializeRedisValueError() from e
+
     @abc.abstractmethod
     def iterate_items(self):
-        pass
+        pass  # pragma: no cover
 
     @classmethod
     @abc.abstractmethod
     def full_serializer(cls, value, info: SerializationInfo):
-        pass
+        pass  # pragma: no cover
 
     @classmethod
     @abc.abstractmethod
     def full_deserializer(cls, value, info: ValidationInfo):
-        pass
+        pass  # pragma: no cover
 
     @classmethod
     @abc.abstractmethod
     def schema_for_unknown(cls):
-        pass
+        pass  # pragma: no cover
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -178,7 +211,9 @@ class GenericRedisType(RedisType, Generic[T], ABC):
                 ),
             )
         else:
-            # Normal serialization for concrete types
+            # Normal serialization for concrete types — preserve inner type args
+            args = get_args(source_type)
+            inner_type = cls.build_typed_original(args)
             return core_schema.no_info_after_validator_function(
-                cls, handler(cls.original_type)
+                cls, handler(inner_type)
             )

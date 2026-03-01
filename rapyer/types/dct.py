@@ -1,84 +1,17 @@
 from typing import TypeVar, Generic, get_args, Any, TypeAlias, TYPE_CHECKING
 
 from pydantic_core import core_schema
-from rapyer.types.base import GenericRedisType, RedisType, REDIS_DUMP_FLAG_NAME
+
+from rapyer.scripts import arun_sha, DICT_POP_SCRIPT_NAME, DICT_POPITEM_SCRIPT_NAME
+from rapyer.types.base import (
+    GenericRedisType,
+    RedisType,
+    REDIS_DUMP_FLAG_NAME,
+    SKIP_SENTINEL,
+)
 from rapyer.utils.redis import update_keys_in_pipeline
 
 T = TypeVar("T")
-
-# Redis Lua script for atomic get-and-delete operation
-POP_SCRIPT = """
-local key = KEYS[1]
-local path = ARGV[1]
-local target_key = ARGV[2]
-
--- Get the value from the JSON object
-local value = redis.call('JSON.GET', key, path .. '.' .. target_key)
-
-if value and value ~= '[]' and value ~= 'null' then
-    -- Delete the key from the JSON object
-    redis.call('JSON.DEL', key, path .. '.' .. target_key)
-
-    -- Parse and return the actual value
-    local parsed = cjson.decode(value)
-    return parsed[1]  -- Return first element if it's an array
-else
-    return nil
-end
-"""
-
-
-# Redis Lua script for atomic get-arbitrary-key-and-delete operation
-POPITEM_SCRIPT = """
-local key = KEYS[1]
-local path = ARGV[1]
-
--- Get all the keys from the JSON object
-local keys = redis.call('JSON.OBJKEYS', key, path)
-
--- Return nil if no keys exist
-if not keys or #keys == 0 then
-    return nil
-end
-
--- Handle nested arrays - Redis sometimes wraps results
-if type(keys[1]) == 'table' then
-    keys = keys[1]
-end
-
--- Check again after unwrapping
-if not keys or #keys == 0 then
-    return nil
-end
-
-local first_key = tostring(keys[1])
-
--- Get the value for this key
-local value = redis.call('JSON.GET', key, path .. '.' .. first_key)
-
--- Return nil if value doesn't exist
-if not value then
-    return nil
-end
-
--- Delete the key from the JSON object
-redis.call('JSON.DEL', key, path .. '.' .. first_key)
-
--- Parse the JSON string
-local parsed_value = cjson.decode(value)
-
--- If it's a table/object, return the first value
-if type(parsed_value) == 'table' then
-    for _, v in pairs(parsed_value) do
-        return {first_key, v}  -- Return first value found
-    end
-    -- If table is empty, return nil
-    return nil
-end
-
--- Otherwise return the parsed value as-is
-return {first_key, parsed_value}
-"""
 
 
 class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
@@ -91,7 +24,17 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
     @classmethod
     def find_inner_type(cls, type_):
         args = get_args(type_)
-        return args[1] if len(args) >= 2 else Any
+        if len(args) >= 2:
+            return args[1]
+        elif args:
+            return args[0]
+        return Any
+
+    @classmethod
+    def build_typed_original(cls, source_args):
+        if len(source_args) == 1:
+            return dict[str, source_args[0]]
+        return dict[tuple(source_args)]
 
     def validate_dict(self, dct: dict):
         new_dct = self._adapter.validate_python(dct)
@@ -102,10 +45,13 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
 
     def update(self, m=None, /, **kwargs):
         if self.pipeline:
-            m_redis_val = self._adapter.dump_python(
-                m, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
+            m_redis_val = (
+                self._adapter.dump_python(
+                    m, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
+                )
+                if m
+                else {}
             )
-            m_redis_val = m_redis_val or {}
             kwargs_redis_val = self._adapter.dump_python(
                 kwargs, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
             )
@@ -125,7 +71,12 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
 
     def __setitem__(self, key, value):
         if self.pipeline:
-            self.pipeline.json().set(self.key, self.json_field_path(key), value)
+            serialized = self._adapter.dump_python(
+                {key: value}, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
+            )
+            self.pipeline.json().set(
+                self.key, self.json_field_path(key), serialized[key]
+            )
         new_val = self.validate_dict({key: value})[key]
         super().__setitem__(key, new_val)
 
@@ -136,13 +87,17 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         serialized_value = self._adapter.dump_python(
             {key: value}, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
         )
-        return await self.client.json().set(
+        result = await self.client.json().set(
             self.key, self.json_field_path(key), serialized_value[key]
         )
+        await self.refresh_ttl_if_needed()
+        return result
 
     async def adel_item(self, key):
         super().__delitem__(key)
-        return await self.client.json().delete(self.key, self.json_field_path(key))
+        result = await self.client.json().delete(self.key, self.json_field_path(key))
+        await self.refresh_ttl_if_needed()
+        return result
 
     async def aupdate(self, **kwargs):
         self.update(**kwargs)
@@ -157,15 +112,22 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
             async with self.redis.pipeline() as pipeline:
                 update_keys_in_pipeline(pipeline, self.key, **redis_params)
                 await pipeline.execute()
+            await self.refresh_ttl_if_needed()
 
     async def apop(self, key, default=None):
-        # Execute the script atomically
-        result = await self.client.eval(POP_SCRIPT, 1, self.key, self.json_path, key)
-        # Key exists in Redis, pop from local dict (it should exist there too)
+        result = await arun_sha(
+            self.client,
+            self.Meta,
+            DICT_POP_SCRIPT_NAME,
+            1,
+            self.key,
+            self.json_path,
+            key,
+        )
         super().pop(key, None)
+        await self.refresh_ttl_if_needed()
 
         if result is None:
-            # Key doesn't exist in Redis
             return default
 
         return self._adapter.validate_python(
@@ -173,8 +135,15 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         )[key]
 
     async def apopitem(self):
-        # Execute the script atomically
-        result = await self.client.eval(POPITEM_SCRIPT, 1, self.key, self.json_path)
+        result = await arun_sha(
+            self.client,
+            self.Meta,
+            DICT_POPITEM_SCRIPT_NAME,
+            1,
+            self.key,
+            self.json_path,
+        )
+        await self.refresh_ttl_if_needed()
 
         if result is not None:
             redis_key, redis_value = result
@@ -192,7 +161,9 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
     async def aclear(self):
         self.clear()
         # Clear Redis dict
-        return await self.client.json().set(self.key, self.json_path, {})
+        result = await self.client.json().set(self.key, self.json_path, {})
+        await self.refresh_ttl_if_needed()
+        return result
 
     def clone(self):
         return {
@@ -213,15 +184,19 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         }
 
     @classmethod
-    def full_deserializer(cls, value, info: core_schema.ValidationInfo):
+    def full_deserializer(cls, value: dict, info: core_schema.ValidationInfo):
         ctx = info.context or {}
         should_serialize_redis = ctx.get(REDIS_DUMP_FLAG_NAME)
-        if isinstance(value, dict):
-            return {
-                key: cls.deserialize_unknown(item) if should_serialize_redis else item
-                for key, item in value.items()
-            }
-        return value
+
+        if not should_serialize_redis:
+            return value
+
+        return {
+            key: deserialized
+            for key, item in value.items()
+            if (deserialized := cls.try_deserialize_item(item, f"key '{key}'"))
+            is not SKIP_SENTINEL
+        }
 
     @classmethod
     def schema_for_unknown(cls):
@@ -229,4 +204,4 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
 
 
 if TYPE_CHECKING:
-    RedisDict: TypeAlias = RedisDict[T] | dict[str, T]
+    RedisDict: TypeAlias = RedisDict[T] | dict[str, T]  # pragma: no cover

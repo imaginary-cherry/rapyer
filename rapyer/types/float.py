@@ -1,7 +1,16 @@
 from typing import TypeAlias, TYPE_CHECKING
 
-from rapyer.types.base import RedisType
 from redis.commands.search.field import NumericField
+
+from rapyer.scripts import (
+    run_sha,
+    NUM_MUL_SCRIPT_NAME,
+    NUM_TRUEDIV_SCRIPT_NAME,
+    NUM_FLOORDIV_SCRIPT_NAME,
+    NUM_MOD_SCRIPT_NAME,
+    NUM_POW_FLOAT_SCRIPT_NAME,
+)
+from rapyer.types.base import RedisType, marks_redis_updated
 
 
 class RedisFloat(float, RedisType):
@@ -13,35 +22,86 @@ class RedisFloat(float, RedisType):
 
     async def aincrease(self, amount: float = 1.0):
         result = await self.client.json().numincrby(self.key, self.json_path, amount)
+        await self.refresh_ttl_if_needed()
         return result[0] if isinstance(result, list) and result else result
 
     def clone(self):
         return float(self)
 
+    @marks_redis_updated
     def __iadd__(self, other):
         new_value = self + other
         if self.pipeline:
-            self.pipeline.json().set(self.key, self.json_path, new_value)
+            self.pipeline.json().numincrby(self.key, self.json_path, other)
         return self.__class__(new_value)
 
+    @marks_redis_updated
     def __isub__(self, other):
         new_value = self - other
         if self.pipeline:
-            self.pipeline.json().set(self.key, self.json_path, new_value)
+            self.pipeline.json().numincrby(self.key, self.json_path, -other)
         return self.__class__(new_value)
 
+    @marks_redis_updated
     def __imul__(self, other):
         new_value = self * other
         if self.pipeline:
-            self.pipeline.json().set(self.key, self.json_path, new_value)
+            run_sha(
+                self.pipeline, NUM_MUL_SCRIPT_NAME, 1, self.key, self.json_path, other
+            )
         return self.__class__(new_value)
 
+    @marks_redis_updated
     def __itruediv__(self, other):
         new_value = self / other
         if self.pipeline:
-            self.pipeline.json().set(self.key, self.json_path, new_value)
+            run_sha(
+                self.pipeline,
+                NUM_TRUEDIV_SCRIPT_NAME,
+                1,
+                self.key,
+                self.json_path,
+                other,
+            )
+        return self.__class__(new_value)
+
+    @marks_redis_updated
+    def __ifloordiv__(self, other):
+        new_value = self // other
+        if self.pipeline:
+            run_sha(
+                self.pipeline,
+                NUM_FLOORDIV_SCRIPT_NAME,
+                1,
+                self.key,
+                self.json_path,
+                other,
+            )
+        return self.__class__(new_value)
+
+    @marks_redis_updated
+    def __imod__(self, other):
+        new_value = self % other
+        if self.pipeline:
+            run_sha(
+                self.pipeline, NUM_MOD_SCRIPT_NAME, 1, self.key, self.json_path, other
+            )
+        return self.__class__(new_value)
+
+    @marks_redis_updated
+    def __ipow__(self, other):
+        new_value = self**other
+        if self.pipeline:
+            run_sha(
+                self.pipeline,
+                NUM_POW_FLOAT_SCRIPT_NAME,
+                1,
+                self.key,
+                self.json_path,
+                other,
+            )
         return self.__class__(new_value)
 
 
 if TYPE_CHECKING:
-    RedisFloat: TypeAlias = RedisFloat | float
+    RedisFloat: TypeAlias = RedisFloat | float  # pragma: no cover

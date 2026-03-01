@@ -66,6 +66,19 @@ class User(AtomicRedisModel):
 ### Methods
 All standard Python `str` methods are available (`upper()`, `lower()`, `split()`, etc.) plus:
 
+#### In-Place String Operations (Pipeline Context)
+RedisStr supports in-place string operations that automatically sync with Redis when used within a pipeline:
+
+- `+=` - In-place concatenation
+- `*=` - In-place repetition
+
+```python
+async with user.apipeline():
+    user.name += " Jr."     # Append suffix
+    user.prefix *= 3        # Repeat string 3 times
+    # All operations applied atomically when context exits
+```
+
 #### `clone()`
 **Returns:** `str`  
 **Description:** Returns a native Python string copy.
@@ -135,8 +148,26 @@ new_value = await counter.count.aincrease()  # Returns 6
 new_value = await counter.count.aincrease(10)  # Returns 16
 ```
 
+#### In-Place Arithmetic Operations (Pipeline Context)
+RedisInt supports in-place arithmetic operations that automatically sync with Redis when used within a pipeline:
+
+- `+=` - In-place addition
+- `-=` - In-place subtraction
+- `*=` - In-place multiplication
+- `//=` - In-place floor division
+- `%=` - In-place modulo
+- `**=` - In-place exponentiation
+
+```python
+async with post.apipeline():
+    post.views += 10    # Add 10
+    post.likes *= 2     # Double likes
+    post.views //= 2    # Floor division
+    # All operations applied atomically when context exits
+```
+
 #### `clone()`
-**Returns:** `int`  
+**Returns:** `int`
 **Description:** Returns a native Python integer copy.
 
 ### Example Usage
@@ -151,8 +182,8 @@ post = BlogPost(title="My Blog Post")
 await post.asave()
 
 # Atomic increment operations
-await post.views.increase()        # Increment views by 1
-await post.likes.increase(5)       # Increment likes by 5
+await post.views.aincrease()        # Increment views by 1
+await post.likes.aincrease(5)       # Increment likes by 5
 
 # Standard integer operations
 total_engagement = post.views + post.likes
@@ -204,13 +235,17 @@ RedisFloat supports in-place arithmetic operations that automatically sync with 
 - `+=` - In-place addition
 - `-=` - In-place subtraction
 - `*=` - In-place multiplication
-- `/=` - In-place division
+- `/=` - In-place true division
+- `//=` - In-place floor division
+- `%=` - In-place modulo
+- `**=` - In-place exponentiation
 
 ```python
 async with product.apipeline():
     product.price += 10.0    # Add 10.0
     product.price *= 1.1     # Apply 10% increase
     product.discount -= 5.0  # Reduce discount by 5.0
+    product.price //= 2      # Floor division
     # All operations applied atomically when context exits
 ```
 
@@ -284,6 +319,31 @@ These methods work immediately in pipeline contexts and batch operations:
 
 #### `clear()`
 **Description:** Removes all items from list. In pipeline context, operation is batched.
+
+#### `remove_range(start, end)`
+**Parameters:**
+- `start` (int): Start index (inclusive). Supports negative indices.
+- `end` (int): End index (exclusive). Supports negative indices.
+**Description:** Removes items from index `start` to `end` (exclusive), similar to `del list[start:end]`. 
+This function has effect only within a pipeline context - when called outside a pipeline, no changes are made to either the local list or Redis. Uses an atomic Lua script to avoid race conditions.
+
+**Index Handling:**
+- Negative indices count from the end (e.g., `-1` is the last element)
+- If `end` exceeds list length, it is trimmed to the list length
+- If `start` exceeds list length, no operation is performed
+
+```python
+playlist = Playlist(name="My Songs", songs=["a", "b", "c", "d", "e"])
+await playlist.asave()
+
+async with playlist.apipeline():
+    playlist.songs.remove_range(1, 3)  # Removes "b" and "c"
+    # Result: ["a", "d", "e"]
+
+# Negative indices
+async with playlist.apipeline():
+    playlist.songs.remove_range(-2, -1)  # Removes second-to-last item
+```
 
 #### `__setitem__(index, value)`
 **Parameters:**

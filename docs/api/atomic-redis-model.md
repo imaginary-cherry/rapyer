@@ -18,8 +18,8 @@ print(user.pk)  # Returns UUID if no key field defined
 ```
 
 #### `key`
-**Type:** `str`  
-**Description:** The Redis key used to store this model instance. Format: `{ClassName}:{pk}`
+**Type:** `RapyerKey`
+**Description:** The Redis key used to store this model instance. Format: `{ClassName}:{pk}`. Returns a `RapyerKey`, a `str` subclass that identifies the value as a Rapyer-managed key.
 
 ```python
 user = User(name="John")
@@ -51,8 +51,9 @@ await user.asave()
 ```
 
 #### `aload()`
-**Type:** `async` method  
-**Returns:** `Self`  
+**Type:** `async` method
+**Returns:** `Self`
+**Raises:** `CantSerializeRedisValueError` if the value in Redis cannot be deserialized (Corruption or missing resources)
 **Description:** Loads the latest data from Redis for this model instance, updating the current instance.
 
 ```python
@@ -68,9 +69,24 @@ await user.aload()  # Refreshes user with latest Redis data
 success = await user.adelete()
 ```
 
+#### `aset_ttl(ttl)`
+**Type:** `async` method
+**Parameters:**
+- `ttl` (int): Time-to-live in seconds
+**Description:** Sets the TTL for this model instance in Redis. Can only be called on top-level models. Supports pipeline context for atomic TTL updates.
+
+```python
+# Direct usage
+await user.aset_ttl(3600)  # Expire in 1 hour
+
+# Within pipeline context
+async with user.apipeline():
+    user.score += 100
+    await user.aset_ttl(7200)
+    await user2.aset_ttl(7200)  # TTL set atomically with other changes as part of the transaction
+```
+
 #### `aduplicate()`
-**Type:** `async` method  
-**Returns:** `Self`  
 **Description:** Creates a duplicate of the current model with a new primary key and saves it to Redis.
 
 ```python
@@ -121,11 +137,15 @@ if user.is_inner_model():
 ### Class Methods
 
 #### `aget(key)`
-**Type:** `async` class method  
-**Parameters:** 
-- `key` (str): The Redis key to retrieve  
-**Returns:** `Self`  
-**Raises:** `KeyNotFound` if key doesn't exist  
+**Type:** `async` class method
+**Parameters:**
+- `key` (str): The Redis key to retrieve
+**Returns:** `Self`
+**Raises:**
+
+- `KeyNotFound` if key doesn't exist
+- `CantSerializeRedisValueError` if the value in Redis cannot be deserialized  (Corruption or missing resources)
+
 **Description:** Retrieves a model instance from Redis by its key.
 
 ```python
@@ -143,16 +163,25 @@ user = await User.aget("User:abc-123")
 success = await User.adelete_by_key("User:abc-123")
 ```
 
-#### `afind(*expressions)`
-**Type:** `async` class method  
+#### `afind(*args, max_results=None)`
+**Type:** `async` class method
 **Parameters:**
-- `*expressions` (Expression): Optional filter expressions  
-**Returns:** `list of redis models`  
-**Description:** Retrieves all instances of this model class from Redis, optionally filtered by expressions.
+- `*args` (str | Expression): Keys (strings) or filter expressions
+- `max_results` (int | None): Maximum number of models to return. `None` returns all matches.
+**Returns:** `list of redis models`
+**Raises:** `CantSerializeRedisValueError` if a value in Redis cannot be deserialized  (Corruption or missing resources)
+**Description:** Retrieves model instances from Redis. Supports three modes:
+
+1. **No arguments** - Returns all instances
+2. **Keys** - Pass string keys to retrieve specific models
+3. **Expressions** - Pass filter expressions (requires `Index` annotation)
+
+!!! note
+    Keys and expressions are mutually exclusive. If both are provided, keys take priority and expressions are ignored (a warning is logged).
 
 **Supported Filter Operators:**
 - `==` - Equal to
-- `!=` - Not equal to  
+- `!=` - Not equal to
 - `>` - Greater than
 - `<` - Less than
 - `>=` - Greater than or equal to
@@ -163,7 +192,11 @@ success = await User.adelete_by_key("User:abc-123")
 
 ```python
 # Get all users
-all_users = await User.afind()  
+all_users = await User.afind()
+
+# Find by keys (full key or just primary key)
+users = await User.afind("User:abc123", "User:def456")
+users = await User.afind("abc123", "def456")  # prefix added automatically
 
 # Filter with expressions (requires Index annotation on fields)
 active_users = await User.afind(User.status == "active")
@@ -173,15 +206,35 @@ adult_users = await User.afind(User.age >= 18)
 filtered = await User.afind(
     (User.age > 18) & (User.status == "active") | (User.role == "admin")
 )
+
+# Limit results
+top_5 = await User.afind(max_results=5)
+recent_active = await User.afind(User.status == "active", max_results=10)
 ```
 
-#### `afind_keys()`
-**Type:** `async` class method  
-**Returns:** `list[str]`  
-**Description:** Retrieves all Redis keys for instances of this model class.
+#### `afind_one(*args)`
+**Type:** `async` class method
+**Parameters:**
+- `*args` (str | Expression): Keys (strings) or filter expressions (same as `afind()`)
+**Returns:** `Self | None` - Returns a single model instance or `None` if no match is found.
+**Description:** Retrieves a single model instance. Returns `None` when no match is found. Equivalent to calling `afind(*args, max_results=1)` and returning the first result.
+
+```python
+user = await User.afind_one(User.name == "Alice")
+if user is not None:
+    print(user.name)
+```
+
+#### `afind_keys(max_results=None)`
+**Type:** `async` class method
+**Parameters:**
+- `max_results` (int | None): Maximum number of keys to return. `None` returns all keys.
+**Returns:** `list[RapyerKey]`
+**Description:** Retrieves Redis keys for instances of this model class.
 
 ```python
 user_keys = await User.afind_keys()  # Returns ["User:123", "User:456", ...]
+first_10 = await User.afind_keys(max_results=10)
 ```
 
 #### `ainsert(*models)`
@@ -213,24 +266,28 @@ await User.ainsert(user1, user2, user3)
 ```
 
 #### `adelete_many(*args)`
-**Type:** `async` class method  
-**Parameters:** 
-- `*args` (Self | str): Variable number of model instances or Redis keys to delete   
-**Description:** Deletes multiple model instances from Redis in a single atomic transaction. Accepts both model instances and Redis key strings, making it flexible for different use cases. This is significantly more efficient than calling `delete()` on each model individually, as it uses Redis batch deletion.
+**Type:** `async` class method
+**Parameters:**
+- `*args` (Self | RapyerKey | str | Expression): Model instances, keys obtained from `.key`/`.pk`, or filter expressions
+**Returns:** `DeleteResult` - contains `count` (number of deleted keys) and `was_committed` (`bool`)
+**Raises:** `UnsupportArgumentTypeError` if no arguments provided, if expressions are mixed with keys/instances, or if an unsupported type is passed
+
+Deletes multiple model instances from Redis. Supports three input modes: model instances, `RapyerKey` strings (from `.key` or `.pk`), or filter expressions (requires `Index` fields). Large deletes are automatically batched based on `max_delete_per_transaction`.
 
 ```python
 # Delete using model instances
-await User.adelete_many(*users)
+result = await User.adelete_many(*users)
+print(result.count)  # 4
 
-# Delete using Redis keys
-await User.adelete_many("User:123", "User:456", "User:789")
+# Delete using keys from .key or .pk or a string
+result = await User.adelete_many(users[0].key, users[1].pk, "User:123")
 
 # Mix models and keys
-await User.adelete_many(user1, "User:xyz", user2.key, user3)
+result = await User.adelete_many(user1, user2.key, user3.pk)
 
-# Delete all instances of a model
-all_users = await User.afind()
-await User.adelete_many(*all_users)
+# Delete with filter expressions (requires indexed fields)
+result = await User.adelete_many(User.status == "inactive")
+result = await User.adelete_many((User.age < 18) & (User.status == "pending"))
 ```
 
 #### `class_key_initials()`
@@ -275,10 +332,10 @@ async with user.alock("settings_update", save_at_end=True) as locked_user:
     locked_user.settings = {"theme": "dark"}
 ```
 
-#### `apipeline(ignore_if_deleted=False)`
+#### `apipeline(ignore_redis_error=False)`
 **Type:** `async` context manager  
 **Parameters:**
-- `ignore_if_deleted` (bool): Continue if model was deleted during pipeline  
+- `ignore_redis_error` (bool): If `True`, suppresses `redis.exceptions.ResponseError` raised during pipeline execution (for example, if the model was deleted during the pipeline) and continues.  
 **Returns:** `AsyncGenerator[Self, None]`  
 **Description:** Batches all operations into a Redis pipeline for atomic execution.
 
@@ -299,11 +356,18 @@ async with user.apipeline() as pipeline_user:
 class User(AtomicRedisModel):
     name: str
     age: int
-    
-    class Meta:
-        redis = redis_client
-        ttl = 3600  # Expire after 1 hour
+
+    Meta = RedisConfig(redis=redis_client, ttl=3600)  # Expire after 1 hour
 ```
+
+**Available options:**
+
+- `redis` - Redis client instance
+- `ttl` - Time-to-live in seconds
+- `refresh_ttl` - Refresh TTL on read/write (default: `True`)
+- `safe_load_all` - Treat all non-Redis fields as SafeLoad (default: `False`)
+- `prefer_normal_json_dump` - Use JSON serialization for compatible fields instead of pickle (default: `False`)
+- `max_delete_per_transaction` - Maximum keys deleted per pipeline transaction in `adelete_many()` (default: `1000`, set to `None` to disable batching)
 
 ### Special Behaviors
 

@@ -41,6 +41,9 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+!!! note "RapyerKey"
+    The `.key` property returns a `RapyerKey` — a `str` subclass that marks the value as a Rapyer-managed Redis key. It behaves exactly like a regular string.
+
 ### Bulk Model Insert - `ainsert()`
 
 For better performance when saving multiple models, use the `ainsert()` classmethod which performs all insertions in a single Redis transaction:
@@ -162,6 +165,42 @@ if __name__ == "__main__":
 ```
 
 This is much more efficient than individual get operations when you need to retrieve multiple instances.
+
+### Finding by Keys
+
+Retrieve specific models by passing their keys directly to `afind()`:
+
+```python
+async def find_by_keys_example():
+    # Create and save users
+    users = [
+        User(name="Alice", age=25, email="alice@example.com"),
+        User(name="Bob", age=30, email="bob@example.com"),
+        User(name="Charlie", age=35, email="charlie@example.com")
+    ]
+    await User.ainsert(*users)
+
+    # Find specific users by their full keys
+    alice_key = users[0].key  # e.g., "User:abc123"
+    bob_key = users[1].key
+
+    found_users = await User.afind(alice_key, bob_key)
+    print(f"Found {len(found_users)} users")  # 2
+
+    # You can also use just the primary key (without prefix)
+    alice_pk = users[0].pk  # e.g., "abc123"
+    found_alice = await User.afind(alice_pk)
+    print(f"Found: {found_alice[0].name}")  # Alice
+```
+
+**Key behavior:**
+
+- Pass full keys (`User:abc123`) or just the primary key (`abc123`)
+- Non-existent keys are silently ignored
+- Returns an empty list if no keys match
+
+!!! warning "Keys and Expressions are Mutually Exclusive"
+    If you pass both keys and expressions to `afind()`, the expressions are ignored and only the keys are used. A warning is logged when this happens.
 
 ### Filtering with Expressions
 
@@ -288,9 +327,10 @@ async def performance_example():
 
 ### Finding vs. Loading Individual Models
 
-- Use `afind()` when you need all instances of a model class
-- Use `get()` when you know the specific key you want to retrieve
-- Use `afind_keys()` if you only need the Redis keys without loading the full models
+- Use `afind()` when you need multiple instances
+- Use `afind_one()` when you expect a single result
+- Use `aget()` when you know the exact key
+- Use `afind_keys()` if you only need the Redis keys without loading models
 
 ```python
 async def main():
@@ -301,6 +341,9 @@ async def main():
     # Get all user instances
     users = await User.afind()
     print(f"Loaded {len(users)} users")
+
+    # Get a single user by expression
+    alice = await User.afind_one(User.name == "Alice")
 
     # Get specific user by key
     specific_user = await User.aget(user_keys[0])
@@ -395,48 +438,89 @@ if __name__ == "__main__":
 
 ### Bulk Model Deletion - `adelete_many()`
 
-For better performance when deleting multiple models, use the `adelete_many()` classmethod which performs all deletions in a single Redis transaction. You can pass either model instances or Redis keys directly:
+Delete multiple models in a single Redis transaction using model instances, Redis keys, or filter expressions. Returns a `DeleteResult` with the number of deleted models.
 
 ```python
 async def bulk_delete_example():
-    # Create and save multiple users
     users = [
         User(name="Alice", age=25, email="alice@example.com"),
         User(name="Bob", age=30, email="bob@example.com"),
         User(name="Charlie", age=35, email="charlie@example.com"),
         User(name="Diana", age=28, email="diana@example.com")
     ]
-    
-    # Save all users
     await User.ainsert(*users)
-    print(f"Created {len(users)} users")
-    
-    # Method 1: Bulk delete using model instances
-    await User.adelete_many(*users)
-    print(f"Successfully deleted {len(users)} users in one transaction")
-    
-    # Method 2: Bulk delete using Redis keys
-    user_keys = ["User:123", "User:456", "User:789"]
-    await User.adelete_many(*user_keys)
-    print(f"Successfully deleted users by keys")
-    
-    # Method 3: Mix models and keys
-    await User.adelete_many(users[0], "User:xyz", users[1].key)
-    print(f"Successfully deleted using mixed inputs")
-    
-    # Verify all users were deleted
-    remaining_users = await User.afind()
-    print(f"Remaining users in Redis: {len(remaining_users)}")
 
-if __name__ == "__main__":
-    asyncio.run(bulk_delete_example())
+    # Delete using model instances
+    result = await User.adelete_many(*users)
+    print(result.count)  # 4
+
+    # Delete using keys from .key or .pk
+    result = await User.adelete_many(users[0].key, users[1].key)
+
+    # Mix models and keys
+    result = await User.adelete_many(users[0], users[1].key, users[2].pk)
 ```
+
+#### Deleting with Expressions
+
+Pass filter expressions to `adelete_many()` to delete models matching specific criteria. Fields must be annotated with `Index` (see [Indexing Fields](indexing-fields.md)).
+
+```python
+from rapyer import AtomicRedisModel, Index
+from typing import Annotated
+
+
+class User(AtomicRedisModel):
+    name: Annotated[str, Index]
+    age: Annotated[int, Index]
+    status: Annotated[str, Index] = "active"
+
+
+async def delete_with_filters():
+    # Delete all inactive users
+    result = await User.adelete_many(User.status == "inactive")
+    print(f"Deleted {result.count} inactive users")
+
+    # Combine expressions
+    result = await User.adelete_many((User.age < 18) & (User.status == "pending"))
+    print(f"Deleted {result.count} underage pending users")
+```
+
+!!! warning "Cannot Mix Expressions with Keys or Instances"
+    Passing expressions together with keys or model instances raises an `UnsupportArgumentTypeError`. Use one approach per call.
+
+#### DeleteResult
+
+`adelete_many()` returns a `DeleteResult` with:
+
+- `count` (`int`): Number of keys actually deleted
+- `was_committed` (`bool`): `True` when the deletion was executed immediately. `False` when called inside an `apipeline()` context — the delete is queued and committed when the pipeline exits.
+
+```python
+async def pipeline_delete_example():
+    async with rapyer.apipeline():
+        result = await User.adelete_many(User.status == "inactive")
+        print(result.was_committed)  # False — queued, not yet executed
+```
+
+#### Batching
+
+Large deletes are automatically split into batches. Configure the batch size via `max_delete_per_transaction` in `Meta`:
+
+```python
+class User(AtomicRedisModel):
+    name: str
+
+    Meta = RedisConfig(redis=redis_client, max_delete_per_transaction=500)
+```
+
+The default is `1000`. Set to `None` to disable batching. Batching only applies outside a pipeline context.
 
 **Why `adelete_many()` is Better Than Individual `delete()` Calls:**
 
-- **Transactional**: All models are deleted atomically - either all succeed or all fail
+- **Transactional**: All models are deleted atomically per batch
 - **Performance**: Single Redis operation instead of multiple round trips
-- **Network Efficiency**: Reduces network latency by batching operations
+- **Expression Support**: Delete by filter criteria without loading models first
 
 ### Performance Comparison: `adelete_many()` vs Individual `delete()` Operations
 

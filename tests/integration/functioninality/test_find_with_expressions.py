@@ -1,7 +1,11 @@
 from datetime import datetime, timedelta
+from uuid import uuid4
 
 import pytest
 import pytest_asyncio
+
+from rapyer.errors import BadFilterError
+from rapyer.fields import RapyerKey
 from tests.models.index_types import (
     IndexTestModel,
     BaseIndexModel,
@@ -22,22 +26,6 @@ async def create_indices(redis_client):
     await BaseIndexModel.adelete_index()
 
 
-@pytest.fixture
-def test_models():
-    return [
-        IndexTestModel(name="Alice", age=25, description="Engineer"),
-        IndexTestModel(name="Bob", age=30, description="Manager"),
-        IndexTestModel(name="Charlie", age=35, description="Designer"),
-        IndexTestModel(name="David", age=40, description="Director"),
-    ]
-
-
-@pytest_asyncio.fixture
-async def inserted_test_models(test_models):
-    await IndexTestModel.ainsert(*test_models)
-    return test_models
-
-
 @pytest.mark.asyncio
 async def test_afind_with_single_expression_sanity(
     create_indices, inserted_test_models
@@ -54,6 +42,7 @@ async def test_afind_with_single_expression_sanity(
     for model in models:
         if model.age > 30:
             assert model in found_models
+    assert all(isinstance(m.key, RapyerKey) for m in found_models)
 
 
 @pytest.mark.asyncio
@@ -139,6 +128,7 @@ async def test_afind_without_expressions_returns_all_sanity(inserted_three_test_
     assert len(found_models) == 3
     for model in models:
         assert model in found_models
+    assert all(isinstance(m.key, RapyerKey) for m in found_models)
 
 
 @pytest.mark.asyncio
@@ -369,3 +359,135 @@ async def test_afind_with_datetime_filtering_sanity(redis_client):
 
     # Cleanup
     await UserIndexModel.adelete_index()
+
+
+@pytest.mark.asyncio
+async def test_afind_with_ne_expression_numeric_sanity(
+    create_indices, inserted_test_models
+):
+    # Arrange
+    IndexTestModel.init_class()
+
+    # Act
+    found_models = await IndexTestModel.afind(IndexTestModel.age != 30)
+
+    # Assert
+    assert len(found_models) == 3
+    found_ages = {m.age for m in found_models}
+    assert 30 not in found_ages
+    assert 25 in found_ages
+    assert 35 in found_ages
+    assert 40 in found_ages
+
+
+@pytest.mark.asyncio
+async def test_afind_with_ne_expression_string_sanity(
+    create_indices, inserted_test_models
+):
+    # Arrange
+    IndexTestModel.init_class()
+
+    # Act
+    found_models = await IndexTestModel.afind(IndexTestModel.name != "Alice")
+
+    # Assert
+    assert len(found_models) == 3
+    found_names = {m.name for m in found_models}
+    assert "Alice" not in found_names
+    assert "Bob" in found_names
+    assert "Charlie" in found_names
+    assert "David" in found_names
+
+
+@pytest.mark.asyncio
+async def test_afind_with_ne_expression_combined_with_and_sanity(
+    create_indices, inserted_test_models
+):
+    # Arrange
+    IndexTestModel.init_class()
+
+    # Act - Find people who are not 30 and not Alice
+    expression = (IndexTestModel.age != 30) & (IndexTestModel.name != "Alice")
+    found_models = await IndexTestModel.afind(expression)
+
+    # Assert - Should find Charlie (35) and David (40), both not age 30 and not Alice
+    assert len(found_models) == 2
+    found_names = {m.name for m in found_models}
+    assert "Charlie" in found_names
+    assert "David" in found_names
+
+
+@pytest.mark.asyncio
+async def test_afind_with_ne_expression_combined_with_or_sanity(
+    create_indices, inserted_test_models
+):
+    # Arrange
+    IndexTestModel.init_class()
+
+    # Act - Find people who are not 30 OR not named Charlie
+    expression = (IndexTestModel.age != 30) | (IndexTestModel.name != "Charlie")
+    found_models = await IndexTestModel.afind(expression)
+
+    # Assert - All 4 match (Alice: 25 not 30; Bob: not Charlie; Charlie: not 30; David: not Charlie)
+    assert len(found_models) == 4
+
+
+@pytest.mark.asyncio
+async def test_afind_returns_empty_list_when_no_docs_match_expression_edge_case(
+    create_indices,
+):
+    # Arrange - Insert models with ages 25, 30, 35
+    models = [
+        IndexTestModel(name="Alice", age=25, description="Engineer"),
+        IndexTestModel(name="Bob", age=30, description="Manager"),
+        IndexTestModel(name="Charlie", age=35, description="Designer"),
+    ]
+    await IndexTestModel.ainsert(*models)
+    IndexTestModel.init_class()
+
+    # Act - Search for models with age > 100 (none exist)
+    found_models = await IndexTestModel.afind(IndexTestModel.age > 100)
+
+    # Assert - Should return empty list
+    assert found_models == []
+
+
+@pytest.mark.asyncio
+async def test_expression_field_create_filter_raises_bad_filter_error_sanity():
+    # Act & Assert
+    with pytest.raises(BadFilterError):
+        await IndexTestModel.afind(IndexTestModel.name)
+
+
+@pytest.mark.asyncio
+async def test_afind_with_expression_handles_mixed_corrupted_data_comprehensive(
+    create_indices,
+):
+    # Arrange
+    models = [
+        IndexTestModel(name="Alice", age=25, description="Engineer"),
+        IndexTestModel(name="Bob", age=30, description="Manager"),
+        IndexTestModel(name="Charlie", age=35, description="Designer"),
+        IndexTestModel(name="David", age=40, description="Director"),
+    ]
+    await IndexTestModel.ainsert(*models)
+
+    redis = IndexTestModel.Meta.redis
+    lock_key = f"IndexTestModel:{uuid4()}:lock"
+    await redis.set(lock_key, "lock_value")
+
+    invalid_schema_key = f"IndexTestModel:{uuid4()}"
+    await redis.json().set(invalid_schema_key, "$", {"age": "invalid", "name": 999})
+
+    IndexTestModel.init_class()
+
+    # Act
+    found_models = await IndexTestModel.afind(
+        (IndexTestModel.age > 25) & (IndexTestModel.age < 40)
+    )
+
+    # Assert
+    assert len(found_models) == 2
+    found_names = {m.name for m in found_models}
+    assert "Bob" in found_names
+    assert "Charlie" in found_names

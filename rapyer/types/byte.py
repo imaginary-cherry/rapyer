@@ -2,7 +2,8 @@ from typing import TypeAlias, TYPE_CHECKING
 
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, SerializationInfo
-from rapyer.types.base import RedisType, REDIS_DUMP_FLAG_NAME
+
+from rapyer.types.base import RedisType, REDIS_DUMP_FLAG_NAME, marks_redis_updated
 
 
 class RedisBytes(bytes, RedisType):
@@ -11,10 +12,13 @@ class RedisBytes(bytes, RedisType):
     def clone(self):
         return bytes(self)
 
+    @marks_redis_updated
     def __iadd__(self, other):
         new_value = self + other
         if self.pipeline:
-            self.pipeline.json().set(self.key, self.json_path, new_value)
+            self.pipeline.json().set(
+                self.key, self.json_path, self.serialize_unknown(new_value)
+            )
         return self.__class__(new_value)
 
     @classmethod
@@ -52,4 +56,4 @@ class RedisBytes(bytes, RedisType):
 
 
 if TYPE_CHECKING:
-    RedisBytes: TypeAlias = RedisBytes | bytes
+    RedisBytes: TypeAlias = RedisBytes | bytes  # pragma: no cover

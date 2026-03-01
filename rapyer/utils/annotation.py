@@ -10,17 +10,17 @@ DYNAMIC_CLASS_DOC = "___dynamic_class___"
 class TypeConverter(ABC):
     @abc.abstractmethod
     def is_type_support(self, type_to_check: type) -> bool:
-        pass
+        pass  # pragma: no cover
 
     @abc.abstractmethod
     def convert_flat_type(self, type_to_convert: type) -> type:
-        pass
+        pass  # pragma: no cover
 
     @abc.abstractmethod
     def covert_generic_type(
         self, type_to_covert: type, generic_values: tuple[type]
     ) -> type:
-        pass
+        pass  # pragma: no cover
 
 
 def replace_to_redis_types_in_annotation(
@@ -74,13 +74,10 @@ def replace_to_redis_types_in_annotation(
             # If we don't support the origin, just use the original annotation
             origin = annotation
         return origin
-    return annotation
+    return annotation  # pragma: no cover - There is no way to reach this line
 
 
 def has_annotation(field: Any, annotation_type: Any) -> bool:
-    if field is annotation_type:
-        return True
-
     origin = get_origin(field)
     if origin is Annotated:
         args = get_args(field)

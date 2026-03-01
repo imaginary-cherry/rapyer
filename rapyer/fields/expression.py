@@ -1,12 +1,17 @@
 from typing import Any
 
 from pydantic import TypeAdapter
+
+from rapyer.errors import BadFilterError
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME
+from rapyer.typing_support import Unpack
 
 
 class Expression:
     def create_filter(self) -> str:
-        raise NotImplementedError("Subclasses must implement create_filter")
+        raise NotImplementedError(  # pragma: no cover
+            "Subclasses must implement create_filter"  # pragma: no cover
+        )  # pragma: no cover
 
     def __and__(self, other: "Expression") -> "AndExpression":
         return AndExpression(self, other)
@@ -18,13 +23,22 @@ class Expression:
         return NotExpression(self)
 
 
+class AtomicField(Expression):
+    def __init__(self, field_name: str, **sub_fields: Unpack[Expression]):
+        self.field_name = field_name
+        for sub_field_name, sub_field in sub_fields.items():
+            setattr(self, sub_field_name, sub_field)
+
+
 class ExpressionField(Expression):
     def __init__(self, field_name: str, field_type: Any = None):
         self.field_name = field_name
         self._adapter = TypeAdapter(field_type)
 
     def create_filter(self) -> str:
-        return f"@{self.field_name}:*"
+        raise BadFilterError(
+            "You must use an operator to filter an expression in redis"
+        )
 
     def serialize_value(self, value: Any) -> Any:
         return self._adapter.dump_python(

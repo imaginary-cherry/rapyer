@@ -1,10 +1,21 @@
 import json
-from typing import TypeVar, TYPE_CHECKING
+import logging
+from typing import TypeVar, TYPE_CHECKING, get_origin
 
 from pydantic_core import core_schema
 from pydantic_core.core_schema import ValidationInfo, SerializationInfo
-from rapyer.types.base import GenericRedisType, RedisType, REDIS_DUMP_FLAG_NAME
 from typing_extensions import TypeAlias
+
+from rapyer.scripts import run_sha, REMOVE_RANGE_SCRIPT_NAME
+from rapyer.types.base import (
+    GenericRedisType,
+    RedisType,
+    REDIS_DUMP_FLAG_NAME,
+    SKIP_SENTINEL,
+    marks_redis_updated,
+)
+
+logger = logging.getLogger("rapyer")
 
 T = TypeVar("T")
 
@@ -26,35 +37,60 @@ class RedisList(list, GenericRedisType[T]):
         new_val = self.create_new_values([key], [value])[0]
         return new_val
 
+    @classmethod
+    def build_typed_original(cls, source_args):
+        base_type = get_origin(cls.original_type) or cls.original_type
+        # When reconstructing a parameterized type, avoid wrapping the type
+        # arguments in a new tuple; `source_args` already has the correct shape.
+        return base_type[source_args[0]]
+
+    def sub_field_path(self, key: str):
+        return f"{self.field_path}[{key}]"
+
     def __setitem__(self, key, value):
         if self.pipeline:
-            self.pipeline.json().set(self.key, self.json_field_path(key), value)
+            serialized = self._adapter.dump_python(
+                [value], mode="json", context={REDIS_DUMP_FLAG_NAME: True}
+            )
+            self.pipeline.json().set(self.key, self.json_field_path(key), serialized[0])
         new_val = self.create_new_value(key, value)
         return super().__setitem__(key, new_val)
 
+    @marks_redis_updated
     def __iadd__(self, other):
         self.extend(other)
-        if self.pipeline and other:
-            self.pipeline.json().arrappend(self.key, self.json_path, *other)
         return self
 
     def append(self, __object):
         if self.pipeline:
-            self.pipeline.json().arrappend(self.key, self.json_path, __object)
+            serialized_object = self._adapter.dump_python(
+                [__object], mode="json", context={REDIS_DUMP_FLAG_NAME: True}
+            )
+            self.pipeline.json().arrappend(
+                self.key, self.json_path, serialized_object[0]
+            )
         key = len(self)
         new_val = self.create_new_value(key, __object)
         return super().append(new_val)
 
     def extend(self, new_lst):
         if self.pipeline and new_lst:
-            self.pipeline.json().arrappend(self.key, self.json_path, *new_lst)
+            serialized = self._adapter.dump_python(
+                list(new_lst), mode="json", context={REDIS_DUMP_FLAG_NAME: True}
+            )
+            self.pipeline.json().arrappend(self.key, self.json_path, *serialized)
         new_keys = range(len(self), len(self) + len(new_lst))
         new_vals = self.create_new_values(list(new_keys), new_lst)
         return super().extend(new_vals)
 
     def insert(self, index, __object):
         if self.pipeline:
-            self.pipeline.json().arrinsert(self.key, self.json_path, index, __object)
+            serialized = self._adapter.dump_python(
+                [__object], mode="json", context={REDIS_DUMP_FLAG_NAME: True}
+            )
+            self.pipeline.json().arrinsert(
+                self.key, self.json_path, index, serialized[0]
+            )
         new_val = self.create_new_value(index, __object)
         return super().insert(index, new_val)
 
@@ -62,6 +98,24 @@ class RedisList(list, GenericRedisType[T]):
         if self.pipeline:
             self.pipeline.json().set(self.key, self.json_path, [])
         return super().clear()
+
+    def remove_range(self, start: int, end: int):
+        if self.pipeline:
+            run_sha(
+                self.pipeline,
+                REMOVE_RANGE_SCRIPT_NAME,
+                1,
+                self.key,
+                self.json_path,
+                start,
+                end,
+            )
+            del self[start:end]
+        else:
+            logger.warning(
+                "remove_range() called without a pipeline context. "
+                "No changes were made. Use 'async with model.apipeline():' to execute."
+            )
 
     async def aappend(self, __object):
         self.append(__object)
@@ -74,6 +128,7 @@ class RedisList(list, GenericRedisType[T]):
             await self.redis.json().arrappend(
                 self.key, self.json_path, *serialized_object
             )
+            await self.refresh_ttl_if_needed()
 
     async def aextend(self, __iterable):
         items = list(__iterable)
@@ -90,15 +145,13 @@ class RedisList(list, GenericRedisType[T]):
                 self.json_path,
                 *serialized_items,
             )
+            await self.refresh_ttl_if_needed()
 
     async def apop(self, index=-1):
         if self:
             self.pop(index)
         arrpop = await self.redis.json().arrpop(self.key, self.json_path, index)
-
-        # Handle empty list case
-        if arrpop is None or (isinstance(arrpop, list) and len(arrpop) == 0):
-            return None
+        await self.refresh_ttl_if_needed()
 
         # Handle case where arrpop returns [None] for an empty list
         if arrpop[0] is None:
@@ -119,6 +172,7 @@ class RedisList(list, GenericRedisType[T]):
             await self.redis.json().arrinsert(
                 self.key, self.json_path, index, *serialized_object
             )
+            await self.refresh_ttl_if_needed()
 
     async def aclear(self):
         # Clear local list
@@ -127,6 +181,7 @@ class RedisList(list, GenericRedisType[T]):
         # Clear Redis list
         if not self.pipeline:
             await self.client.json().set(self.key, self.json_path, [])
+            await self.refresh_ttl_if_needed()
 
     def clone(self):
         return [v.clone() if isinstance(v, RedisType) else v for v in self]
@@ -144,16 +199,19 @@ class RedisList(list, GenericRedisType[T]):
         ]
 
     @classmethod
-    def full_deserializer(cls, value, info: ValidationInfo):
+    def full_deserializer(cls, value: list, info: ValidationInfo):
         ctx = info.context or {}
         is_redis_data = ctx.get(REDIS_DUMP_FLAG_NAME)
 
-        if isinstance(value, list):
-            return [
-                cls.deserialize_unknown(item) if is_redis_data else item
-                for item in value
-            ]
-        return value
+        if not is_redis_data:
+            return value
+
+        return [
+            deserialized
+            for idx, item in enumerate(value)
+            if (deserialized := cls.try_deserialize_item(item, f"index {idx}"))
+            is not SKIP_SENTINEL
+        ]
 
     @classmethod
     def schema_for_unknown(cls):
@@ -161,4 +219,4 @@ class RedisList(list, GenericRedisType[T]):
 
 
 if TYPE_CHECKING:
-    RedisList: TypeAlias = RedisList[T] | list[T]
+    RedisList: TypeAlias = RedisList[T] | list[T]  # pragma: no cover

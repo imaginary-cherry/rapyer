@@ -77,11 +77,11 @@ class Counter(AtomicRedisModel):
 
 ### Available Operations
 
-| Operation     | Method | Description |
-|---------------|---------|-------------|
-| **save**      | `await counter.count.asave()` | Save field value to Redis |
-| **load**      | `await counter.count.aload()` | Load field value from Redis (returns value, doesn't update model) |
-| **aincrease** | `await counter.count.increase(5)` | Atomically increment by amount (default: 1) |
+| Operation     | Method                             | Description |
+|---------------|------------------------------------|-------------|
+| **save**      | `await counter.count.asave()`      | Save field value to Redis |
+| **load**      | `await counter.count.aload()`      | Load field value from Redis (returns value, doesn't update model) |
+| **aincrease** | `await counter.count.aincrease(5)` | Atomically increment by amount (default: 1) |
 
 !!! warning "Non-mutating Operation"
     The `increase()` method returns the new value from Redis but **does not update the local instance**. You need to reload the model or field to see the updated value locally.
@@ -143,7 +143,7 @@ class UserProfile(AtomicRedisModel):
 | **pop** | `item = await user.tags.apop()` | Atomically remove and return item |
 | **clear** | `await user.tags.aclear()` | Atomically clear entire list |
 
-All standard `list` methods are available (append, extend, pop, etc.) and work on both local copy and Redis when used with pipelines.
+Standard `list` methods (append, extend, insert, clear) work on both local copy and Redis when used with pipelines. Use async methods (apop, etc.) for operations that require returning values.
 
 ---
 
@@ -175,7 +175,7 @@ class UserSettings(AtomicRedisModel):
 | **pop item** | `key, val = await user.preferences.apopitem()` | Atomically remove and return arbitrary key-value pair |
 | **clear** | `await user.preferences.aclear()` | Atomically clear entire dict |
 
-All standard `dict` methods are available (update, pop, clear, etc.) and work on both local copy and Redis when used with pipelines.
+Standard `dict` methods (update, clear, item assignment) work on both local copy and Redis when used with pipelines. Use async methods (apop, apopitem, etc.) for operations that require returning values.
 
 ---
 

@@ -1,6 +1,8 @@
 from datetime import datetime
+from typing import Optional
 
 from rapyer import AtomicRedisModel
+from rapyer.config import RedisConfig
 from rapyer.fields import Index, Key
 
 
@@ -50,3 +52,24 @@ class ChildWithParentModel(AtomicRedisModel):
     name: Index[str]
     dad: ParentWithIndexModel
     birth_date: Index[datetime]
+
+
+class UnsupportedIndexModel(AtomicRedisModel):
+    name: str
+    data: Index[set]
+
+    Meta = RedisConfig(init_with_rapyer=False)
+
+
+class UnsupportedGenericIndexModel(AtomicRedisModel):
+    name: str
+    tags: Index[list[str]]
+
+    Meta = RedisConfig(init_with_rapyer=False)
+
+
+class UnsupportedOptionalIndexModel(AtomicRedisModel):
+    name: str
+    count: Index[Optional[int]]
+
+    Meta = RedisConfig(init_with_rapyer=False)

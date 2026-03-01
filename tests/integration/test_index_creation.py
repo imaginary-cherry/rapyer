@@ -1,13 +1,14 @@
 import pytest
 import pytest_asyncio
 
-from rapyer import init_rapyer
+from rapyer import init_rapyer, AtomicRedisModel
 from tests.models.index_types import (
     IndexTestModel,
     UserIndexModel,
     PersonModel,
     AddressModel,
 )
+from tests.models.simple_types import StrModel
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -71,7 +72,10 @@ async def clean_test_indexes(redis_client):
     ],
 )
 async def test_basic_index_creation(
-    redis_client, model, expected_indexed_fields, expected_non_indexed_fields
+    redis_client,
+    model: AtomicRedisModel,
+    expected_indexed_fields,
+    expected_non_indexed_fields,
 ):
     # Arrange & Act
     await init_rapyer(redis=redis_client)
@@ -242,3 +246,16 @@ async def test_index_override_false_preserves_existing_index(
     assert (
         "age" not in current_fields
     ), "Model field 'age' was added despite override_old_idx=False"
+
+
+@pytest.mark.asyncio
+async def test_acreate_index_with_no_index_fields_sanity(redis_client):
+    # Arrange
+    StrModel.Meta.redis = redis_client
+
+    # Act
+    await StrModel.acreate_index()
+
+    # Assert
+    index_list = await redis_client.execute_command("FT._LIST")
+    assert StrModel.index_name() not in index_list

@@ -1,5 +1,6 @@
 import pytest
 
+from rapyer.context import _context_pipe
 from tests.models.collection_types import PipelineTestModel, ComprehensiveTestModel
 
 
@@ -19,7 +20,7 @@ async def test_pipeline_context_manager__dict_update_operations__check_atomic_ba
 
     # Act
     async with model.apipeline() as redis_model:
-        await redis_model.metadata.aupdate(key1="value1", key2="value2")
+        redis_model.metadata.update(key1="value1", key2="value2")
         await redis_model.metadata.aupdate(key3="value3", key4="value4")
 
         # Check that none of the operations have been applied to Redis yet
@@ -137,18 +138,16 @@ async def test_pipeline_context_manager__pipeline_context_cleanup__check_context
     model = PipelineTestModel(metadata={"test": "value"})
     await model.asave()
 
-    from rapyer.context import _context_var
-
     # Act & Assert - Context should be None before a pipeline
-    assert _context_var.get() is None
+    assert _context_pipe.get() is None
 
     async with model.apipeline() as redis_model:
         # Context should be set to pipeline inside context
-        assert _context_var.get() is not None
+        assert _context_pipe.get() is not None
         await redis_model.metadata.aupdate(updated="true")
 
     # Context should be cleared after a pipeline
-    assert _context_var.get() is None
+    assert _context_pipe.get() is None
 
     # Verify operation was executed
     final_model = await PipelineTestModel.aget(model.key)

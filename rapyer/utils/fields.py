@@ -1,7 +1,8 @@
-from typing import get_origin, ClassVar
+from typing import get_origin, ClassVar, Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
 from pydantic.fields import FieldInfo
+from pydantic_core import PydanticUndefined
 
 
 def _collect_annotations_recursive(
@@ -62,3 +63,25 @@ def is_redis_field(field_name, field_annotation):
         or field_name.endswith("_")
         or get_origin(field_annotation) is ClassVar
     )
+
+
+def is_field_default_has_value(field_default):
+    return field_default is not PydanticUndefined and field_default is not None
+
+
+def is_type_json_serializable(typ: type, test_value: Any) -> bool:
+    try:
+        adapter = TypeAdapter(typ)
+        if isinstance(test_value, FieldInfo):
+            if is_field_default_has_value(test_value.default):
+                test_value = test_value.default
+            elif is_field_default_has_value(test_value.default_factory):
+                test_value = test_value.default_factory()
+            else:
+                return False
+        if test_value is None:
+            return False
+        adapter.dump_python(test_value, mode="json")
+        return True
+    except Exception:
+        return False

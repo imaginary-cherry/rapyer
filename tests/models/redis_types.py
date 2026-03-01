@@ -1,7 +1,9 @@
 from typing import Annotated
 
 from pydantic import Field
+
 from rapyer.base import AtomicRedisModel
+from rapyer.fields.key import RapyerKey
 from rapyer.types.byte import RedisBytes
 from rapyer.types.dct import RedisDict
 from rapyer.types.integer import RedisInt
@@ -56,3 +58,28 @@ class AnnotatedDirectRedisTypesModel(AtomicRedisModel):
     settings: Annotated[RedisDict[str], Field(description="Settings dict")] = Field(
         default_factory=dict
     )
+
+
+class RapyerKeyFieldModel(AtomicRedisModel):
+    single_key: RapyerKey
+    key_list: RedisList[RapyerKey]
+    key_dict: RedisDict[RapyerKey]
+    plain_key_list: list[RapyerKey]
+    plain_key_dict: dict[str, RapyerKey]
+
+
+class ListOfDictsRapyerKeyModel(AtomicRedisModel):
+    items: list[dict[str, RapyerKey]] = Field(default_factory=list)
+
+
+class DictOfListsRapyerKeyModel(AtomicRedisModel):
+    items: dict[str, list[RapyerKey]] = Field(default_factory=dict)
+
+
+class PipelineAllTypesTestModel(AtomicRedisModel):
+    counter: int = 0
+    amount: float = 0.0
+    name: str = ""
+    data: bytes = b""
+    items: list[str] = Field(default_factory=list)
+    metadata: dict[str, str] = Field(default_factory=dict)

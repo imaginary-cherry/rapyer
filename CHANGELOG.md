@@ -1,5 +1,215 @@
 # Changelog
 
+## [1.2.4]
+
+### 🐛 Fixed
+
+- **Pipeline Operations for Redis Types**: Fixed pipeline using `SET` instead of atomic operations (e.g., `INCRBY`) for Redis-native types. When modifying a `RedisInt` with `+= 5` inside a pipeline, it previously overwrote the value with `SET` instead of using `INCRBY`. Non-Redis-type fields are now correctly updated via pipeline while Redis-native types manage their own updates.
+
+## [1.2.3]
+
+### ✨ Added
+
+- **`afind_one()` Method**: Added `afind_one()` classmethod to `AtomicRedisModel` for retrieving a single model instance matching the given criteria.
+  - Returns the first matching model or `None` if no match is found
+  - Supports keys, expressions, and no-argument usage (returns any single instance)
+  - Example: `user = await User.afind_one(User.age >= 30)`
+- **`max_results` Parameter for `afind()`**: Added optional `max_results` parameter to `afind()` to limit the number of returned results.
+  - Works with all query modes: keys, expressions, and full scan
+  - Uses efficient Redis SCAN for key-based limiting and query paging for expression-based limiting
+  - Example: `top_5 = await User.afind(User.active == True, max_results=5)`
+- **`RapyerKey` as a Model Field Type**: `RapyerKey` can now be used directly as a field type in models, including inside `RedisList[RapyerKey]`, `RedisDict[RapyerKey]`, `list[RapyerKey]`, and `dict[str, RapyerKey]`.
+  - Values are stored as plain strings in Redis (no pickling), and deserialized back as `RapyerKey` instances on load
+  - Example: `single_key: RapyerKey`, `key_list: RedisList[RapyerKey]`, `key_dict: dict[str, RapyerKey]`
+
+### 🐛 Fixed
+
+- **Serialization for Nested Generic Types**: Fixed Pydantic schema generation for generic Redis types (e.g., `RedisList[RapyerKey]`, `RedisDict[RapyerKey]`) to correctly preserve inner type arguments during serialization.
+
+
+## [1.2.2]
+
+### ✨ Added
+
+- **`RapyerKey` Type**: From now on, the key value will be of type `RapyerKey`, RapyerKey is still a string, but now you can identify the string as rapyer key by type.
+- **Delete with Expressions**: `Model.adelete_many()` now supports filter expressions, allowing bulk deletion of models matching specific criteria.
+  - Example: `await Model.adelete_many(Model.age > 30, Model.active == False)`
+- **Global `adelete_many()`**: Added `rapyer.adelete_many()` function to delete models of different types in a single bulk operation.
+  - Accepts both string keys and model instances of any type
+  - Example: `result = await rapyer.adelete_many(model2.key, order_instance)`
+
+### 🛠️ Technical Improvements
+
+- **Optimized `aduplicate_many()`**: The `aduplicate_many()` method now uses bulk `ainsert()` instead of individual `asave()` calls for better performance.
+
+
+## [1.2.1]
+
+### ✨ Added
+
+- **Global `rapyer.apipeline()` Function**: Added a global `apipeline()` context manager that enables batched Redis operations across multiple models without requiring a specific model instance.
+
+### 🐛 Fixed
+- **Nested Pipeline Support**: Pipelines can now be properly nested, with each pipeline executing its commands independently when exiting its context.
+  - Inner pipelines commit changes when they exit, while outer pipeline changes remain pending until the outer context exits
+- **Atmoic mocdel field assignments in Pipeline**: Fixed `__setattr__` to check all model fields (including inherited fields) instead of only the current class's annotations, ensuring proper field handling for inherited models.
+- **Bug when apipeline raises an error**: Fix an error when apipeline failed that causes future redis action to have no effect 
+
+### 🛠️ Technical Improvements
+
+- **Pipeline Support for `asave()`**: The `asave()` method now works correctly within pipeline context, allowing batched save operations.
+  - Example: `async with model.apipeline() as m: await m.asave()`
+
+- **NOSCRIPT Error Recovery for Async Operations**: Recover scripts for redis action when script was deleted (for apop and apop_item functions). 
+
+
+## [1.2.0]
+
+### 🔄 Changed
+
+- **BREAKING - Removed Deprecated Methods**: Removed all deprecated methods that were marked for removal in 1.2.0:
+  - `save()` → use `asave()`
+  - `load()` → use `aload()`
+  - `delete()` → use `adelete()`
+  - `get()` → use `aget()`
+  - `duplicate()` → use `aduplicate()`
+  - `duplicate_many()` → use `aduplicate_many()`
+  - `delete_by_key()` → use `adelete_by_key()`
+  - `lock()` → use `alock()`
+  - `lock_from_key()` → use `alock_from_key()`
+  - `pipeline()` → use `apipeline()`
+  - `increase()` → use `aincrease()`
+
+- **BREAKING - Removed Backward Compatibility for Pickled JSON Fields**: Removed backward compatibility for loading old pickled data in JSON-serializable fields. Data must now be in JSON format.
+
+- **Renamed `ignore_if_deleted` to `ignore_redis_error`**: The `apipeline()` parameter `ignore_if_deleted` has been renamed to `ignore_redis_error` for better accuracy.
+
+### 🐛 Fixed
+
+- **Dict Operations Edge Case**: Fixed an edge case where dict operations would fail when the model reference was None.
+
+### 🛠️ Technical Improvements
+
+- **BREAKING - Lua Scripts for Dict Operations**: Extracted `pop()` and `popitem()` dict operations into registered Lua scripts for better maintainability and NOSCRIPT error recovery, these functions will no longer work without init_rapyer setup.
+  - Added `dict_pop` and `dict_popitem` scripts to the script registry.
+  - Added `arun_sha()` function for executing registered scripts outside pipeline context.
+
+- **Pipeline Transactions for `aupdate()`**: The `aupdate()` method now uses Redis MULTI/EXEC transactions for atomic execution.
+
+- **Pipeline Support for `aset_ttl()`**: The `aset_ttl()` method now works correctly within pipeline context.
+
+
+## [1.1.7]
+
+### ✨ Added
+
+- **Global `rapyer.afind()` Function**: Added `rapyer.afind()` function to retrieve multiple models of different types by their keys in a single bulk operation.
+  - Supports fetching models of heterogeneous types in one call
+  - Automatically refreshes TTL for models with `refresh_ttl` enabled
+  - Raises `KeyNotFound` if any key is missing in Redis
+  - Raises `RapyerModelDoesntExistError` if a key refers to an unregistered model class
+  - Example: `models = await rapyer.afind("UserModel:123", "OrderModel:456")`
+
+- **Pipeline Operations for Non-Redis-Native Types**: Added full pipeline support for `List[Any]` and `Dict[str, Any]` fields that store serialized data.
+  - Supports `append()`, `extend()`, `insert()`, index assignment for lists
+  - Supports `update()`, key assignment, `pop()` for dicts
+  - Direct field assignment within pipeline context (e.g., `redis_model.field = value`)
+  - All operations are atomic and only committed when the pipeline exits
+  - Example: `async with model.apipeline() as m: m.mixed_list.append({"key": "value"})`
+
+- **Enhanced Pipeline Operations for Redis-Native Types**: Added in-place arithmetic operations (`+=`, `-=`) within pipeline context for Redis-native types.
+  - `RedisDatetime` and `RedisDatetimeTimestamp`: Support `+=` and `-=` with `timedelta` for atomic date arithmetic
+  - `RedisFloat`: Support `+=`, `-=`, `*=`, `/=` for atomic numeric operations
+  - `RedisInt`: Support `+=`, `-=` for atomic increment/decrement operations
+  - `RedisStr`: Support `+=` for atomic string append operations
+
+- **FakeRedis Support**: Added support for `fakeredis` library for unit testing without a real Redis instance.
+  - Supports `rapyer.afind()`, `rapyer.ainsert()`, `rapyer.aget()` with FakeRedis
+  - Supports pipeline operations with FakeRedis
+  - Enables faster test execution without Redis dependency
+
+### 🐛 Fixed
+
+- **TTL Support in `ainsert`**: The `ainsert()` method now automatically sets TTL on inserted models based on their model configuration.
+
+### 🔄 Changed
+
+- **`Model.afind()` Strict Key Validation**: When specific keys are passed to `Model.afind()`, it now raises `KeyNotFound` if any key is missing in Redis. Previously, missing keys were silently ignored.
+
+## [1.1.6]
+
+### ✨ Added
+
+- **afind Key-Based Search**: Added support for passing keys directly to `afind()` to retrieve specific models by their keys, without requiring a Redis Search query.
+  - Supports both full keys (`Model:uuid`) and primary key values (`uuid`)
+  - Example: `await Model.afind(key1, key2)` or `await Model.afind("uuid1", "uuid2")`
+  - Note: If both keys and expressions are provided, expressions are ignored with a warning
+- **Logger Configuration in init_rapyer**: Added `logger` parameter to `init_rapyer()` function to configure the rapyer logger with a custom logger's level and handlers.
+  - Example: `await init_rapyer(redis=redis_client, logger=my_logger)`
+- **aset_ttl Method**: Added `aset_ttl(ttl)` method to `AtomicRedisModel` for manually setting or updating the TTL of a model instance.
+  - Example: `await model.aset_ttl(3600)` sets TTL to 1 hour
+  - Only works on top-level models (raises `RuntimeError` if called on inner models)
+
+### 🐛 Fixed
+
+- **afind with Non-JSON Keys**: Fixed `afind` to gracefully skip non-JSON keys (e.g., lock keys like `Model:key:lock`) that match the model's key pattern but contain plain string values instead of JSON.
+- **afind with Invalid JSON Schema**: Fixed `afind` to skip entries with JSON values that don't match the model schema, preventing validation errors from crashing the entire operation.
+- **Global afind Bug**: Fixed a bug where `afind` would fail when encountering keys that were deleted during the operation.
+- **apipeline bug**: Fixed a bug for apipeline when we want to ignore deleted model.
+
+
+## [1.1.5]
+
+### ✨ Added
+
+- **RedisList.remove_range()**: Added `remove_range(start, end)` method to `RedisList` for removing a range of items (like `del list[start:end]`).
+  - Works within pipeline context for atomic operations
+  - Supports negative indices (count from end)
+  - Uses Lua script internally for race-condition-free execution
+  - Example: `playlist.songs.remove_range(1, 3)` removes items at indices 1 and 2
+- **SafeLoad Field Annotation**: Added `SafeLoad[T]` annotation for fields that should gracefully handle deserialization failures instead of raising exceptions.
+  - When a SafeLoad field fails to deserialize, it returns `None` and logs a warning instead of crashing
+  - Failed field names are tracked in the model's `failed_fields` property
+  - Example: `safe_type_field: SafeLoad[Optional[Type[str]]] = Field(default=None)`
+- **Model-Wide SafeLoad Configuration**: Added `safe_load_all` option to `RedisConfig` Meta class to treat all non-Redis-supported fields as SafeLoad fields.
+  - Example: `Meta = RedisConfig(safe_load_all=True)`
+
+### 🛠️ Technical Improvements
+
+- **Pipeline Transactions**: Pipelines now use Redis MULTI/EXEC transactions for atomic execution of batched operations.
+- **NOSCRIPT Error Recovery**: Pipelines automatically recover from NOSCRIPT errors (e.g., after Redis restart) by re-registering Lua scripts and retrying failed script commands.
+- **Smart Field Serialization**: Fields that can be JSON-serialized are now stored as native JSON instead of being pickled. This improves Redis data readability and interoperability with other systems.
+  - Pickle is only used for fields that cannot be JSON-serialized (e.g., `type` objects, custom classes)
+  - Backward compatible: existing pickled data is automatically detected and loaded correctly, We will remove the compatibility in version 1.2.0 
+
+
+## [1.1.4]
+### ✨ Added
+- **Global alock_from_key Function**: Added `rapyer.alock_from_key()` function to create locks without needing a model instance. This allows locking by key directly for operations that don't require the model class.
+- **Model TTL Extension on Redis Actions**: Models now automatically extend their TTL when performing Redis actions, keeping frequently accessed models alive longer.
+
+### 🔧 Improved
+- **Redis Locking Mechanism**: Now using formal Redis lock for more persistent and reliable locking mechanism.
+
+### 🐛 Fixed
+- **apipeline KeyNotFound**: Fixed `apipeline` for cases where model doesn't exists in redis.
+- **rapyer.get**: Fix a bug in the rapyer.get() function.
+- **Context Manager Annotations**: Fixed type annotations for context managers to properly reflect their return types.
+- **RedisBytes Pipeline**: Fixed bug in RedisBytes when used within pipeline context.
+- **RedisList Pipeline**: Fixed bug in RedisList when used within pipeline context.
+- **afind Nested Fields**: Fixed `afind` to support filtering on nested fields (e.g., `afind(User.parent.age > 20)`).
+- **Key and Index Type Checking**: Fixed type checking support for `Key[T]` and `Index[T]` annotations. IDEs now correctly recognize `Index[str]` as `str` instead of `_IndexType[str]`.
+
+### 🛠️ Technical Improvements
+- **Test Coverage**: Added tests for full coverage.
+
+## [1.1.3]
+Reupload of 1.1.2 
+
+## [1.1.2]
+We yanked the 1.1.1 release due to a bug in the pipeline context manager.
+This is the fixed version.
+
 ## [1.1.1]
 In this version we officaly starting the support for bulk operation on multiple models. In line with our philsophy of atomic operations.
 

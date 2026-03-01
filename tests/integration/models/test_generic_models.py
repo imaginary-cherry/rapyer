@@ -1,6 +1,11 @@
 import pytest
 
-from tests.models.generic_types import GenericListModel, GenericDictModel
+from tests.models.generic_types import (
+    GenericListModel,
+    GenericDictModel,
+    GenericBaseModel,
+    CompositeGenericModel,
+)
 
 
 @pytest.mark.asyncio
@@ -182,3 +187,37 @@ async def test_generic_model__try_delete_nonexistent__check_returns_false():
 
     # Assert
     assert result is False
+
+
+@pytest.mark.asyncio
+async def test_composite_generic_model__save_and_get__check_data_persisted():
+    # Arrange
+    base_field = GenericBaseModel[str](value="test_value", label="test_label")
+    atomic_field = GenericListModel[int](items=[1, 2, 3], name="nested_list")
+    complex_field = GenericListModel[GenericBaseModel[bytes]](
+        items=[
+            GenericBaseModel[bytes](value=b"data1", label="first"),
+            GenericBaseModel[bytes](value=b"data2", label="second"),
+        ],
+        name="complex_list",
+    )
+    model = CompositeGenericModel(
+        base_field=base_field, atomic_field=atomic_field, complex_field=complex_field
+    )
+
+    # Act
+    await model.asave()
+    loaded_model = await CompositeGenericModel.aget(model.key)
+
+    # Assert
+    assert loaded_model == model
+    assert loaded_model.base_field.value == "test_value"
+    assert loaded_model.base_field.label == "test_label"
+    assert loaded_model.atomic_field.items == [1, 2, 3]
+    assert loaded_model.atomic_field.name == "nested_list"
+    assert loaded_model.complex_field.name == "complex_list"
+    assert len(loaded_model.complex_field.items) == 2
+    assert loaded_model.complex_field.items[0]["value"] == b"data1"
+    assert loaded_model.complex_field.items[0]["label"] == "first"
+    assert loaded_model.complex_field.items[1]["value"] == b"data2"
+    assert loaded_model.complex_field.items[1]["label"] == "second"

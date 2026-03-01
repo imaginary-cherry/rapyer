@@ -155,7 +155,7 @@ async def test_redis_int_increase_functionality_sanity(
     await model.count.asave()
 
     # Act
-    result = await model.count.increase(increase_amount)
+    result = await model.count.aincrease(increase_amount)
 
     # Assert
     fresh_model = IntModel()
@@ -174,7 +174,7 @@ async def test_redis_int_increase_default_amount_sanity():
     await model.count.asave()
 
     # Act
-    result = await model.count.increase()
+    result = await model.count.aincrease()
 
     # Assert
     fresh_model = IntModel()
@@ -191,7 +191,7 @@ async def test_redis_int_increase_on_non_existent_key_edge_case():
     await model.asave()
 
     # Act
-    result = await model.count.increase(5)
+    result = await model.count.aincrease(5)
 
     # Assert
     fresh_model = IntModel()
@@ -208,9 +208,9 @@ async def test_redis_int_increase_multiple_times_sanity():
     await model.asave()
 
     # Act
-    result1 = await model.count.increase(10)
-    result2 = await model.count.increase(20)
-    result3 = await model.count.increase(-5)
+    result1 = await model.count.aincrease(10)
+    result2 = await model.count.aincrease(20)
+    result3 = await model.count.aincrease(-5)
 
     # Assert
     fresh_model = IntModel()
