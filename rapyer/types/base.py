@@ -33,7 +33,9 @@ def marks_redis_updated(method):
     return wrapper
 
 
-class RedisType(ABC):
+class BaseRedisType(ABC):
+    """Common base for all Redis-aware field types (inline and special)."""
+
     original_type: type = None
     field_name: str = None
     _adapter: TypeAdapter = None
@@ -71,7 +73,6 @@ class RedisType(ABC):
         return f"${self.field_path}"
 
     def __init__(self, *args, **kwargs):
-        # Note: This should be overridden in the base class AtomicRedisModel, it would allow me to get access to a redis key
         self._base_model_link = None
         self._redis_updated = False
 
@@ -85,6 +86,9 @@ class RedisType(ABC):
 
     def json_field_path(self, field_name: str):
         return f"${self.sub_field_path(field_name)}"
+
+
+class RedisType(BaseRedisType):
 
     async def asave(self) -> Self:
         model_dump = self._adapter.dump_python(

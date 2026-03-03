@@ -3,7 +3,8 @@ from typing import get_origin
 from pydantic import BaseModel, PrivateAttr, TypeAdapter
 
 from rapyer.fields.key import RapyerKey
-from rapyer.types.base import RedisType
+from rapyer.types.base import BaseRedisType, RedisType
+from rapyer.types.special import SpecialFieldType
 from rapyer.utils.annotation import TypeConverter, DYNAMIC_CLASS_DOC
 from rapyer.utils.pythonic import safe_issubclass
 
@@ -23,7 +24,7 @@ class RedisConverter(TypeConverter):
         origin = get_origin(type_to_check) or type_to_check
         if safe_issubclass(origin, RapyerKey):
             return True
-        if safe_issubclass(origin, RedisType):
+        if safe_issubclass(origin, BaseRedisType):
             return True
         from rapyer.base import AtomicRedisModel
 
@@ -32,7 +33,7 @@ class RedisConverter(TypeConverter):
     def is_type_support(self, type_to_check: type) -> bool:
         if safe_issubclass(type_to_check, BaseModel):
             return True
-        if safe_issubclass(type_to_check, RedisType):
+        if safe_issubclass(type_to_check, BaseRedisType):
             return True
         return type_to_check in self.supported_types
 
@@ -58,7 +59,7 @@ class RedisConverter(TypeConverter):
                     __doc__=DYNAMIC_CLASS_DOC,
                 ),
             )
-        if safe_issubclass(type_to_convert, RedisType):
+        if safe_issubclass(type_to_convert, BaseRedisType):
             redis_type = type_to_convert
             original_type = type_to_convert.original_type
         else:
@@ -76,13 +77,14 @@ class RedisConverter(TypeConverter):
             ),
         )
 
-        new_type._adapter = TypeAdapter(new_type)
+        if not safe_issubclass(redis_type, SpecialFieldType):
+            new_type._adapter = TypeAdapter(new_type)
         return new_type
 
     def covert_generic_type(
         self, type_to_covert: type, generic_values: tuple[type]
     ) -> type:
-        if safe_issubclass(type_to_covert, RedisType):
+        if safe_issubclass(type_to_covert, BaseRedisType):
             redis_type = type_to_covert
             original_type = type_to_covert.original_type
         else:
@@ -100,8 +102,20 @@ class RedisConverter(TypeConverter):
                 __doc__=DYNAMIC_CLASS_DOC,
             ),
         )
-        adapter_type = new_type[generic_values]
 
+        if safe_issubclass(redis_type, SpecialFieldType):
+            # Special fields don't store data inline; create a value adapter
+            # for serializing individual items, not the field itself.
+            inner = generic_values[0]
+            original_inner = (
+                inner.original_type
+                if safe_issubclass(inner, BaseRedisType)
+                else inner
+            )
+            new_type._value_adapter = TypeAdapter(original_inner)
+            return new_type
+
+        adapter_type = new_type[generic_values]
         if issubclass(redis_type, RedisType):
             new_type._adapter = TypeAdapter(adapter_type)
         return new_type[generic_values]
