@@ -5,7 +5,7 @@ from tests.models.collection_types import ComprehensiveTestModel
 
 
 @pytest.mark.asyncio
-async def test_rapyer_apipeline__use_exising_pipe_true__defers_execution_to_outer(
+async def test_rapyer_apipeline__use_existing_pipe_true__defers_execution_to_outer(
     real_redis_client,
 ):
     model = ComprehensiveTestModel(name="original", counter=1, tags=["tag1"])
@@ -32,7 +32,7 @@ async def test_rapyer_apipeline__use_exising_pipe_true__defers_execution_to_oute
 
 
 @pytest.mark.asyncio
-async def test_model_apipeline__use_exising_pipe_true__defers_execution_to_outer(
+async def test_model_apipeline__use_existing_pipe_true__defers_execution_to_outer(
     real_redis_client,
 ):
     model1 = ComprehensiveTestModel(name="m1", counter=10, tags=["a"])
@@ -64,7 +64,7 @@ async def test_model_apipeline__use_exising_pipe_true__defers_execution_to_outer
 
 
 @pytest.mark.asyncio
-async def test_three_level_nesting__mixed_use_exising_pipe__defers_and_executes_correctly(
+async def test_three_level_nesting__mixed_use_existing_pipe__defers_and_executes_correctly(
     real_redis_client,
 ):
     model1 = ComprehensiveTestModel(name="m1", counter=1)
@@ -73,16 +73,16 @@ async def test_three_level_nesting__mixed_use_exising_pipe__defers_and_executes_
     await rapyer.ainsert(model1, model2, model3)
 
     async with rapyer.apipeline():  # Level 1 (outer)
-        # Level 2A: use_exising_pipe=True — batches with outer
+        # Level 2A: use_existing_pipe=True — batches with outer
         async with rapyer.apipeline(use_existing_pipe=True):
-            # Level 3A: use_exising_pipe=True — batches with outer (via 2A)
+            # Level 3A: use_existing_pipe=True — batches with outer (via 2A)
             async with rapyer.apipeline(use_existing_pipe=True):
                 m1 = await ComprehensiveTestModel.aget(model1.key)
                 m1.name = "m1_updated"
 
-        # Level 2B: use_exising_pipe=False — independent pipe
+        # Level 2B: use_existing_pipe=False — independent pipe
         async with rapyer.apipeline():
-            # Level 3B: use_exising_pipe=True — reuses 2B's independent pipe
+            # Level 3B: use_existing_pipe=True — reuses 2B's independent pipe
             async with rapyer.apipeline(use_existing_pipe=True):
                 m2 = await ComprehensiveTestModel.aget(model2.key)
                 m2.name = "m2_updated"
@@ -95,9 +95,9 @@ async def test_three_level_nesting__mixed_use_exising_pipe__defers_and_executes_
         loaded1 = await ComprehensiveTestModel.aget(model1.key)
         assert loaded1.name == "m1"
 
-        # Level 2C: use_exising_pipe=True — batches with outer
+        # Level 2C: use_existing_pipe=True — batches with outer
         async with rapyer.apipeline(use_existing_pipe=True):
-            # Level 3C: use_exising_pipe=True — batches with outer (via 2C)
+            # Level 3C: use_existing_pipe=True — batches with outer (via 2C)
             async with rapyer.apipeline(use_existing_pipe=True):
                 m3 = await ComprehensiveTestModel.aget(model3.key)
                 m3.name = "m3_updated"
@@ -125,10 +125,10 @@ async def test_three_level_nesting__outer_error__rolls_back_batched_but_not_inde
     await rapyer.ainsert(model1, model2)
 
     async with rapyer.apipeline():  # Level 1 (outer)
-        # Level 2: use_exising_pipe=False — independent pipe, error inside
+        # Level 2: use_existing_pipe=False — independent pipe, error inside
         with pytest.raises(RuntimeError):
             async with rapyer.apipeline(use_existing_pipe=True):
-                # Level 3: use_exising_pipe=True — reuses independent pipe
+                # Level 3: use_existing_pipe=True — reuses independent pipe
                 async with rapyer.apipeline(use_existing_pipe=True):
                     m2 = await ComprehensiveTestModel.aget(model2.key)
                     m2.name = "m2_updated"
@@ -140,7 +140,7 @@ async def test_three_level_nesting__outer_error__rolls_back_batched_but_not_inde
 
 
 @pytest.mark.asyncio
-async def test_nested_apipeline__use_exising_pipe_false__executes_independently(
+async def test_nested_apipeline__use_existing_pipe_false__executes_independently(
     real_redis_client,
 ):
     model = ComprehensiveTestModel(name="original", counter=1)
@@ -152,6 +152,6 @@ async def test_nested_apipeline__use_exising_pipe_false__executes_independently(
             m.name = "inner_modified"
             await m.asave()
 
-        # Inner with use_exising_pipe=False creates its own pipe — executes on exit
+        # Inner with use_existing_pipe=False creates its own pipe — executes on exit
         loaded = await ComprehensiveTestModel.aget(model.key)
         assert loaded.name == "inner_modified"

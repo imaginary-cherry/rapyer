@@ -221,7 +221,7 @@ if __name__ == "__main__":
 ## apipeline()
 
 ```python
-async def apipeline(ignore_redis_error: bool = False, use_exising_pipe: bool = False)
+async def apipeline(ignore_redis_error: bool = False, use_existing_pipe: bool = False)
 ```
 
 Creates a pipeline context manager for batching Redis operations across multiple models.
@@ -229,7 +229,7 @@ Creates a pipeline context manager for batching Redis operations across multiple
 ### Parameters
 
 - **ignore_redis_error** (`bool`, optional): If True, suppresses `ResponseError` exceptions during pipeline execution. Default is False.
-- **use_exising_pipe** (`bool`, optional): If True, reuses an already active pipeline from an outer context instead of creating a new one. Default is False.
+- **use_existing_pipe** (`bool`, optional): If True, reuses an already active pipeline from an outer context instead of creating a new one. Default is False.
 
 ### Description
 
@@ -291,7 +291,7 @@ async def nested_example():
 
 ### Reusing an Existing Pipeline
 
-With `use_exising_pipe=True`, a nested pipeline joins the outer pipeline instead of creating its own. All operations are deferred until the outer pipeline exits:
+With `use_existing_pipe=True`, a nested pipeline joins the outer pipeline instead of creating its own. All operations are deferred until the outer pipeline exits:
 
 ```python
 async def batch_with_outer():
@@ -306,7 +306,7 @@ async def batch_with_outer():
   # Outer exits — all changes applied atomically
 ```
 
-When no outer pipeline exists, `use_exising_pipe=True` falls back to creating a new pipeline as usual.
+When no outer pipeline exists, `use_existing_pipe=True` falls back to creating a new pipeline as usual.
 
 ## alock_from_key()
 

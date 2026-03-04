@@ -4,9 +4,9 @@
 
 ### ✨ Added
 
-- **`use_exising_pipe` Parameter for `apipeline()`**: Added `use_exising_pipe` flag to both `model.apipeline()` and the global `rapyer.apipeline()` that reuses an existing pipeline from context instead of creating a new one.
-  - When `use_exising_pipe=True` and a pipeline already exists in the current context, it yields the existing pipeline instead of nesting a new one
-  - Example: `async with model.apipeline(use_exising_pipe=True) as m: await m.asave()`
+- **`use_existing_pipe` Parameter for `apipeline()`**: Added `use_existing_pipe` flag to both `model.apipeline()` and the global `rapyer.apipeline()` that reuses an existing pipeline from context instead of creating a new one.
+  - When `use_existing_pipe=True` and a pipeline already exists in the current context, it yields the existing pipeline instead of nesting a new one
+  - Example: `async with model.apipeline(use_existing_pipe=True) as m: await m.asave()`
 
 
 ## [1.2.4]
