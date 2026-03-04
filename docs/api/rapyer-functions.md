@@ -295,15 +295,15 @@ With `use_exising_pipe=True`, a nested pipeline joins the outer pipeline instead
 
 ```python
 async def batch_with_outer():
-    async with rapyer.apipeline():  # outer pipeline
-        async with rapyer.apipeline(use_exising_pipe=True):
-            m = await User.aget(user.key)
-            m.name = "updated"
+  async with rapyer.apipeline():  # outer pipeline
+    async with rapyer.apipeline(use_existing_pipe=True):
+      m = await User.aget(user.key)
+      m.name = "updated"
 
-        # Inner exited, but changes are NOT in Redis yet
-        # They are queued on the outer pipeline
+    # Inner exited, but changes are NOT in Redis yet
+    # They are queued on the outer pipeline
 
-    # Outer exits — all changes applied atomically
+  # Outer exits — all changes applied atomically
 ```
 
 When no outer pipeline exists, `use_exising_pipe=True` falls back to creating a new pipeline as usual.

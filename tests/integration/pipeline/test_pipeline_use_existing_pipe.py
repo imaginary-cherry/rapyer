@@ -12,7 +12,7 @@ async def test_rapyer_apipeline__use_exising_pipe_true__defers_execution_to_oute
     await rapyer.ainsert(model)
 
     async with rapyer.apipeline():
-        async with rapyer.apipeline(use_exising_pipe=True):
+        async with rapyer.apipeline(use_existing_pipe=True):
             m = await ComprehensiveTestModel.aget(model.key)
             m.name += "_modified"
             m.counter += 98
@@ -40,7 +40,7 @@ async def test_model_apipeline__use_exising_pipe_true__defers_execution_to_outer
     await rapyer.ainsert(model1, model2)
 
     async with rapyer.apipeline():
-        async with model1.apipeline(use_exising_pipe=True) as m1:
+        async with model1.apipeline(use_existing_pipe=True) as m1:
             m1.name = "m1_updated"
             m1.counter += 90
             m1.metadata["key1"] = "value1"
@@ -74,16 +74,16 @@ async def test_three_level_nesting__mixed_use_exising_pipe__defers_and_executes_
 
     async with rapyer.apipeline():  # Level 1 (outer)
         # Level 2A: use_exising_pipe=True — batches with outer
-        async with rapyer.apipeline(use_exising_pipe=True):
+        async with rapyer.apipeline(use_existing_pipe=True):
             # Level 3A: use_exising_pipe=True — batches with outer (via 2A)
-            async with rapyer.apipeline(use_exising_pipe=True):
+            async with rapyer.apipeline(use_existing_pipe=True):
                 m1 = await ComprehensiveTestModel.aget(model1.key)
                 m1.name = "m1_updated"
 
         # Level 2B: use_exising_pipe=False — independent pipe
         async with rapyer.apipeline():
             # Level 3B: use_exising_pipe=True — reuses 2B's independent pipe
-            async with rapyer.apipeline(use_exising_pipe=True):
+            async with rapyer.apipeline(use_existing_pipe=True):
                 m2 = await ComprehensiveTestModel.aget(model2.key)
                 m2.name = "m2_updated"
 
@@ -96,9 +96,9 @@ async def test_three_level_nesting__mixed_use_exising_pipe__defers_and_executes_
         assert loaded1.name == "m1"
 
         # Level 2C: use_exising_pipe=True — batches with outer
-        async with rapyer.apipeline(use_exising_pipe=True):
+        async with rapyer.apipeline(use_existing_pipe=True):
             # Level 3C: use_exising_pipe=True — batches with outer (via 2C)
-            async with rapyer.apipeline(use_exising_pipe=True):
+            async with rapyer.apipeline(use_existing_pipe=True):
                 m3 = await ComprehensiveTestModel.aget(model3.key)
                 m3.name = "m3_updated"
 
@@ -127,9 +127,9 @@ async def test_three_level_nesting__outer_error__rolls_back_batched_but_not_inde
     async with rapyer.apipeline():  # Level 1 (outer)
         # Level 2: use_exising_pipe=False — independent pipe, error inside
         with pytest.raises(RuntimeError):
-            async with rapyer.apipeline(use_exising_pipe=True):
+            async with rapyer.apipeline(use_existing_pipe=True):
                 # Level 3: use_exising_pipe=True — reuses independent pipe
-                async with rapyer.apipeline(use_exising_pipe=True):
+                async with rapyer.apipeline(use_existing_pipe=True):
                     m2 = await ComprehensiveTestModel.aget(model2.key)
                     m2.name = "m2_updated"
                 raise RuntimeError("simulated inner error")
@@ -147,7 +147,7 @@ async def test_nested_apipeline__use_exising_pipe_false__executes_independently(
     await rapyer.ainsert(model)
 
     async with rapyer.apipeline():
-        async with rapyer.apipeline(use_exising_pipe=False):
+        async with rapyer.apipeline(use_existing_pipe=False):
             m = await ComprehensiveTestModel.aget(model.key)
             m.name = "inner_modified"
             await m.asave()

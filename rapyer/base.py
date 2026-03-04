@@ -630,11 +630,11 @@ class AtomicRedisModel(BaseModel):
 
     @contextlib.asynccontextmanager
     async def apipeline(
-        self, ignore_redis_error: bool = False, use_exising_pipe: bool = False
+        self, ignore_redis_error: bool = False, use_existing_pipe: bool = False
     ) -> AbstractAsyncContextManager[Self]:
         async with apipeline(
             ignore_redis_error=ignore_redis_error,
-            use_exising_pipe=use_exising_pipe,
+            use_existing_pipe=use_existing_pipe,
             _meta=self.Meta,
         ) as pipe:
             try:
@@ -866,11 +866,11 @@ async def alock_from_key(
 @contextlib.asynccontextmanager
 async def apipeline(
     ignore_redis_error: bool = False,
-    use_exising_pipe: bool = False,
+    use_existing_pipe: bool = False,
     _meta: RedisConfig = None,
 ) -> AbstractAsyncContextManager[Pipeline]:
     pipe = _context_pipe.get()
-    if use_exising_pipe and pipe is not None:
+    if use_existing_pipe and pipe is not None:
         yield pipe
     else:
         async with _apipeline(ignore_redis_error, _meta) as pipe:
