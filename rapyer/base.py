@@ -869,6 +869,18 @@ async def apipeline(
     use_exising_pipe: bool = False,
     _meta: RedisConfig = None,
 ) -> AbstractAsyncContextManager[Pipeline]:
+    pipe = _context_pipe.get()
+    if use_exising_pipe and pipe is not None:
+        yield pipe
+    else:
+        async with _apipeline(ignore_redis_error, _meta) as pipe:
+            yield pipe
+
+
+@contextlib.asynccontextmanager
+async def _apipeline(
+    ignore_redis_error: bool = False, _meta: RedisConfig = None
+) -> AbstractAsyncContextManager[Pipeline]:
     _meta = _meta or AtomicRedisModel.Meta
     redis = _meta.redis
     async with redis.pipeline(transaction=True) as pipe:
