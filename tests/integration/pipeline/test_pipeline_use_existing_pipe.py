@@ -117,7 +117,7 @@ async def test_three_level_nesting__mixed_use_existing_pipe__defers_and_executes
 
 
 @pytest.mark.asyncio
-async def test_three_level_nesting__outer_error__rolls_back_batched_but_not_independent(
+async def test_three_level_nesting__outer_error__finish_changes_in_upper(
     real_redis_client,
 ):
     model1 = ComprehensiveTestModel(name="m1", counter=1)
