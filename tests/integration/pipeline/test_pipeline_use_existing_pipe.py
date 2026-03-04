@@ -132,7 +132,6 @@ async def test_three_level_nesting__outer_error__rolls_back_batched_but_not_inde
                 async with rapyer.apipeline(use_exising_pipe=True):
                     m1 = await ComprehensiveTestModel.aget(model1.key)
                     m1.name = "m1_updated"
-                    await m1.asave()
 
             # Level 2: use_exising_pipe=False — independent pipe
             async with rapyer.apipeline(use_exising_pipe=False):
@@ -140,7 +139,6 @@ async def test_three_level_nesting__outer_error__rolls_back_batched_but_not_inde
                 async with rapyer.apipeline(use_exising_pipe=True):
                     m2 = await ComprehensiveTestModel.aget(model2.key)
                     m2.name = "m2_updated"
-                    await m2.asave()
 
             # Error in outer pipe body
             raise RuntimeError("simulated outer error")
