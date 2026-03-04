@@ -32,7 +32,7 @@ from rapyer.errors import (
     UnsupportedIndexedFieldError,
     CantSerializeRedisValueError,
     RapyerModelDoesntExistError,
-    UnsupportArgumentTypeError,
+    UnsupportedArgumentTypeError,
     MissingParameterError,
     UnsupportedArgumentValueError,
 )
@@ -563,7 +563,7 @@ class AtomicRedisModel(BaseModel):
         cls, *args: Self | RapyerKey | str | Expression
     ) -> DeleteResult:
         if not args:
-            raise UnsupportArgumentTypeError(
+            raise UnsupportedArgumentTypeError(
                 f"adelete_many requires at least one argument, see {ATOMIC_MODEL_API_REF_LINK}"
             )
 
@@ -572,7 +572,7 @@ class AtomicRedisModel(BaseModel):
         )
 
         if expressions and (provided_keys or model_instances):
-            raise UnsupportArgumentTypeError(
+            raise UnsupportedArgumentTypeError(
                 "Cannot mix expressions with keys or model instances in adelete_many"
             )
 
@@ -724,7 +724,7 @@ def categorize_delete_args(
         elif allow_expressions and isinstance(arg, Expression):
             expressions.append(arg)
         else:
-            raise UnsupportArgumentTypeError(
+            raise UnsupportedArgumentTypeError(
                 f"{arg} is not a valid for adelete_many, see {ATOMIC_MODEL_API_REF_LINK}"
             )
     return keys, model_instances, expressions
