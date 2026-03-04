@@ -10,7 +10,6 @@ from tests.models.simple_types import (
     DatetimeTimestampModel,
 )
 
-
 # ===== RedisInt tests (ComprehensiveTestModel.counter) =====
 
 
