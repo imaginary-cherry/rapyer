@@ -9,23 +9,26 @@ async def test_rapyer_apipeline__use_exising_pipe_true__defers_execution_to_oute
     real_redis_client,
 ):
     model = ComprehensiveTestModel(name="original", counter=1, tags=["tag1"])
-    await model.asave()
+    await rapyer.ainsert(model)
 
     async with rapyer.apipeline():
         async with rapyer.apipeline(use_exising_pipe=True):
             m = await ComprehensiveTestModel.aget(model.key)
-            m.name = "modified"
-            m.counter = 99
+            m.name += "_modified"
+            m.counter += 98
+            m.tags.append("tag2")
 
         # Inner exited but outer hasn't — changes should NOT be in Redis yet
         loaded = await ComprehensiveTestModel.aget(model.key)
         assert loaded.name == "original"
         assert loaded.counter == 1
+        assert loaded.tags == ["tag1"]
 
     # After outer exits — changes should be applied
     loaded = await ComprehensiveTestModel.aget(model.key)
-    assert loaded.name == "modified"
+    assert loaded.name == "original_modified"
     assert loaded.counter == 99
+    assert loaded.tags == ["tag1", "tag2"]
 
 
 @pytest.mark.asyncio
@@ -34,23 +37,25 @@ async def test_model_apipeline__use_exising_pipe_true__defers_execution_to_outer
 ):
     model1 = ComprehensiveTestModel(name="m1", counter=10, tags=["a"])
     model2 = ComprehensiveTestModel(name="m2", counter=20, tags=["b"])
-    await model1.asave()
-    await model2.asave()
+    await rapyer.ainsert(model1, model2)
 
     async with rapyer.apipeline():
         async with model1.apipeline(use_exising_pipe=True) as m1:
             m1.name = "m1_updated"
-            m1.counter = 100
+            m1.counter += 90
+            m1.metadata["key1"] = "value1"
 
         # Inner exited but outer hasn't — model1 changes should NOT be in Redis yet
         loaded = await ComprehensiveTestModel.aget(model1.key)
         assert loaded.name == "m1"
         assert loaded.counter == 10
+        assert loaded.metadata == {}
 
     # After outer exits — changes should be applied
     loaded1 = await ComprehensiveTestModel.aget(model1.key)
     assert loaded1.name == "m1_updated"
     assert loaded1.counter == 100
+    assert loaded1.metadata == {"key1": "value1"}
 
     # model2 should be unchanged
     loaded2 = await ComprehensiveTestModel.aget(model2.key)
@@ -65,9 +70,7 @@ async def test_nested_pipelines__mixed_use_exising_pipe__error_in_independent_pi
     model1 = ComprehensiveTestModel(name="m1", counter=1)
     model2 = ComprehensiveTestModel(name="m2", counter=2)
     model3 = ComprehensiveTestModel(name="m3", counter=3)
-    await model1.asave()
-    await model2.asave()
-    await model3.asave()
+    await rapyer.ainsert(model1, model2, model3)
 
     async with rapyer.apipeline():
         # Inner A: use_exising_pipe=True — batches with outer
@@ -107,7 +110,7 @@ async def test_nested_apipeline__use_exising_pipe_false__executes_independently(
     real_redis_client,
 ):
     model = ComprehensiveTestModel(name="original", counter=1)
-    await model.asave()
+    await rapyer.ainsert(model)
 
     async with rapyer.apipeline():
         async with rapyer.apipeline(use_exising_pipe=False):
