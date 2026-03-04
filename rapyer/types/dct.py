@@ -87,7 +87,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         serialized_value = self._adapter.dump_python(
             {key: value}, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
         )
-        result = await self.client.json().set(
+        result = await self.client.json().set(  # type: ignore[misc]
             self.key, self.json_field_path(key), serialized_value[key]
         )
         await self.refresh_ttl_if_needed()
@@ -95,7 +95,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
 
     async def adel_item(self, key):
         super().__delitem__(key)
-        result = await self.client.json().delete(self.key, self.json_field_path(key))
+        result = await self.client.json().delete(self.key, self.json_field_path(key))  # type: ignore[misc]
         await self.refresh_ttl_if_needed()
         return result
 
@@ -161,7 +161,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
     async def aclear(self):
         self.clear()
         # Clear Redis dict
-        result = await self.client.json().set(self.key, self.json_path, {})
+        result = await self.client.json().set(self.key, self.json_path, {})  # type: ignore[misc]
         await self.refresh_ttl_if_needed()
         return result
 

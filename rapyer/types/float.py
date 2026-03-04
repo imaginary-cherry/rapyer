@@ -21,7 +21,7 @@ class RedisFloat(float, RedisType):
         return NumericField(f"$.{field_name}", as_name=field_name)
 
     async def aincrease(self, amount: float = 1.0):
-        result = await self.client.json().numincrby(self.key, self.json_path, amount)
+        result = await self.client.json().numincrby(self.key, self.json_path, amount)  # type: ignore[misc]
         await self.refresh_ttl_if_needed()
         return result[0] if isinstance(result, list) and result else result
 

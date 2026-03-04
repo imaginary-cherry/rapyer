@@ -29,5 +29,5 @@ class PersistentNoScriptError(RapyerError):
     pass
 
 
-class UnsupportArgumentTypeError(RapyerError):
+class UnsupportedArgumentTypeError(RapyerError):
     pass

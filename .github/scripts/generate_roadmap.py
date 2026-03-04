@@ -4,7 +4,6 @@ import os
 import urllib.request
 from datetime import datetime
 
-
 GITHUB_API = "https://api.github.com"
 
 

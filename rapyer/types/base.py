@@ -90,14 +90,14 @@ class RedisType(ABC):
         model_dump = self._adapter.dump_python(
             self, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
         )
-        await self.client.json().set(self.key, self.json_path, model_dump)
+        await self.client.json().set(self.key, self.json_path, model_dump)  # type: ignore[misc]
         if self.Meta.ttl is not None:
             nx = not self.Meta.refresh_ttl
             await self.client.expire(self.key, self.Meta.ttl, nx=nx)
         return self
 
     async def aload(self):
-        redis_value = await self.client.json().get(self.key, self.field_path)
+        redis_value = await self.client.json().get(self.key, self.field_path)  # type: ignore[misc]
         if redis_value is None:
             return None
         result = self._adapter.validate_python(

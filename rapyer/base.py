@@ -18,7 +18,7 @@ from pydantic import (
     ValidationError,
 )
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
-from redis.client import Pipeline
+from redis.asyncio.client import Pipeline
 from redis.commands.search.aggregation import AggregateRequest
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
@@ -32,7 +32,7 @@ from rapyer.errors import (
     UnsupportedIndexedFieldError,
     CantSerializeRedisValueError,
     RapyerModelDoesntExistError,
-    UnsupportArgumentTypeError,
+    UnsupportedArgumentTypeError,
     MissingParameterError,
     UnsupportedArgumentValueError,
 )
@@ -327,7 +327,7 @@ class AtomicRedisModel(BaseModel):
 
     async def asave(self) -> Self:
         model_dump = self.redis_dump()
-        await self.client.json().set(self.key, self.json_path, model_dump)
+        await self.client.json().set(self.key, self.json_path, model_dump)  # type: ignore[misc]
         if self.Meta.ttl is not None:
             nx = not self.Meta.refresh_ttl
             await self.client.expire(self.key, self.Meta.ttl, nx=nx)
@@ -392,7 +392,7 @@ class AtomicRedisModel(BaseModel):
         # In case we get the field of Key[]
         if cls._key_field_name and ":" not in key:
             key = f"{cls.class_key_initials()}:{key}"
-        model_dump = await cls.Meta.redis.json().get(key, "$")
+        model_dump = await cls.Meta.redis.json().get(key, "$")  # type: ignore[misc]
         if not model_dump:
             raise KeyNotFound(f"{key} is missing in redis")
         model_dump = model_dump[0]
@@ -406,7 +406,7 @@ class AtomicRedisModel(BaseModel):
         return instance
 
     async def aload(self) -> Self:
-        model_dump = await self.Meta.redis.json().get(self.key, self.json_path)
+        model_dump = await self.Meta.redis.json().get(self.key, self.json_path)  # type: ignore[misc]
         if not model_dump:
             raise KeyNotFound(f"{self.key} is missing in redis")
         model_dump = model_dump[0]
@@ -475,7 +475,7 @@ class AtomicRedisModel(BaseModel):
             return []
 
         # Fetch the actual documents
-        models = await cls.Meta.redis.json().mget(keys=targeted_keys, path="$")
+        models = await cls.Meta.redis.json().mget(keys=targeted_keys, path="$")  # type: ignore[misc]
 
         instances = []
         for model, key in zip(models, targeted_keys):
@@ -563,7 +563,7 @@ class AtomicRedisModel(BaseModel):
         cls, *args: Self | RapyerKey | str | Expression
     ) -> DeleteResult:
         if not args:
-            raise UnsupportArgumentTypeError(
+            raise UnsupportedArgumentTypeError(
                 f"adelete_many requires at least one argument, see {ATOMIC_MODEL_API_REF_LINK}"
             )
 
@@ -572,7 +572,7 @@ class AtomicRedisModel(BaseModel):
         )
 
         if expressions and (provided_keys or model_instances):
-            raise UnsupportArgumentTypeError(
+            raise UnsupportedArgumentTypeError(
                 "Cannot mix expressions with keys or model instances in adelete_many"
             )
 
@@ -630,10 +630,12 @@ class AtomicRedisModel(BaseModel):
 
     @contextlib.asynccontextmanager
     async def apipeline(
-        self, ignore_redis_error: bool = False
+        self, ignore_redis_error: bool = False, use_existing_pipe: bool = False
     ) -> AbstractAsyncContextManager[Self]:
         async with apipeline(
-            ignore_redis_error=ignore_redis_error, _meta=self.Meta
+            ignore_redis_error=ignore_redis_error,
+            use_existing_pipe=use_existing_pipe,
+            _meta=self.Meta,
         ) as pipe:
             try:
                 redis_model = await self.__class__.aget(self.key)
@@ -722,7 +724,7 @@ def categorize_delete_args(
         elif allow_expressions and isinstance(arg, Expression):
             expressions.append(arg)
         else:
-            raise UnsupportArgumentTypeError(
+            raise UnsupportedArgumentTypeError(
                 f"{arg} is not a valid for adelete_many, see {ATOMIC_MODEL_API_REF_LINK}"
             )
     return keys, model_instances, expressions
@@ -759,7 +761,7 @@ async def afind(*redis_keys: str, skip_missing: bool = False) -> list[AtomicRedi
             )
         key_to_class[key] = redis_model_mapping[class_name]
 
-    models_data = await AtomicRedisModel.Meta.redis.json().mget(
+    models_data = await AtomicRedisModel.Meta.redis.json().mget(  # type: ignore[misc]
         keys=redis_keys, path="$"
     )
 
@@ -863,6 +865,20 @@ async def alock_from_key(
 
 @contextlib.asynccontextmanager
 async def apipeline(
+    ignore_redis_error: bool = False,
+    use_existing_pipe: bool = False,
+    _meta: RedisConfig = None,
+) -> AbstractAsyncContextManager[Pipeline]:
+    pipe = _context_pipe.get()
+    if use_existing_pipe and pipe is not None:
+        yield pipe
+    else:
+        async with _apipeline(ignore_redis_error, _meta) as pipe:
+            yield pipe
+
+
+@contextlib.asynccontextmanager
+async def _apipeline(
     ignore_redis_error: bool = False, _meta: RedisConfig = None
 ) -> AbstractAsyncContextManager[Pipeline]:
     _meta = _meta or AtomicRedisModel.Meta

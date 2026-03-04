@@ -221,7 +221,7 @@ if __name__ == "__main__":
 ## apipeline()
 
 ```python
-async def apipeline(ignore_redis_error: bool = False)
+async def apipeline(ignore_redis_error: bool = False, use_existing_pipe: bool = False)
 ```
 
 Creates a pipeline context manager for batching Redis operations across multiple models.
@@ -229,6 +229,7 @@ Creates a pipeline context manager for batching Redis operations across multiple
 ### Parameters
 
 - **ignore_redis_error** (`bool`, optional): If True, suppresses `ResponseError` exceptions during pipeline execution. Default is False.
+- **use_existing_pipe** (`bool`, optional): If True, reuses an already active pipeline from an outer context instead of creating a new one. Default is False.
 
 ### Description
 
@@ -287,6 +288,25 @@ async def nested_example():
 
     # User changes committed here
 ```
+
+### Reusing an Existing Pipeline
+
+With `use_existing_pipe=True`, a nested pipeline joins the outer pipeline instead of creating its own. All operations are deferred until the outer pipeline exits:
+
+```python
+async def batch_with_outer():
+  async with rapyer.apipeline():  # outer pipeline
+    async with rapyer.apipeline(use_existing_pipe=True):
+      m = await User.aget(user.key)
+      m.name = "updated"
+
+    # Inner exited, but changes are NOT in Redis yet
+    # They are queued on the outer pipeline
+
+  # Outer exits — all changes applied atomically
+```
+
+When no outer pipeline exists, `use_existing_pipe=True` falls back to creating a new pipeline as usual.
 
 ## alock_from_key()
 
