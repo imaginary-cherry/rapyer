@@ -147,7 +147,7 @@ async def test_nested_apipeline__use_existing_pipe_false__executes_independently
     await rapyer.ainsert(model)
 
     async with rapyer.apipeline():
-        async with rapyer.apipeline(use_existing_pipe=False):
+        async with rapyer.apipeline():
             m = await ComprehensiveTestModel.aget(model.key)
             m.name = "inner_modified"
             await m.asave()
