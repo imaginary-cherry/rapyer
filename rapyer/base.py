@@ -634,7 +634,7 @@ class AtomicRedisModel(BaseModel):
     ) -> AbstractAsyncContextManager[Self]:
         async with apipeline(
             ignore_redis_error=ignore_redis_error,
-            use_exising_pipe=False,
+            use_exising_pipe=use_exising_pipe,
             _meta=self.Meta,
         ) as pipe:
             try:
