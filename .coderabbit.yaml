@@ -26,22 +26,22 @@ reviews:
         Focus on correctness, error handling, and async safety.
         Check that imports are at the top of the file following PEP 8 ordering.
 
-auto_review:
-  enabled: true
-  base_branches:
-    - "develop"
-    - "main"
-  auto_incremental_review: true
-  drafts: false
-  ignore_title_keywords:
-    - "WIP"
-    - "DO NOT MERGE"
+  auto_review:
+    enabled: true
+    base_branches:
+      - "develop"
+      - "main"
+    auto_incremental_review: true
+    drafts: false
+    ignore_title_keywords:
+      - "WIP"
+      - "DO NOT MERGE"
 
-path_filters:
-  - "!**/*.lock"
-  - "!**/uv.lock"
-  - "!**/*.png"
-  - "!**/*.jpg"
+  path_filters:
+    - "!**/*.lock"
+    - "!**/uv.lock"
+    - "!**/*.png"
+    - "!**/*.jpg"
 
 
 knowledge_base:
