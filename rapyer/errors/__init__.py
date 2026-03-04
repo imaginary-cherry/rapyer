@@ -12,7 +12,7 @@ from rapyer.errors.find import (
     ScriptsNotInitializedError,
     UnsupportedIndexedFieldError,
     CantSerializeRedisValueError,
-    UnsupportArgumentTypeError,
+    UnsupportedArgumentTypeError,
 )
 
 __all__ = [
@@ -27,4 +27,5 @@ __all__ = [
     "CantSerializeRedisValueError",
     "MissingParameterError",
     "UnsupportedArgumentValueError",
+    "UnsupportedArgumentTypeError",
 ]

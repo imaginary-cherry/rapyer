@@ -128,3 +128,4 @@ git-flow-plus.config
 .jbeval
 .claude/
 .planning/
+uv.toml

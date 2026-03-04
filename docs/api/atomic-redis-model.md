@@ -332,11 +332,12 @@ async with user.alock("settings_update", save_at_end=True) as locked_user:
     locked_user.settings = {"theme": "dark"}
 ```
 
-#### `apipeline(ignore_redis_error=False)`
-**Type:** `async` context manager  
+#### `apipeline(ignore_redis_error=False, use_existing_pipe=False)`
+**Type:** `async` context manager
 **Parameters:**
-- `ignore_redis_error` (bool): If `True`, suppresses `redis.exceptions.ResponseError` raised during pipeline execution (for example, if the model was deleted during the pipeline) and continues.  
-**Returns:** `AsyncGenerator[Self, None]`  
+- `ignore_redis_error` (bool): If `True`, suppresses `redis.exceptions.ResponseError` raised during pipeline execution (for example, if the model was deleted during the pipeline) and continues.
+- `use_existing_pipe` (bool): If `True`, reuses an already active pipeline from an outer context instead of creating a new one. Changes are deferred until the outer pipeline exits.
+**Returns:** `AsyncGenerator[Self, None]`
 **Description:** Batches all operations into a Redis pipeline for atomic execution.
 
 ```python

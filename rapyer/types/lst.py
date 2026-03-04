@@ -125,7 +125,7 @@ class RedisList(list, GenericRedisType[T]):
             serialized_object = self._adapter.dump_python(
                 [__object], mode="json", context={REDIS_DUMP_FLAG_NAME: True}
             )
-            await self.redis.json().arrappend(
+            await self.redis.json().arrappend(  # type: ignore[misc]
                 self.key, self.json_path, *serialized_object
             )
             await self.refresh_ttl_if_needed()
@@ -140,7 +140,7 @@ class RedisList(list, GenericRedisType[T]):
             serialized_items = self._adapter.dump_python(
                 items, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
             )
-            await self.redis.json().arrappend(
+            await self.redis.json().arrappend(  # type: ignore[misc]
                 self.key,
                 self.json_path,
                 *serialized_items,
@@ -150,7 +150,7 @@ class RedisList(list, GenericRedisType[T]):
     async def apop(self, index=-1):
         if self:
             self.pop(index)
-        arrpop = await self.redis.json().arrpop(self.key, self.json_path, index)
+        arrpop = await self.redis.json().arrpop(self.key, self.json_path, index)  # type: ignore[misc]
         await self.refresh_ttl_if_needed()
 
         # Handle case where arrpop returns [None] for an empty list
@@ -169,7 +169,7 @@ class RedisList(list, GenericRedisType[T]):
             serialized_object = self._adapter.dump_python(
                 [__object], mode="json", context={REDIS_DUMP_FLAG_NAME: True}
             )
-            await self.redis.json().arrinsert(
+            await self.redis.json().arrinsert(  # type: ignore[misc]
                 self.key, self.json_path, index, *serialized_object
             )
             await self.refresh_ttl_if_needed()
@@ -180,7 +180,7 @@ class RedisList(list, GenericRedisType[T]):
 
         # Clear Redis list
         if not self.pipeline:
-            await self.client.json().set(self.key, self.json_path, [])
+            await self.client.json().set(self.key, self.json_path, [])  # type: ignore[misc]
             await self.refresh_ttl_if_needed()
 
     def clone(self):

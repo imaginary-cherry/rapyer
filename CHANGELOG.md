@@ -1,10 +1,23 @@
 # Changelog
 
+## [1.2.5]
+
+### ✨ Added
+
+- **`use_existing_pipe` Parameter for `apipeline()`**: Added `use_existing_pipe` flag to both `model.apipeline()` and the global `rapyer.apipeline()` that reuses an existing pipeline from context instead of creating a new one.
+  - When `use_existing_pipe=True` and a pipeline already exists in the current context, it yields the existing pipeline instead of nesting a new one
+  - Example: `async with model.apipeline(use_existing_pipe=True) as m: await m.asave()`
+
+
 ## [1.2.4]
 
 ### 🐛 Fixed
 
 - **Pipeline Operations for Redis Types**: Fixed pipeline using `SET` instead of atomic operations (e.g., `INCRBY`) for Redis-native types. When modifying a `RedisInt` with `+= 5` inside a pipeline, it previously overwrote the value with `SET` instead of using `INCRBY`. Non-Redis-type fields are now correctly updated via pipeline while Redis-native types manage their own updates.
+
+### ✨ Added
+
+- **CodSpeed benchmarks**: Added CodSpeed benchmarks for Redis operations.
 
 ## [1.2.3]
 
