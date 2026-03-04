@@ -69,6 +69,8 @@ Repository = "https://github.com/imaginary-cherry/rapyer"
 
 [tool.hatch.build.targets.wheel]
 packages = ["rapyer"]
+include = ["rapyer/**/*.lua"]
+
 
 [dependency-groups]
 dev = ["black>=25.9.0", "mypy>=1.0.0"]
