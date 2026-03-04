@@ -155,3 +155,21 @@ async def test_nested_apipeline__use_existing_pipe_false__executes_independently
         # Inner with use_existing_pipe=False creates its own pipe — executes on exit
         loaded = await ComprehensiveTestModel.aget(model.key)
         assert loaded.name == "inner_modified"
+
+
+@pytest.mark.asyncio
+async def test_rapyer_apipeline__use_existing_pipe_true_no_parent__executes_normally(
+    real_redis_client,
+):
+    model = ComprehensiveTestModel(name="original", counter=1, tags=["tag1"])
+    await rapyer.ainsert(model)
+
+    async with rapyer.apipeline(use_existing_pipe=True):
+        model.name = "modified"
+        model.counter += 99
+        model.tags.append("tag2")
+
+    loaded = await ComprehensiveTestModel.aget(model.key)
+    assert loaded.name == "modified"
+    assert loaded.counter == 100
+    assert loaded.tags == ["tag1", "tag2"]
