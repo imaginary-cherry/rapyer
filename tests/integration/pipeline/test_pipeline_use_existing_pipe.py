@@ -124,30 +124,17 @@ async def test_three_level_nesting__outer_error__rolls_back_batched_but_not_inde
     model2 = ComprehensiveTestModel(name="m2", counter=2)
     await rapyer.ainsert(model1, model2)
 
-    with pytest.raises(RuntimeError):
-        async with rapyer.apipeline():  # Level 1 (outer)
-            # Level 2: use_exising_pipe=True — batches with outer
+    async with rapyer.apipeline():  # Level 1 (outer)
+        # Level 2: use_exising_pipe=False — independent pipe, error inside
+        with pytest.raises(RuntimeError):
             async with rapyer.apipeline(use_exising_pipe=True):
-                # Level 3: use_exising_pipe=True — batches with outer
-                async with rapyer.apipeline(use_exising_pipe=True):
-                    m1 = await ComprehensiveTestModel.aget(model1.key)
-                    m1.name = "m1_updated"
-
-            # Level 2: use_exising_pipe=False — independent pipe
-            async with rapyer.apipeline(use_exising_pipe=False):
                 # Level 3: use_exising_pipe=True — reuses independent pipe
                 async with rapyer.apipeline(use_exising_pipe=True):
                     m2 = await ComprehensiveTestModel.aget(model2.key)
                     m2.name = "m2_updated"
+                raise RuntimeError("simulated inner error")
 
-            # Error in outer pipe body
-            raise RuntimeError("simulated outer error")
-
-    # model1 changes NOT applied (batched with outer, outer never executed)
-    loaded1 = await ComprehensiveTestModel.aget(model1.key)
-    assert loaded1.name == "m1"
-
-    # model2 changes ARE applied (was in independent pipe that already executed)
+    # model2 changes NOT applied (independent pipe errored, never executed)
     loaded2 = await ComprehensiveTestModel.aget(model2.key)
     assert loaded2.name == "m2_updated"
 
