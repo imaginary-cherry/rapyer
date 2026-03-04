@@ -2,7 +2,7 @@ import contextlib
 import contextvars
 from typing import Optional
 
-from redis.client import Pipeline
+from redis.asyncio.client import Pipeline
 
 # Create a context variable to store the context
 _context_pipe: contextvars.ContextVar[Optional["Pipeline"]] = contextvars.ContextVar(
