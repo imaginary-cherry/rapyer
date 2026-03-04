@@ -1,0 +1,59 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+language: "en-US"
+
+tone_instructions: "Be concise and focus on bugs, security issues, and design problems. Avoid trivial style suggestions already handled by linters."
+
+reviews:
+  profile: "chill"
+  request_changes_workflow: false
+  high_level_summary: true
+  collapse_walkthrough: true
+  poem: false
+  review_status: true
+  assess_linked_issues: true
+  related_issues: true
+  related_prs: true
+
+  path_instructions:
+    - path: "tests/**"
+      instructions: |
+        Focus on test coverage completeness and edge cases.
+        Verify that tests use plain functions (not classes) per project convention.
+        Check that pytest.mark.parametrize uses list-of-lists format.
+    - path: "rapyer/**"
+      instructions: |
+        Focus on correctness, error handling, and async safety.
+        Check that imports are at the top of the file following PEP 8 ordering.
+
+auto_review:
+  enabled: true
+  base_branches:
+    - "develop"
+    - "main"
+  auto_incremental_review: true
+  drafts: false
+  ignore_title_keywords:
+    - "WIP"
+    - "DO NOT MERGE"
+
+path_filters:
+  - "!**/*.lock"
+  - "!**/uv.lock"
+  - "!**/*.png"
+  - "!**/*.jpg"
+
+
+knowledge_base:
+  opt_out: false
+  learnings:
+    scope: "auto"
+  issues:
+    scope: "auto"
+  jira:
+    project_keys: []
+  linear:
+    team_keys: []
+
+chat:
+  auto_reply: true
