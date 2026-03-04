@@ -630,10 +630,12 @@ class AtomicRedisModel(BaseModel):
 
     @contextlib.asynccontextmanager
     async def apipeline(
-        self, ignore_redis_error: bool = False
+        self, ignore_redis_error: bool = False, use_exising_pipe: bool = False
     ) -> AbstractAsyncContextManager[Self]:
         async with apipeline(
-            ignore_redis_error=ignore_redis_error, _meta=self.Meta
+            ignore_redis_error=ignore_redis_error,
+            use_exising_pipe=False,
+            _meta=self.Meta,
         ) as pipe:
             try:
                 redis_model = await self.__class__.aget(self.key)
@@ -863,7 +865,9 @@ async def alock_from_key(
 
 @contextlib.asynccontextmanager
 async def apipeline(
-    ignore_redis_error: bool = False, _meta: RedisConfig = None
+    ignore_redis_error: bool = False,
+    use_exising_pipe: bool = False,
+    _meta: RedisConfig = None,
 ) -> AbstractAsyncContextManager[Pipeline]:
     _meta = _meta or AtomicRedisModel.Meta
     redis = _meta.redis
