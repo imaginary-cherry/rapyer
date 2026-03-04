@@ -327,7 +327,7 @@ class AtomicRedisModel(BaseModel):
 
     async def asave(self) -> Self:
         model_dump = self.redis_dump()
-        await self.client.json().set(self.key, self.json_path, model_dump)
+        await self.client.json().set(self.key, self.json_path, model_dump)  # type: ignore[misc]
         if self.Meta.ttl is not None:
             nx = not self.Meta.refresh_ttl
             await self.client.expire(self.key, self.Meta.ttl, nx=nx)
@@ -392,7 +392,7 @@ class AtomicRedisModel(BaseModel):
         # In case we get the field of Key[]
         if cls._key_field_name and ":" not in key:
             key = f"{cls.class_key_initials()}:{key}"
-        model_dump = await cls.Meta.redis.json().get(key, "$")
+        model_dump = await cls.Meta.redis.json().get(key, "$")  # type: ignore[misc]
         if not model_dump:
             raise KeyNotFound(f"{key} is missing in redis")
         model_dump = model_dump[0]
@@ -406,7 +406,7 @@ class AtomicRedisModel(BaseModel):
         return instance
 
     async def aload(self) -> Self:
-        model_dump = await self.Meta.redis.json().get(self.key, self.json_path)
+        model_dump = await self.Meta.redis.json().get(self.key, self.json_path)  # type: ignore[misc]
         if not model_dump:
             raise KeyNotFound(f"{self.key} is missing in redis")
         model_dump = model_dump[0]
@@ -475,7 +475,7 @@ class AtomicRedisModel(BaseModel):
             return []
 
         # Fetch the actual documents
-        models = await cls.Meta.redis.json().mget(keys=targeted_keys, path="$")
+        models = await cls.Meta.redis.json().mget(keys=targeted_keys, path="$")  # type: ignore[misc]
 
         instances = []
         for model, key in zip(models, targeted_keys):
@@ -761,7 +761,7 @@ async def afind(*redis_keys: str, skip_missing: bool = False) -> list[AtomicRedi
             )
         key_to_class[key] = redis_model_mapping[class_name]
 
-    models_data = await AtomicRedisModel.Meta.redis.json().mget(
+    models_data = await AtomicRedisModel.Meta.redis.json().mget(  # type: ignore[misc]
         keys=redis_keys, path="$"
     )
 
