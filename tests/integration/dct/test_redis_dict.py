@@ -151,21 +151,24 @@ async def test_redis_dict__update__check_local_consistency_sanity(
     assert user.metadata == fresh_user.metadata
 
 
+DICT_MODEL_TEST_DATA = [
+    [StrDictModel, {"key1": "value1", "key2": "value2"}],
+    [IntDictModel, {"key1": 42, "key2": 100}],
+    [BytesDictModel, {"key1": b"data1", "key2": b"data2"}],
+    [
+        DatetimeDictModel,
+        {"key1": datetime(2023, 1, 1), "key2": datetime(2023, 2, 1)},
+    ],
+    [EnumDictModel, {"key1": Status.ACTIVE, "key2": Status.PENDING}],
+    [AnyDictModel, {"key1": "mixed", "key2": 42}],
+    [BaseDictMetadataModel, {"key1": "value1", "key2": "value2"}],
+]
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ["model_class", "initial_data"],
-    [
-        [StrDictModel, {"key1": "value1", "key2": "value2"}],
-        [IntDictModel, {"key1": 42, "key2": 100}],
-        [BytesDictModel, {"key1": b"data1", "key2": b"data2"}],
-        [
-            DatetimeDictModel,
-            {"key1": datetime(2023, 1, 1), "key2": datetime(2023, 2, 1)},
-        ],
-        [EnumDictModel, {"key1": Status.ACTIVE, "key2": Status.PENDING}],
-        [AnyDictModel, {"key1": "mixed", "key2": 42}],
-        [BaseDictMetadataModel, {"key1": "value1", "key2": "value2"}],
-    ],
+    DICT_MODEL_TEST_DATA,
 )
 async def test_redis_dict__clear__check_local_consistency_sanity(
     model_class: type[BaseDictMetadataModel], initial_data
@@ -302,18 +305,7 @@ async def test_redis_dict__pop_with_default__check_default_return_sanity(
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ["model_class", "initial_data"],
-    [
-        [StrDictModel, {"key1": "value1", "key2": "value2"}],
-        [IntDictModel, {"key1": 42, "key2": 100}],
-        [BytesDictModel, {"key1": b"data1", "key2": b"data2"}],
-        [
-            DatetimeDictModel,
-            {"key1": datetime(2023, 1, 1), "key2": datetime(2023, 2, 1)},
-        ],
-        [EnumDictModel, {"key1": Status.ACTIVE, "key2": Status.PENDING}],
-        [AnyDictModel, {"key1": "mixed", "key2": 42}],
-        [BaseDictMetadataModel, {"key1": "value1", "key2": "value2"}],
-    ],
+    DICT_MODEL_TEST_DATA,
 )
 async def test_redis_dict__popitem__check_redis_popitem_sanity(
     model_class: type[BaseDictMetadataModel], initial_data: dict
@@ -387,21 +379,7 @@ async def test_redis_dict__update_with_kwargs__check_local_consistency_sanity(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ["model_class", "initial_data"],
-    [
-        [StrDictModel, {"key1": "value1", "key2": "value2"}],
-        [IntDictModel, {"key1": 42, "key2": 100}],
-        [BytesDictModel, {"key1": b"data1", "key2": b"data2"}],
-        [
-            DatetimeDictModel,
-            {"key1": datetime(2023, 1, 1), "key2": datetime(2023, 2, 1)},
-        ],
-        [EnumDictModel, {"key1": Status.ACTIVE, "key2": Status.PENDING}],
-        [AnyDictModel, {"key1": "mixed", "key2": 42}],
-        [BaseDictMetadataModel, {"key1": "value1", "key2": "value2"}],
-    ],
-)
+@pytest.mark.parametrize(["model_class", "initial_data"], DICT_MODEL_TEST_DATA)
 async def test_redis_dict__clone__check_clone_functionality_sanity(
     model_class: type[BaseDictMetadataModel], initial_data
 ):
