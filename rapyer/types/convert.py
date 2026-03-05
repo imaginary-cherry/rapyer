@@ -5,7 +5,7 @@ from pydantic import BaseModel, PrivateAttr, TypeAdapter
 from rapyer.fields.key import RapyerKey
 from rapyer.types.base import BaseRedisType, RedisType
 from rapyer.types.special import SpecialFieldType
-from rapyer.utils.annotation import TypeConverter, DYNAMIC_CLASS_DOC
+from rapyer.utils.annotation import DYNAMIC_CLASS_DOC, TypeConverter
 from rapyer.utils.pythonic import safe_issubclass
 
 

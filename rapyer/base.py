@@ -25,7 +25,7 @@ from redis.commands.search.query import Query
 from redis.exceptions import NoScriptError, ResponseError
 
 from rapyer.config import RedisConfig
-from rapyer.context import _context_pipe, with_pipe_context, ensure_pipeline
+from rapyer.context import _context_pipe, ensure_pipeline, with_pipe_context
 from rapyer.errors import (
     CantSerializeRedisValueError,
     KeyNotFound,
@@ -43,10 +43,14 @@ from rapyer.fields.safe_load import SafeLoadAnnotation
 from rapyer.links import ATOMIC_MODEL_API_REF_LINK, REDIS_SUPPORTED_LINK
 from rapyer.result import DeleteResult, RapyerDeleteResult
 from rapyer.scripts import registry as scripts_registry
-from rapyer.types.base import FAILED_FIELDS_KEY, REDIS_DUMP_FLAG_NAME, RedisType
-from rapyer.types.base import BaseRedisType, RedisType, REDIS_DUMP_FLAG_NAME, FAILED_FIELDS_KEY
-from rapyer.types.special import SpecialFieldType
+from rapyer.types.base import (
+    FAILED_FIELDS_KEY,
+    REDIS_DUMP_FLAG_NAME,
+    BaseRedisType,
+    RedisType,
+)
 from rapyer.types.convert import RedisConverter
+from rapyer.types.special import SpecialFieldType
 from rapyer.typing_support import Self, Unpack
 from rapyer.utils.annotation import (
     DYNAMIC_CLASS_DOC,
