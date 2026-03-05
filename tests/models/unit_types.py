@@ -1,7 +1,6 @@
 from datetime import datetime
 
 from pydantic import Field
-
 from rapyer.base import AtomicRedisModel
 from rapyer.types import RedisDatetimeTimestamp
 

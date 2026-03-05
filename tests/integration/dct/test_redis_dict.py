@@ -2,26 +2,25 @@ from datetime import datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from redis.exceptions import NoScriptError
-
 from rapyer.base import AtomicRedisModel
 from rapyer.errors import PersistentNoScriptError
 from rapyer.types.dct import RedisDict
+from redis.exceptions import NoScriptError
 from tests.models.collection_types import (
-    IntDictModel,
-    StrDictModel,
-    BytesDictModel,
-    DatetimeDictModel,
-    EnumDictModel,
     AnyDictModel,
+    BaseDictMetadataModel,
     BaseModelDictModel,
     BoolDictModel,
+    BytesDictModel,
+    ComprehensiveTestModel,
+    DatetimeDictModel,
+    EnumDictModel,
+    IntDictModel,
     ListDictModel,
     NestedDictModel,
-    BaseDictMetadataModel,
-    ComprehensiveTestModel,
+    StrDictModel,
 )
-from tests.models.common import Status, Person
+from tests.models.common import Person, Status
 
 
 @pytest.mark.asyncio

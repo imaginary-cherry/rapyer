@@ -2,16 +2,15 @@ from datetime import datetime
 from typing import ClassVar
 
 from pydantic import Field
-
 from rapyer.base import AtomicRedisModel, RedisConfig
 from rapyer.types import (
-    RedisFloat,
     RedisDatetimeTimestamp,
+    RedisDict,
+    RedisFloat,
     RedisInt,
     RedisList,
-    RedisDict,
 )
-from tests.models.common import TaskStatus, Priority
+from tests.models.common import Priority, TaskStatus
 
 TTL_TEST_SECONDS = 24
 USER_TTL = 300

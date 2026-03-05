@@ -1,9 +1,8 @@
 from datetime import datetime
 
 import pytest
-
 from rapyer.fields import RapyerKey
-from tests.models.common import UserWithKeyModel, EventWithDatetimeKeyModel
+from tests.models.common import EventWithDatetimeKeyModel, UserWithKeyModel
 
 
 @pytest.mark.asyncio

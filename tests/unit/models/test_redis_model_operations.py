@@ -1,7 +1,6 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from rapyer import AtomicRedisModel
 from rapyer.types.base import RedisType
 from rapyer.types.dct import RedisDict
@@ -9,16 +8,16 @@ from rapyer.types.integer import RedisInt
 from rapyer.types.lst import RedisList
 from rapyer.types.string import RedisStr
 from tests.models.collection_types import (
-    SimpleListModel,
-    SimpleIntListModel,
     SimpleDictModel,
+    SimpleIntListModel,
+    SimpleListModel,
 )
-from tests.models.complex_types import MiddleModel, InnerMostModel
+from tests.models.complex_types import InnerMostModel, MiddleModel
 from tests.models.simple_types import NoneTestModel
 from tests.models.unit_types import (
-    SimpleIntDictModel,
     MixedCollectionModel,
     OperationsTestModel,
+    SimpleIntDictModel,
 )
 from tests.unit.assertions import (
     assert_redis_dict_item_correct,

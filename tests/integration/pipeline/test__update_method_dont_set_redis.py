@@ -1,14 +1,9 @@
 from datetime import datetime, timedelta
 
 import pytest
-
 import rapyer
 from tests.models.collection_types import ComprehensiveTestModel
-from tests.models.simple_types import (
-    FloatModel,
-    DatetimeModel,
-    DatetimeTimestampModel,
-)
+from tests.models.simple_types import DatetimeModel, DatetimeTimestampModel, FloatModel
 
 # ===== RedisInt tests (ComprehensiveTestModel.counter) =====
 

@@ -11,12 +11,24 @@ end
 --[[EXTRACT_ARRAY]]
 local n = #arr
 
-if start_idx < 0 then start_idx = n + start_idx end
-if end_idx < 0 then end_idx = n + end_idx end
-if start_idx < 0 then start_idx = 0 end
-if end_idx < 0 then end_idx = 0 end
-if end_idx > n then end_idx = n end
-if start_idx >= n or start_idx >= end_idx then return true end
+if start_idx < 0 then
+    start_idx = n + start_idx
+end
+if end_idx < 0 then
+    end_idx = n + end_idx
+end
+if start_idx < 0 then
+    start_idx = 0
+end
+if end_idx < 0 then
+    end_idx = 0
+end
+if end_idx > n then
+    end_idx = n
+end
+if start_idx >= n or start_idx >= end_idx then
+    return true
+end
 
 local new_arr = {}
 local j = 1

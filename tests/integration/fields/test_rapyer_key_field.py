@@ -1,12 +1,11 @@
 import pytest
-
 from rapyer.fields import RapyerKey
 from rapyer.types.dct import RedisDict
 from rapyer.types.lst import RedisList
 from tests.models.redis_types import (
-    RapyerKeyFieldModel,
-    ListOfDictsRapyerKeyModel,
     DictOfListsRapyerKeyModel,
+    ListOfDictsRapyerKeyModel,
+    RapyerKeyFieldModel,
 )
 
 

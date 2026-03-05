@@ -3,7 +3,6 @@ from datetime import datetime
 import pytest
 import pytest_asyncio
 from pydantic import ValidationError
-
 from rapyer.types.byte import RedisBytes
 from rapyer.types.datetime import RedisDatetime
 from rapyer.types.dct import RedisDict
@@ -11,16 +10,16 @@ from rapyer.types.integer import RedisInt
 from rapyer.types.lst import RedisList
 from rapyer.types.string import RedisStr
 from tests.models.collection_types import MixedTypesModel, StrDictModel
-from tests.models.common import TaskStatus, Priority
+from tests.models.common import Priority, TaskStatus
 from tests.models.complex_types import InnerMostModel, MiddleModel, OuterModel
 from tests.models.simple_types import (
-    NoneTestModel,
     BoolModel,
     BytesModel,
     DatetimeModel,
-    TaskModel,
     IntModel,
+    NoneTestModel,
     StrModel,
+    TaskModel,
 )
 
 # Import models from centralized location

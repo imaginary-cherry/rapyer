@@ -1,9 +1,8 @@
 import pytest
-
 from rapyer.context import _context_pipe
 from rapyer.errors import PersistentNoScriptError
 from tests.models.collection_types import ComprehensiveTestModel
-from tests.models.simple_types import TTLRefreshTestModel, TTL_TEST_SECONDS
+from tests.models.simple_types import TTL_TEST_SECONDS, TTLRefreshTestModel
 
 
 @pytest.mark.asyncio

@@ -1,20 +1,19 @@
 import pytest
-
 from rapyer.types.byte import RedisBytes
 from rapyer.types.dct import RedisDict
 from rapyer.types.integer import RedisInt
 from rapyer.types.lst import RedisList
 from rapyer.types.string import RedisStr
 from tests.models.redis_types import (
-    DirectRedisStringModel,
-    DirectRedisIntModel,
-    DirectRedisBytesModel,
-    DirectRedisListModel,
-    DirectRedisListIntModel,
-    DirectRedisDictModel,
-    DirectRedisDictIntModel,
-    MixedDirectRedisTypesModel,
     AnnotatedDirectRedisTypesModel,
+    DirectRedisBytesModel,
+    DirectRedisDictIntModel,
+    DirectRedisDictModel,
+    DirectRedisIntModel,
+    DirectRedisListIntModel,
+    DirectRedisListModel,
+    DirectRedisStringModel,
+    MixedDirectRedisTypesModel,
 )
 
 

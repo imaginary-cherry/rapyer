@@ -1,17 +1,16 @@
 import pytest
 from pydantic import ValidationError
-
 from rapyer.types.dct import RedisDict
 from rapyer.types.integer import RedisInt
 from rapyer.types.lst import RedisList
 from rapyer.types.string import RedisStr
 from tests.models.annotated_types import (
     AnnotatedFieldsModel,
-    SimpleAnnotatedModel,
-    ValidationFieldsModel,
     ComplexAnnotatedModel,
     DefaultAnnotatedModel,
     NestedAnnotatedModel,
+    SimpleAnnotatedModel,
+    ValidationFieldsModel,
 )
 
 

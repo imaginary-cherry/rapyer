@@ -1,10 +1,9 @@
 import pytest
-
 from tests.models.generic_types import (
-    GenericListModel,
-    GenericDictModel,
-    GenericBaseModel,
     CompositeGenericModel,
+    GenericBaseModel,
+    GenericDictModel,
+    GenericListModel,
 )
 
 

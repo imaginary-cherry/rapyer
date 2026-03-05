@@ -3,7 +3,6 @@ from enum import Enum
 from typing import List
 
 from pydantic import Field
-
 from rapyer.base import AtomicRedisModel
 
 

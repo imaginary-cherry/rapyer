@@ -1,12 +1,11 @@
 import pytest
-
 from tests.models.unknown_types import (
-    StrStatus,
     IntPriority,
-    ModelWithStrEnumDefault,
     ModelWithIntEnumDefault,
-    ModelWithStrEnumInList,
+    ModelWithStrEnumDefault,
     ModelWithStrEnumInDict,
+    ModelWithStrEnumInList,
+    StrStatus,
 )
 
 

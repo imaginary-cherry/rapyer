@@ -1,7 +1,6 @@
 import pytest
-
-from tests.models.collection_types import UserListModel, ProductListModel
-from tests.models.common import User, Product
+from tests.models.collection_types import ProductListModel, UserListModel
+from tests.models.common import Product, User
 
 
 @pytest.fixture

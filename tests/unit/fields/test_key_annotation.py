@@ -1,8 +1,7 @@
 from datetime import datetime
 
 import pytest
-
-from tests.models.common import UserWithKeyModel, EventWithDatetimeKeyModel
+from tests.models.common import EventWithDatetimeKeyModel, UserWithKeyModel
 
 
 def test_key_field_name_detection_sanity():

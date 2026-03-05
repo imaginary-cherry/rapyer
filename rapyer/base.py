@@ -6,51 +6,45 @@ import pickle
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager
-from typing import ClassVar, Any, get_origin, Optional
+from typing import Any, ClassVar, get_origin, Optional
 
 from pydantic import (
     BaseModel,
-    PrivateAttr,
     ConfigDict,
-    model_validator,
     field_serializer,
     field_validator,
+    model_validator,
+    PrivateAttr,
     ValidationError,
 )
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
-from redis.asyncio.client import Pipeline
-from redis.commands.search.aggregation import AggregateRequest
-from redis.commands.search.index_definition import IndexDefinition, IndexType
-from redis.commands.search.query import Query
-from redis.exceptions import NoScriptError, ResponseError
-
 from rapyer.config import RedisConfig
 from rapyer.context import _context_pipe, with_pipe_context
 from rapyer.errors import (
-    KeyNotFound,
-    PersistentNoScriptError,
-    UnsupportedIndexedFieldError,
     CantSerializeRedisValueError,
+    KeyNotFound,
+    MissingParameterError,
+    PersistentNoScriptError,
     RapyerModelDoesntExistError,
     UnsupportedArgumentTypeError,
-    MissingParameterError,
     UnsupportedArgumentValueError,
+    UnsupportedIndexedFieldError,
 )
-from rapyer.fields.expression import ExpressionField, AtomicField, Expression
+from rapyer.fields.expression import AtomicField, Expression, ExpressionField
 from rapyer.fields.index import IndexAnnotation
 from rapyer.fields.key import KeyAnnotation, RapyerKey
 from rapyer.fields.safe_load import SafeLoadAnnotation
-from rapyer.links import REDIS_SUPPORTED_LINK, ATOMIC_MODEL_API_REF_LINK
+from rapyer.links import ATOMIC_MODEL_API_REF_LINK, REDIS_SUPPORTED_LINK
 from rapyer.result import DeleteResult, RapyerDeleteResult
 from rapyer.scripts import registry as scripts_registry
-from rapyer.types.base import RedisType, REDIS_DUMP_FLAG_NAME, FAILED_FIELDS_KEY
+from rapyer.types.base import FAILED_FIELDS_KEY, REDIS_DUMP_FLAG_NAME, RedisType
 from rapyer.types.convert import RedisConverter
 from rapyer.typing_support import Self, Unpack
 from rapyer.utils.annotation import (
-    replace_to_redis_types_in_annotation,
-    has_annotation,
-    field_with_flag,
     DYNAMIC_CLASS_DOC,
+    field_with_flag,
+    has_annotation,
+    replace_to_redis_types_in_annotation,
 )
 from rapyer.utils.fields import (
     get_all_pydantic_annotation,
@@ -60,11 +54,16 @@ from rapyer.utils.fields import (
 from rapyer.utils.pythonic import safe_issubclass
 from rapyer.utils.redis import (
     acquire_lock,
-    update_keys_in_pipeline,
-    delete_in_batches,
     batched,
+    delete_in_batches,
     scan_keys,
+    update_keys_in_pipeline,
 )
+from redis.asyncio.client import Pipeline
+from redis.commands.search.aggregation import AggregateRequest
+from redis.commands.search.index_definition import IndexDefinition, IndexType
+from redis.commands.search.query import Query
+from redis.exceptions import NoScriptError, ResponseError
 
 logger = logging.getLogger("rapyer")
 

@@ -1,7 +1,6 @@
 from typing import Annotated
 
 from pydantic import Field
-
 from rapyer.base import AtomicRedisModel
 from rapyer.fields.key import RapyerKey
 from rapyer.types.byte import RedisBytes

@@ -10,7 +10,9 @@ end
 --[[EXTRACT_DATETIME]]
 local pattern = "(%d+)-(%d+)-(%d+)T(%d+):(%d+):(%d+)"
 local y, m, d, h, mi, s = string.match(value, pattern)
-if not y then return nil end
+if not y then
+    return nil
+end
 
 y = tonumber(y)
 m = tonumber(m)
@@ -51,7 +53,7 @@ local function is_leap_year(year)
 end
 
 local function days_in_month(year, month)
-    local days = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+    local days = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }
     if month == 2 and is_leap_year(year) then
         return 29
     end

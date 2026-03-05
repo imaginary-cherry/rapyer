@@ -1,16 +1,15 @@
 import pytest
-
 from rapyer.types.byte import RedisBytes
 from rapyer.types.datetime import RedisDatetime
 from rapyer.types.integer import RedisInt
 from rapyer.types.string import RedisStr
-from tests.models.simple_types import IntModel, DatetimeModel, StrModel
+from tests.models.simple_types import DatetimeModel, IntModel, StrModel
 from tests.models.unit_types import (
-    SimpleStringModel,
-    SimpleIntModel,
+    MultiTypeModel,
     SimpleBoolModel,
     SimpleBytesModel,
-    MultiTypeModel,
+    SimpleIntModel,
+    SimpleStringModel,
 )
 
 

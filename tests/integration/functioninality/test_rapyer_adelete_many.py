@@ -1,10 +1,9 @@
 import pytest
-
 import rapyer
 from rapyer import RapyerDeleteResult
-from rapyer.errors import RapyerModelDoesntExistError, MissingParameterError
+from rapyer.errors import MissingParameterError, RapyerModelDoesntExistError
 from rapyer.fields import RapyerKey
-from tests.models.simple_types import StrModel, IntModel
+from tests.models.simple_types import IntModel, StrModel
 from tests.models.specialized import UserModel
 
 

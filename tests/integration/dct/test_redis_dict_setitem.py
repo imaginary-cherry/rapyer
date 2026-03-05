@@ -1,11 +1,10 @@
 import pytest
-
 from rapyer import AtomicRedisModel
 from tests.models.collection_types import (
+    BaseModelDictSetitemModel as BaseModelDictModel,
+    DictDictModel,
     IntDictModel,
     StrDictModel,
-    DictDictModel,
-    BaseModelDictSetitemModel as BaseModelDictModel,
 )
 from tests.models.common import Address, Company, Settings
 

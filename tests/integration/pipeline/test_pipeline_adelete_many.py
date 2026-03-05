@@ -1,11 +1,10 @@
 import pytest
 import pytest_asyncio
-
 import rapyer
 from rapyer import DeleteResult, RapyerDeleteResult
 from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.index_types import IndexTestModel
-from tests.models.simple_types import StrModel, IntModel
+from tests.models.simple_types import IntModel, StrModel
 
 
 @pytest.fixture

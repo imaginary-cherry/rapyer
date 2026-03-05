@@ -1,7 +1,6 @@
 from datetime import datetime
 
 import pytest
-
 from rapyer.base import AtomicRedisModel
 from rapyer.types.base import RedisType
 from rapyer.types.byte import RedisBytes
@@ -11,25 +10,25 @@ from rapyer.types.integer import RedisInt
 from rapyer.types.lst import RedisList
 from rapyer.types.string import RedisStr
 from tests.models.collection_types import (
-    IntDictModel,
-    StrDictModel,
+    AnyDictModel,
+    BaseDictMetadataModel,
     BytesDictModel,
     DatetimeDictModel,
     EnumDictModel,
-    AnyDictModel,
-    Status,
-    BaseDictMetadataModel,
-    SimpleListModel,
-    SimpleIntListModel,
+    IntDictModel,
     SimpleDictModel,
+    SimpleIntListModel,
+    SimpleListModel,
+    Status,
+    StrDictModel,
 )
 from tests.models.complex_types import OuterModel
 from tests.models.simple_types import (
-    StrModel,
-    IntModel,
     BoolModel,
     BytesModel,
     DatetimeModel,
+    IntModel,
+    StrModel,
 )
 
 

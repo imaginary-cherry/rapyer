@@ -1,5 +1,4 @@
 import pytest
-
 import rapyer
 from rapyer import AtomicRedisModel
 from rapyer.types import RedisDict, RedisFloat, RedisInt, RedisList
@@ -9,10 +8,10 @@ from tests.integration.conftest import REDUCED_TTL_SECONDS
 from tests.models.complex_types import OuterModelWithRedisNested
 from tests.models.simple_types import (
     TTL_TEST_SECONDS,
-    USER_TTL,
-    TTLRefreshTestModel as ModelWithTTL,
-    UserModelWithoutTTL as ModelWithoutTTL,
     TTLRefreshDisabledModel as ModelWithTTLNoRefresh,
+    TTLRefreshTestModel as ModelWithTTL,
+    USER_TTL,
+    UserModelWithoutTTL as ModelWithoutTTL,
     UserModelWithTTL,
 )
 

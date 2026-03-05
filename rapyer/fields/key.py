@@ -1,5 +1,5 @@
 import dataclasses
-from typing import TYPE_CHECKING, Annotated, Any, Generic, TypeAlias, TypeVar
+from typing import Annotated, Any, Generic, TYPE_CHECKING, TypeAlias, TypeVar
 
 
 @dataclasses.dataclass(frozen=True)

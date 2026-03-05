@@ -1,13 +1,12 @@
 import pytest
-
 from rapyer.types.dct import RedisDict
 from rapyer.types.integer import RedisInt
 from rapyer.types.lst import RedisList
 from rapyer.types.string import RedisStr
 from tests.models.collection_types import (
-    SimpleListModel,
-    SimpleIntListModel,
     SimpleDictModel,
+    SimpleIntListModel,
+    SimpleListModel,
 )
 from tests.models.unit_types import MixedCollectionModel, SimpleIntDictModel
 

@@ -1,20 +1,19 @@
 import pytest
-
 from rapyer.errors import CantSerializeRedisValueError
 from tests.models.complex_types import (
-    OuterModelWithRedisNested,
     ContainerModel,
     InnerRedisModel,
+    OuterModelWithRedisNested,
 )
 from tests.models.safe_load_types import (
-    ModelWithSafeLoadField,
-    ModelWithMultipleSafeLoadFields,
     ModelWithMixedFields,
+    ModelWithMultipleSafeLoadFields,
     ModelWithSafeLoadAllConfig,
-    ModelWithSafeLoadListOfAny,
     ModelWithSafeLoadDictOfAny,
-    ModelWithUnsafeListOfAny,
+    ModelWithSafeLoadField,
+    ModelWithSafeLoadListOfAny,
     ModelWithUnsafeDictOfAny,
+    ModelWithUnsafeListOfAny,
 )
 
 

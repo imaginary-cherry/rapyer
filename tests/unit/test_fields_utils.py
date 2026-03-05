@@ -2,13 +2,8 @@ from typing import Type
 
 import pytest
 from pydantic import Field
-
 from rapyer.utils.fields import is_type_json_serializable
-from tests.models.unknown_types import (
-    StrStatus,
-    IntPriority,
-    PlainEnum,
-)
+from tests.models.unknown_types import IntPriority, PlainEnum, StrStatus
 
 
 @pytest.mark.parametrize(

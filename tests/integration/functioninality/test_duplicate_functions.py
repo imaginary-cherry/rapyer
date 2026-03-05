@@ -1,16 +1,15 @@
 import pytest
 import pytest_asyncio
-
 from tests.integration.models.test_nested_redis_models import (
-    InnerRedisModel,
     ContainerModel,
+    InnerRedisModel,
     OuterModelWithRedisNested,
 )
 from tests.models.complex_types import (
-    TestRedisModel,
     InnerMostModel,
     MiddleModel,
     OuterModel,
+    TestRedisModel,
 )
 
 

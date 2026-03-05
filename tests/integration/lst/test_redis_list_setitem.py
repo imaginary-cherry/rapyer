@@ -1,13 +1,12 @@
 import pytest
-
 from rapyer import AtomicRedisModel
 from tests.models.collection_types import (
+    BaseModelListModel,
+    DictListModel,
     IntListModel,
     StrListModel,
-    DictListModel,
-    BaseModelListModel,
 )
-from tests.models.common import Product, NestedConfig, UserProfile
+from tests.models.common import NestedConfig, Product, UserProfile
 
 
 @pytest.fixture

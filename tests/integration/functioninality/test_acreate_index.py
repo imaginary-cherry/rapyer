@@ -1,10 +1,9 @@
 import pytest
-
 from rapyer import AtomicRedisModel
 from rapyer.errors import UnsupportedIndexedFieldError
 from tests.models.index_types import (
-    UnsupportedIndexModel,
     UnsupportedGenericIndexModel,
+    UnsupportedIndexModel,
     UnsupportedOptionalIndexModel,
 )
 

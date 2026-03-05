@@ -1,7 +1,6 @@
 import pytest
-
 from rapyer.context import _context_pipe
-from tests.models.collection_types import PipelineTestModel, ComprehensiveTestModel
+from tests.models.collection_types import ComprehensiveTestModel, PipelineTestModel
 
 
 @pytest.mark.asyncio

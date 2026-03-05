@@ -1,8 +1,7 @@
 import pytest
 import pytest_asyncio
-
 import rapyer
-from tests.models.simple_types import StrModel, IntModel
+from tests.models.simple_types import IntModel, StrModel
 
 
 @pytest_asyncio.fixture

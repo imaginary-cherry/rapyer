@@ -1,10 +1,9 @@
 import pytest
-
 from tests.models.unknown_types import (
-    CustomSerializableType,
     ComplexCustomType,
-    NestedPydanticModel,
+    CustomSerializableType,
     ModelWithCustomTypes,
+    NestedPydanticModel,
 )
 
 

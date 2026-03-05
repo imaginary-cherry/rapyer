@@ -1,19 +1,18 @@
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 from pydantic import Field
-
 from rapyer.base import AtomicRedisModel
 from tests.models.common import (
-    Status,
-    Person,
-    User,
-    Product,
-    UserProfile,
-    NestedConfig,
     Address,
     Company,
+    NestedConfig,
+    Person,
+    Product,
     Settings,
+    Status,
+    User,
+    UserProfile,
 )
 
 

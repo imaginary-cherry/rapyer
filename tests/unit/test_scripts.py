@@ -1,14 +1,13 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from rapyer.errors import ScriptsNotInitializedError
 from rapyer.scripts import (
-    run_sha,
+    _REGISTERED_SCRIPT_SHAS,
     handle_noscript_error,
     register_scripts,
     REMOVE_RANGE_SCRIPT_NAME,
-    _REGISTERED_SCRIPT_SHAS,
+    run_sha,
 )
 
 
