@@ -52,6 +52,9 @@ jobs:
     - name: Install dependencies
       run: uv sync --group dev
 
+    - name: Check import ordering with isort
+      run: uv run isort --check --diff .
+
     - name: Check code formatting with black
       run: uv run black --check --diff .
 
