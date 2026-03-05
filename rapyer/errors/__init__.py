@@ -15,7 +15,19 @@ from rapyer.errors.find import (
     UnsupportedArgumentTypeError,
 )
 
-UnsupportArgumentTypeError = UnsupportedArgumentTypeError
+import warnings
+
+
+def __getattr__(name):
+    if name == "UnsupportArgumentTypeError":
+        warnings.warn(
+            "UnsupportArgumentTypeError is deprecated, use UnsupportedArgumentTypeError instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return UnsupportedArgumentTypeError
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "BadFilterError",
