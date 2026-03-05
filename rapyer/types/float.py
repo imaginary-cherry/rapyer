@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING, TypeAlias
 
+from redis.commands.search.field import NumericField
+
 from rapyer.scripts import (
     NUM_FLOORDIV_SCRIPT_NAME,
     NUM_MOD_SCRIPT_NAME,
@@ -8,8 +10,7 @@ from rapyer.scripts import (
     NUM_TRUEDIV_SCRIPT_NAME,
     run_sha,
 )
-from rapyer.types.base import marks_redis_updated, RedisType
-from redis.commands.search.field import NumericField
+from rapyer.types.base import RedisType, marks_redis_updated
 
 
 class RedisFloat(float, RedisType):

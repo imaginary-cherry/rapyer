@@ -1,5 +1,6 @@
 import pytest
 from pydantic import ValidationError
+
 from rapyer.types.dct import RedisDict
 from rapyer.types.integer import RedisInt
 from rapyer.types.lst import RedisList

@@ -1,4 +1,5 @@
 import pytest
+
 from rapyer.types.byte import RedisBytes
 from rapyer.types.dct import RedisDict
 from rapyer.types.integer import RedisInt

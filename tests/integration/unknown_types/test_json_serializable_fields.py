@@ -1,4 +1,5 @@
 import pytest
+
 from tests.models.unknown_types import (
     IntPriority,
     ModelWithIntEnumDefault,

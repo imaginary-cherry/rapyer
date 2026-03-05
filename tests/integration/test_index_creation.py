@@ -1,5 +1,6 @@
 import pytest
 import pytest_asyncio
+
 from rapyer import AtomicRedisModel, init_rapyer
 from tests.models.index_types import (
     AddressModel,

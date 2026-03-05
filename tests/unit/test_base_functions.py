@@ -2,8 +2,9 @@ from enum import Enum
 from typing import Any, Generic, TypeVar
 
 import pytest
+
 from rapyer import AtomicRedisModel
-from rapyer.base import find_redis_models, REDIS_MODELS
+from rapyer.base import REDIS_MODELS, find_redis_models
 
 
 @pytest.fixture

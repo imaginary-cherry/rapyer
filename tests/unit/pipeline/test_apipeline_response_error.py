@@ -2,6 +2,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from redis.exceptions import ResponseError
+
 from tests.models.redis_types import PipelineAllTypesTestModel
 
 

@@ -1,4 +1,5 @@
 import pytest
+
 from tests.models.simple_types import BoolModel, IntModel, StrModel
 
 

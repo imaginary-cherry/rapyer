@@ -1,4 +1,5 @@
 import pytest
+
 from rapyer.context import _context_pipe
 from rapyer.errors import PersistentNoScriptError
 from tests.models.collection_types import ComprehensiveTestModel

@@ -1,8 +1,9 @@
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager
 
-from rapyer.context import _context_pipe
 from redis.asyncio import Redis
+
+from rapyer.context import _context_pipe
 
 
 def acquire_lock(

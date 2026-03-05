@@ -1,4 +1,5 @@
 import pytest
+
 from rapyer.types import RedisInt, RedisList, RedisStr
 from tests.models.collection_types import AnyDictModel
 from tests.models.common import Person

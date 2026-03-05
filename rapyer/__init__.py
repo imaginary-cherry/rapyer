@@ -1,6 +1,7 @@
 """Redis Pydantic - Pydantic models with Redis as the backend."""
 
 from rapyer.base import (
+    AtomicRedisModel,
     adelete_many,
     afind,
     afind_one,
@@ -8,7 +9,6 @@ from rapyer.base import (
     ainsert,
     alock_from_key,
     apipeline,
-    AtomicRedisModel,
     find_redis_models,
 )
 from rapyer.init import init_rapyer, teardown_rapyer

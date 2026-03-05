@@ -1,4 +1,5 @@
 import pytest
+
 from rapyer import AtomicRedisModel
 from tests.models.collection_types import (
     BaseModelListModel,

@@ -1,4 +1,5 @@
 import pytest
+
 from tests.models.generic_types import (
     CompositeGenericModel,
     GenericBaseModel,

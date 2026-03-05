@@ -1,4 +1,5 @@
 import pytest
+
 from tests.models.collection_types import (
     ComprehensiveTestModel,
     DictListModel,

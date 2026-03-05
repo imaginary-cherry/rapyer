@@ -1,5 +1,6 @@
 import pytest
 import pytest_asyncio
+
 import rapyer
 from rapyer import DeleteResult, RapyerDeleteResult
 from tests.models.collection_types import ComprehensiveTestModel

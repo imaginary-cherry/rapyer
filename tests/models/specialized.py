@@ -1,4 +1,5 @@
 from pydantic import ConfigDict, Field
+
 from rapyer.base import AtomicRedisModel
 
 

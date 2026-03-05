@@ -1,6 +1,7 @@
 from typing import Any, Optional, Type
 
 from pydantic import Field
+
 from rapyer.base import AtomicRedisModel
 from rapyer.config import RedisConfig
 from rapyer.fields.safe_load import SafeLoad

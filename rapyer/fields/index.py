@@ -1,6 +1,6 @@
 import dataclasses
 from datetime import datetime
-from typing import Annotated, Any, Generic, TYPE_CHECKING, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Annotated, Any, Generic, TypeAlias, TypeVar
 
 from rapyer.types.datetime import RedisDatetimeTimestamp
 

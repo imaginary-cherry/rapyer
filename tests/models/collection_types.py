@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Any, Dict, List
 
 from pydantic import Field
+
 from rapyer.base import AtomicRedisModel
 from tests.models.common import (
     Address,

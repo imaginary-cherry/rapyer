@@ -1,6 +1,7 @@
 from typing import get_origin
 
 from pydantic import BaseModel, PrivateAttr, TypeAdapter
+
 from rapyer.fields.key import RapyerKey
 from rapyer.types.base import RedisType
 from rapyer.utils.annotation import DYNAMIC_CLASS_DOC, TypeConverter

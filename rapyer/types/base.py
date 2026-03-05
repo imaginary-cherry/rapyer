@@ -4,15 +4,16 @@ import functools
 import logging
 import pickle
 from abc import ABC
-from typing import Any, Generic, get_args, TypeVar
+from typing import Any, Generic, TypeVar, get_args
 
 from pydantic import GetCoreSchemaHandler, TypeAdapter
 from pydantic_core import core_schema
 from pydantic_core.core_schema import CoreSchema, SerializationInfo, ValidationInfo
+from redis.commands.search.field import TextField
+
 from rapyer.context import _context_pipe
 from rapyer.errors import CantSerializeRedisValueError
 from rapyer.typing_support import Self
-from redis.commands.search.field import TextField
 
 logger = logging.getLogger("rapyer")
 

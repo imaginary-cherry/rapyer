@@ -2,11 +2,12 @@ import logging
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+from redis import ResponseError
+from redis.asyncio.client import Redis
+
 from rapyer.init import init_rapyer, teardown_rapyer
 from rapyer.result import RapyerDeleteResult
 from rapyer.scripts import SCRIPTS
-from redis import ResponseError
-from redis.asyncio.client import Redis
 from tests.models.collection_types import IntListModel, ProductListModel, StrListModel
 from tests.models.index_types import IndexTestModel
 from tests.models.simple_types import (

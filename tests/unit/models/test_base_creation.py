@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import pytest
+
 from rapyer.base import AtomicRedisModel
 from rapyer.types.base import RedisType
 from rapyer.types.byte import RedisBytes
@@ -149,6 +150,7 @@ async def test_redis_dict__model_creation__check_redis_dict_instance_sanity(
 async def test_model_creation__check_private_and_class_fields_not_converted_to_redis_types_sanity():
     # Arrange
     from typing import ClassVar
+
     from pydantic import PrivateAttr
 
     class TestModel(AtomicRedisModel):

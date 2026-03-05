@@ -1,4 +1,5 @@
 import pytest
+
 from rapyer.errors import CantSerializeRedisValueError
 from tests.models.complex_types import (
     ContainerModel,

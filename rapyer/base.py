@@ -6,18 +6,24 @@ import pickle
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager
-from typing import Any, ClassVar, get_origin, Optional
+from typing import Any, ClassVar, Optional, get_origin
 
 from pydantic import (
     BaseModel,
     ConfigDict,
+    PrivateAttr,
+    ValidationError,
     field_serializer,
     field_validator,
     model_validator,
-    PrivateAttr,
-    ValidationError,
 )
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
+from redis.asyncio.client import Pipeline
+from redis.commands.search.aggregation import AggregateRequest
+from redis.commands.search.index_definition import IndexDefinition, IndexType
+from redis.commands.search.query import Query
+from redis.exceptions import NoScriptError, ResponseError
+
 from rapyer.config import RedisConfig
 from rapyer.context import _context_pipe, with_pipe_context
 from rapyer.errors import (
@@ -59,11 +65,6 @@ from rapyer.utils.redis import (
     scan_keys,
     update_keys_in_pipeline,
 )
-from redis.asyncio.client import Pipeline
-from redis.commands.search.aggregation import AggregateRequest
-from redis.commands.search.index_definition import IndexDefinition, IndexType
-from redis.commands.search.query import Query
-from redis.exceptions import NoScriptError, ResponseError
 
 logger = logging.getLogger("rapyer")
 

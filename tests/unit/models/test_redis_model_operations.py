@@ -1,6 +1,7 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+
 from rapyer import AtomicRedisModel
 from rapyer.types.base import RedisType
 from rapyer.types.dct import RedisDict
@@ -610,7 +611,7 @@ class TestRedisModelUpdateOperations:
     )
     def test_update_non_redis_types_sanity(self, initial_data, update_data):
         # Arrange
-        from tests.models.simple_types import StrModel, IntModel
+        from tests.models.simple_types import IntModel, StrModel
 
         str_model = StrModel(name=initial_data["name"])
         int_model = IntModel(score=initial_data["score"])

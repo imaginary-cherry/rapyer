@@ -1,4 +1,5 @@
 import pytest
+
 from tests.models.complex_types import (
     ContainerModel,
     InnerMostModel,
