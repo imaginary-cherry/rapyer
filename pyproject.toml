@@ -73,11 +73,14 @@ include = ["rapyer/**/*.lua"]
 
 
 [dependency-groups]
-dev = ["black>=25.9.0", "isort>=6.0.0", "mypy>=1.0.0"]
+dev = ["black>=25.9.0", "mypy>=1.0.0", "ruff>=0.9.0"]
 benchmark = ["pytest>=8.4.2", "pytest-benchmark>=5.2.3", "pytest-codspeed>=4.2.0"]
 
-[tool.isort]
-profile = "black"
+[tool.ruff]
+select = ["I", "F401"]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
 
 [tool.bandit]
 exclude_dirs = ["tests"]
