@@ -15,6 +15,7 @@
   [![PyPI version](https://badge.fury.io/py/rapyer.svg)](https://badge.fury.io/py/rapyer)
   [![Downloads](https://static.pepy.tech/badge/rapyer)](https://pepy.tech/project/rapyer)
   [![Documentation](https://img.shields.io/badge/docs-github.io-blue)](https://imaginary-cherry.github.io/rapyer/)
+  [![CodeRabbit](https://img.shields.io/coderabbit/prs/github/imaginary-cherry/rapyer?logo=coderabbit)](https://coderabbit.ai)
 
   
   📚 **[Full Documentation](https://imaginary-cherry.github.io/rapyer/)** | [Installation](https://imaginary-cherry.github.io/rapyer/installation/) | [Examples](https://imaginary-cherry.github.io/rapyer/examples/) | [API Reference](https://imaginary-cherry.github.io/rapyer/api/)
