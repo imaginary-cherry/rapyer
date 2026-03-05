@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from redis.exceptions import NoScriptError
 
-from rapyer.base import AtomicRedisModel
 from rapyer.errors import PersistentNoScriptError
 from rapyer.types.dct import RedisDict
 from tests.models.collection_types import (
@@ -135,7 +134,7 @@ async def test_redis_dict__delitem__check_local_consistency_sanity(
     ],
 )
 async def test_redis_dict__update__check_local_consistency_sanity(
-    model_class: type[BaseDictMetadataModel], initial_data, update_data
+    model_class: type[BaseDictMetadataModel], initial_data: dict, update_data: dict
 ):
     # Arrange
     user = model_class(metadata=initial_data)
@@ -317,7 +316,7 @@ async def test_redis_dict__pop_with_default__check_default_return_sanity(
     ],
 )
 async def test_redis_dict__popitem__check_redis_popitem_sanity(
-    model_class: type[BaseDictMetadataModel], initial_data
+    model_class: type[BaseDictMetadataModel], initial_data: dict
 ):
     # Arrange
     user = model_class(metadata=initial_data)
@@ -354,7 +353,7 @@ async def test_redis_dict__popitem__check_redis_popitem_sanity(
     ],
 )
 async def test_redis_dict__update_with_kwargs__check_local_consistency_sanity(
-    model_class: type[AtomicRedisModel], initial_data
+    model_class: type[BaseDictMetadataModel], initial_data
 ):
     # Arrange
     user = model_class(metadata=initial_data)
