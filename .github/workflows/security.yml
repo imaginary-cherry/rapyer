@@ -30,16 +30,17 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install tools
+      - name: Install uv and pip-audit
         run: |
-          python -m pip install --upgrade pip pipx
           pip install pip-audit
-          pipx install poetry
-          pipx inject poetry poetry-plugin-export
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
 
       - name: Export and audit dependencies
         run: |
-          poetry export -f requirements.txt --without-hashes -o requirements-audit.txt
+          uv export --locked --no-hashes -o requirements-audit.txt
+          sed -i '/^-e \./d' requirements-audit.txt
           pip-audit --strict -r requirements-audit.txt
 
 

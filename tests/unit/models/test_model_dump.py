@@ -5,51 +5,51 @@ import pytest_asyncio
 
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME
 from tests.models.collection_types import (
-    SimpleListModel,
-    SimpleDictModel,
     MixedTypesModel,
+    SimpleDictModel,
+    SimpleListModel,
 )
-from tests.models.common import TaskStatus, Priority
+from tests.models.common import Priority, TaskStatus
 from tests.models.complex_types import (
-    NestedListModel,
-    NestedDictModel,
-    ListOfDictsModel,
     DictOfListsModel,
-    OuterModel,
     InnerMostModel,
+    ListOfDictsModel,
     MiddleModel,
+    NestedDictModel,
+    NestedListModel,
+    OuterModel,
 )
 from tests.models.inheritance_types import AdminUserModel, UserRole
 from tests.models.pickle_types import NonRedisDumpableModel
 from tests.models.redis_types import (
-    DirectRedisStringModel,
-    DirectRedisIntModel,
     DirectRedisBytesModel,
-    DirectRedisListModel,
     DirectRedisDictModel,
+    DirectRedisIntModel,
+    DirectRedisListModel,
+    DirectRedisStringModel,
     MixedDirectRedisTypesModel,
 )
 from tests.models.simple_types import (
-    StrModel,
-    IntModel,
-    FloatModel,
     BoolModel,
     BytesModel,
     DatetimeModel,
     DatetimeTimestampModel,
+    FloatModel,
+    IntModel,
+    StrModel,
     TaskModel,
 )
 from tests.models.unit_types import SimpleBytesModel
 from tests.models.unknown_types import (
-    ModelWithIntEnumDefault,
-    IntPriority,
-    ModelWithStrEnumDefault,
-    StrStatus,
-    ModelWithStrEnumInList,
     InnerModelWithEnum,
-    ModelWithNestedEnum,
+    IntPriority,
     ModelWithEnumCreatedByFactory,
+    ModelWithIntEnumDefault,
+    ModelWithNestedEnum,
     ModelWithPreferJsonDumpConfig,
+    ModelWithStrEnumDefault,
+    ModelWithStrEnumInList,
+    StrStatus,
 )
 
 PREFER_JSON_DUMP_MODELS = [

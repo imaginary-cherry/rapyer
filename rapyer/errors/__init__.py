@@ -1,19 +1,33 @@
+import warnings
+
 from rapyer.errors.base import (
-    RapyerError,
-    RapyerModelDoesntExistError,
     KeyNotFound,
     MissingParameterError,
+    RapyerError,
+    RapyerModelDoesntExistError,
     UnsupportedArgumentValueError,
 )
 from rapyer.errors.find import (
     BadFilterError,
+    CantSerializeRedisValueError,
     FindError,
     PersistentNoScriptError,
     ScriptsNotInitializedError,
+    UnsupportedArgumentTypeError,
     UnsupportedIndexedFieldError,
-    CantSerializeRedisValueError,
-    UnsupportArgumentTypeError,
 )
+
+
+def __getattr__(name):
+    if name == "UnsupportArgumentTypeError":
+        warnings.warn(
+            "UnsupportArgumentTypeError is deprecated, use UnsupportedArgumentTypeError instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return UnsupportedArgumentTypeError
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "BadFilterError",
@@ -27,4 +41,5 @@ __all__ = [
     "CantSerializeRedisValueError",
     "MissingParameterError",
     "UnsupportedArgumentValueError",
+    "UnsupportedArgumentTypeError",
 ]

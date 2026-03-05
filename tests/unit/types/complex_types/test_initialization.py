@@ -4,12 +4,12 @@ from rapyer.types.dct import RedisDict
 from rapyer.types.lst import RedisList
 from rapyer.types.string import RedisStr
 from tests.models.complex_types import (
-    NestedListModel,
-    NestedDictModel,
     ComplexNestedModel,
-    TripleNestedModel,
-    ListOfDictsModel,
     DictOfListsModel,
+    ListOfDictsModel,
+    NestedDictModel,
+    NestedListModel,
+    TripleNestedModel,
 )
 
 

@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Annotated
 
-from pydantic import Field, BaseModel
+from pydantic import BaseModel, Field
 
 from rapyer.base import AtomicRedisModel
 from rapyer.fields.key import Key

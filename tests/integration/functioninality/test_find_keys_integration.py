@@ -1,6 +1,6 @@
 import pytest
 
-from tests.models.simple_types import StrModel, IntModel, BoolModel
+from tests.models.simple_types import BoolModel, IntModel, StrModel
 
 
 @pytest.mark.asyncio

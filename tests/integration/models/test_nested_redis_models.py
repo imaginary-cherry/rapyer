@@ -1,11 +1,11 @@
 import pytest
 
 from tests.models.complex_types import (
+    ContainerModel,
     InnerMostModel,
+    InnerRedisModel,
     MiddleModel,
     OuterModel,
-    InnerRedisModel,
-    ContainerModel,
     OuterModelWithRedisNested,
 )
 from tests.models.inheritance_types import StrictMixedInheritanceModel

@@ -10,9 +10,9 @@ from tests.models.complex_types import OuterModelWithRedisNested
 from tests.models.simple_types import (
     TTL_TEST_SECONDS,
     USER_TTL,
+    TTLRefreshDisabledModel as ModelWithTTLNoRefresh,
     TTLRefreshTestModel as ModelWithTTL,
     UserModelWithoutTTL as ModelWithoutTTL,
-    TTLRefreshDisabledModel as ModelWithTTLNoRefresh,
     UserModelWithTTL,
 )
 

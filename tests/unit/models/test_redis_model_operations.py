@@ -9,16 +9,19 @@ from rapyer.types.integer import RedisInt
 from rapyer.types.lst import RedisList
 from rapyer.types.string import RedisStr
 from tests.models.collection_types import (
-    SimpleListModel,
-    SimpleIntListModel,
     SimpleDictModel,
+    SimpleIntListModel,
+    SimpleListModel,
 )
-from tests.models.complex_types import MiddleModel, InnerMostModel
-from tests.models.simple_types import NoneTestModel
+from tests.models.complex_types import InnerMostModel, MiddleModel, OuterModel
+from tests.models.inheritance_types import AdminUserModel
+from tests.models.pickle_types import ModelWithUnserializableFields
+from tests.models.redis_types import MixedDirectRedisTypesModel
+from tests.models.simple_types import IntModel, NoneTestModel, StrModel
 from tests.models.unit_types import (
-    SimpleIntDictModel,
     MixedCollectionModel,
     OperationsTestModel,
+    SimpleIntDictModel,
 )
 from tests.unit.assertions import (
     assert_redis_dict_item_correct,
@@ -452,8 +455,6 @@ class TestRedisModelUpdateOperations:
     )
     def test_update_redis_types_sanity(self, initial_data, update_data):
         # Arrange
-        from tests.models.redis_types import MixedDirectRedisTypesModel
-
         model = MixedDirectRedisTypesModel(**initial_data)
 
         # Act
@@ -484,8 +485,6 @@ class TestRedisModelUpdateOperations:
         self, field_name, initial_value, update_value
     ):
         # Arrange
-        from tests.models.pickle_types import ModelWithUnserializableFields
-
         model = ModelWithUnserializableFields(**{field_name: initial_value})
 
         # Act
@@ -550,8 +549,6 @@ class TestRedisModelUpdateOperations:
     )
     def test_update_nested_model_sanity(self, updated_middle):
         # Arrange
-        from tests.models.complex_types import OuterModel
-
         model = OuterModel()
 
         # Act
@@ -586,8 +583,6 @@ class TestRedisModelUpdateOperations:
     )
     def test_update_inheritance_parent_fields_sanity(self, base_data, update_data):
         # Arrange
-        from tests.models.inheritance_types import AdminUserModel
-
         model = AdminUserModel(**base_data)
 
         # Act
@@ -611,8 +606,6 @@ class TestRedisModelUpdateOperations:
     )
     def test_update_non_redis_types_sanity(self, initial_data, update_data):
         # Arrange
-        from tests.models.simple_types import StrModel, IntModel
-
         str_model = StrModel(name=initial_data["name"])
         int_model = IntModel(score=initial_data["score"])
 

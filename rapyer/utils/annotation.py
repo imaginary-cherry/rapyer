@@ -1,8 +1,7 @@
 import abc
 from abc import ABC
 from types import UnionType
-from typing import get_origin, Union, get_args, Any, Annotated
-
+from typing import Annotated, Any, Union, get_args, get_origin
 
 DYNAMIC_CLASS_DOC = "___dynamic_class___"
 

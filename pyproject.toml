@@ -1,10 +1,10 @@
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "rapyer"
-version = "1.2.4"
+version = "1.2.5"
 description = "Pydantic models with Redis as the backend"
 authors = [{name = "YedidyaHKfir", email = "yedidyakfir@gmail.com"}]
 readme = "README.md"
@@ -67,25 +67,24 @@ Repository = "https://github.com/imaginary-cherry/rapyer"
 "Bug Tracker" = "https://github.com/imaginary-cherry/rapyer/issues"
 "Changelog" = "https://github.com/imaginary-cherry/rapyer/releases"
 
-[tool.poetry]
-packages = [{include = "rapyer"}]
-include = ["rapyer/scripts/lua/**/*.lua"]
+[tool.hatch.build.targets.wheel]
+packages = ["rapyer"]
+include = ["rapyer/**/*.lua"]
 
 
-[tool.poetry.group.dev.dependencies]
-black = "^25.9.0"
-mypy = "^1.0.0"
-ty = "^0.0.17"
+[dependency-groups]
+dev = ["black>=25.9.0", "mypy>=1.0.0", "ruff>=0.9.0"]
+benchmark = ["pytest>=8.4.2", "pytest-benchmark>=5.2.3", "pytest-codspeed>=4.2.0"]
+
+[tool.ruff]
+select = ["I", "F401"]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
 
 [tool.bandit]
 exclude_dirs = ["tests"]
 skips = ["B101"]  # assert_used - valid in test files
-
-
-[tool.poetry.group.benchmark.dependencies]
-pytest = "^8.4.2"
-pytest-benchmark = "^5.2.3"
-pytest-codspeed = "^4.2.0"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

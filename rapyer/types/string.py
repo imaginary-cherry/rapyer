@@ -1,6 +1,6 @@
-from typing import TypeAlias, TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeAlias
 
-from rapyer.scripts import run_sha, STR_APPEND_SCRIPT_NAME, STR_MUL_SCRIPT_NAME
+from rapyer.scripts import STR_APPEND_SCRIPT_NAME, STR_MUL_SCRIPT_NAME, run_sha
 from rapyer.types.base import RedisType, marks_redis_updated
 
 

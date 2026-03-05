@@ -1,6 +1,6 @@
 from typing import Generic, TypeVar
 
-from pydantic import Field, BaseModel
+from pydantic import BaseModel, Field
 
 from rapyer.base import AtomicRedisModel
 

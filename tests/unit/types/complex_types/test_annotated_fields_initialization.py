@@ -7,11 +7,11 @@ from rapyer.types.lst import RedisList
 from rapyer.types.string import RedisStr
 from tests.models.annotated_types import (
     AnnotatedFieldsModel,
-    SimpleAnnotatedModel,
-    ValidationFieldsModel,
     ComplexAnnotatedModel,
     DefaultAnnotatedModel,
     NestedAnnotatedModel,
+    SimpleAnnotatedModel,
+    ValidationFieldsModel,
 )
 
 

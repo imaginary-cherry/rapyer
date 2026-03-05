@@ -1,11 +1,14 @@
 import pytest
 
 from rapyer import AtomicRedisModel
+from rapyer.types.dct import RedisDict
+from rapyer.types.integer import RedisInt
+from rapyer.types.string import RedisStr
 from tests.models.collection_types import (
+    BaseModelDictSetitemModel as BaseModelDictModel,
+    DictDictModel,
     IntDictModel,
     StrDictModel,
-    DictDictModel,
-    BaseModelDictSetitemModel as BaseModelDictModel,
 )
 from tests.models.common import Address, Company, Settings
 
@@ -55,8 +58,6 @@ async def test_redis_dict_setitem_int_type_checking_sanity(int_dict_model):
     model.metadata["test_key"] = 42
 
     # Assert
-    from rapyer.types.integer import RedisInt
-
     assert isinstance(model.metadata["test_key"], RedisInt)
 
 
@@ -70,8 +71,6 @@ async def test_redis_dict_setitem_str_type_checking_sanity(str_dict_model):
     model.metadata["test_key"] = "test_string"
 
     # Assert
-    from rapyer.types.string import RedisStr
-
     assert isinstance(model.metadata["test_key"], RedisStr)
 
 
@@ -85,8 +84,6 @@ async def test_redis_dict_setitem_dict_type_checking_sanity(dict_dict_model):
     model.metadata["test_key"] = {"nested_key": "nested_value"}
 
     # Assert
-    from rapyer.types.dct import RedisDict
-
     assert isinstance(model.metadata["test_key"], RedisDict)
 
 

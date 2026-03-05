@@ -46,37 +46,17 @@ jobs:
       with:
         python-version: "3.11"
 
-    - name: Cache pip packages
-      uses: actions/cache@v3
-      with:
-        path: ~/.cache/pip
-        key: pip-static-${{ runner.os }}-${{ hashFiles('**/pyproject.toml') }}
-        restore-keys: |
-          pip-static-${{ runner.os }}-
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
 
-    - name: Install Poetry
-      uses: snok/install-poetry@v1
-      with:
-        version: latest
-        virtualenvs-create: true
-        virtualenvs-in-project: true
-    
-    - name: Load cached venv
-      id: cached-poetry-dependencies
-      uses: actions/cache@v3
-      with:
-        path: .venv
-        key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
-    
     - name: Install dependencies
-      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-      run: poetry install --no-interaction --no-root
-    
-    - name: Install project
-      run: poetry install --no-interaction
-    
+      run: uv sync --locked --group dev
+
+    - name: Check import ordering and unused imports with ruff
+      run: uv run ruff check --diff .
+
     - name: Check code formatting with black
-      run: poetry run black --check --diff .
+      run: uv run black --check --diff .
 
   mypy:
     runs-on: ubuntu-22.04

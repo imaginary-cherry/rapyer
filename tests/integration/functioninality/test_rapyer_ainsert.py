@@ -4,35 +4,35 @@ import pytest
 
 import rapyer
 from tests.models.collection_types import (
-    ListModel,
-    DictModel,
-    ComprehensiveTestModel,
     BaseModelListModel,
+    ComprehensiveTestModel,
+    DictModel,
+    ListModel,
 )
 from tests.models.common import (
-    UserProfile,
-    Product,
-    NestedConfig,
-    UserWithKeyModel,
     EventWithDatetimeKeyModel,
+    NestedConfig,
+    Product,
+    UserProfile,
+    UserWithKeyModel,
 )
 from tests.models.complex_types import (
+    DuplicateInnerMostModel,
+    DuplicateMiddleModel,
+    InnerMostModel,
+    MiddleModel,
     OuterModel,
     TestRedisModel,
-    MiddleModel,
-    InnerMostModel,
-    DuplicateMiddleModel,
-    DuplicateInnerMostModel,
 )
-from tests.models.inheritance_types import BaseUserModel, AdminUserModel, UserRole
+from tests.models.inheritance_types import AdminUserModel, BaseUserModel, UserRole
 from tests.models.pickle_types import ModelWithUnserializableFields
 from tests.models.redis_types import DirectRedisStringModel, MixedDirectRedisTypesModel
 from tests.models.simple_types import (
-    StrModel,
-    IntModel,
     BoolModel,
     BytesModel,
     DatetimeModel,
+    IntModel,
+    StrModel,
 )
 
 

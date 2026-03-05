@@ -1,6 +1,6 @@
 import pytest
 
-from tests.models.simple_types import UserModelWithTTL, UserModelWithoutTTL
+from tests.models.simple_types import UserModelWithoutTTL, UserModelWithTTL
 
 
 @pytest.mark.asyncio

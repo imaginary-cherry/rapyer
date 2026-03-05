@@ -1,9 +1,9 @@
-from typing import TypeAlias, TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeAlias
 
 from pydantic_core import core_schema
-from pydantic_core.core_schema import ValidationInfo, SerializationInfo
+from pydantic_core.core_schema import SerializationInfo, ValidationInfo
 
-from rapyer.types.base import RedisType, REDIS_DUMP_FLAG_NAME, marks_redis_updated
+from rapyer.types.base import REDIS_DUMP_FLAG_NAME, RedisType, marks_redis_updated
 
 
 class RedisBytes(bytes, RedisType):

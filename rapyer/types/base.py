@@ -4,11 +4,11 @@ import functools
 import logging
 import pickle
 from abc import ABC
-from typing import get_args, Any, TypeVar, Generic
+from typing import Any, Generic, TypeVar, get_args
 
 from pydantic import GetCoreSchemaHandler, TypeAdapter
 from pydantic_core import core_schema
-from pydantic_core.core_schema import ValidationInfo, CoreSchema, SerializationInfo
+from pydantic_core.core_schema import CoreSchema, SerializationInfo, ValidationInfo
 from redis.commands.search.field import TextField
 
 from rapyer.context import _context_pipe
@@ -90,14 +90,14 @@ class RedisType(ABC):
         model_dump = self._adapter.dump_python(
             self, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
         )
-        await self.client.json().set(self.key, self.json_path, model_dump)
+        await self.client.json().set(self.key, self.json_path, model_dump)  # type: ignore[misc]
         if self.Meta.ttl is not None:
             nx = not self.Meta.refresh_ttl
             await self.client.expire(self.key, self.Meta.ttl, nx=nx)
         return self
 
     async def aload(self):
-        redis_value = await self.client.json().get(self.key, self.field_path)
+        redis_value = await self.client.json().get(self.key, self.field_path)  # type: ignore[misc]
         if redis_value is None:
             return None
         result = self._adapter.validate_python(
