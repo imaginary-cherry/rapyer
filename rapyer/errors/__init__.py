@@ -1,3 +1,5 @@
+import warnings
+
 from rapyer.errors.base import (
     RapyerError,
     RapyerModelDoesntExistError,
@@ -14,8 +16,6 @@ from rapyer.errors.find import (
     CantSerializeRedisValueError,
     UnsupportedArgumentTypeError,
 )
-
-import warnings
 
 
 def __getattr__(name):
