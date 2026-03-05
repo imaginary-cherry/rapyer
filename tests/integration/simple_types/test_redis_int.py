@@ -1,5 +1,6 @@
 import pytest
 
+from rapyer.types.integer import RedisInt
 from tests.models.simple_types import IntModel
 
 
@@ -68,8 +69,6 @@ async def test_redis_int_inheritance_sanity():
     model = IntModel(count=42)
 
     # Assert
-    from rapyer.types.integer import RedisInt
-
     assert isinstance(model.count, RedisInt)
     assert isinstance(model.count, int)
     assert model.count == 42

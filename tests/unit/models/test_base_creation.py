@@ -1,6 +1,8 @@
 from datetime import datetime
+from typing import ClassVar
 
 import pytest
+from pydantic import PrivateAttr
 
 from rapyer.base import AtomicRedisModel
 from rapyer.types.base import RedisType
@@ -149,10 +151,6 @@ async def test_redis_dict__model_creation__check_redis_dict_instance_sanity(
 @pytest.mark.asyncio
 async def test_model_creation__check_private_and_class_fields_not_converted_to_redis_types_sanity():
     # Arrange
-    from typing import ClassVar
-
-    from pydantic import PrivateAttr
-
     class TestModel(AtomicRedisModel):
         _private_field: str = PrivateAttr(default="private")
         class_field: ClassVar[int] = 42
