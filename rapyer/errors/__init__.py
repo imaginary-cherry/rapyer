@@ -15,6 +15,8 @@ from rapyer.errors.find import (
     UnsupportedArgumentTypeError,
 )
 
+UnsupportArgumentTypeError = UnsupportedArgumentTypeError
+
 __all__ = [
     "BadFilterError",
     "FindError",
@@ -28,4 +30,5 @@ __all__ = [
     "MissingParameterError",
     "UnsupportedArgumentValueError",
     "UnsupportedArgumentTypeError",
+    "UnsupportArgumentTypeError",
 ]
