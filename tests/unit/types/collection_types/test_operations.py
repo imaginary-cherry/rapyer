@@ -5,14 +5,14 @@ from rapyer.types.integer import RedisInt
 from rapyer.types.lst import RedisList
 from rapyer.types.string import RedisStr
 from tests.models.collection_types import (
-    SimpleListModel,
-    SimpleIntListModel,
     SimpleDictModel,
+    SimpleIntListModel,
+    SimpleListModel,
 )
 from tests.models.unit_types import SimpleIntDictModel
 from tests.unit.assertions import (
-    assert_redis_list_correct_types,
     assert_redis_dict_item_correct,
+    assert_redis_list_correct_types,
     assert_redis_list_item_correct,
 )
 

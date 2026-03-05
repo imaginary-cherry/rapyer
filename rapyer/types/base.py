@@ -4,11 +4,11 @@ import functools
 import logging
 import pickle
 from abc import ABC
-from typing import get_args, Any, TypeVar, Generic
+from typing import Any, Generic, TypeVar, get_args
 
 from pydantic import GetCoreSchemaHandler, TypeAdapter
 from pydantic_core import core_schema
-from pydantic_core.core_schema import ValidationInfo, CoreSchema, SerializationInfo
+from pydantic_core.core_schema import CoreSchema, SerializationInfo, ValidationInfo
 from redis.commands.search.field import TextField
 
 from rapyer.context import _context_pipe

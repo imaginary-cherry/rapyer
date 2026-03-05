@@ -1,5 +1,5 @@
 import logging
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from redis import ResponseError

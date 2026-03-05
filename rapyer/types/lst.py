@@ -1,17 +1,17 @@
 import json
 import logging
-from typing import TypeVar, TYPE_CHECKING, get_origin
+from typing import TYPE_CHECKING, TypeVar, get_origin
 
 from pydantic_core import core_schema
-from pydantic_core.core_schema import ValidationInfo, SerializationInfo
+from pydantic_core.core_schema import SerializationInfo, ValidationInfo
 from typing_extensions import TypeAlias
 
-from rapyer.scripts import run_sha, REMOVE_RANGE_SCRIPT_NAME
+from rapyer.scripts import REMOVE_RANGE_SCRIPT_NAME, run_sha
 from rapyer.types.base import (
-    GenericRedisType,
-    RedisType,
     REDIS_DUMP_FLAG_NAME,
     SKIP_SENTINEL,
+    GenericRedisType,
+    RedisType,
     marks_redis_updated,
 )
 

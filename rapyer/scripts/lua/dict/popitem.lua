@@ -26,4 +26,4 @@ redis.call('JSON.DEL', key, path .. '.' .. first_key)
 
 local extracted
 --[[DICT_EXTRACT_POPITEM]]
-return {first_key, extracted}
+return { first_key, extracted }

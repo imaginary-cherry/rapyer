@@ -1,5 +1,6 @@
 import pytest
 
+from rapyer.types.string import RedisStr
 from tests.models.simple_types import StrModel
 
 
@@ -52,8 +53,6 @@ async def test_redis_str_inheritance_sanity():
     model = StrModel(name="hello")
 
     # Assert
-    from rapyer.types.string import RedisStr
-
     assert isinstance(model.name, RedisStr)
     assert isinstance(model.name, str)
     assert model.name == "hello"

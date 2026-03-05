@@ -1,13 +1,13 @@
-from typing import TypeVar, Generic, get_args, Any, TypeAlias, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Generic, TypeAlias, TypeVar, get_args
 
 from pydantic_core import core_schema
 
-from rapyer.scripts import arun_sha, DICT_POP_SCRIPT_NAME, DICT_POPITEM_SCRIPT_NAME
+from rapyer.scripts import DICT_POP_SCRIPT_NAME, DICT_POPITEM_SCRIPT_NAME, arun_sha
 from rapyer.types.base import (
-    GenericRedisType,
-    RedisType,
     REDIS_DUMP_FLAG_NAME,
     SKIP_SENTINEL,
+    GenericRedisType,
+    RedisType,
 )
 from rapyer.utils.redis import update_keys_in_pipeline
 

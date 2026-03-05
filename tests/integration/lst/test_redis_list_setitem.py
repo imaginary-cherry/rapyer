@@ -1,13 +1,16 @@
 import pytest
 
 from rapyer import AtomicRedisModel
+from rapyer.types.dct import RedisDict
+from rapyer.types.integer import RedisInt
+from rapyer.types.string import RedisStr
 from tests.models.collection_types import (
+    BaseModelListModel,
+    DictListModel,
     IntListModel,
     StrListModel,
-    DictListModel,
-    BaseModelListModel,
 )
-from tests.models.common import Product, NestedConfig, UserProfile
+from tests.models.common import NestedConfig, Product, UserProfile
 
 
 @pytest.fixture
@@ -81,8 +84,6 @@ async def test_redis_list_setitem_int_type_checking_sanity(int_list_model_with_i
     model.items[2] = 42
 
     # Assert
-    from rapyer.types.integer import RedisInt
-
     assert isinstance(model.items[2], RedisInt)
 
 
@@ -96,8 +97,6 @@ async def test_redis_list_setitem_str_type_checking_sanity(str_list_model_with_i
     model.items[2] = "test_string"
 
     # Assert
-    from rapyer.types.string import RedisStr
-
     assert isinstance(model.items[2], RedisStr)
 
 
@@ -111,8 +110,6 @@ async def test_redis_list_setitem_dict_type_checking_sanity(dict_list_model_with
     model.items[2] = {"key": "value"}
 
     # Assert
-    from rapyer.types.dct import RedisDict
-
     assert isinstance(model.items[2], RedisDict)
 
 

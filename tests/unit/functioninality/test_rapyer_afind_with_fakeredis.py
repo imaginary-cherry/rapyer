@@ -1,7 +1,7 @@
 import pytest
 
 import rapyer
-from tests.models.simple_types import StrModel, IntModel
+from tests.models.simple_types import IntModel, StrModel
 
 
 @pytest.mark.asyncio

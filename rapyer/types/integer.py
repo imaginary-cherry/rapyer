@@ -1,13 +1,13 @@
-from typing import TypeAlias, TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeAlias
 
 from redis.commands.search.field import NumericField
 
 from rapyer.scripts import (
-    run_sha,
-    NUM_MUL_SCRIPT_NAME,
     NUM_FLOORDIV_SCRIPT_NAME,
     NUM_MOD_SCRIPT_NAME,
+    NUM_MUL_SCRIPT_NAME,
     NUM_POW_SCRIPT_NAME,
+    run_sha,
 )
 from rapyer.types.base import RedisType, marks_redis_updated
 

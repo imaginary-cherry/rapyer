@@ -1,4 +1,4 @@
-from typing import get_origin, ClassVar, Any
+from typing import Any, ClassVar, get_origin
 
 from pydantic import BaseModel, TypeAdapter
 from pydantic.fields import FieldInfo

@@ -1,12 +1,12 @@
 import pytest
 
 from tests.models.collection_types import (
-    SimpleListModel,
-    SimpleDictModel,
     ComprehensiveTestModel,
     DictListModel,
+    SimpleDictModel,
+    SimpleListModel,
 )
-from tests.models.complex_types import OuterModel, ComplexNestedModel, NestedDictModel
+from tests.models.complex_types import ComplexNestedModel, NestedDictModel, OuterModel
 from tests.models.simple_types import IntModel
 
 

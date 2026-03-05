@@ -2,9 +2,9 @@ import pytest
 
 from rapyer.types import RedisStr
 from tests.models.complex_types import (
-    OuterModelWithRedisNested,
     ContainerModel,
     InnerRedisModel,
+    OuterModelWithRedisNested,
 )
 from tests.models.inheritance_types import AdminUserModel
 from tests.models.pickle_types import ModelWithUnserializableFields

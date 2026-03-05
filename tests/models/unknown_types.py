@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Any, ClassVar
 
-from pydantic import GetCoreSchemaHandler, BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, GetCoreSchemaHandler
 from pydantic_core import core_schema
 
 from rapyer.base import AtomicRedisModel

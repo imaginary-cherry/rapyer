@@ -1,12 +1,12 @@
 import pytest
 import pytest_asyncio
 
-from rapyer import init_rapyer, AtomicRedisModel
+from rapyer import AtomicRedisModel, init_rapyer
 from tests.models.index_types import (
-    IndexTestModel,
-    UserIndexModel,
-    PersonModel,
     AddressModel,
+    IndexTestModel,
+    PersonModel,
+    UserIndexModel,
 )
 from tests.models.simple_types import StrModel
 
