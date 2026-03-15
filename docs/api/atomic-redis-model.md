@@ -153,14 +153,32 @@ user = await User.aget("User:abc-123")
 ```
 
 #### `adelete_by_key(key)`
-**Type:** `async` class method  
-**Parameters:** 
-- `key` (str): The Redis key to delete  
-**Returns:** `bool`  
+**Type:** `async` class method
+**Parameters:**
+- `key` (str): The Redis key to delete
+**Returns:** `bool`
 **Description:** Deletes a model from Redis by its key without needing to load it first.
 
 ```python
 success = await User.adelete_by_key("User:abc-123")
+```
+
+#### `aexists(key)`
+**Type:** `async` class method
+**Parameters:**
+- `key` (str): The Redis key to check
+**Returns:** `bool`
+**Description:** Checks whether a key exists in Redis. If the model uses a `Key[]` annotation and the provided key has no `:` separator, the class key prefix is automatically prepended.
+
+```python
+# Check with full key
+exists = await User.aexists("User:abc-123")
+
+# With Key[] annotation, just the primary key value works too
+exists = await User.aexists("abc-123")
+
+if not exists:
+    print("User not found")
 ```
 
 #### `afind(*args, max_results=None)`
