@@ -221,14 +221,14 @@ if __name__ == "__main__":
 ## aexists()
 
 ```python
-async def aexists(redis_key: str) -> bool
+async def aexists(redis_key: str | AtomicRedisModel) -> bool
 ```
 
 Checks whether a key exists in Redis, automatically determining the correct model class from the key prefix.
 
 ### Parameters
 
-- **redis_key** (`str`): The Redis key to check (e.g., `"UserModel:123"`)
+- **redis_key** (`str | AtomicRedisModel`): The Redis key to check (e.g., `"UserModel:123"`) or a model instance whose `.key` will be extracted automatically.
 
 ### Returns
 

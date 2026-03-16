@@ -166,7 +166,7 @@ success = await User.adelete_by_key("User:abc-123")
 #### `aexists(key)`
 **Type:** `async` class method
 **Parameters:**
-- `key` (str): The Redis key to check
+- `key` (str | AtomicRedisModel): The Redis key or a model instance to check. When a model instance is passed, its `.key` is extracted automatically.
 **Returns:** `bool`
 **Description:** Checks whether a key exists in Redis. If the model uses a `Key[]` annotation and the provided key has no `:` separator, the class key prefix is automatically prepended.
 
