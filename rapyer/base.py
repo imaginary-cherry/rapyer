@@ -532,7 +532,9 @@ class AtomicRedisModel(BaseModel):
         return await self.adelete_by_key(self.key)
 
     @classmethod
-    async def aexists(cls, key: str) -> bool:
+    async def aexists(cls, key: str | Self) -> bool:
+        if isinstance(key, AtomicRedisModel):
+            key = key.key
         if cls._key_field_name and ":" not in key:
             key = f"{cls.class_key_initials()}:{key}"
         client = _context_pipe.get() or cls.Meta.redis
@@ -753,7 +755,9 @@ async def afind_one(redis_key: str) -> Optional[AtomicRedisModel]:
         return None
 
 
-async def aexists(redis_key: str) -> bool:
+async def aexists(redis_key: str | AtomicRedisModel) -> bool:
+    if isinstance(redis_key, AtomicRedisModel):
+        redis_key = redis_key.key
     redis_model_mapping = {klass.__name__: klass for klass in REDIS_MODELS}
     class_name = redis_key.split(":")[0]
     klass = redis_model_mapping.get(class_name)
