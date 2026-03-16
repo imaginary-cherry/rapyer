@@ -77,7 +77,9 @@ async def test_rapyer_aexists__module_level_unknown_class(setup_fake_redis_for_m
 
 
 @pytest.mark.asyncio
-async def test_rapyer_aexists__module_level_with_model_instance(setup_fake_redis_for_models):
+async def test_rapyer_aexists__module_level_with_model_instance(
+    setup_fake_redis_for_models,
+):
     model = StrModel(name="module_instance_test", description="module level instance")
     await model.asave()
 

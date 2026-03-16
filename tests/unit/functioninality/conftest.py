@@ -1,8 +1,8 @@
 import pytest
 
 from rapyer import AtomicRedisModel
-from tests.models.index_types import AddressModel, IndexTestModel, PersonModel
 from tests.models.common import UserWithKeyModel
+from tests.models.index_types import AddressModel, IndexTestModel, PersonModel
 from tests.models.simple_types import IntModel, StrModel
 
 
