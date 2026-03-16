@@ -60,7 +60,27 @@ async def test_rapyer_aexists__module_level_existing_key():
 
 
 @pytest.mark.asyncio
+async def test_aexists__returns_true_with_model_instance():
+    model = StrModel(name="instance_test", description="test with instance")
+    await model.asave()
+
+    result = await StrModel.aexists(model)
+
+    assert result is True
+
+
+@pytest.mark.asyncio
 async def test_rapyer_aexists__module_level_unknown_class():
     result = await rapyer.aexists("UnknownClass:123")
 
     assert result is False
+
+
+@pytest.mark.asyncio
+async def test_rapyer_aexists__module_level_with_model_instance():
+    model = StrModel(name="module_instance_test", description="module level instance")
+    await model.asave()
+
+    result = await rapyer.aexists(model)
+
+    assert result is True
