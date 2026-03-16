@@ -388,10 +388,16 @@ class AtomicRedisModel(BaseModel):
             await self.Meta.redis.expire(self.key, ttl)
 
     @classmethod
+    def _resolve_key(cls, key: str | Self) -> str:
+        if isinstance(key, AtomicRedisModel):
+            return key.key
+        if ":" not in key:
+            return f"{cls.class_key_initials()}:{key}"
+        return key
+
+    @classmethod
     async def aget(cls, key: str) -> Self:
-        # In case we get the field of Key[]
-        if cls._key_field_name and ":" not in key:
-            key = f"{cls.class_key_initials()}:{key}"
+        key = cls._resolve_key(key)
         model_dump = await cls.Meta.redis.json().get(key, "$")  # type: ignore[misc]
         if not model_dump:
             raise KeyNotFound(f"{key} is missing in redis")
@@ -454,10 +460,7 @@ class AtomicRedisModel(BaseModel):
 
         if provided_keys:
             # Case 1: Extract by keys
-            targeted_keys = [
-                k if ":" in k else f"{cls.class_key_initials()}:{k}"
-                for k in provided_keys
-            ]
+            targeted_keys = [cls._resolve_key(k) for k in provided_keys]
             if max_results is not None:
                 targeted_keys = targeted_keys[:max_results]
         elif expressions:
@@ -533,10 +536,7 @@ class AtomicRedisModel(BaseModel):
 
     @classmethod
     async def aexists(cls, key: str | Self) -> bool:
-        if isinstance(key, AtomicRedisModel):
-            key = key.key
-        if cls._key_field_name and ":" not in key:
-            key = f"{cls.class_key_initials()}:{key}"
+        key = cls._resolve_key(key)
         client = _context_pipe.get() or cls.Meta.redis
         return await client.exists(key) == 1
 
@@ -591,10 +591,7 @@ class AtomicRedisModel(BaseModel):
 
         if provided_keys or model_instances:
             model_keys = [m.key for m in model_instances]
-            prefixed_keys = [
-                k if ":" in k else f"{cls.class_key_initials()}:{k}"
-                for k in provided_keys
-            ]
+            prefixed_keys = [cls._resolve_key(k) for k in provided_keys]
             targeted_keys = model_keys + prefixed_keys
             if targeted_keys:
                 batch_size = max_batch if should_batch else len(targeted_keys)
@@ -739,10 +736,14 @@ def categorize_delete_args(
     return keys, model_instances, expressions
 
 
-async def aget(redis_key: str) -> AtomicRedisModel:
+def _resolve_model_class(redis_key: str) -> type[AtomicRedisModel] | None:
     redis_model_mapping = {klass.__name__: klass for klass in REDIS_MODELS}
     class_name = redis_key.split(":")[0]
-    klass = redis_model_mapping.get(class_name)
+    return redis_model_mapping.get(class_name)
+
+
+async def aget(redis_key: str) -> AtomicRedisModel:
+    klass = _resolve_model_class(redis_key)
     if klass is None:
         raise KeyNotFound(f"{redis_key} is missing in redis")
     return await klass.aget(redis_key)
@@ -758,9 +759,7 @@ async def afind_one(redis_key: str) -> Optional[AtomicRedisModel]:
 async def aexists(redis_key: str | AtomicRedisModel) -> bool:
     if isinstance(redis_key, AtomicRedisModel):
         redis_key = redis_key.key
-    redis_model_mapping = {klass.__name__: klass for klass in REDIS_MODELS}
-    class_name = redis_key.split(":")[0]
-    klass = redis_model_mapping.get(class_name)
+    klass = _resolve_model_class(redis_key)
     if klass is None:
         return False
     return await klass.aexists(redis_key)
@@ -770,16 +769,15 @@ async def afind(*redis_keys: str, skip_missing: bool = False) -> list[AtomicRedi
     if not redis_keys:
         return []
 
-    redis_model_mapping = {klass.__name__: klass for klass in REDIS_MODELS}
-
     key_to_class: dict[str, type[AtomicRedisModel]] = {}
     for key in redis_keys:
-        class_name = key.split(":")[0]
-        if class_name not in redis_model_mapping:
+        klass = _resolve_model_class(key)
+        if klass is None:
+            class_name = key.split(":")[0]
             raise RapyerModelDoesntExistError(
                 class_name, f"Unknown model class: {class_name}"
             )
-        key_to_class[key] = redis_model_mapping[class_name]
+        key_to_class[key] = klass
 
     models_data = await AtomicRedisModel.Meta.redis.json().mget(  # type: ignore[misc]
         keys=redis_keys, path="$"
@@ -832,18 +830,17 @@ async def adelete_many(*args: RapyerKey | str | AtomicRedisModel) -> RapyerDelet
 
     string_keys, model_instances, _ = categorize_delete_args(args)
 
-    redis_model_mapping = {klass.__name__: klass for klass in REDIS_MODELS}
-
     key_to_class: dict[str, type[AtomicRedisModel]] = {}
     validated_keys = []
 
     for key in string_keys:
-        class_name = key.split(":")[0]
-        if class_name not in redis_model_mapping:
+        klass = _resolve_model_class(key)
+        if klass is None:
+            class_name = key.split(":")[0]
             raise RapyerModelDoesntExistError(
                 class_name, f"Unknown model class: {class_name}"
             )
-        key_to_class[key] = redis_model_mapping[class_name]
+        key_to_class[key] = klass
         validated_keys.append(key)
 
     for instance in model_instances:
