@@ -136,6 +136,58 @@ if __name__ == "__main__":
 
 The `rapyer.get()` function automatically determines the correct model class from the Redis key format and returns the appropriate model instance. This is particularly useful when you have multiple model types and want a unified way to retrieve them.
 
+## Checking if a Model Exists
+
+Use the `aexists()` class method to check whether a key exists in Redis without loading the full model:
+
+```python
+async def main():
+    user = User(name="Alice", age=25, email="alice@example.com")
+    await user.asave()
+
+    # Check if a key exists
+    exists = await User.aexists(user.key)
+    print(f"User exists: {exists}")  # True
+
+    # Check a non-existent key
+    exists = await User.aexists("User:nonexistent")
+    print(f"Missing user exists: {exists}")  # False
+
+    # With Key[] annotation, just the primary key value works
+    exists = await User.aexists("alice_pk_value")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Using rapyer.aexists() - Global Existence Check
+
+You can also check existence using the global `rapyer.aexists()` function, which works with any model type by examining the Redis key:
+
+```python
+import rapyer
+
+
+async def main():
+    user = User(name="Bob", age=30, email="bob@example.com")
+    await user.asave()
+
+    # Check using global function
+    exists = await rapyer.aexists(user.key)
+    print(f"Exists: {exists}")  # True
+
+    # Returns False for unknown model types (no error raised)
+    exists = await rapyer.aexists("UnknownModel:123")
+    print(f"Unknown: {exists}")  # False
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+This is useful when you need a lightweight check before performing more expensive operations like `aget()` or `aload()`.
+
 ## Finding All Model Instances
 
 Use the `afind()` class method to retrieve all instances of a specific model class from Redis:

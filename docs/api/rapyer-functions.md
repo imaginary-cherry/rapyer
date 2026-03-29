@@ -218,6 +218,81 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+## aexists()
+
+```python
+async def aexists(redis_key: str | AtomicRedisModel) -> bool
+```
+
+Checks whether a key exists in Redis, automatically determining the correct model class from the key prefix.
+
+### Parameters
+
+- **redis_key** (`str | AtomicRedisModel`): The Redis key to check (e.g., `"UserModel:123"`) or a model instance whose `.key` will be extracted automatically.
+
+### Returns
+
+- **bool**: `True` if the key exists in Redis, `False` otherwise. Also returns `False` if the key prefix doesn't match any registered model class.
+
+### Description
+
+The `aexists()` function provides a global way to check if a key exists in Redis without needing to know its specific model class. It works by:
+
+1. Extracting the class name from the Redis key format (`ClassName:instance_id`)
+2. Looking up the appropriate model class from the registered Redis models
+3. Calling the class-specific `aexists()` method to check existence
+
+Unlike `aget()`, this function never raises an error — it simply returns `False` for missing keys or unknown model types.
+
+### Example
+
+```python
+import asyncio
+import rapyer
+from rapyer import AtomicRedisModel
+
+
+class User(AtomicRedisModel):
+    name: str
+    age: int
+    email: str
+
+
+class Product(AtomicRedisModel):
+    name: str
+    price: float
+
+
+async def main():
+    user = User(name="Alice", age=30, email="alice@example.com")
+    await user.asave()
+
+    # Check existence using global function
+    exists = await rapyer.aexists(user.key)
+    print(f"User exists: {exists}")  # True
+
+    # Returns False for missing keys
+    exists = await rapyer.aexists("User:nonexistent")
+    print(f"Missing user exists: {exists}")  # False
+
+    # Returns False for unknown model types
+    exists = await rapyer.aexists("UnknownModel:123")
+    print(f"Unknown model exists: {exists}")  # False
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Comparison with aget()
+
+| Scenario | `rapyer.aexists()` | `rapyer.aget()` |
+|----------|-------------------|-----------------|
+| Key exists | Returns `True` | Returns model instance |
+| Key missing | Returns `False` | Raises `KeyNotFound` |
+| Unknown model class | Returns `False` | Raises `KeyNotFound` |
+| Use case | Lightweight existence check | Full model retrieval |
+
 ## apipeline()
 
 ```python

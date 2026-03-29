@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rapyer"
-version = "1.2.5"
+version = "1.2.6"
 description = "Pydantic models with Redis as the backend"
 authors = [{name = "YedidyaHKfir", email = "yedidyakfir@gmail.com"}]
 readme = "README.md"
@@ -73,7 +73,7 @@ include = ["rapyer/**/*.lua"]
 
 
 [dependency-groups]
-dev = ["black>=25.9.0", "mypy>=1.0.0", "ruff>=0.9.0"]
+dev = ["black>=26.3.1", "mypy>=1.0.0", "ruff>=0.9.0"]
 benchmark = ["pytest>=8.4.2", "pytest-benchmark>=5.2.3", "pytest-codspeed>=4.2.0"]
 
 [tool.ruff]

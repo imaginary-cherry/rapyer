@@ -1,6 +1,7 @@
 import pytest
 
 from rapyer import AtomicRedisModel
+from tests.models.common import UserWithKeyModel
 from tests.models.index_types import AddressModel, IndexTestModel, PersonModel
 from tests.models.simple_types import IntModel, StrModel
 
@@ -14,6 +15,7 @@ def setup_fake_redis_for_models(fake_redis_client):
         IndexTestModel,
         PersonModel,
         AddressModel,
+        UserWithKeyModel,
         AtomicRedisModel,
     ]
     for model in models:

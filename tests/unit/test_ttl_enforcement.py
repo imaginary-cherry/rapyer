@@ -16,6 +16,8 @@ EXCLUDED_METHODS = [
     # Methods that create NEW keys (get their own TTL via asave)
     AtomicRedisModel.aduplicate,
     AtomicRedisModel.aduplicate_many,
+    # Existence check - no data access, no TTL refresh needed
+    AtomicRedisModel.aexists,
     # Delegating methods (call other methods that handle TTL)
     AtomicRedisModel.afind_keys,
     AtomicRedisModel.acreate_index,
