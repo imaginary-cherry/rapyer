@@ -51,6 +51,7 @@ nav:
     - Redis Serialization: documentation/redis-serialization.md
     - Redis Types: documentation/redis-types.md
     - Special Fields:
+      - documentation/special-fields/index.md
       - Priority Queue: documentation/special-fields/priority-queue.md
     - Atomic Actions: documentation/atomic-actions.md
     - Key adjustment: documentation/setting-key-field.md
@@ -59,6 +60,7 @@ nav:
   - API Reference:
     - AtomicRedisModel: api/atomic-redis-model.md
     - Redis Types: api/redis-types.md
+    - PriorityQueue: api/priority-queue.md
     - Rapyer: api/rapyer-functions.md
   - Roadmap: roadmap.md
   - Changelog: changelog.md
