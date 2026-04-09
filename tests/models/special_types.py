@@ -1,27 +1,29 @@
-from typing import Generic, Optional, TypeVar
+from typing import ClassVar, Generic, Optional, TypeVar
 
 from pydantic import Field
 
-from rapyer.base import AtomicRedisModel
+from rapyer.base import AtomicRedisModel, RedisConfig
 from rapyer.types.priority_queue import RedisPriorityQueue
+from tests.models.simple_types import TTL_TEST_SECONDS
 
 T = TypeVar("T")
 
 
-class PriorityQueueModel(AtomicRedisModel):
+class PriorityQueueModelBase(AtomicRedisModel, Generic[T]):
+    tasks: RedisPriorityQueue[T] = Field(default_factory=RedisPriorityQueue)
+
+
+class PriorityQueueModel(PriorityQueueModelBase[str]):
     name: str = "default"
-    tasks: RedisPriorityQueue[str] = Field(default_factory=RedisPriorityQueue)
 
 
-class PriorityQueueIntModel(AtomicRedisModel):
+class PriorityQueueIntModel(PriorityQueueModelBase[int]):
     label: str = "test"
-    queue: RedisPriorityQueue[int] = Field(default_factory=RedisPriorityQueue)
 
 
-class MixedSpecialModel(AtomicRedisModel):
+class MixedSpecialModel(PriorityQueueModelBase[str]):
     name: str = "mixed"
     count: int = 0
-    tasks: RedisPriorityQueue[str] = Field(default_factory=RedisPriorityQueue)
 
 
 class OptionalPriorityQueueModel(AtomicRedisModel):
@@ -32,3 +34,15 @@ class OptionalPriorityQueueModel(AtomicRedisModel):
 class GenericPriorityQueueModel(AtomicRedisModel, Generic[T]):
     name: str = "default"
     tasks: RedisPriorityQueue[T] = Field(default_factory=RedisPriorityQueue)
+
+
+class PriorityQueueTTLModel(PriorityQueueModelBase[str]):
+    name: str = "default"
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=TTL_TEST_SECONDS)
+
+
+class PriorityQueueTTLNoRefreshModel(PriorityQueueModelBase[str]):
+    name: str = "default"
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=TTL_TEST_SECONDS, refresh_ttl=False)
