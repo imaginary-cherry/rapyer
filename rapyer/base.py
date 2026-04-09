@@ -35,6 +35,7 @@ from rapyer.errors import (
     UnsupportedArgumentTypeError,
     UnsupportedArgumentValueError,
     UnsupportedIndexedFieldError,
+    UpdateAtomicModelError,
 )
 from rapyer.fields.expression import AtomicField, Expression, ExpressionField
 from rapyer.fields.index import IndexAnnotation
@@ -395,6 +396,15 @@ class AtomicRedisModel(BaseModel):
             setattr(self, field_name, value)
 
     async def aupdate(self, **kwargs):
+        # Special fields (e.g. RedisPriorityQueue) manage their own separate
+        # Redis storage and cannot be serialized as JSON path updates.
+        special_in_kwargs = self._special_field_names & set(kwargs.keys())
+        if special_in_kwargs:
+            raise UpdateAtomicModelError(
+                f"Cannot update special fields via aupdate: {special_in_kwargs}. "
+                f"Special fields manage their own Redis storage and cannot be "
+                f"serialized as JSON path updates."
+            )
         self.update(**kwargs)
 
         # Only serialize the updated fields using the include parameters

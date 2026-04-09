@@ -1,12 +1,13 @@
 import pytest
 
+from rapyer.errors import UpdateAtomicModelError
 from rapyer.types.base import BaseRedisType
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.special import SpecialFieldType
 from tests.models.special_types import (
-    PriorityQueueModel,
-    PriorityQueueIntModel,
     MixedSpecialModel,
+    PriorityQueueIntModel,
+    PriorityQueueModel,
 )
 
 
@@ -90,3 +91,19 @@ def test_priority_queue_model_dump_serializes_none():
 
     assert dump["tasks"] is None
     assert dump["name"] == "test"
+
+
+@pytest.mark.asyncio
+async def test_aupdate_raises_error_for_special_field():
+    model = MixedSpecialModel(name="mixed", count=42)
+
+    with pytest.raises(UpdateAtomicModelError):
+        await model.aupdate(tasks=RedisPriorityQueue())
+
+
+@pytest.mark.asyncio
+async def test_aupdate_raises_error_for_special_field_among_regular_fields():
+    model = MixedSpecialModel(name="mixed", count=42)
+
+    with pytest.raises(UpdateAtomicModelError):
+        await model.aupdate(name="new_name", tasks=RedisPriorityQueue())
