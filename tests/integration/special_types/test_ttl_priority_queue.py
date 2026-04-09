@@ -3,7 +3,12 @@ import pytest_asyncio
 
 from rapyer.base import AtomicRedisModel
 from rapyer.types.priority_queue import PriorityQueueItem, RedisPriorityQueue
-from tests.conftest import special_field_ttl_test_for, ttl_no_refresh_test_for, ttl_test_for
+from tests.conftest import (
+    base_model_ttl_test_for,
+    special_field_ttl_test_for,
+    ttl_no_refresh_test_for,
+    ttl_test_for,
+)
 from tests.integration.conftest import REDUCED_TTL_SECONDS, SavedModelWithReducedTTL
 from tests.models.simple_types import TTL_TEST_SECONDS
 from tests.models.special_types import (
@@ -59,6 +64,7 @@ async def assert_ttl_not_refreshed(real_redis_client, initial_ttl, *keys):
 # --- PQ method TTL refresh tests ---
 
 
+@base_model_ttl_test_for(RedisPriorityQueue.apush)
 @ttl_test_for(RedisPriorityQueue.apush)
 @pytest.mark.asyncio
 async def test_ttl_refresh_on_pq_apush(
@@ -77,6 +83,7 @@ async def test_ttl_refresh_on_pq_apush(
     )
 
 
+@base_model_ttl_test_for(RedisPriorityQueue.apush_many)
 @ttl_test_for(RedisPriorityQueue.apush_many)
 @pytest.mark.asyncio
 async def test_ttl_refresh_on_pq_apush_many(
@@ -100,6 +107,7 @@ async def test_ttl_refresh_on_pq_apush_many(
     )
 
 
+@base_model_ttl_test_for(RedisPriorityQueue.apop)
 @ttl_test_for(RedisPriorityQueue.apop)
 @pytest.mark.asyncio
 async def test_ttl_refresh_on_pq_apop(
@@ -118,6 +126,7 @@ async def test_ttl_refresh_on_pq_apop(
     )
 
 
+@base_model_ttl_test_for(RedisPriorityQueue.aclear)
 @ttl_test_for(RedisPriorityQueue.aclear)
 @pytest.mark.asyncio
 async def test_ttl_refresh_on_pq_aclear(
@@ -134,6 +143,7 @@ async def test_ttl_refresh_on_pq_aclear(
     await assert_ttl_refreshed(real_redis_client, initial_ttl, model.key)
 
 
+@base_model_ttl_test_for(RedisPriorityQueue.aremove)
 @ttl_test_for(RedisPriorityQueue.aremove)
 @pytest.mark.asyncio
 async def test_ttl_refresh_on_pq_aremove(

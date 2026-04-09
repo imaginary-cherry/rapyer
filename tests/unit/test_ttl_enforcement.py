@@ -7,6 +7,7 @@ from rapyer.types.base import BaseRedisType, RedisType
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.special import SpecialFieldType
 from tests.conftest import (
+    BASE_MODEL_TTL_TESTED_METHODS,
     TTL_NO_REFRESH_TESTED_METHODS,
     TTL_TESTED_METHODS,
     get_async_methods,
@@ -69,6 +70,29 @@ def collect_all_methods():
         all_methods.update(get_async_methods(cls))
     all_methods.update(get_async_methods(AtomicRedisModel))
     return sorted([m for m in all_methods if m not in EXCLUDED_FROM_TTL_TEST])
+
+
+def collect_special_field_methods():
+    all_methods = set()
+    for cls in get_subclasses_recursive(SpecialFieldType):
+        all_methods.update(get_async_methods(cls))
+    return sorted([m for m in all_methods if m not in EXCLUDED_FROM_TTL_TEST])
+
+
+@pytest.mark.parametrize(["class_name", "method_name"], collect_special_field_methods())
+def test_special_field_method_has_base_model_ttl_test_coverage(class_name, method_name):
+    # Arrange
+    expected_entry = (class_name, method_name)
+
+    # Act
+    has_coverage = expected_entry in BASE_MODEL_TTL_TESTED_METHODS
+
+    # Assert
+    assert has_coverage, (
+        f"Method {class_name}.{method_name} needs a base model TTL test.\n"
+        f"Add @base_model_ttl_test_for({class_name}.{method_name}) to a test.\n"
+        f"Or add to EXCLUDED_FROM_TTL_TEST with justification."
+    )
 
 
 @pytest.mark.parametrize(["class_name", "method_name"], collect_all_methods())
