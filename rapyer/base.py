@@ -397,27 +397,20 @@ class AtomicRedisModel(BaseModel):
     async def aupdate(self, **kwargs):
         self.update(**kwargs)
 
-        # Filter out special fields from the JSON path update
-        regular_kwargs = {
-            k: v for k, v in kwargs.items()
-            if k not in self._special_field_names
+        # Only serialize the updated fields using the include parameters
+        serialized_fields = self.model_dump(
+            mode="json",
+            context={REDIS_DUMP_FLAG_NAME: True},
+            include=set(kwargs.keys()),
+        )
+        json_path_kwargs = {
+            f"{self.json_path}.{field_name}": serialized_fields[field_name]
+            for field_name in kwargs.keys()
         }
 
-        if regular_kwargs:
-            # Only serialize the updated fields using the include parameters
-            serialized_fields = self.model_dump(
-                mode="json",
-                context={REDIS_DUMP_FLAG_NAME: True},
-                include=set(regular_kwargs.keys()),
-            )
-            json_path_kwargs = {
-                f"{self.json_path}.{field_name}": serialized_fields[field_name]
-                for field_name in regular_kwargs.keys()
-            }
-
-            async with self.Meta.redis.pipeline(transaction=True) as pipe:
-                update_keys_in_pipeline(pipe, self.key, **json_path_kwargs)
-                await pipe.execute()
+        async with self.Meta.redis.pipeline(transaction=True) as pipe:
+            update_keys_in_pipeline(pipe, self.key, **json_path_kwargs)
+            await pipe.execute()
         await self.refresh_ttl_if_needed()
 
     async def aset_ttl(self, ttl: int) -> None:
