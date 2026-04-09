@@ -2,7 +2,7 @@
 
 <div style="background: linear-gradient(135deg, #7c4dff 0%, #b388ff 100%); color: white; padding: 16px 20px; border-radius: 8px; margin-bottom: 20px;">
   <strong style="font-size: 1.1em;">🧪 Beta Feature</strong><br>
-  <span style="opacity: 0.95;">RedisPriorityQueue is currently experimental. The API may change in future releases based on feedback.</span>
+  <span style="opacity: 0.95;">RedisPriorityQueue is currently experimental. The API may change in future releases based on feedback.<br>Only JSON-serializable value types are supported: <code>str</code>, <code>int</code>, <code>float</code>, and <code>bool</code>.</span>
 </div>
 
 `RedisPriorityQueue` is a priority queue field backed by a Redis Sorted Set. Items with **lower priority scores are popped first**.
