@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.6]
+
+### ✨ Added
+
+- **`aexists()` Method**: Added `aexists()` classmethod to `AtomicRedisModel` to check if a key exists in Redis, returning a boolean.
+  - Automatically prepends the class key prefix when using `Key[]` annotation and only a primary key value is provided
+  - Supports pipeline context
+  - Example: `exists = await User.aexists("user_123")`
+- **Global `aexists()` Function**: Added `rapyer.aexists()` function to check key existence without needing the specific model class.
+  - Resolves the model class from the key prefix automatically
+  - Returns `False` for unknown class prefixes
+  - Example: `exists = await rapyer.aexists("UserModel:user_123")`
+
+
 ## [1.2.5]
 
 ### ✨ Added
