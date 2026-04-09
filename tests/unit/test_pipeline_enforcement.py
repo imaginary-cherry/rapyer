@@ -15,22 +15,21 @@ import tests.integration.pipeline.test_redis_list_pipeline  # noqa: F401
 import tests.integration.pipeline.test_redis_str_pipeline  # noqa: F401
 from rapyer.types.base import RedisType
 from rapyer.types.byte import RedisBytes
+from rapyer.types.datetime import RedisDatetime, RedisDatetimeTimestamp
 from rapyer.types.dct import RedisDict
 from rapyer.types.float import RedisFloat
 from rapyer.types.integer import RedisInt
 from rapyer.types.lst import RedisList
 from rapyer.types.string import RedisStr
-from rapyer.types.datetime import RedisDatetime, RedisDatetimeTimestamp
 from tests.conftest import (
     MODEL_PIPELINE_TESTED_METHODS,
     STANDALONE_PIPELINE_TESTED_METHODS,
-    get_async_methods,
-    get_marks_redis_updated_methods,
-    get_sync_pipeline_methods,
+    get_all_type_methods,
     method_to_tuple,
 )
 
 PIPELINE_TYPES = [
+    RedisType,
     RedisInt,
     RedisFloat,
     RedisStr,
@@ -49,6 +48,25 @@ EXCLUDED_METHODS = [
     RedisDict.apopitem,
     # Read-only operation — no mutation to verify
     RedisType.aload,
+    # Internal/utility methods — not Redis operations
+    RedisType.clone,
+    RedisType.serialize_unknown,
+    RedisType.deserialize_unknown,
+    RedisInt.clone,
+    RedisFloat.clone,
+    RedisStr.clone,
+    RedisBytes.clone,
+    RedisDatetime.clone,
+    RedisList.clone,
+    RedisDict.clone,
+    RedisList.__init__,
+    RedisDict.__init__,
+    RedisList.create_new_value,
+    RedisList.create_new_values,
+    RedisList.iterate_items,
+    RedisList.sub_field_path,
+    RedisDict.iterate_items,
+    RedisDict.validate_dict,
 ]
 
 EXCLUDED_FROM_PIPELINE_TEST = {method_to_tuple(m) for m in EXCLUDED_METHODS}
@@ -57,16 +75,11 @@ EXCLUDED_FROM_PIPELINE_TEST = {method_to_tuple(m) for m in EXCLUDED_METHODS}
 def collect_all_pipeline_methods():
     all_methods = set()
     for cls in PIPELINE_TYPES:
-        all_methods.update(get_marks_redis_updated_methods(cls))
-        all_methods.update(get_sync_pipeline_methods(cls))
-        all_methods.update(get_async_methods(cls))
-    all_methods.update(get_async_methods(RedisType))
+        all_methods.update(get_all_type_methods(cls))
     return sorted(m for m in all_methods if m not in EXCLUDED_FROM_PIPELINE_TEST)
 
 
-@pytest.mark.parametrize(
-    ["class_name", "method_name"], collect_all_pipeline_methods()
-)
+@pytest.mark.parametrize(["class_name", "method_name"], collect_all_pipeline_methods())
 def test_method_has_model_pipeline_test_coverage(class_name, method_name):
     # Arrange
     expected_entry = (class_name, method_name)
@@ -82,9 +95,7 @@ def test_method_has_model_pipeline_test_coverage(class_name, method_name):
     )
 
 
-@pytest.mark.parametrize(
-    ["class_name", "method_name"], collect_all_pipeline_methods()
-)
+@pytest.mark.parametrize(["class_name", "method_name"], collect_all_pipeline_methods())
 def test_method_has_standalone_pipeline_test_coverage(class_name, method_name):
     # Arrange
     expected_entry = (class_name, method_name)
