@@ -18,6 +18,16 @@ from tests.models.special_types import GenericPriorityQueueModel
             [(30, 3.0), (10, 1.0), (20, 2.0)],
             [10, 20, 30],
         ],
+        [
+            GenericPriorityQueueModel[float],
+            [(3.14, 3.0), (1.1, 1.0), (2.72, 2.0)],
+            [1.1, 2.72, 3.14],
+        ],
+        [
+            GenericPriorityQueueModel[bool],
+            [(True, 2.0), (False, 1.0)],
+            [False, True],
+        ],
     ],
 )
 @pytest.mark.asyncio
