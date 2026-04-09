@@ -12,10 +12,11 @@ from tests.conftest import (
 )
 
 EXCLUDED_METHODS = [
-    # Class setup - detects special fields during subclass init, not a runtime action
-    AtomicRedisModel.__init_subclass__,
-    AtomicRedisModel.redis_dump,
-    AtomicRedisModel.redis_dump_json,
+    # Index operations - schema-level, not field-level
+    AtomicRedisModel.acreate_index,
+    AtomicRedisModel.adelete_index,
+    # Inner methods
+    AtomicRedisModel._search_keys_by_query,
 ]
 
 
@@ -30,16 +31,19 @@ EXCLUDED_TTL_METHODS = [
     AtomicRedisModel.aduplicate,
 ]
 
-EXCLUDED_FROM_SPECIAL_FIELD_TTL_TEST = {method_to_tuple(m) for m in EXCLUDED_TTL_METHODS}
+EXCLUDED_FROM_SPECIAL_FIELD_TTL_TEST = {
+    method_to_tuple(m) for m in EXCLUDED_TTL_METHODS
+}
 
 
 def collect_model_methods(excluded):
-    return sorted(
-        m for m in get_async_methods(AtomicRedisModel) if m not in excluded
-    )
+    return sorted(m for m in get_async_methods(AtomicRedisModel) if m not in excluded)
 
 
-@pytest.mark.parametrize(["class_name", "method_name"], collect_model_methods(EXCLUDED_FROM_SPECIAL_FIELD_TTL_TEST))
+@pytest.mark.parametrize(
+    ["class_name", "method_name"],
+    collect_model_methods(EXCLUDED_FROM_SPECIAL_FIELD_TTL_TEST),
+)
 def test_method_has_special_field_ttl_test_coverage(class_name, method_name):
     # Arrange
     expected_entry = (class_name, method_name)
@@ -55,7 +59,10 @@ def test_method_has_special_field_ttl_test_coverage(class_name, method_name):
     )
 
 
-@pytest.mark.parametrize(["class_name", "method_name"], collect_model_methods(EXCLUDED_FROM_SPECIAL_FIELD_TEST))
+@pytest.mark.parametrize(
+    ["class_name", "method_name"],
+    collect_model_methods(EXCLUDED_FROM_SPECIAL_FIELD_TEST),
+)
 def test_method_has_special_field_test_coverage(class_name, method_name):
     # Arrange
     expected_entry = (class_name, method_name)
