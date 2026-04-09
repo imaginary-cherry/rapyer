@@ -30,13 +30,15 @@ async def create_pq_model(real_redis_client, model: PriorityQueueModelBase):
 @pytest_asyncio.fixture
 async def saved_pq_ttl_model_with_reduced_ttl(real_redis_client):
     model = PriorityQueueTTLModel(name="pq_ttl_test")
-    yield create_pq_model(real_redis_client, model)
+    async for result in create_pq_model(real_redis_client, model):
+        yield result
 
 
 @pytest_asyncio.fixture
 async def saved_pq_no_refresh_model_with_reduced_ttl(real_redis_client):
     model = PriorityQueueTTLNoRefreshModel(name="pq_no_refresh_test")
-    yield create_pq_model(real_redis_client, model)
+    async for result in create_pq_model(real_redis_client, model):
+        yield result
 
 
 # --- PQ method TTL refresh tests ---
