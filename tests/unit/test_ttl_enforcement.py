@@ -3,9 +3,12 @@ from typing import Callable
 
 import pytest
 
+import tests.integration.special_types.test_ttl_priority_queue  # noqa: F401 - triggers decorator registration
 import tests.integration.test_ttl_refresh  # noqa: F401 - triggers decorator registration
 from rapyer.base import AtomicRedisModel
 from rapyer.types.base import BaseRedisType, RedisType
+from rapyer.types.priority_queue import RedisPriorityQueue
+from rapyer.types.special import SpecialFieldType
 from tests.conftest import TTL_NO_REFRESH_TESTED_METHODS, TTL_TESTED_METHODS
 
 EXCLUDED_METHODS = [
@@ -28,6 +31,16 @@ EXCLUDED_METHODS = [
     RedisType.refresh_ttl_if_needed,
     # Inner methods
     AtomicRedisModel._search_keys_by_query,
+    # PQ: read-only operations — no data mutation, no TTL refresh needed
+    RedisPriorityQueue.apeek,
+    RedisPriorityQueue.asize,
+    RedisPriorityQueue.aitems,
+    # PQ: save is a no-op, delete removes the key
+    RedisPriorityQueue.asave_special,
+    RedisPriorityQueue.adelete_special,
+    # SpecialFieldType: abstract methods — covered by concrete subclass exclusions
+    SpecialFieldType.asave_special,
+    SpecialFieldType.adelete_special,
 ]
 
 
