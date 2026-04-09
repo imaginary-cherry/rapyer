@@ -96,7 +96,9 @@ async def test_priority_queue_push_many_and_verify_order(
     model = model_class()
     await model.asave()
 
-    await model.tasks.apush_many(items_with_priorities)
+    await model.tasks.apush_many(
+        [PriorityQueueItem(value=v, priority=p) for v, p in items_with_priorities]
+    )
 
     expected_sorted = sorted(items_with_priorities, key=lambda x: x[1])
     items = await model.tasks.aitems()

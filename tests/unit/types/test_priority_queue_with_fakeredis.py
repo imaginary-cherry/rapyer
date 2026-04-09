@@ -153,11 +153,13 @@ async def test_pq_push_many(fake_redis):
     model = FakePriorityQueueModel(name="push_many")
     await model.asave()
 
-    await model.tasks.apush_many([
-        ("task_a", 3.0),
-        ("task_b", 1.0),
-        ("task_c", 2.0),
-    ])
+    await model.tasks.apush_many(
+        [
+            PriorityQueueItem(value="task_a", priority=3.0),
+            PriorityQueueItem(value="task_b", priority=1.0),
+            PriorityQueueItem(value="task_c", priority=2.0),
+        ]
+    )
 
     assert await model.tasks.asize() == 3
     items = await model.tasks.aitems()

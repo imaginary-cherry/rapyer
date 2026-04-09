@@ -52,8 +52,8 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         await self.client.zadd(self.special_key, {serialized: priority})
         await self.refresh_ttl_if_needed()
 
-    async def apush_many(self, items: list[tuple]) -> None:
-        mapping = {self._serialize_value(v): p for v, p in items}
+    async def apush_many(self, items: list[PriorityQueueItem[T]]):
+        mapping = {self._serialize_value(item.value): item.priority for item in items}
         await self.client.zadd(self.special_key, mapping)
         await self.refresh_ttl_if_needed()
 
