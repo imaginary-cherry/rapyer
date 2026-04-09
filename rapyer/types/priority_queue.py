@@ -32,7 +32,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
 
     def _deserialize_value(self, raw):
         if isinstance(raw, bytes):
-            raw = raw.decode("utf-8")
+            raw = raw.decode()
         parsed = json.loads(raw)
         if self._value_adapter:
             return self._value_adapter.validate_python(parsed)
@@ -41,22 +41,16 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
     # --- Queue operations ---
 
     async def apush(self, value, priority: float) -> None:
-        """Add an item with given priority. Lower priority = higher precedence."""
         serialized = self._serialize_value(value)
         await self.client.zadd(self.special_key, {serialized: priority})
         await self.refresh_ttl_if_needed()
 
     async def apush_many(self, items: list[tuple]) -> None:
-        """Add multiple (value, priority) pairs atomically."""
         mapping = {self._serialize_value(v): p for v, p in items}
         await self.client.zadd(self.special_key, mapping)
         await self.refresh_ttl_if_needed()
 
     async def apop(self):
-        """Remove and return the item with the lowest priority score.
-
-        Returns a ``(value, priority)`` tuple, or ``None`` if empty.
-        """
         result = await self.client.zpopmin(self.special_key, count=1)
         if not result:
             return None
@@ -64,8 +58,8 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         return self._deserialize_value(member), score
 
     async def apeek(self):
-        """Return the item with the lowest priority score without removing it.
-
+        """
+        Return the item with the lowest priority score without removing it.
         Returns a ``(value, priority)`` tuple, or ``None`` if empty.
         """
         result = await self.client.zrange(
