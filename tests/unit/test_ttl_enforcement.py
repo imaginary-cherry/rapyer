@@ -5,7 +5,7 @@ import pytest
 
 import tests.integration.test_ttl_refresh  # noqa: F401 - triggers decorator registration
 from rapyer.base import AtomicRedisModel
-from rapyer.types.base import RedisType
+from rapyer.types.base import BaseRedisType, RedisType
 from tests.conftest import TTL_NO_REFRESH_TESTED_METHODS, TTL_TESTED_METHODS
 
 EXCLUDED_METHODS = [
@@ -51,7 +51,7 @@ def get_subclasses_recursive(cls):
 
 
 def get_all_redis_subclasses():
-    return get_subclasses_recursive(RedisType)
+    return get_subclasses_recursive(BaseRedisType)
 
 
 def get_async_methods(cls):
