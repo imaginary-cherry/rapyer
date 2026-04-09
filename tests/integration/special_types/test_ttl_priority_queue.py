@@ -41,6 +41,20 @@ async def saved_pq_no_refresh_model_with_reduced_ttl(real_redis_client):
         yield result
 
 
+async def assert_ttl_refreshed(real_redis_client, *keys, initial_ttl):
+    for key in keys:
+        ttl = await real_redis_client.ttl(key)
+        assert ttl > initial_ttl
+        assert TTL_TEST_SECONDS - 2 < ttl <= TTL_TEST_SECONDS
+
+
+async def assert_ttl_not_refreshed(real_redis_client, *keys, initial_ttl):
+    for key in keys:
+        ttl = await real_redis_client.ttl(key)
+        assert ttl <= initial_ttl
+        assert 0 < ttl <= REDUCED_TTL_SECONDS
+
+
 # --- PQ method TTL refresh tests ---
 
 
@@ -57,9 +71,9 @@ async def test_ttl_refresh_on_pq_apush(
     await model.tasks.apush("new_item", 0.5)
 
     # Assert
-    final_pq_ttl = await real_redis_client.ttl(model.tasks.special_key)
-    assert final_pq_ttl > initial_ttl
-    assert TTL_TEST_SECONDS - 2 < final_pq_ttl <= TTL_TEST_SECONDS
+    await assert_ttl_refreshed(
+        real_redis_client, model.tasks.special_key, model.key, initial_ttl=initial_ttl
+    )
 
 
 @ttl_test_for(RedisPriorityQueue.apush_many)
@@ -80,9 +94,9 @@ async def test_ttl_refresh_on_pq_apush_many(
     )
 
     # Assert
-    final_pq_ttl = await real_redis_client.ttl(model.tasks.special_key)
-    assert final_pq_ttl > initial_ttl
-    assert TTL_TEST_SECONDS - 2 < final_pq_ttl <= TTL_TEST_SECONDS
+    await assert_ttl_refreshed(
+        real_redis_client, model.tasks.special_key, model.key, initial_ttl=initial_ttl
+    )
 
 
 @ttl_test_for(RedisPriorityQueue.apop)
@@ -98,9 +112,9 @@ async def test_ttl_refresh_on_pq_apop(
     await model.tasks.apop()
 
     # Assert
-    final_pq_ttl = await real_redis_client.ttl(model.tasks.special_key)
-    assert final_pq_ttl > initial_ttl
-    assert TTL_TEST_SECONDS - 2 < final_pq_ttl <= TTL_TEST_SECONDS
+    await assert_ttl_refreshed(
+        real_redis_client, model.tasks.special_key, model.key, initial_ttl=initial_ttl
+    )
 
 
 @ttl_test_for(RedisPriorityQueue.aclear)
@@ -115,10 +129,8 @@ async def test_ttl_refresh_on_pq_aclear(
     # Act
     await model.tasks.aclear()
 
-    # Assert
-    final_model_ttl = await real_redis_client.ttl(model.key)
-    assert final_model_ttl > initial_ttl
-    assert TTL_TEST_SECONDS - 2 < final_model_ttl <= TTL_TEST_SECONDS
+    # Assert — PQ key is deleted by aclear, so only model key TTL can be checked
+    await assert_ttl_refreshed(real_redis_client, model.key, initial_ttl=initial_ttl)
 
 
 @ttl_test_for(RedisPriorityQueue.aremove)
@@ -134,9 +146,9 @@ async def test_ttl_refresh_on_pq_aremove(
     await model.tasks.aremove("medium")
 
     # Assert
-    final_pq_ttl = await real_redis_client.ttl(model.tasks.special_key)
-    assert final_pq_ttl > initial_ttl
-    assert TTL_TEST_SECONDS - 2 < final_pq_ttl <= TTL_TEST_SECONDS
+    await assert_ttl_refreshed(
+        real_redis_client, model.tasks.special_key, model.key, initial_ttl=initial_ttl
+    )
 
 
 # --- PQ method TTL no-refresh tests ---
@@ -156,9 +168,9 @@ async def test_ttl_no_refresh_on_pq_apush(
     await model.tasks.apush("new_item", 0.5)
 
     # Assert
-    final_pq_ttl = await real_redis_client.ttl(model.tasks.special_key)
-    assert final_pq_ttl <= initial_ttl
-    assert 0 < final_pq_ttl <= REDUCED_TTL_SECONDS
+    await assert_ttl_not_refreshed(
+        real_redis_client, model.tasks.special_key, model.key, initial_ttl=initial_ttl
+    )
 
 
 @ttl_no_refresh_test_for(RedisPriorityQueue.apush_many)
@@ -180,9 +192,9 @@ async def test_ttl_no_refresh_on_pq_apush_many(
     )
 
     # Assert
-    final_pq_ttl = await real_redis_client.ttl(model.tasks.special_key)
-    assert final_pq_ttl <= initial_ttl
-    assert 0 < final_pq_ttl <= REDUCED_TTL_SECONDS
+    await assert_ttl_not_refreshed(
+        real_redis_client, model.tasks.special_key, model.key, initial_ttl=initial_ttl
+    )
 
 
 @ttl_no_refresh_test_for(RedisPriorityQueue.apop)
@@ -199,9 +211,9 @@ async def test_ttl_no_refresh_on_pq_apop(
     await model.tasks.apop()
 
     # Assert
-    final_pq_ttl = await real_redis_client.ttl(model.tasks.special_key)
-    assert final_pq_ttl <= initial_ttl
-    assert 0 < final_pq_ttl <= REDUCED_TTL_SECONDS
+    await assert_ttl_not_refreshed(
+        real_redis_client, model.tasks.special_key, model.key, initial_ttl=initial_ttl
+    )
 
 
 @ttl_no_refresh_test_for(RedisPriorityQueue.aclear)
@@ -217,10 +229,10 @@ async def test_ttl_no_refresh_on_pq_aclear(
     # Act
     await model.tasks.aclear()
 
-    # Assert
-    final_model_ttl = await real_redis_client.ttl(model.key)
-    assert final_model_ttl <= initial_ttl
-    assert 0 < final_model_ttl <= REDUCED_TTL_SECONDS
+    # Assert — PQ key is deleted by aclear, so only model key TTL can be checked
+    await assert_ttl_not_refreshed(
+        real_redis_client, model.key, initial_ttl=initial_ttl
+    )
 
 
 @ttl_no_refresh_test_for(RedisPriorityQueue.aremove)
@@ -237,9 +249,9 @@ async def test_ttl_no_refresh_on_pq_aremove(
     await model.tasks.aremove("medium")
 
     # Assert
-    final_pq_ttl = await real_redis_client.ttl(model.tasks.special_key)
-    assert final_pq_ttl <= initial_ttl
-    assert 0 < final_pq_ttl <= REDUCED_TTL_SECONDS
+    await assert_ttl_not_refreshed(
+        real_redis_client, model.tasks.special_key, model.key, initial_ttl=initial_ttl
+    )
 
 
 # --- Base model action PQ key TTL tests ---
@@ -258,9 +270,9 @@ async def test_ttl_refresh_pq_key_on_asave(
     await model.asave()
 
     # Assert
-    final_pq_ttl = await real_redis_client.ttl(model.tasks.special_key)
-    assert final_pq_ttl > initial_ttl
-    assert TTL_TEST_SECONDS - 2 < final_pq_ttl <= TTL_TEST_SECONDS
+    await assert_ttl_refreshed(
+        real_redis_client, model.tasks.special_key, model.key, initial_ttl=initial_ttl
+    )
 
 
 @pytest.mark.asyncio
@@ -275,9 +287,9 @@ async def test_ttl_refresh_pq_key_on_aload(
     await model.aload()
 
     # Assert
-    final_pq_ttl = await real_redis_client.ttl(model.tasks.special_key)
-    assert final_pq_ttl > initial_ttl
-    assert TTL_TEST_SECONDS - 2 < final_pq_ttl <= TTL_TEST_SECONDS
+    await assert_ttl_refreshed(
+        real_redis_client, model.tasks.special_key, model.key, initial_ttl=initial_ttl
+    )
 
 
 @pytest.mark.asyncio
@@ -292,9 +304,9 @@ async def test_ttl_refresh_pq_key_on_aupdate(
     await model.aupdate(name="updated")
 
     # Assert
-    final_pq_ttl = await real_redis_client.ttl(model.tasks.special_key)
-    assert final_pq_ttl > initial_ttl
-    assert TTL_TEST_SECONDS - 2 < final_pq_ttl <= TTL_TEST_SECONDS
+    await assert_ttl_refreshed(
+        real_redis_client, model.tasks.special_key, model.key, initial_ttl=initial_ttl
+    )
 
 
 @pytest.mark.asyncio
@@ -309,28 +321,26 @@ async def test_ttl_refresh_pq_key_on_aget(
     await PriorityQueueTTLModel.aget(model.key)
 
     # Assert
-    final_pq_ttl = await real_redis_client.ttl(model.tasks.special_key)
-    assert final_pq_ttl > initial_ttl
-    assert TTL_TEST_SECONDS - 2 < final_pq_ttl <= TTL_TEST_SECONDS
+    await assert_ttl_refreshed(
+        real_redis_client, model.tasks.special_key, model.key, initial_ttl=initial_ttl
+    )
 
 
 @pytest.mark.asyncio
-async def test_ttl_refresh_pq_key_on_afind(real_redis_client):
+async def test_ttl_refresh_pq_key_on_afind(
+    real_redis_client, saved_pq_ttl_model_with_reduced_ttl: SavedModelWithReducedTTL
+):
     # Arrange
-    model = PriorityQueueTTLModel(name="find_ttl_test")
-    await model.asave()
-    await model.tasks.apush("item", 1.0)
-    await real_redis_client.expire(model.key, REDUCED_TTL_SECONDS)
-    await real_redis_client.expire(model.tasks.special_key, REDUCED_TTL_SECONDS)
-    initial_ttl = await real_redis_client.ttl(model.tasks.special_key)
+    model = saved_pq_ttl_model_with_reduced_ttl.model
+    initial_ttl = saved_pq_ttl_model_with_reduced_ttl.initial_ttl
 
     # Act
     await PriorityQueueTTLModel.afind()
 
     # Assert
-    final_pq_ttl = await real_redis_client.ttl(model.tasks.special_key)
-    assert final_pq_ttl > initial_ttl
-    assert TTL_TEST_SECONDS - 2 < final_pq_ttl <= TTL_TEST_SECONDS
+    await assert_ttl_refreshed(
+        real_redis_client, model.tasks.special_key, model.key, initial_ttl=initial_ttl
+    )
 
 
 @pytest.mark.asyncio
@@ -342,5 +352,6 @@ async def test_ttl_pq_key_on_ainsert(real_redis_client):
     await PriorityQueueTTLModel.ainsert(model)
 
     # Assert
-    model_ttl = await real_redis_client.ttl(model.key)
-    assert TTL_TEST_SECONDS - 2 < model_ttl <= TTL_TEST_SECONDS
+    await assert_ttl_refreshed(
+        real_redis_client, model.key, initial_ttl=REDUCED_TTL_SECONDS
+    )
