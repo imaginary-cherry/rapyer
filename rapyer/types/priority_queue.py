@@ -1,4 +1,5 @@
 import json
+from dataclasses import dataclass
 from typing import Any, Generic, TypeVar, get_args
 
 from pydantic import GetCoreSchemaHandler, TypeAdapter
@@ -7,6 +8,12 @@ from pydantic_core import core_schema
 from rapyer.types.special import SpecialFieldType
 
 T = TypeVar("T")
+
+
+@dataclass
+class PriorityQueueItem(Generic[T]):
+    value: T
+    priority: float
 
 
 class RedisPriorityQueue(SpecialFieldType, Generic[T]):
@@ -75,12 +82,15 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         """Remove all items from the queue."""
         await self.client.delete(self.special_key)
 
-    async def aitems(self) -> list[tuple]:
+    async def aitems(self) -> list[PriorityQueueItem]:
         """Return all items sorted by priority (ascending)."""
         result = await self.client.zrange(
             self.special_key, 0, -1, withscores=True
         )
-        return [(self._deserialize_value(m), s) for m, s in result]
+        return [
+            PriorityQueueItem(value=self._deserialize_value(m), priority=s)
+            for m, s in result
+        ]
 
     async def aremove(self, value) -> bool:
         """Remove a specific value from the queue. Returns True if removed."""

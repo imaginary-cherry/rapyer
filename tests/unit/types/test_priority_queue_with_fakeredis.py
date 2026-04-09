@@ -7,7 +7,7 @@ from pydantic import Field
 
 from rapyer.base import AtomicRedisModel
 from rapyer.config import RedisConfig
-from rapyer.types.priority_queue import RedisPriorityQueue
+from rapyer.types.priority_queue import PriorityQueueItem, RedisPriorityQueue
 from rapyer.types.special import SpecialFieldType
 
 
@@ -116,9 +116,9 @@ async def test_pq_items(fake_redis):
 
     items = await model.tasks.aitems()
     assert len(items) == 3
-    assert items[0] == "a"
-    assert items[1] == "b"
-    assert items[2] == "c"
+    assert items[0] == PriorityQueueItem(value="a", priority=1.0)
+    assert items[1] == PriorityQueueItem(value="b", priority=2.0)
+    assert items[2] == PriorityQueueItem(value="c", priority=3.0)
 
 
 @pytest.mark.asyncio
@@ -135,7 +135,7 @@ async def test_pq_remove(fake_redis):
 
     items = await model.tasks.aitems()
     assert len(items) == 2
-    assert "b" not in items
+    assert all(item.value != "b" for item in items)
 
 
 @pytest.mark.asyncio
@@ -161,9 +161,9 @@ async def test_pq_push_many(fake_redis):
 
     assert await model.tasks.asize() == 3
     items = await model.tasks.aitems()
-    assert items[0] == "task_b"
-    assert items[1] == "task_c"
-    assert items[2] == "task_a"
+    assert items[0] == PriorityQueueItem(value="task_b", priority=1.0)
+    assert items[1] == PriorityQueueItem(value="task_c", priority=2.0)
+    assert items[2] == PriorityQueueItem(value="task_a", priority=3.0)
 
 
 @pytest.mark.asyncio
@@ -228,8 +228,8 @@ async def test_pq_survives_model_reload(fake_redis):
     assert await loaded.tasks.asize() == 2
 
     items = await loaded.tasks.aitems()
-    assert items[0] == "item1"
-    assert items[1] == "item2"
+    assert items[0] == PriorityQueueItem(value="item1", priority=1.0)
+    assert items[1] == PriorityQueueItem(value="item2", priority=2.0)
 
 
 @pytest.mark.asyncio
