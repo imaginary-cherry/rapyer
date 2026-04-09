@@ -78,7 +78,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         """Return the number of items in the queue."""
         return await self.client.zcard(self.special_key)
 
-    async def aclear(self) -> None:
+    async def aclear(self):
         """Remove all items from the queue."""
         await self.client.delete(self.special_key)
 
