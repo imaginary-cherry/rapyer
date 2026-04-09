@@ -109,6 +109,7 @@ async def test_ainsert_mixed_models_regular_fields_and_pq_accessible(real_redis_
 # --- aget ---
 
 
+@special_field_test_for(AtomicRedisModel.aget)
 @pytest.mark.asyncio
 async def test_aget_model_with_pq_data_pq_functional_after_load(saved_pq_model):
     # Arrange
@@ -141,6 +142,7 @@ async def test_aget_mixed_model_regular_fields_and_pq_accessible(saved_mixed_mod
 # --- aload ---
 
 
+@special_field_test_for(AtomicRedisModel.aload)
 @pytest.mark.asyncio
 async def test_aload_model_with_pq_reloaded_has_functional_pq(saved_pq_model):
     # Arrange
@@ -173,6 +175,7 @@ async def test_aload_after_pq_modification_sees_current_state(saved_pq_model):
 # --- afind ---
 
 
+@special_field_test_for(AtomicRedisModel.afind)
 @pytest.mark.asyncio
 async def test_afind_all_models_with_pq_returned_with_functional_pq(real_redis_client):
     # Arrange
