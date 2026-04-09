@@ -62,10 +62,7 @@ async def test_pq_push_and_pop(fake_redis):
     await model.tasks.apush("task_c", 2.0)
 
     result = await model.tasks.apop()
-    assert result is not None
-    value, score = result
-    assert value == "task_b"
-    assert score == 1.0
+    assert result == "task_b"
 
 
 @pytest.mark.asyncio
@@ -77,10 +74,7 @@ async def test_pq_peek(fake_redis):
     await model.tasks.apush("low", 1.0)
 
     result = await model.tasks.apeek()
-    assert result is not None
-    value, score = result
-    assert value == "low"
-    assert score == 1.0
+    assert result == "low"
 
     # peek should not remove
     assert await model.tasks.asize() == 2
@@ -122,9 +116,9 @@ async def test_pq_items(fake_redis):
 
     items = await model.tasks.aitems()
     assert len(items) == 3
-    assert items[0] == ("a", 1.0)
-    assert items[1] == ("b", 2.0)
-    assert items[2] == ("c", 3.0)
+    assert items[0] == "a"
+    assert items[1] == "b"
+    assert items[2] == "c"
 
 
 @pytest.mark.asyncio
@@ -141,8 +135,7 @@ async def test_pq_remove(fake_redis):
 
     items = await model.tasks.aitems()
     assert len(items) == 2
-    values = [v for v, _ in items]
-    assert "b" not in values
+    assert "b" not in items
 
 
 @pytest.mark.asyncio
@@ -168,9 +161,9 @@ async def test_pq_push_many(fake_redis):
 
     assert await model.tasks.asize() == 3
     items = await model.tasks.aitems()
-    assert items[0] == ("task_b", 1.0)
-    assert items[1] == ("task_c", 2.0)
-    assert items[2] == ("task_a", 3.0)
+    assert items[0] == "task_b"
+    assert items[1] == "task_c"
+    assert items[2] == "task_a"
 
 
 @pytest.mark.asyncio
@@ -235,8 +228,8 @@ async def test_pq_survives_model_reload(fake_redis):
     assert await loaded.tasks.asize() == 2
 
     items = await loaded.tasks.aitems()
-    assert items[0] == ("item1", 1.0)
-    assert items[1] == ("item2", 2.0)
+    assert items[0] == "item1"
+    assert items[1] == "item2"
 
 
 @pytest.mark.asyncio
@@ -248,10 +241,7 @@ async def test_pq_int_values(fake_redis):
     await model.queue.apush(99, 2.0)
 
     result = await model.queue.apop()
-    assert result is not None
-    value, score = result
-    assert value == 42
-    assert score == 1.0
+    assert result == 42
 
 
 @pytest.mark.asyncio

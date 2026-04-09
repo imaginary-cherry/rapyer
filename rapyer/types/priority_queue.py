@@ -55,20 +55,17 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         if not result:
             return None
         member, score = result[0]
-        return self._deserialize_value(member), score
+        return self._deserialize_value(member)
 
     async def apeek(self):
-        """
-        Return the item with the lowest priority score without removing it.
-        Returns a ``(value, priority)`` tuple, or ``None`` if empty.
-        """
+        """Return the item with the lowest priority score without removing it."""
         result = await self.client.zrange(
             self.special_key, 0, 0, withscores=True
         )
         if not result:
             return None
         member, score = result[0]
-        return self._deserialize_value(member), score
+        return self._deserialize_value(member)
 
     async def asize(self) -> int:
         """Return the number of items in the queue."""

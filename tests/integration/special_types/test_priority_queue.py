@@ -29,10 +29,10 @@ async def test_priority_queue_save_push_verify_and_pop_order(real_redis_client):
     first = await model.tasks.apop()
 
     # Assert - check output of priority queue
-    assert first == ("high_priority", 1.0)
+    assert first == "high_priority"
 
     second = await model.tasks.apop()
-    assert second == ("medium_priority", 2.0)
+    assert second == "medium_priority"
 
     third = await model.tasks.apop()
-    assert third == ("low_priority", 3.0)
+    assert third == "low_priority"
