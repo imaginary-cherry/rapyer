@@ -1,5 +1,5 @@
 import json
-from typing import Any, TypeVar, Generic, get_args
+from typing import Any, Generic, TypeVar, get_args
 
 from pydantic import GetCoreSchemaHandler, TypeAdapter
 from pydantic_core import core_schema
@@ -10,16 +10,11 @@ T = TypeVar("T")
 
 
 class RedisPriorityQueue(SpecialFieldType, Generic[T]):
-    """Priority queue backed by a Redis Sorted Set. Pure Redis proxy — no local state.
+    """
+    Priority queue backed by a Redis Sorted Set. Pure Redis proxy — no local state.
 
     All operations go directly to Redis via ``self.client`` (pipeline-aware).
     Lower priority score = higher precedence.
-
-    Usage::
-
-        class MyModel(AtomicRedisModel):
-            name: str
-            tasks: RedisPriorityQueue[str] = Field(default_factory=RedisPriorityQueue)
     """
 
     original_type: type = type(None)
