@@ -101,6 +101,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
     # --- SpecialFieldType interface ---
 
     async def asave_special(self) -> None:
+        # NOTE - nothing to save
         pass
 
     async def adelete_special(self) -> None:
