@@ -79,6 +79,11 @@ from tests.models.simple_types import (
     UserModelWithTTL,
 )
 from tests.models.specialized import UserModel
+from tests.models.special_types import (
+    MixedSpecialModel,
+    PriorityQueueIntModel,
+    PriorityQueueModel,
+)
 from tests.models.unknown_types import (
     ModelWithIntEnumDefault,
     ModelWithStrEnumDefault,
@@ -171,4 +176,8 @@ TESTED_REDIS_MODELS = [
     RapyerKeyFieldModel,
     ListOfDictsRapyerKeyModel,
     DictOfListsRapyerKeyModel,
+    # Special types (priority queue)
+    PriorityQueueModel,
+    PriorityQueueIntModel,
+    MixedSpecialModel,
 ]
