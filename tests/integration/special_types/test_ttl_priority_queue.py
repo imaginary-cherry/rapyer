@@ -1,8 +1,9 @@
 import pytest
 import pytest_asyncio
 
+from rapyer.base import AtomicRedisModel
 from rapyer.types.priority_queue import PriorityQueueItem, RedisPriorityQueue
-from tests.conftest import ttl_no_refresh_test_for, ttl_test_for
+from tests.conftest import special_field_ttl_test_for, ttl_no_refresh_test_for, ttl_test_for
 from tests.integration.conftest import REDUCED_TTL_SECONDS, SavedModelWithReducedTTL
 from tests.models.simple_types import TTL_TEST_SECONDS
 from tests.models.special_types import (
@@ -255,6 +256,7 @@ async def test_ttl_no_refresh_on_pq_aremove(
 # --- Base model action PQ key TTL tests ---
 
 
+@special_field_ttl_test_for(AtomicRedisModel.asave)
 @pytest.mark.asyncio
 async def test_ttl_refresh_pq_key_on_asave(
     real_redis_client, saved_pq_ttl_model_with_reduced_ttl: SavedModelWithReducedTTL
@@ -273,6 +275,7 @@ async def test_ttl_refresh_pq_key_on_asave(
     )
 
 
+@special_field_ttl_test_for(AtomicRedisModel.aload)
 @pytest.mark.asyncio
 async def test_ttl_refresh_pq_key_on_aload(
     real_redis_client, saved_pq_ttl_model_with_reduced_ttl: SavedModelWithReducedTTL
@@ -290,6 +293,7 @@ async def test_ttl_refresh_pq_key_on_aload(
     )
 
 
+@special_field_ttl_test_for(AtomicRedisModel.aupdate)
 @pytest.mark.asyncio
 async def test_ttl_refresh_pq_key_on_aupdate(
     real_redis_client, saved_pq_ttl_model_with_reduced_ttl: SavedModelWithReducedTTL
@@ -307,6 +311,7 @@ async def test_ttl_refresh_pq_key_on_aupdate(
     )
 
 
+@special_field_ttl_test_for(AtomicRedisModel.aget)
 @pytest.mark.asyncio
 async def test_ttl_refresh_pq_key_on_aget(
     real_redis_client, saved_pq_ttl_model_with_reduced_ttl: SavedModelWithReducedTTL
@@ -324,6 +329,7 @@ async def test_ttl_refresh_pq_key_on_aget(
     )
 
 
+@special_field_ttl_test_for(AtomicRedisModel.afind)
 @pytest.mark.asyncio
 async def test_ttl_refresh_pq_key_on_afind(
     real_redis_client, saved_pq_ttl_model_with_reduced_ttl: SavedModelWithReducedTTL
@@ -341,6 +347,7 @@ async def test_ttl_refresh_pq_key_on_afind(
     )
 
 
+@special_field_ttl_test_for(AtomicRedisModel.ainsert)
 @pytest.mark.asyncio
 async def test_ttl_pq_key_on_ainsert(real_redis_client):
     # Arrange
