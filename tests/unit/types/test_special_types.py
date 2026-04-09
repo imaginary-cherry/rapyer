@@ -27,9 +27,9 @@ def test_priority_queue_model_creation_sanity():
 def test_priority_queue_int_model_creation_sanity():
     model = PriorityQueueIntModel(label="items")
 
-    assert isinstance(model.queue, SpecialFieldType)
-    assert model.queue.field_path == ".queue"
-    assert model.queue.special_key == f"{model.key}:queue"
+    assert isinstance(model.tasks, SpecialFieldType)
+    assert model.tasks.field_path == ".tasks"
+    assert model.tasks.special_key == f"{model.key}:tasks"
 
 
 def test_mixed_special_model_creation_sanity():
