@@ -82,6 +82,7 @@ from tests.models.specialized import UserModel
 from tests.models.special_types import (
     GenericPriorityQueueModel,
     MixedSpecialModel,
+    OptionalPriorityQueueModel,
     PriorityQueueIntModel,
     PriorityQueueModel,
 )
@@ -182,4 +183,5 @@ TESTED_REDIS_MODELS = [
     PriorityQueueIntModel,
     MixedSpecialModel,
     GenericPriorityQueueModel,
+    OptionalPriorityQueueModel,
 ]

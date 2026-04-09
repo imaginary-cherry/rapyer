@@ -3,8 +3,11 @@ import json
 import pytest
 import pytest_asyncio
 
-from rapyer.types.priority_queue import PriorityQueueItem
-from tests.models.special_types import GenericPriorityQueueModel
+from rapyer.types.priority_queue import PriorityQueueItem, RedisPriorityQueue
+from tests.models.special_types import (
+    GenericPriorityQueueModel,
+    OptionalPriorityQueueModel,
+)
 
 PQ_INIT_PARAMS = [
     [GenericPriorityQueueModel[str], [("gamma", 3.0), ("alpha", 1.0), ("beta", 2.0)]],
@@ -201,3 +204,17 @@ async def test_priority_queue_delete_special_clears_queue(
     await model.tasks.adelete_special()
 
     assert await real_redis_client.exists(special_key) == 0
+
+
+@pytest.mark.asyncio
+async def test_optional_priority_queue_set_after_init(real_redis_client):
+    model = OptionalPriorityQueueModel()
+    assert model.tasks is None
+
+    await model.asave()
+
+    model.tasks = RedisPriorityQueue()
+    await model.tasks.apush("hello", 1.0)
+
+    result = await model.tasks.apop()
+    assert result == "hello"

@@ -1,4 +1,4 @@
-from typing import Generic, TypeVar
+from typing import Generic, Optional, TypeVar
 
 from pydantic import Field
 
@@ -22,6 +22,11 @@ class MixedSpecialModel(AtomicRedisModel):
     name: str = "mixed"
     count: int = 0
     tasks: RedisPriorityQueue[str] = Field(default_factory=RedisPriorityQueue)
+
+
+class OptionalPriorityQueueModel(AtomicRedisModel):
+    name: str = "default"
+    tasks: Optional[RedisPriorityQueue[str]] = None
 
 
 class GenericPriorityQueueModel(AtomicRedisModel, Generic[T]):
