@@ -1,6 +1,3 @@
-import inspect
-from typing import Callable
-
 import pytest
 
 import tests.integration.special_types.test_ttl_priority_queue  # noqa: F401 - triggers decorator registration
@@ -9,7 +6,12 @@ from rapyer.base import AtomicRedisModel
 from rapyer.types.base import BaseRedisType, RedisType
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.special import SpecialFieldType
-from tests.conftest import TTL_NO_REFRESH_TESTED_METHODS, TTL_TESTED_METHODS
+from tests.conftest import (
+    TTL_NO_REFRESH_TESTED_METHODS,
+    TTL_TESTED_METHODS,
+    get_async_methods,
+    method_to_tuple,
+)
 
 EXCLUDED_METHODS = [
     # Delete operations - key/item is removed
@@ -44,12 +46,6 @@ EXCLUDED_METHODS = [
 ]
 
 
-def method_to_tuple(method: Callable) -> tuple[str, str]:
-    qualname = method.__qualname__
-    class_name, method_name = qualname.rsplit(".", 1)
-    return class_name, method_name
-
-
 EXCLUDED_FROM_TTL_TEST = {method_to_tuple(m) for m in EXCLUDED_METHODS}
 
 
@@ -65,17 +61,6 @@ def get_subclasses_recursive(cls):
 
 def get_all_redis_subclasses():
     return get_subclasses_recursive(BaseRedisType)
-
-
-def get_async_methods(cls):
-    methods = []
-    for name, method in inspect.getmembers(cls, predicate=inspect.iscoroutinefunction):
-        if name.startswith("__"):
-            continue
-        if method.__qualname__.split(".")[0] != cls.__name__:
-            continue
-        methods.append((cls.__name__, name))
-    return methods
 
 
 def collect_all_methods():

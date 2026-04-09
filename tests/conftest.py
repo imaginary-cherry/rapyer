@@ -1,3 +1,4 @@
+import inspect
 from typing import Callable
 
 TTL_TESTED_METHODS: set[tuple[str, str]] = set()
@@ -48,3 +49,20 @@ def special_field_ttl_test_for(method: Callable):
         return func
 
     return decorator
+
+
+def method_to_tuple(method: Callable) -> tuple[str, str]:
+    qualname = method.__qualname__
+    class_name, method_name = qualname.rsplit(".", 1)
+    return class_name, method_name
+
+
+def get_async_methods(cls):
+    methods = []
+    for name, method in inspect.getmembers(cls, predicate=inspect.iscoroutinefunction):
+        if name.startswith("__"):
+            continue
+        if method.__qualname__.split(".")[0] != cls.__name__:
+            continue
+        methods.append((cls.__name__, name))
+    return methods
