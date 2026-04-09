@@ -50,6 +50,8 @@ nav:
     - Initialization: documentation/initialization.md
     - Redis Serialization: documentation/redis-serialization.md
     - Redis Types: documentation/redis-types.md
+    - Special Fields:
+      - Priority Queue: documentation/special-fields/priority-queue.md
     - Atomic Actions: documentation/atomic-actions.md
     - Key adjustment: documentation/setting-key-field.md
     - Indexing Fields: documentation/indexing-fields.md
