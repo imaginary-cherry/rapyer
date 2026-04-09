@@ -47,7 +47,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
 
     # --- Queue operations ---
 
-    async def apush(self, value, priority: float) -> None:
+    async def apush(self, value: T, priority: float) -> None:
         serialized = self._serialize_value(value)
         await self.client.zadd(self.special_key, {serialized: priority})
         await self.refresh_ttl_if_needed()
