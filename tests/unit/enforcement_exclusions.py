@@ -147,6 +147,8 @@ PQ_READ_METHODS = _group_rapyer_actions(
 SPECIAL_FIELD_LIFECYCLE_METHODS = _group_rapyer_actions(
     SpecialFieldType.asave_special,
     SpecialFieldType.adelete_special,
+    SpecialFieldType.aduplicate_special,
     RedisPriorityQueue.asave_special,
     RedisPriorityQueue.adelete_special,
+    RedisPriorityQueue.aduplicate_special,
 )

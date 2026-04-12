@@ -293,7 +293,7 @@ async def test_aupdate_regular_and_pq_field_together_raises_error(saved_mixed_mo
 
 @special_field_test_for(AtomicRedisModel.aduplicate, RedisPriorityQueue)
 @pytest.mark.asyncio
-async def test_aduplicate_model_with_pq_duplicate_has_empty_pq(saved_pq_model):
+async def test_aduplicate_model_with_pq_duplicate_has_copied_pq(saved_pq_model):
     # Arrange
     model = saved_pq_model
 
@@ -304,7 +304,7 @@ async def test_aduplicate_model_with_pq_duplicate_has_empty_pq(saved_pq_model):
     assert duplicate.pk != model.pk
     assert duplicate.name == model.name
     assert isinstance(duplicate.tasks, RedisPriorityQueue)
-    assert await duplicate.tasks.asize() == 0
+    assert await duplicate.tasks.asize() == 3
     assert await model.tasks.asize() == 3
 
 
@@ -318,7 +318,7 @@ async def test_aduplicate_pq_operations_on_duplicate_independent(saved_pq_model)
     await duplicate.tasks.apush("new_task", 0.5)
 
     # Assert
-    assert await duplicate.tasks.asize() == 1
+    assert await duplicate.tasks.asize() == 4
     assert await model.tasks.asize() == 3
     assert await model.tasks.apop() == "high"
 
@@ -336,7 +336,7 @@ async def test_aduplicate_mixed_model_regular_fields_copied_pq_independent(
     # Assert
     assert duplicate.name == model.name
     assert duplicate.count == model.count
-    assert await duplicate.tasks.asize() == 0
+    assert await duplicate.tasks.asize() == 2
     assert await model.tasks.asize() == 2
 
 
@@ -398,7 +398,7 @@ async def test_adelete_many_does_delete_pq_keys(real_redis_client):
 
 @special_field_test_for(AtomicRedisModel.aduplicate_many, RedisPriorityQueue)
 @pytest.mark.asyncio
-async def test_aduplicate_many_models_with_pq_duplicates_have_empty_pq(
+async def test_aduplicate_many_models_with_pq_duplicates_have_copied_pq(
     saved_pq_model,
 ):
     # Arrange
@@ -413,7 +413,7 @@ async def test_aduplicate_many_models_with_pq_duplicates_have_empty_pq(
         assert duplicate.pk != model.pk
         assert duplicate.name == model.name
         assert isinstance(duplicate.tasks, RedisPriorityQueue)
-        assert await duplicate.tasks.asize() == 0
+        assert await duplicate.tasks.asize() == 3
     assert await model.tasks.asize() == 3
 
 
@@ -422,7 +422,7 @@ async def test_aduplicate_many_models_with_pq_duplicates_have_empty_pq(
 
 @special_field_test_for(AtomicRedisModel.aset_ttl, RedisPriorityQueue)
 @pytest.mark.asyncio
-async def test_aset_ttl_only_sets_ttl_on_model_key_not_pq_key(
+async def test_aset_ttl_sets_ttl_on_both_model_and_pq_key(
     real_redis_client, saved_pq_model
 ):
     # Arrange
