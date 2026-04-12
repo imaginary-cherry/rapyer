@@ -62,6 +62,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         if not result:
             return None
         member, score = result[0]
+        await self.refresh_ttl_if_needed()
         return self._deserialize_value(member)
 
     async def apeek(self):
@@ -81,6 +82,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
     async def aclear(self):
         """Remove all items from the queue."""
         await self.client.delete(self.special_key)
+        await self.refresh_ttl_if_needed()
 
     async def aitems(self) -> list[PriorityQueueItem]:
         """Return all items sorted by priority (ascending)."""
@@ -96,6 +98,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         """Remove a specific value from the queue. Returns True if removed."""
         serialized = self._serialize_value(value)
         removed = await self.client.zrem(self.special_key, serialized)
+        await self.refresh_ttl_if_needed()
         return removed > 0
 
     # --- SpecialFieldType interface ---
