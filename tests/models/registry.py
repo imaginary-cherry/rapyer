@@ -83,10 +83,12 @@ from tests.models.special_types import (
     GenericPriorityQueueModel,
     MixedSpecialModel,
     OptionalPriorityQueueModel,
+    PQContainerModel,
     PriorityQueueIntModel,
     PriorityQueueModel,
     PriorityQueueTTLModel,
     PriorityQueueTTLNoRefreshModel,
+    SubSubPriorityQueueModel,
 )
 from tests.models.unknown_types import (
     ModelWithIntEnumDefault,
@@ -188,4 +190,6 @@ TESTED_REDIS_MODELS = [
     OptionalPriorityQueueModel,
     PriorityQueueTTLModel,
     PriorityQueueTTLNoRefreshModel,
+    SubSubPriorityQueueModel,
+    PQContainerModel,
 ]

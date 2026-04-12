@@ -36,6 +36,15 @@ class GenericPriorityQueueModel(AtomicRedisModel, Generic[T]):
     tasks: RedisPriorityQueue[T] = Field(default_factory=RedisPriorityQueue)
 
 
+class SubSubPriorityQueueModel(PriorityQueueModel):
+    extra: str = "sub_sub"
+
+
+class PQContainerModel(AtomicRedisModel):
+    inner_pq: PriorityQueueModel = Field(default_factory=PriorityQueueModel)
+    outer_name: str = "container"
+
+
 class PriorityQueueTTLModel(PriorityQueueModelBase[str]):
     name: str = "default"
 

@@ -5,7 +5,12 @@ from rapyer.base import AtomicRedisModel
 from rapyer.errors import UpdateAtomicModelError
 from rapyer.types.priority_queue import RedisPriorityQueue
 from tests.conftest import special_field_test_for
-from tests.models.special_types import MixedSpecialModel, PriorityQueueModel
+from tests.models.special_types import (
+    MixedSpecialModel,
+    PQContainerModel,
+    PriorityQueueModel,
+    SubSubPriorityQueueModel,
+)
 
 
 @pytest_asyncio.fixture
@@ -435,3 +440,65 @@ async def test_aset_ttl_only_sets_ttl_on_model_key_not_pq_key(
     pq_ttl = await real_redis_client.ttl(pq_key)
     assert 0 < model_ttl <= 60
     assert 0 < pq_ttl <= 60
+
+
+# --- sub-sub class with PQ in base ---
+
+
+@pytest.mark.asyncio
+async def test_sub_sub_class_pq_has_correct_key_and_actions_work():
+    # Arrange
+    model = SubSubPriorityQueueModel(name="sub_sub_test", extra="deep")
+    await model.asave()
+
+    # Assert - key format
+    expected_key = f"SubSubPriorityQueueModel:{model.pk}:tasks"
+    assert model.tasks.special_key == expected_key
+
+    # Act - push items with varying priorities
+    await model.tasks.apush("low", 3.0)
+    await model.tasks.apush("high", 1.0)
+    await model.tasks.apush("medium", 2.0)
+
+    # Assert - size
+    assert await model.tasks.asize() == 3
+
+    # Assert - peek returns highest priority (lowest score)
+    assert await model.tasks.apeek() == "high"
+
+    # Assert - pop order respects priority
+    assert await model.tasks.apop() == "high"
+    assert await model.tasks.apop() == "medium"
+    assert await model.tasks.apop() == "low"
+    assert await model.tasks.asize() == 0
+
+
+# --- contained model with PQ ---
+
+
+@pytest.mark.asyncio
+async def test_contained_model_pq_has_correct_key_and_actions_work():
+    # Arrange
+    model = PQContainerModel(outer_name="outer_test")
+    await model.asave()
+
+    # Assert - key format uses outer model's key
+    expected_key = f"PQContainerModel:{model.pk}:tasks"
+    assert model.inner_pq.tasks.special_key == expected_key
+
+    # Act - push items via the contained model's PQ
+    await model.inner_pq.tasks.apush("low", 3.0)
+    await model.inner_pq.tasks.apush("high", 1.0)
+    await model.inner_pq.tasks.apush("medium", 2.0)
+
+    # Assert - size
+    assert await model.inner_pq.tasks.asize() == 3
+
+    # Assert - peek returns highest priority (lowest score)
+    assert await model.inner_pq.tasks.apeek() == "high"
+
+    # Assert - pop order respects priority
+    assert await model.inner_pq.tasks.apop() == "high"
+    assert await model.inner_pq.tasks.apop() == "medium"
+    assert await model.inner_pq.tasks.apop() == "low"
+    assert await model.inner_pq.tasks.asize() == 0
