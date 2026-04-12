@@ -101,23 +101,18 @@ MODEL_INDEX_METHODS = _group_rapyer_actions(
     AtomicRedisModel.adelete_index,
 )
 
-# ── Model: TTL setter ──
+# ── Model: TTL operations (setter + refresh mechanism) ──
 
 MODEL_TTL_METHODS = _group_rapyer_actions(
     AtomicRedisModel.aset_ttl,
+    AtomicRedisModel.refresh_ttl_if_needed,
+    RedisType.refresh_ttl_if_needed,
 )
 
 # ── Model: internal query helpers ──
 
 MODEL_INTERNAL_METHODS = _group_rapyer_actions(
     AtomicRedisModel._search_keys_by_query,
-)
-
-# ── TTL refresh mechanism (spans model + type) ──
-
-TTL_REFRESH_METHODS = _group_rapyer_actions(
-    AtomicRedisModel.refresh_ttl_if_needed,
-    RedisType.refresh_ttl_if_needed,
 )
 
 # ── Priority queue: read-only operations ──
@@ -128,16 +123,11 @@ PQ_READ_METHODS = _group_rapyer_actions(
     RedisPriorityQueue.aitems,
 )
 
-# ── Priority queue: lifecycle (save is no-op, delete removes key) ──
+# ── Special field lifecycle methods (abstract + concrete) ──
 
-PQ_LIFECYCLE_METHODS = _group_rapyer_actions(
-    RedisPriorityQueue.asave_special,
-    RedisPriorityQueue.adelete_special,
-)
-
-# ── SpecialFieldType: abstract base methods (covered by concrete subclass) ──
-
-SPECIAL_FIELD_ABSTRACT_METHODS = _group_rapyer_actions(
+SPECIAL_FIELD_LIFECYCLE_METHODS = _group_rapyer_actions(
     SpecialFieldType.asave_special,
     SpecialFieldType.adelete_special,
+    RedisPriorityQueue.asave_special,
+    RedisPriorityQueue.adelete_special,
 )
