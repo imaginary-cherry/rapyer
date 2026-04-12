@@ -80,6 +80,11 @@ MODEL_QUERY_METHODS = _group_rapyer_actions(
     AtomicRedisModel.aexists,
 )
 
+MODEL_CHECK_METHODS = _group_rapyer_actions(
+    AtomicRedisModel.aexists,
+    AtomicRedisModel.afind_keys,
+)
+
 # ── Model: update operations ──
 
 MODEL_UPDATE_METHODS = _group_rapyer_actions(
