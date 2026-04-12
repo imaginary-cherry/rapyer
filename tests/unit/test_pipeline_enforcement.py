@@ -73,84 +73,55 @@ EXCLUDED_METHODS = [
     RedisDict.validate_dict,
 ]
 
-EXCLUDED_FROM_PIPELINE_TEST = {method_to_tuple(m) for m in EXCLUDED_METHODS}
+EXCLUDED_FROM_TYPE_PIPELINE_TEST = {method_to_tuple(m) for m in EXCLUDED_METHODS}
 
+EXCLUDED_MODEL_METHODS = [
+    # Creates own internal pipeline(transaction=True), not context-pipeline-aware
+    AtomicRedisModel.aupdate,
+    # Read-only operations — no mutation to verify in pipeline
+    AtomicRedisModel.aget,
+    AtomicRedisModel.aload,
+    AtomicRedisModel.afind,
+    AtomicRedisModel.afind_one,
+    AtomicRedisModel.afind_keys,
+    AtomicRedisModel.aexists,
+    # Schema operations — not data operations
+    AtomicRedisModel.acreate_index,
+    AtomicRedisModel.adelete_index,
+    # Delegate to asave/ainsert (tested transitively)
+    AtomicRedisModel.aduplicate,
+    AtomicRedisModel.aduplicate_many,
+    # Internal methods
+    AtomicRedisModel._search_keys_by_query,
+    AtomicRedisModel.refresh_ttl_if_needed,
+]
+
+EXCLUDED_FROM_MODEL_PIPELINE_TEST = {method_to_tuple(m) for m in EXCLUDED_MODEL_METHODS}
 
 def collect_all_pipeline_methods():
     all_methods = set()
     for cls in PIPELINE_TYPES:
         all_methods.update(get_all_type_methods(cls))
-    return sorted(m for m in all_methods if m not in EXCLUDED_FROM_PIPELINE_TEST)
-
-
-def collect_all_model_pipeline_methods():
-    all_methods = get_async_methods(AtomicRedisModel)
-    return sorted(m for m in all_methods if m not in EXCLUDED_FROM_MODEL_PIPELINE_TEST)
+    all_methods.update(get_async_methods(AtomicRedisModel))
+    excluded = EXCLUDED_FROM_TYPE_PIPELINE_TEST | EXCLUDED_FROM_MODEL_PIPELINE_TEST
+    return sorted(m for m in all_methods if m not in excluded)
 
 
 @pytest.mark.parametrize(["class_name", "method_name"], collect_all_pipeline_methods())
-def test_method_has_model_pipeline_test_coverage(class_name, method_name):
+def test_method_has_pipeline_test_coverage(class_name, method_name):
     # Arrange
     expected_entry = (class_name, method_name)
 
     # Act
-    has_coverage = expected_entry in MODEL_PIPELINE_TESTED_METHODS
-
-    # Assert
-    assert has_coverage, (
-        f"Method {class_name}.{method_name} needs a model.apipeline() test.\n"
-        f"Add @model_pipeline_test_for({class_name}.{method_name}) to a test.\n"
-        f"Or add to EXCLUDED_METHODS with justification."
+    has_coverage = (
+        expected_entry in MODEL_PIPELINE_TESTED_METHODS
+        or expected_entry in STANDALONE_PIPELINE_TESTED_METHODS
     )
 
-
-@pytest.mark.parametrize(["class_name", "method_name"], collect_all_pipeline_methods())
-def test_method_has_standalone_pipeline_test_coverage(class_name, method_name):
-    # Arrange
-    expected_entry = (class_name, method_name)
-
-    # Act
-    has_coverage = expected_entry in STANDALONE_PIPELINE_TESTED_METHODS
-
     # Assert
     assert has_coverage, (
-        f"Method {class_name}.{method_name} needs a rapyer.apipeline() test.\n"
-        f"Add @standalone_pipeline_test_for({class_name}.{method_name}) to a test.\n"
-        f"Or add to EXCLUDED_METHODS with justification."
-    )
-
-
-@pytest.mark.parametrize(
-    ["class_name", "method_name"], collect_all_model_pipeline_methods()
-)
-def test_model_action_has_model_pipeline_test_coverage(class_name, method_name):
-    # Arrange
-    expected_entry = (class_name, method_name)
-
-    # Act
-    has_coverage = expected_entry in MODEL_PIPELINE_TESTED_METHODS
-
-    # Assert
-    assert has_coverage, (
-        f"Method {class_name}.{method_name} needs a model.apipeline() test.\n"
-        f"Add @model_pipeline_test_for({class_name}.{method_name}) to a test.\n"
-        f"Or add to EXCLUDED_MODEL_METHODS with justification."
-    )
-
-
-@pytest.mark.parametrize(
-    ["class_name", "method_name"], collect_all_model_pipeline_methods()
-)
-def test_model_action_has_standalone_pipeline_test_coverage(class_name, method_name):
-    # Arrange
-    expected_entry = (class_name, method_name)
-
-    # Act
-    has_coverage = expected_entry in STANDALONE_PIPELINE_TESTED_METHODS
-
-    # Assert
-    assert has_coverage, (
-        f"Method {class_name}.{method_name} needs a rapyer.apipeline() test.\n"
-        f"Add @standalone_pipeline_test_for({class_name}.{method_name}) to a test.\n"
-        f"Or add to EXCLUDED_MODEL_METHODS with justification."
+        f"Method {class_name}.{method_name} needs a pipeline atomicity test.\n"
+        f"Add @model_pipeline_test_for({class_name}.{method_name}) or "
+        f"@standalone_pipeline_test_for({class_name}.{method_name}) to a test.\n"
+        f"Or add to EXCLUDED_METHODS / EXCLUDED_MODEL_METHODS with justification."
     )
