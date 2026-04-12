@@ -20,6 +20,13 @@ def with_pipe_context(pipe: Pipeline):
 
 
 @contextlib.asynccontextmanager
+async def pipe_ctx_from_redix(redis_client):
+    async with redis_client.pipeline() as pipe:
+        with with_pipe_context(pipe):
+            yield pipe
+
+
+@contextlib.asynccontextmanager
 async def ensure_pipeline(meta):
     """Yield existing pipeline from context, or create a new transactional one.
 

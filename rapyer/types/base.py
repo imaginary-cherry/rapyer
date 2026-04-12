@@ -52,8 +52,8 @@ class BaseRedisType(ABC):
     def Meta(self):
         return self._base_model_link.Meta
 
-    async def refresh_ttl_if_needed(self):
-        await self._base_model_link.refresh_ttl_if_needed()
+    async def refresh_ttl_if_needed(self, can_use_pipeline: bool = False):
+        await self._base_model_link.refresh_ttl_if_needed(can_use_pipeline=can_use_pipeline)
 
     @property
     def field_path(self) -> str:

@@ -25,7 +25,12 @@ from redis.commands.search.query import Query
 from redis.exceptions import NoScriptError, ResponseError
 
 from rapyer.config import RedisConfig
-from rapyer.context import _context_pipe, ensure_pipeline, with_pipe_context
+from rapyer.context import (
+    _context_pipe,
+    ensure_pipeline,
+    pipe_ctx_from_redix,
+    with_pipe_context,
+)
 from rapyer.errors import (
     CantSerializeRedisValueError,
     KeyNotFound,
@@ -540,9 +545,9 @@ class AtomicRedisModel(BaseModel):
             instances.append(model)
 
         if cls.should_refresh():
-            async with cls.Meta.redis.pipeline() as pipe:
+            async with pipe_ctx_from_redix(cls.Meta.redis) as pipe:
                 for model in instances:
-                    pipe.expire(model.key, cls.Meta.ttl)
+                    await model.refresh_ttl_if_needed(can_use_pipeline=True)
                 await pipe.execute()
 
         return instances
