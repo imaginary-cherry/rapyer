@@ -7,7 +7,7 @@ from rapyer.types.integer import RedisInt
 from rapyer.types.lst import RedisList
 from tests.conftest import model_pipeline_test_for, standalone_pipeline_test_for
 from tests.models.collection_types import ComprehensiveTestModel
-from tests.models.simple_types import UserModelWithoutTTL
+from tests.models.simple_types import TTL_TEST_SECONDS, TTLRefreshTestModel, UserModelWithoutTTL
 
 TTL_SECONDS = 300
 
@@ -278,3 +278,103 @@ async def test_pipeline_redis_dict_clear__check_atomicity():
     # Assert - change applied after pipeline
     final = await ComprehensiveTestModel.aget(model.key)
     assert final.metadata == {}
+
+
+@standalone_pipeline_test_for(AtomicRedisModel.aduplicate)
+@pytest.mark.asyncio
+async def test_pipeline_model_aduplicate__standalone_pipeline__check_atomicity():
+    # Arrange
+    model = ComprehensiveTestModel(name="original", counter=42, tags=["t1"])
+    await model.asave()
+
+    # Act
+    async with rapyer.apipeline():
+        duplicate = await model.aduplicate()
+
+        # Assert - duplicate not visible during pipeline
+        assert not await ComprehensiveTestModel.aexists(duplicate.key)
+
+    # Assert - duplicate exists after pipeline with correct values
+    loaded = await ComprehensiveTestModel.aget(duplicate.key)
+    assert loaded.name == "original"
+    assert loaded.counter == 42
+    assert loaded.tags == ["t1"]
+    assert duplicate.pk != model.pk
+
+
+@standalone_pipeline_test_for(AtomicRedisModel.aduplicate_many)
+@pytest.mark.asyncio
+async def test_pipeline_model_aduplicate_many__standalone_pipeline__check_atomicity():
+    # Arrange
+    model = ComprehensiveTestModel(name="original", counter=42, tags=["t1"])
+    await model.asave()
+
+    # Act
+    async with rapyer.apipeline():
+        duplicates = await model.aduplicate_many(3)
+
+        # Assert - duplicates not visible during pipeline
+        for dup in duplicates:
+            assert not await ComprehensiveTestModel.aexists(dup.key)
+
+    # Assert - all duplicates exist after pipeline
+    for dup in duplicates:
+        loaded = await ComprehensiveTestModel.aget(dup.key)
+        assert loaded.name == "original"
+        assert loaded.counter == 42
+        assert loaded.tags == ["t1"]
+
+    # All PKs should be unique
+    all_pks = [model.pk] + [d.pk for d in duplicates]
+    assert len(set(all_pks)) == 4
+
+
+@standalone_pipeline_test_for(AtomicRedisModel.aupdate)
+@pytest.mark.asyncio
+async def test_pipeline_model_aupdate__standalone_pipeline__executes_immediately():
+    # Arrange
+    model = ComprehensiveTestModel(name="original", counter=10)
+    await model.asave()
+
+    # Act - aupdate uses its own internal pipeline, so changes are
+    # visible immediately even inside an outer pipeline context
+    async with rapyer.apipeline():
+        await model.aupdate(name="updated", counter=99)
+
+        # Assert - changes visible during pipeline (aupdate is self-contained)
+        loaded = await ComprehensiveTestModel.aget(model.key)
+        assert loaded.name == "updated"
+        assert loaded.counter == 99
+
+    # Assert - still correct after outer pipeline exits
+    final = await ComprehensiveTestModel.aget(model.key)
+    assert final.name == "updated"
+    assert final.counter == 99
+
+
+@standalone_pipeline_test_for(AtomicRedisModel.refresh_ttl_if_needed)
+@pytest.mark.asyncio
+async def test_pipeline_model_refresh_ttl__standalone_pipeline__check_atomicity(
+    real_redis_client,
+):
+    # Arrange
+    model = TTLRefreshTestModel(name="ttl_test", age=25)
+    await model.asave()
+    # Reduce TTL to create a measurable gap
+    reduced_ttl = 10
+    await real_redis_client.expire(model.key, reduced_ttl)
+    ttl_before = await real_redis_client.ttl(model.key)
+    assert 0 < ttl_before <= reduced_ttl
+
+    # Act
+    async with rapyer.apipeline():
+        await model.refresh_ttl_if_needed(can_use_pipeline=True)
+
+        # Assert - TTL not refreshed during pipeline
+        ttl_during = await real_redis_client.ttl(model.key)
+        assert ttl_during <= reduced_ttl
+
+    # Assert - TTL refreshed after pipeline
+    ttl_after = await real_redis_client.ttl(model.key)
+    assert ttl_after > reduced_ttl
+    assert ttl_after <= TTL_TEST_SECONDS
