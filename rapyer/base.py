@@ -295,7 +295,7 @@ class AtomicRedisModel(BaseModel):
             setattr(cls, field_name, field)
 
         # Detect special field types
-        cls._special_field_names = set()
+        cls._special_field_names = set(getattr(cls, "_special_field_names", set()))
         for field_name, annotation in cls.__annotations__.items():
             origin = get_origin(annotation) or annotation
             if safe_issubclass(origin, SpecialFieldType):
