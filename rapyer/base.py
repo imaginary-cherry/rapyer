@@ -452,6 +452,17 @@ class AtomicRedisModel(BaseModel):
                 if isinstance(field, SpecialFieldType):
                     pipe.expire(field.special_key, ttl)
 
+    @functools.cached_property
+    def all_keys(self) -> list[str]:
+        return self._all_keys_for_key(self.key)
+
+    @classmethod
+    def _all_keys_for_key(cls, key: str) -> list[str]:
+        keys = [key]
+        for fname in cls._special_field_names:
+            keys.append(f"{key}:{fname}")
+        return keys
+
     @classmethod
     def _resolve_key(cls, key: str | Self) -> str:
         if isinstance(key, AtomicRedisModel):
@@ -646,6 +657,17 @@ class AtomicRedisModel(BaseModel):
                 yield [row[1] for row in result.rows]
 
     @classmethod
+    async def _iter_expanded_filter_batches(
+        cls,
+        query_string: str,
+        batch_size: int,
+        collected_keys: list[str],
+    ) -> AsyncIterator[list[str]]:
+        async for batch in cls.iter_filter_batches(query_string, batch_size):
+            collected_keys.extend(batch)
+            yield [k for key in batch for k in cls._all_keys_for_key(key)]
+
+    @classmethod
     async def adelete_many(
         cls, *args: Self | RapyerKey | str | Expression
     ) -> DeleteResult:
@@ -666,28 +688,40 @@ class AtomicRedisModel(BaseModel):
         max_batch = cls.Meta.max_delete_per_transaction
         should_batch = _context_pipe.get() is None and max_batch is not None
         batches = None
+        targeted_keys = None
 
         if provided_keys or model_instances:
-            model_keys = [m.key for m in model_instances]
-            prefixed_keys = [cls._resolve_key(k) for k in provided_keys]
-            targeted_keys = model_keys + prefixed_keys
-            if targeted_keys:
-                batch_size = max_batch if should_batch else len(targeted_keys)
-                batches = batched(targeted_keys, batch_size)
+            # Get all keys for the models, including detached speical field keys
+            all_keys = [k for m in model_instances for k in m.all_keys]
+            for key in provided_keys:
+                all_keys.extend(cls._all_keys_for_key(cls._resolve_key(key)))
+            targeted_keys = [
+                cls._resolve_key(k) for k in provided_keys + model_instances
+            ]
+            if all_keys:
+                batch_size = max_batch if should_batch else len(all_keys)
+                batches = batched(all_keys, batch_size)
         elif expressions:
             combined_expression = functools.reduce(lambda a, b: a & b, expressions)
             query_string = combined_expression.create_filter()
             if should_batch:
-                batches = cls.iter_filter_batches(query_string, max_batch)
+                targeted_keys = []
+                batches = cls._iter_expanded_filter_batches(
+                    query_string, max_batch, targeted_keys
+                )
             else:
                 targeted_keys = await cls._search_keys_by_query(query_string)
                 if targeted_keys:
-                    batches = batched(targeted_keys, len(targeted_keys))
+                    all_keys = [
+                        k for key in targeted_keys for k in cls._all_keys_for_key(key)
+                    ]
+                    batches = batched(all_keys, len(all_keys))
 
         if batches is None:
             return DeleteResult(count=0)
 
         count, was_commited = await delete_in_batches(cls.Meta.redis, batches)
+        count = len(targeted_keys) if targeted_keys else 0
         return DeleteResult(count=count, was_committed=was_commited)
 
     @classmethod
