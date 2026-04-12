@@ -42,6 +42,15 @@ class SpecialFieldType(BaseRedisType, abc.ABC):
         Uses ``self.client`` which is pipeline-aware.
         """
 
+    @abc.abstractmethod
+    async def aduplicate_special(self, target_special_key: str) -> None:
+        """Copy this field's data to a new key for a duplicated model.
+
+        The *read* must use ``self.redis`` (direct client) so the data is
+        available immediately; the *write* should use ``self.client`` so it
+        participates in any active pipeline.
+        """
+
     def clone(self):
         return self.__class__()
 

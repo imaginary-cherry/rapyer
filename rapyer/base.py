@@ -386,7 +386,13 @@ class AtomicRedisModel(BaseModel):
             raise RuntimeError("Can only duplicate from top level model")
 
         duplicated = self.__class__(**self.model_dump())
-        await duplicated.asave()
+        async with ensure_pipeline(self.Meta):
+            await duplicated.asave()
+            for fname in self._special_field_names:
+                source_field = getattr(self, fname)
+                target_field = getattr(duplicated, fname)
+                if isinstance(source_field, SpecialFieldType):
+                    await source_field.aduplicate_special(target_field.special_key)
         return duplicated
 
     async def aduplicate_many(self, num: int) -> list[Self]:
@@ -394,7 +400,14 @@ class AtomicRedisModel(BaseModel):
             raise RuntimeError("Can only duplicate from top level model")
 
         duplicated_models = [self.__class__(**self.model_dump()) for _ in range(num)]
-        await self.ainsert(*duplicated_models)
+        async with ensure_pipeline(self.Meta):
+            await self.ainsert(*duplicated_models)
+            for fname in self._special_field_names:
+                source_field = getattr(self, fname)
+                if isinstance(source_field, SpecialFieldType):
+                    for dup in duplicated_models:
+                        target_field = getattr(dup, fname)
+                        await source_field.aduplicate_special(target_field.special_key)
         return duplicated_models
 
     def update(self, **kwargs):
@@ -432,11 +445,12 @@ class AtomicRedisModel(BaseModel):
     async def aset_ttl(self, ttl: int) -> None:
         if self.is_inner_model():
             raise RuntimeError("Can only set TTL from top level model")
-        pipeline = _context_pipe.get()
-        if pipeline is not None:
-            pipeline.expire(self.key, ttl)
-        else:
-            await self.Meta.redis.expire(self.key, ttl)
+        async with ensure_pipeline(self.Meta) as pipe:
+            pipe.expire(self.key, ttl)
+            for fname in self._special_field_names:
+                field = getattr(self, fname)
+                if isinstance(field, SpecialFieldType):
+                    pipe.expire(field.special_key, ttl)
 
     @classmethod
     def _resolve_key(cls, key: str | Self) -> str:
