@@ -45,7 +45,7 @@ def test_mixed_special_model_creation_sanity():
 def test_special_field_names_detected():
     assert "tasks" in PriorityQueueModel._special_field_names
     assert "tasks" in MixedSpecialModel._special_field_names
-    assert "queue" in PriorityQueueIntModel._special_field_names
+    assert "tasks" in PriorityQueueIntModel._special_field_names
     assert "name" not in PriorityQueueModel._special_field_names
     assert "count" not in MixedSpecialModel._special_field_names
 
