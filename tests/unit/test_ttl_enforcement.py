@@ -12,6 +12,7 @@ from tests.conftest import (
     get_async_methods,
 )
 from tests.unit.enforcement_exclusions import (
+    MODEL_CHECK_METHODS,
     MODEL_DELETE_METHODS,
     MODEL_DUPLICATE_METHODS,
     MODEL_INDEX_METHODS,
@@ -27,6 +28,7 @@ EXCLUDED_FROM_TTL_TEST = (
     | MODEL_TTL_METHODS  # IS the TTL operation
     | MODEL_INTERNAL_METHODS  # Internal query helpers
     | SPECIAL_FIELD_LIFECYCLE_METHODS  # Abstract + concrete lifecycle
+    | MODEL_CHECK_METHODS  # Exists method doesn't need ttl update
 )
 
 
