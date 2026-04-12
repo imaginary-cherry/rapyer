@@ -340,7 +340,7 @@ async def test_aduplicate_mixed_model_regular_fields_copied_pq_independent(
 
 @special_field_test_for(AtomicRedisModel.adelete_by_key, RedisPriorityQueue)
 @pytest.mark.asyncio
-async def test_adelete_by_key_does_not_delete_pq_key(real_redis_client, saved_pq_model):
+async def test_adelete_by_key_does_delete_pq_key(real_redis_client, saved_pq_model):
     # Arrange
     model = saved_pq_model
     model_key = model.key
@@ -362,7 +362,7 @@ async def test_adelete_by_key_does_not_delete_pq_key(real_redis_client, saved_pq
 
 @special_field_test_for(AtomicRedisModel.adelete_many, RedisPriorityQueue)
 @pytest.mark.asyncio
-async def test_adelete_many_does_not_delete_pq_keys(real_redis_client):
+async def test_adelete_many_does_delete_pq_keys(real_redis_client):
     # Arrange
     models = []
     for i in range(3):
