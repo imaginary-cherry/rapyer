@@ -10,12 +10,10 @@ from tests.conftest import (
     get_async_methods,
 )
 from tests.unit.enforcement_exclusions import (
-    MODEL_CHECK_METHODS,
-    MODEL_DELETE_METHODS,
-    MODEL_DUPLICATE_METHODS,
     MODEL_INDEX_METHODS,
     MODEL_INTERNAL_METHODS,
 )
+from tests.unit.test_ttl_enforcement import EXCLUDED_FROM_TTL_TEST
 
 EXCLUDED_FROM_SPECIAL_FIELD_TEST = (
     MODEL_INDEX_METHODS  # Schema operations
@@ -23,10 +21,7 @@ EXCLUDED_FROM_SPECIAL_FIELD_TEST = (
 )
 
 EXCLUDED_FROM_SPECIAL_FIELD_TTL_TEST = (
-    EXCLUDED_FROM_SPECIAL_FIELD_TEST
-    | MODEL_DELETE_METHODS  # Key removed, no TTL
-    | MODEL_DUPLICATE_METHODS  # New key, own TTL
-    | MODEL_CHECK_METHODS
+    EXCLUDED_FROM_TTL_TEST | EXCLUDED_FROM_SPECIAL_FIELD_TEST
 )
 
 
