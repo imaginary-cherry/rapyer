@@ -84,6 +84,13 @@ MODEL_CHECK_METHODS = _group_rapyer_actions(
     AtomicRedisModel.aexists,
     AtomicRedisModel.afind_keys,
 )
+VIEW_ACTION_METHODS = _group_rapyer_actions(
+    RedisPriorityQueue.apeek,
+    RedisPriorityQueue.asize,
+    RedisPriorityQueue.aitems,
+    RedisType.aload,
+    AtomicRedisModel.aload,
+)
 
 # ── Model: update operations ──
 

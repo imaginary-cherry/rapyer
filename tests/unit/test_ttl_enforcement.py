@@ -19,6 +19,7 @@ from tests.unit.enforcement_exclusions import (
     MODEL_INTERNAL_METHODS,
     MODEL_TTL_METHODS,
     SPECIAL_FIELD_LIFECYCLE_METHODS,
+    VIEW_ACTION_METHODS,
 )
 
 EXCLUDED_FROM_TTL_TEST = (
@@ -29,6 +30,7 @@ EXCLUDED_FROM_TTL_TEST = (
     | MODEL_INTERNAL_METHODS  # Internal query helpers
     | SPECIAL_FIELD_LIFECYCLE_METHODS  # Abstract + concrete lifecycle
     | MODEL_CHECK_METHODS  # Exists method doesn't need ttl update
+    | VIEW_ACTION_METHODS
 )
 
 
