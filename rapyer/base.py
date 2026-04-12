@@ -175,13 +175,14 @@ class AtomicRedisModel(BaseModel):
     def should_refresh(cls):
         return cls.Meta.refresh_ttl and cls.Meta.ttl is not None
 
-    async def refresh_ttl_if_needed(self):
+    async def refresh_ttl_if_needed(self, can_use_pipeline: bool = False):
         if self.should_refresh():
-            await self.Meta.redis.expire(self.key, self.Meta.ttl)
+            client = self.client if can_use_pipeline else self.Meta.redis
+            await client.expire(self.key, self.Meta.ttl)
             for fname in self._special_field_names:
                 field = getattr(self, fname)
                 if isinstance(field, SpecialFieldType):
-                    await self.Meta.redis.expire(field.special_key, self.Meta.ttl)
+                    await client.expire(field.special_key, self.Meta.ttl)
 
     @classmethod
     def redis_schema(cls, redis_name: str = ""):
@@ -453,7 +454,7 @@ class AtomicRedisModel(BaseModel):
         instance.key = key
         instance._failed_fields = context.get(FAILED_FIELDS_KEY, set())
         if cls.should_refresh():
-            await cls.Meta.redis.expire(key, cls.Meta.ttl)
+            await instance.refresh_ttl_if_needed()
         return instance
 
     async def aload(self) -> Self:
