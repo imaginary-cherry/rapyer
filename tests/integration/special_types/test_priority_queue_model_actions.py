@@ -5,7 +5,6 @@ from rapyer.base import AtomicRedisModel
 from rapyer.errors import UpdateAtomicModelError
 from rapyer.types.priority_queue import RedisPriorityQueue
 from tests.conftest import special_field_test_for
-
 from tests.models.special_types import MixedSpecialModel, PriorityQueueModel
 
 
@@ -194,6 +193,24 @@ async def test_afind_all_models_with_pq_returned_with_functional_pq(real_redis_c
         assert isinstance(found_model.tasks, RedisPriorityQueue)
         assert await found_model.tasks.asize() == 1
         assert await found_model.tasks.apeek() is not None
+
+
+@special_field_test_for(AtomicRedisModel.afind_one, RedisPriorityQueue)
+@pytest.mark.asyncio
+async def test_afind_one_with_pq_returned_with_functional_pq(real_redis_client):
+    # Arrange
+    model = PriorityQueueModel(name=f"find_model")
+    await model.asave()
+    await model.tasks.apush(f"item", 0.0)
+
+    # Act
+    found_model = await PriorityQueueModel.afind_one(model.key)
+
+    # Assert
+    assert found_model is not None
+    assert isinstance(found_model.tasks, RedisPriorityQueue)
+    assert await found_model.tasks.asize() == 1
+    assert await found_model.tasks.apeek() is not None
 
 
 @pytest.mark.asyncio
