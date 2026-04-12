@@ -3,51 +3,35 @@ import pytest
 import tests.integration.special_types.test_ttl_priority_queue  # noqa: F401 - triggers decorator registration
 import tests.integration.test_ttl_refresh  # noqa: F401 - triggers decorator registration
 from rapyer.base import AtomicRedisModel
-from rapyer.types.base import BaseRedisType, RedisType
-from rapyer.types.priority_queue import RedisPriorityQueue
+from rapyer.types.base import BaseRedisType
 from rapyer.types.special import SpecialFieldType
 from tests.conftest import (
     BASE_MODEL_TTL_TESTED_METHODS,
     TTL_NO_REFRESH_TESTED_METHODS,
     TTL_TESTED_METHODS,
     get_async_methods,
-    method_to_tuple,
+)
+from tests.unit.enforcement_exclusions import (
+    MODEL_DELETE_METHODS,
+    MODEL_DUPLICATE_METHODS,
+    MODEL_INDEX_METHODS,
+    MODEL_INTERNAL_METHODS,
+    MODEL_TTL_METHODS,
+    PQ_LIFECYCLE_METHODS,
+    SPECIAL_FIELD_ABSTRACT_METHODS,
+    TTL_REFRESH_METHODS,
 )
 
-EXCLUDED_METHODS = [
-    # Delete operations - key/item is removed
-    AtomicRedisModel.adelete,
-    AtomicRedisModel.adelete_by_key,
-    AtomicRedisModel.adelete_many,
-    # Methods that create NEW keys (get their own TTL via asave)
-    AtomicRedisModel.aduplicate,
-    AtomicRedisModel.aduplicate_many,
-    # Existence check - no data access, no TTL refresh needed
-    AtomicRedisModel.aexists,
-    # Delegating methods (call other methods that handle TTL)
-    AtomicRedisModel.afind_keys,
-    AtomicRedisModel.acreate_index,
-    AtomicRedisModel.adelete_index,
-    # TTL operations - this method IS the TTL operation itself
-    AtomicRedisModel.aset_ttl,
-    AtomicRedisModel.refresh_ttl_if_needed,
-    RedisType.refresh_ttl_if_needed,
-    # Inner methods
-    AtomicRedisModel._search_keys_by_query,
-    # PQ: read-only operations — no data mutation, no TTL refresh needed
-    RedisPriorityQueue.apeek,
-    RedisPriorityQueue.asize,
-    RedisPriorityQueue.aitems,
-    # PQ: save is a no-op, delete removes the key
-    RedisPriorityQueue.asave_special,
-    RedisPriorityQueue.adelete_special,
-    # SpecialFieldType: abstract methods — covered by concrete subclass exclusions
-    SpecialFieldType.asave_special,
-    SpecialFieldType.adelete_special,
-]
-
-
-EXCLUDED_FROM_TTL_TEST = {method_to_tuple(m) for m in EXCLUDED_METHODS}
+EXCLUDED_FROM_TTL_TEST = (
+    MODEL_DELETE_METHODS  # Key removed, no TTL to refresh
+    | MODEL_DUPLICATE_METHODS  # New keys get own TTL via asave
+    | MODEL_INDEX_METHODS  # Delegate to other methods
+    | MODEL_TTL_METHODS  # IS the TTL setter
+    | MODEL_INTERNAL_METHODS  # Internal query helpers
+    | TTL_REFRESH_METHODS  # IS the TTL refresh mechanism
+    | PQ_LIFECYCLE_METHODS  # Save no-op, delete removes key
+    | SPECIAL_FIELD_ABSTRACT_METHODS  # Abstract, covered by concrete subclass
+)
 
 
 def get_subclasses_recursive(cls):

@@ -8,32 +8,24 @@ from tests.conftest import (
     SPECIAL_FIELD_TESTED_METHODS,
     SPECIAL_FIELD_TTL_TESTED_METHODS,
     get_async_methods,
-    method_to_tuple,
+)
+from tests.unit.enforcement_exclusions import (
+    MODEL_DELETE_METHODS,
+    MODEL_DUPLICATE_METHODS,
+    MODEL_INDEX_METHODS,
+    MODEL_INTERNAL_METHODS,
 )
 
-EXCLUDED_METHODS = [
-    # Index operations - schema-level, not field-level
-    AtomicRedisModel.acreate_index,
-    AtomicRedisModel.adelete_index,
-    # Inner methods
-    AtomicRedisModel._search_keys_by_query,
-]
+EXCLUDED_FROM_SPECIAL_FIELD_TEST = (
+    MODEL_INDEX_METHODS  # Schema operations
+    | MODEL_INTERNAL_METHODS  # Internal query helpers
+)
 
-
-EXCLUDED_FROM_SPECIAL_FIELD_TEST = {method_to_tuple(m) for m in EXCLUDED_METHODS}
-
-
-EXCLUDED_TTL_METHODS = [
-    *EXCLUDED_METHODS,
-    # Delete operations - key is removed, no TTL refresh
-    AtomicRedisModel.adelete,
-    # Methods that create NEW keys (get their own TTL via asave)
-    AtomicRedisModel.aduplicate,
-]
-
-EXCLUDED_FROM_SPECIAL_FIELD_TTL_TEST = {
-    method_to_tuple(m) for m in EXCLUDED_TTL_METHODS
-}
+EXCLUDED_FROM_SPECIAL_FIELD_TTL_TEST = (
+    EXCLUDED_FROM_SPECIAL_FIELD_TEST
+    | MODEL_DELETE_METHODS  # Key removed, no TTL
+    | MODEL_DUPLICATE_METHODS  # New key, own TTL
+)
 
 
 def collect_model_methods(excluded):
@@ -55,7 +47,7 @@ def test_method_has_special_field_ttl_test_coverage(class_name, method_name):
     assert has_coverage, (
         f"Method {class_name}.{method_name} needs a special field TTL test.\n"
         f"Add @special_field_ttl_test_for({class_name}.{method_name}) to a test.\n"
-        f"Or add to EXCLUDED_TTL_METHODS with justification."
+        f"Or add to the appropriate group in enforcement_exclusions.py with justification."
     )
 
 
@@ -74,5 +66,5 @@ def test_method_has_special_field_test_coverage(class_name, method_name):
     assert has_coverage, (
         f"Method {class_name}.{method_name} needs a special field test.\n"
         f"Add @special_field_test_for({class_name}.{method_name}) to a test.\n"
-        f"Or add to EXCLUDED_METHODS with justification."
+        f"Or add to the appropriate group in enforcement_exclusions.py with justification."
     )

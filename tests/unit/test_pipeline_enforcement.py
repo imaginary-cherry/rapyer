@@ -29,7 +29,14 @@ from tests.conftest import (
     STANDALONE_PIPELINE_TESTED_METHODS,
     get_all_type_methods,
     get_async_methods,
-    method_to_tuple,
+)
+from tests.unit.enforcement_exclusions import (
+    MODEL_INDEX_METHODS,
+    MODEL_INTERNAL_METHODS,
+    MODEL_QUERY_METHODS,
+    MODEL_READ_METHODS,
+    TYPE_INTERNAL_METHODS,
+    TYPE_READ_METHODS,
 )
 
 PIPELINE_TYPES = [
@@ -44,59 +51,18 @@ PIPELINE_TYPES = [
     RedisDict,
 ]
 
-EXCLUDED_METHODS = [
-    # Not pipeline-aware — uses self.redis directly, not self.client
-    RedisList.apop,
-    # Lua script returns value; can't defer execution in pipeline
-    RedisDict.apop,
-    RedisDict.apopitem,
-    # Read-only operation — no mutation to verify
-    RedisType.aload,
-    # Internal/utility methods — not Redis operations
-    RedisType.clone,
-    RedisType.serialize_unknown,
-    RedisType.deserialize_unknown,
-    RedisInt.clone,
-    RedisFloat.clone,
-    RedisStr.clone,
-    RedisBytes.clone,
-    RedisDatetime.clone,
-    RedisList.clone,
-    RedisDict.clone,
-    RedisList.__init__,
-    RedisDict.__init__,
-    RedisList.create_new_value,
-    RedisList.create_new_values,
-    RedisList.iterate_items,
-    RedisList.sub_field_path,
-    RedisDict.iterate_items,
-    RedisDict.validate_dict,
-]
+EXCLUDED_FROM_TYPE_PIPELINE_TEST = (
+    TYPE_INTERNAL_METHODS  # Not Redis operations
+    | TYPE_READ_METHODS  # Return values, can't defer in pipeline
+)
 
-EXCLUDED_FROM_TYPE_PIPELINE_TEST = {method_to_tuple(m) for m in EXCLUDED_METHODS}
+EXCLUDED_FROM_MODEL_PIPELINE_TEST = (
+    MODEL_READ_METHODS  # No mutation to verify
+    | MODEL_QUERY_METHODS  # No mutation to verify
+    | MODEL_INDEX_METHODS  # Schema ops, not data
+    | MODEL_INTERNAL_METHODS  # Internal query helpers
+)
 
-EXCLUDED_MODEL_METHODS = [
-    # Creates own internal pipeline(transaction=True), not context-pipeline-aware
-    AtomicRedisModel.aupdate,
-    # Read-only operations — no mutation to verify in pipeline
-    AtomicRedisModel.aget,
-    AtomicRedisModel.aload,
-    AtomicRedisModel.afind,
-    AtomicRedisModel.afind_one,
-    AtomicRedisModel.afind_keys,
-    AtomicRedisModel.aexists,
-    # Schema operations — not data operations
-    AtomicRedisModel.acreate_index,
-    AtomicRedisModel.adelete_index,
-    # Delegate to asave/ainsert (tested transitively)
-    AtomicRedisModel.aduplicate,
-    AtomicRedisModel.aduplicate_many,
-    # Internal methods
-    AtomicRedisModel._search_keys_by_query,
-    AtomicRedisModel.refresh_ttl_if_needed,
-]
-
-EXCLUDED_FROM_MODEL_PIPELINE_TEST = {method_to_tuple(m) for m in EXCLUDED_MODEL_METHODS}
 
 def collect_all_pipeline_methods():
     all_methods = set()
@@ -123,5 +89,5 @@ def test_method_has_pipeline_test_coverage(class_name, method_name):
         f"Method {class_name}.{method_name} needs a pipeline atomicity test.\n"
         f"Add @model_pipeline_test_for({class_name}.{method_name}) or "
         f"@standalone_pipeline_test_for({class_name}.{method_name}) to a test.\n"
-        f"Or add to EXCLUDED_METHODS / EXCLUDED_MODEL_METHODS with justification."
+        f"Or add to the appropriate group in enforcement_exclusions.py with justification."
     )
