@@ -30,13 +30,9 @@ special_field_test_for = _make_coverage_decorator(SPECIAL_FIELD_TESTED_METHODS)
 special_field_ttl_test_for = _make_coverage_decorator(SPECIAL_FIELD_TTL_TESTED_METHODS)
 base_model_ttl_test_for = _make_coverage_decorator(BASE_MODEL_TTL_TESTED_METHODS)
 model_pipeline_test_for = _make_coverage_decorator(MODEL_PIPELINE_TESTED_METHODS)
-standalone_pipeline_test_for = _make_coverage_decorator(STANDALONE_PIPELINE_TESTED_METHODS)
-
-
-def method_to_tuple(method: Callable) -> tuple[str, str]:
-    qualname = method.__qualname__
-    class_name, method_name = qualname.rsplit(".", 1)
-    return class_name, method_name
+standalone_pipeline_test_for = _make_coverage_decorator(
+    STANDALONE_PIPELINE_TESTED_METHODS
+)
 
 
 def get_async_methods(cls):

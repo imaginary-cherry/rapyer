@@ -7,6 +7,8 @@ Each enforcement test composes its exclusion set by taking the union
 of the groups it needs.
 """
 
+from typing import Callable
+
 from rapyer.base import AtomicRedisModel
 from rapyer.types.base import RedisType
 from rapyer.types.byte import RedisBytes
@@ -18,7 +20,12 @@ from rapyer.types.lst import RedisList
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.special import SpecialFieldType
 from rapyer.types.string import RedisStr
-from tests.conftest import method_to_tuple
+
+
+def method_to_tuple(method: Callable) -> tuple[str, str]:
+    qualname = method.__qualname__
+    class_name, method_name = qualname.rsplit(".", 1)
+    return class_name, method_name
 
 
 def _group_rapyer_actions(*methods) -> frozenset[tuple[str, str]]:
