@@ -5,6 +5,7 @@ from rapyer.base import AtomicRedisModel
 from rapyer.types.priority_queue import PriorityQueueItem, RedisPriorityQueue
 from tests.conftest import (
     base_model_ttl_test_for,
+    special_field_test_for,
     special_field_ttl_test_for,
     ttl_no_refresh_test_for,
     ttl_test_for,
@@ -368,3 +369,42 @@ async def test_ttl_pq_key_on_ainsert(real_redis_client):
 
     # Assert
     await assert_ttl_refreshed(real_redis_client, REDUCED_TTL_SECONDS, model.key)
+
+
+@special_field_ttl_test_for(AtomicRedisModel.afind_one, RedisPriorityQueue)
+@pytest.mark.asyncio
+async def test_ttl_refresh_pq_key_on_afind_one(
+    real_redis_client, saved_pq_ttl_model_with_reduced_ttl: SavedModelWithReducedTTL
+):
+    # Arrange
+    model = saved_pq_ttl_model_with_reduced_ttl.model
+    initial_ttl = saved_pq_ttl_model_with_reduced_ttl.initial_ttl
+
+    # Act
+    await PriorityQueueTTLModel.afind_one(model.key)
+
+    # Assert
+    await assert_ttl_refreshed(
+        real_redis_client, initial_ttl, model.tasks.special_key, model.key
+    )
+
+
+@special_field_test_for(AtomicRedisModel.refresh_ttl_if_needed, RedisPriorityQueue)
+@pytest.mark.asyncio
+async def test_refresh_ttl_if_needed_refreshes_pq_key_ttl(real_redis_client):
+    # Arrange
+    model = PriorityQueueTTLModel(name="refresh_test")
+    await model.asave()
+    await model.tasks.apush("item", 1.0)
+
+    await real_redis_client.expire(model.key, REDUCED_TTL_SECONDS)
+    await real_redis_client.expire(model.tasks.special_key, REDUCED_TTL_SECONDS)
+    initial_ttl = await real_redis_client.ttl(model.tasks.special_key)
+
+    # Act
+    await model.refresh_ttl_if_needed()
+
+    # Assert
+    await assert_ttl_refreshed(
+        real_redis_client, initial_ttl, model.tasks.special_key, model.key
+    )
