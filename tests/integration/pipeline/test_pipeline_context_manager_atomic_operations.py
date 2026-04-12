@@ -1,6 +1,11 @@
 import pytest
 
+from rapyer.base import AtomicRedisModel
 from rapyer.context import _context_pipe
+from rapyer.types.base import RedisType
+from rapyer.types.dct import RedisDict
+from rapyer.types.lst import RedisList
+from tests.conftest import model_pipeline_test_for
 from tests.models.collection_types import ComprehensiveTestModel, PipelineTestModel
 
 
@@ -154,6 +159,7 @@ async def test_pipeline_context_manager__pipeline_context_cleanup__check_context
     assert final_model.metadata == {"test": "value", "updated": "true"}
 
 
+@model_pipeline_test_for(RedisList.aappend)
 @pytest.mark.asyncio
 async def test_pipeline_list_aappend__check_atomicity_sanity():
     # Arrange
@@ -173,6 +179,7 @@ async def test_pipeline_list_aappend__check_atomicity_sanity():
     assert final_model.tags == ["initial", "new_tag"]
 
 
+@model_pipeline_test_for(RedisList.aextend)
 @pytest.mark.asyncio
 async def test_pipeline_list_aextend__check_atomicity_sanity():
     # Arrange
@@ -192,6 +199,7 @@ async def test_pipeline_list_aextend__check_atomicity_sanity():
     assert final_model.tags == ["initial", "tag1", "tag2"]
 
 
+@model_pipeline_test_for(RedisList.ainsert)
 @pytest.mark.asyncio
 async def test_pipeline_list_ainsert__check_atomicity_sanity():
     # Arrange
@@ -211,6 +219,7 @@ async def test_pipeline_list_ainsert__check_atomicity_sanity():
     assert final_model.tags == ["first", "middle", "last"]
 
 
+@model_pipeline_test_for(RedisList.aclear)
 @pytest.mark.asyncio
 async def test_pipeline_list_aclear__check_atomicity_sanity():
     # Arrange
@@ -230,6 +239,7 @@ async def test_pipeline_list_aclear__check_atomicity_sanity():
     assert final_model.tags == []
 
 
+@model_pipeline_test_for(RedisDict.aset_item)
 @pytest.mark.asyncio
 async def test_pipeline_dict_aset_item__check_atomicity_sanity():
     # Arrange
@@ -249,6 +259,7 @@ async def test_pipeline_dict_aset_item__check_atomicity_sanity():
     assert final_model.metadata == {"existing": "value", "new_key": "new_value"}
 
 
+@model_pipeline_test_for(RedisDict.adel_item)
 @pytest.mark.asyncio
 async def test_pipeline_dict_adel_item__check_atomicity_sanity():
     # Arrange
@@ -268,6 +279,7 @@ async def test_pipeline_dict_adel_item__check_atomicity_sanity():
     assert final_model.metadata == {"key2": "value2"}
 
 
+@model_pipeline_test_for(RedisDict.aupdate)
 @pytest.mark.asyncio
 async def test_pipeline_dict_aupdate__check_atomicity_sanity():
     # Arrange
@@ -291,6 +303,7 @@ async def test_pipeline_dict_aupdate__check_atomicity_sanity():
     }
 
 
+@model_pipeline_test_for(RedisDict.aclear)
 @pytest.mark.asyncio
 async def test_pipeline_dict_aclear__check_atomicity_sanity():
     # Arrange
@@ -310,6 +323,7 @@ async def test_pipeline_dict_aclear__check_atomicity_sanity():
     assert final_model.metadata == {}
 
 
+@model_pipeline_test_for(RedisType.asave)
 @pytest.mark.asyncio
 async def test_pipeline_string_set__check_atomicity_sanity():
     # Arrange
@@ -409,6 +423,7 @@ async def test_pipeline_exception_rollback__check_no_changes_applied_edge_case()
     assert final_model.metadata == original_state.metadata
 
 
+@model_pipeline_test_for(AtomicRedisModel.adelete)
 @pytest.mark.asyncio
 async def test_pipeline_delete__check_atomicity_sanity(real_redis_client):
     # Arrange
@@ -434,6 +449,7 @@ async def test_pipeline_delete__check_atomicity_sanity(real_redis_client):
     assert key2_exists == 1
 
 
+@model_pipeline_test_for(AtomicRedisModel.adelete_by_key)
 @pytest.mark.asyncio
 async def test_pipeline_try_delete__check_atomicity_sanity(real_redis_client):
     # Arrange

@@ -1,8 +1,11 @@
 import pytest
 
+from rapyer.types.integer import RedisInt
+from tests.conftest import model_pipeline_test_for
 from tests.models.collection_types import ComprehensiveTestModel
 
 
+@model_pipeline_test_for(RedisInt.__isub__)
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ["initial_value", "operand", "expected"],
@@ -30,6 +33,7 @@ async def test_redis_int_isub_with_pipeline_sanity(initial_value, operand, expec
     assert final_model.counter == expected
 
 
+@model_pipeline_test_for(RedisInt.__imul__)
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ["initial_value", "operand", "expected"],
@@ -57,6 +61,7 @@ async def test_redis_int_imul_with_pipeline_sanity(initial_value, operand, expec
     assert final_model.counter == expected
 
 
+@model_pipeline_test_for(RedisInt.__ifloordiv__)
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ["initial_value", "operand", "expected"],
@@ -86,6 +91,7 @@ async def test_redis_int_ifloordiv_with_pipeline_sanity(
     assert final_model.counter == expected
 
 
+@model_pipeline_test_for(RedisInt.__imod__)
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ["initial_value", "operand", "expected"],
@@ -113,6 +119,7 @@ async def test_redis_int_imod_with_pipeline_sanity(initial_value, operand, expec
     assert final_model.counter == expected
 
 
+@model_pipeline_test_for(RedisInt.__ipow__)
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ["initial_value", "operand", "expected"],

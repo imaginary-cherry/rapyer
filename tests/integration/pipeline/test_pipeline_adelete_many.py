@@ -3,6 +3,8 @@ import pytest_asyncio
 
 import rapyer
 from rapyer import DeleteResult, RapyerDeleteResult
+from rapyer.base import AtomicRedisModel
+from tests.conftest import standalone_pipeline_test_for
 from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.index_types import IndexTestModel
 from tests.models.simple_types import IntModel, StrModel
@@ -31,6 +33,7 @@ async def create_index(real_redis_client):
     await IndexTestModel.adelete_index()
 
 
+@standalone_pipeline_test_for(AtomicRedisModel.adelete_many)
 @pytest.mark.asyncio
 async def test_pipeline_class_adelete_many__keys_deferred_until_execute(
     real_redis_client,

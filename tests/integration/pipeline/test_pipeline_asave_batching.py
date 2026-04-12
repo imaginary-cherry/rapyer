@@ -1,9 +1,12 @@
 import pytest
 
 import rapyer
+from rapyer.base import AtomicRedisModel
+from tests.conftest import standalone_pipeline_test_for
 from tests.models.collection_types import ComprehensiveTestModel
 
 
+@standalone_pipeline_test_for(AtomicRedisModel.asave)
 @pytest.mark.asyncio
 async def test_pipeline__multiple_model_asave__commands_batched_in_single_pipeline(
     real_redis_client,
