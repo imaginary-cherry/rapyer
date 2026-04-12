@@ -10,6 +10,7 @@ from tests.conftest import (
     get_async_methods,
 )
 from tests.unit.enforcement_exclusions import (
+    MODEL_CHECK_METHODS,
     MODEL_DELETE_METHODS,
     MODEL_DUPLICATE_METHODS,
     MODEL_INDEX_METHODS,
@@ -25,6 +26,7 @@ EXCLUDED_FROM_SPECIAL_FIELD_TTL_TEST = (
     EXCLUDED_FROM_SPECIAL_FIELD_TEST
     | MODEL_DELETE_METHODS  # Key removed, no TTL
     | MODEL_DUPLICATE_METHODS  # New key, own TTL
+    | MODEL_CHECK_METHODS
 )
 
 
@@ -64,7 +66,7 @@ def test_method_has_special_field_test_coverage(class_name, method_name):
 
     # Assert
     assert has_coverage, (
-        f"Method {class_name}.{method_name} needs a special field test.\n"
+        f"Method {class_name}.{method_name} needs a special field test (i.e. check the method affect the special field).\n"
         f"Add @special_field_test_for({class_name}.{method_name}) to a test.\n"
         f"Or add to the appropriate group in enforcement_exclusions.py with justification."
     )
