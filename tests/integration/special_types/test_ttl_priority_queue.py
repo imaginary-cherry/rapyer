@@ -266,7 +266,7 @@ async def test_ttl_no_refresh_on_pq_aremove(
 # --- Base model action PQ key TTL tests ---
 
 
-@special_field_ttl_test_for(AtomicRedisModel.asave)
+@special_field_ttl_test_for(AtomicRedisModel.asave, RedisPriorityQueue)
 @pytest.mark.asyncio
 async def test_ttl_refresh_pq_key_on_asave(
     real_redis_client, saved_pq_ttl_model_with_reduced_ttl: SavedModelWithReducedTTL
@@ -285,7 +285,7 @@ async def test_ttl_refresh_pq_key_on_asave(
     )
 
 
-@special_field_ttl_test_for(AtomicRedisModel.aload)
+@special_field_ttl_test_for(AtomicRedisModel.aload, RedisPriorityQueue)
 @pytest.mark.asyncio
 async def test_ttl_refresh_pq_key_on_aload(
     real_redis_client, saved_pq_ttl_model_with_reduced_ttl: SavedModelWithReducedTTL
@@ -303,7 +303,7 @@ async def test_ttl_refresh_pq_key_on_aload(
     )
 
 
-@special_field_ttl_test_for(AtomicRedisModel.aupdate)
+@special_field_ttl_test_for(AtomicRedisModel.aupdate, RedisPriorityQueue)
 @pytest.mark.asyncio
 async def test_ttl_refresh_pq_key_on_aupdate(
     real_redis_client, saved_pq_ttl_model_with_reduced_ttl: SavedModelWithReducedTTL
@@ -321,7 +321,7 @@ async def test_ttl_refresh_pq_key_on_aupdate(
     )
 
 
-@special_field_ttl_test_for(AtomicRedisModel.aget)
+@special_field_ttl_test_for(AtomicRedisModel.aget, RedisPriorityQueue)
 @pytest.mark.asyncio
 async def test_ttl_refresh_pq_key_on_aget(
     real_redis_client, saved_pq_ttl_model_with_reduced_ttl: SavedModelWithReducedTTL
@@ -339,7 +339,7 @@ async def test_ttl_refresh_pq_key_on_aget(
     )
 
 
-@special_field_ttl_test_for(AtomicRedisModel.afind)
+@special_field_ttl_test_for(AtomicRedisModel.afind, RedisPriorityQueue)
 @pytest.mark.asyncio
 async def test_ttl_refresh_pq_key_on_afind(
     real_redis_client, saved_pq_ttl_model_with_reduced_ttl: SavedModelWithReducedTTL
@@ -357,7 +357,7 @@ async def test_ttl_refresh_pq_key_on_afind(
     )
 
 
-@special_field_ttl_test_for(AtomicRedisModel.ainsert)
+@special_field_ttl_test_for(AtomicRedisModel.ainsert, RedisPriorityQueue)
 @pytest.mark.asyncio
 async def test_ttl_pq_key_on_ainsert(real_redis_client):
     # Arrange

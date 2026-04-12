@@ -6,6 +6,7 @@ from rapyer.types.base import BaseRedisType
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.special import SpecialFieldType
 from tests.conftest import special_field_test_for
+
 from tests.models.special_types import (
     MixedSpecialModel,
     PriorityQueueIntModel,
@@ -49,7 +50,7 @@ def test_special_field_names_detected():
     assert "count" not in MixedSpecialModel._special_field_names
 
 
-@special_field_test_for(AtomicRedisModel.redis_dump)
+@special_field_test_for(AtomicRedisModel.redis_dump, RedisPriorityQueue)
 def test_redis_dump_excludes_special_fields():
     model = PriorityQueueModel(name="test")
     dump = model.redis_dump()

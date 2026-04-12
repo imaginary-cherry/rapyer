@@ -5,6 +5,7 @@ from rapyer.base import AtomicRedisModel
 from rapyer.errors import UpdateAtomicModelError
 from rapyer.types.priority_queue import RedisPriorityQueue
 from tests.conftest import special_field_test_for
+
 from tests.models.special_types import MixedSpecialModel, PriorityQueueModel
 
 
@@ -30,7 +31,7 @@ async def saved_mixed_model():
 # --- adelete ---
 
 
-@special_field_test_for(AtomicRedisModel.adelete)
+@special_field_test_for(AtomicRedisModel.adelete, RedisPriorityQueue)
 @pytest.mark.asyncio
 async def test_adelete_model_with_pq_deletes_model_and_pq_keys(
     real_redis_client, saved_pq_model
@@ -69,7 +70,7 @@ async def test_adelete_model_with_empty_pq_deletes_model_key(real_redis_client):
 # --- ainsert ---
 
 
-@special_field_test_for(AtomicRedisModel.ainsert)
+@special_field_test_for(AtomicRedisModel.ainsert, RedisPriorityQueue)
 @pytest.mark.asyncio
 async def test_ainsert_multiple_models_with_pq_all_saved(real_redis_client):
     # Arrange
@@ -109,7 +110,7 @@ async def test_ainsert_mixed_models_regular_fields_and_pq_accessible(real_redis_
 # --- aget ---
 
 
-@special_field_test_for(AtomicRedisModel.aget)
+@special_field_test_for(AtomicRedisModel.aget, RedisPriorityQueue)
 @pytest.mark.asyncio
 async def test_aget_model_with_pq_data_pq_functional_after_load(saved_pq_model):
     # Arrange
@@ -142,7 +143,7 @@ async def test_aget_mixed_model_regular_fields_and_pq_accessible(saved_mixed_mod
 # --- aload ---
 
 
-@special_field_test_for(AtomicRedisModel.aload)
+@special_field_test_for(AtomicRedisModel.aload, RedisPriorityQueue)
 @pytest.mark.asyncio
 async def test_aload_model_with_pq_reloaded_has_functional_pq(saved_pq_model):
     # Arrange
@@ -175,7 +176,7 @@ async def test_aload_after_pq_modification_sees_current_state(saved_pq_model):
 # --- afind ---
 
 
-@special_field_test_for(AtomicRedisModel.afind)
+@special_field_test_for(AtomicRedisModel.afind, RedisPriorityQueue)
 @pytest.mark.asyncio
 async def test_afind_all_models_with_pq_returned_with_functional_pq(real_redis_client):
     # Arrange
@@ -218,7 +219,7 @@ async def test_afind_by_keys_returns_models_with_functional_pq(real_redis_client
 # --- aupdate ---
 
 
-@special_field_test_for(AtomicRedisModel.aupdate)
+@special_field_test_for(AtomicRedisModel.aupdate, RedisPriorityQueue)
 @pytest.mark.asyncio
 async def test_aupdate_regular_field_on_mixed_model_pq_persists(saved_mixed_model):
     # Arrange
@@ -267,7 +268,7 @@ async def test_aupdate_regular_and_pq_field_together_raises_error(saved_mixed_mo
 # --- aduplicate ---
 
 
-@special_field_test_for(AtomicRedisModel.aduplicate)
+@special_field_test_for(AtomicRedisModel.aduplicate, RedisPriorityQueue)
 @pytest.mark.asyncio
 async def test_aduplicate_model_with_pq_duplicate_has_empty_pq(saved_pq_model):
     # Arrange
