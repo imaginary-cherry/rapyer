@@ -38,13 +38,15 @@ class PipelineAtomicityBase(ABC):
     ``self.test_input.<field>`` directly.
     """
 
-    __test__ = False  # flipped True on concrete leaves via __init_subclass__
-
     params: ClassVar[list[Any]] = []
     """Parametrize values — a list of dataclass instances (or ``None`` for no params)."""
 
     covered_method: ClassVar[Any] = None
     """Method (or list of methods) passed to ``@model_pipeline_test_for``."""
+
+    def __init__(self):
+        self.handle = None
+        self.test_input = None
 
     @abstractmethod
     async def setup_data(self) -> Any:
@@ -103,7 +105,7 @@ class PipelineAtomicityBase(ABC):
 # =============================================================================
 
 
-class ComprehensiveCounterOpBase(PipelineAtomicityBase):
+class ComprehensiveCounterOpBase(PipelineAtomicityBase, ABC):
     """RedisInt binary ops on ``ComprehensiveTestModel.counter``. ``self.test_input`` is ``BinaryOpCase``."""
 
     async def setup_data(self):
@@ -122,7 +124,7 @@ class ComprehensiveCounterOpBase(PipelineAtomicityBase):
         return self.test_input.expected
 
 
-class PipelineAllTypesAmountOpBase(PipelineAtomicityBase):
+class PipelineAllTypesAmountOpBase(PipelineAtomicityBase, ABC):
     """RedisFloat binary ops on ``PipelineAllTypesTestModel.amount``. ``self.test_input`` is ``BinaryOpCase``."""
 
     async def setup_data(self):
@@ -141,7 +143,7 @@ class PipelineAllTypesAmountOpBase(PipelineAtomicityBase):
         return self.test_input.expected
 
 
-class PipelineAllTypesNameOpBase(PipelineAtomicityBase):
+class PipelineAllTypesNameOpBase(PipelineAtomicityBase, ABC):
     """RedisStr ops on ``PipelineAllTypesTestModel.name``."""
 
     async def load_data(self):
@@ -149,7 +151,7 @@ class PipelineAllTypesNameOpBase(PipelineAtomicityBase):
         return loaded.name
 
 
-class ComprehensiveTagsOpBase(PipelineAtomicityBase):
+class ComprehensiveTagsOpBase(PipelineAtomicityBase, ABC):
     """List ops on ``ComprehensiveTestModel.tags``."""
 
     async def load_data(self):
@@ -157,7 +159,7 @@ class ComprehensiveTagsOpBase(PipelineAtomicityBase):
         return loaded.tags
 
 
-class ComprehensiveMetadataOpBase(PipelineAtomicityBase):
+class ComprehensiveMetadataOpBase(PipelineAtomicityBase, ABC):
     """Dict ops on ``ComprehensiveTestModel.metadata``."""
 
     async def load_data(self):
@@ -165,7 +167,7 @@ class ComprehensiveMetadataOpBase(PipelineAtomicityBase):
         return loaded.metadata
 
 
-class AllTypesModelIntFieldOpBase(PipelineAtomicityBase):
+class AllTypesModelIntFieldOpBase(PipelineAtomicityBase, ABC):
     """RedisInt ops on ``AllTypesModel.int_field``."""
 
     async def load_data(self):
@@ -173,7 +175,7 @@ class AllTypesModelIntFieldOpBase(PipelineAtomicityBase):
         return loaded.int_field
 
 
-class AllTypesModelListFieldOpBase(PipelineAtomicityBase):
+class AllTypesModelListFieldOpBase(PipelineAtomicityBase, ABC):
     """RedisList ops on ``AllTypesModel.list_field``."""
 
     async def setup_data(self):
@@ -189,7 +191,7 @@ class AllTypesModelListFieldOpBase(PipelineAtomicityBase):
         return []
 
 
-class AllTypesModelDictFieldOpBase(PipelineAtomicityBase):
+class AllTypesModelDictFieldOpBase(PipelineAtomicityBase, ABC):
     """RedisDict ops on ``AllTypesModel.dict_field``."""
 
     async def setup_data(self):
