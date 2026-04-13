@@ -607,8 +607,10 @@ class AtomicRedisModel(BaseModel):
 
     @classmethod
     async def adelete_by_key(cls, key: str) -> bool:
-        client = _context_pipe.get() or cls.Meta.redis
-        return await client.delete(key) == 1
+        key = cls._resolve_key(key)
+        async with ensure_pipeline(cls.Meta) as pipe:
+            pipe.delete(*cls._all_keys_for_key(key))
+        return True
 
     async def adelete(self):
         if self.is_inner_model():
