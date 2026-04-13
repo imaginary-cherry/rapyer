@@ -10,18 +10,18 @@ from tests.models.collection_types import ComprehensiveTestModel
 class TestRedisListSetitem(ComprehensiveTagsOpBase):
     covered_method = RedisList.__setitem__
 
-    async def setup_data(self, **_):
+    async def setup_data(self):
         model = ComprehensiveTestModel(tags=["first", "second", "third"])
         await model.asave()
         return model
 
-    async def perform_action(self, piped, **_):
+    async def perform_action(self, piped):
         piped.tags[1] = "modified"
 
-    def expected_before(self, **_):
+    def expected_before(self):
         return ["first", "second", "third"]
 
-    def expected_after(self, **_):
+    def expected_after(self):
         return ["first", "modified", "third"]
 
 
@@ -66,18 +66,18 @@ async def test_redis_list_setitem_at_end_with_pipeline_sanity():
 class TestRedisListIadd(ComprehensiveTagsOpBase):
     covered_method = RedisList.__iadd__
 
-    async def setup_data(self, **_):
+    async def setup_data(self):
         model = ComprehensiveTestModel(tags=["initial"])
         await model.asave()
         return model
 
-    async def perform_action(self, piped, **_):
+    async def perform_action(self, piped):
         piped.tags += ["added1", "added2"]
 
-    def expected_before(self, **_):
+    def expected_before(self):
         return ["initial"]
 
-    def expected_after(self, **_):
+    def expected_after(self):
         return ["initial", "added1", "added2"]
 
 

@@ -10,7 +10,7 @@ class TestPipelineAsetTtl(PipelineAtomicityBase):
 
     covered_method = AtomicRedisModel.aset_ttl
 
-    async def setup_data(self, **_):
+    async def setup_data(self):
         models = [
             UserModelWithoutTTL(name="user1", age=25),
             UserModelWithoutTTL(name="user2", age=30),
@@ -21,24 +21,24 @@ class TestPipelineAsetTtl(PipelineAtomicityBase):
         assert all(ttl == -1 for ttl in ttls_before)
         return models
 
-    def pipeline_owner(self, handle):
-        return handle[0]
+    def pipeline_owner(self):
+        return self.handle[0]
 
-    async def perform_action(self, piped, *, handle, **_):
-        for model in handle:
+    async def perform_action(self, piped):
+        for model in self.handle:
             await model.aset_ttl(TTL_SECONDS)
 
-    async def load_data(self, handle):
-        return [await self.real_redis_client.ttl(model.key) for model in handle]
+    async def load_data(self):
+        return [await self.real_redis_client.ttl(model.key) for model in self.handle]
 
-    def expected_before(self, **_):
+    def expected_before(self):
         # All TTLs are still -1 (unset) while the pipeline is open.
         return [-1, -1, -1]
 
-    def assert_after_pipeline(self, loaded, **_):
+    def assert_after_pipeline(self, loaded):
         # After the pipeline commits, each TTL should be positive and bounded by TTL_SECONDS.
         assert all(0 < ttl <= TTL_SECONDS for ttl in loaded), loaded
 
-    def expected_after(self, **_):
+    def expected_after(self):
         # Unused because ``assert_after_pipeline`` is overridden with a range check.
         return None

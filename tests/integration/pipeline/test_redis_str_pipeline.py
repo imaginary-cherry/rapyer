@@ -2,6 +2,7 @@ import pytest
 
 from rapyer.types.string import RedisStr
 from tests.integration.pipeline.pipeline_atomicity_base import (
+    BinaryOpCase,
     PipelineAllTypesNameOpBase,
 )
 from tests.models.redis_types import PipelineAllTypesTestModel
@@ -10,19 +11,19 @@ from tests.models.redis_types import PipelineAllTypesTestModel
 class TestRedisStrAllOperationsCombined(PipelineAllTypesNameOpBase):
     covered_method = RedisStr.__iadd__
 
-    async def setup_data(self, **_):
+    async def setup_data(self):
         model = PipelineAllTypesTestModel(name="hello")
         await model.asave()
         return model
 
-    async def perform_action(self, piped, **_):
+    async def perform_action(self, piped):
         piped.name += "_world"
         piped.name += "_test"
 
-    def expected_before(self, **_):
+    def expected_before(self):
         return "hello"
 
-    def expected_after(self, **_):
+    def expected_after(self):
         return "hello_world_test"
 
 
@@ -47,22 +48,21 @@ async def test_redis_str_operations__changes_outside_pipeline_ignored_sanity():
 
 class TestRedisStrImul(PipelineAllTypesNameOpBase):
     covered_method = RedisStr.__imul__
-    param_names = ["initial_value", "multiplier", "expected"]
-    params = [["test", 0, ""]]
+    params = [BinaryOpCase("test", 0, "")]
 
-    async def setup_data(self, *, initial_value, **_):
-        model = PipelineAllTypesTestModel(name=initial_value)
+    async def setup_data(self):
+        model = PipelineAllTypesTestModel(name=self.test_input.initial)
         await model.asave()
         return model
 
-    async def perform_action(self, piped, *, multiplier, **_):
-        piped.name *= multiplier
+    async def perform_action(self, piped):
+        piped.name *= self.test_input.operand
 
-    def expected_before(self, *, initial_value, **_):
-        return initial_value
+    def expected_before(self):
+        return self.test_input.initial
 
-    def expected_after(self, *, expected, **_):
-        return expected
+    def expected_after(self):
+        return self.test_input.expected
 
 
 @pytest.mark.asyncio

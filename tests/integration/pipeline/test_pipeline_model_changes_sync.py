@@ -103,22 +103,22 @@ async def test_integer_assignment_changes_persisted_after_pipeline_sanity():
 class TestIntegerAddition(PipelineAtomicityBase):
     covered_method = RedisInt.__iadd__
 
-    async def setup_data(self, **_):
+    async def setup_data(self):
         model = AllTypesModel(int_field=100)
         await model.asave()
         return model
 
-    async def perform_action(self, piped, **_):
+    async def perform_action(self, piped):
         piped.int_field += 25
 
-    async def load_data(self, model):
-        loaded = await AllTypesModel.aget(model.key)
+    async def load_data(self):
+        loaded = await AllTypesModel.aget(self.handle.key)
         return loaded.int_field
 
-    def expected_before(self, **_):
+    def expected_before(self):
         return 100
 
-    def expected_after(self, **_):
+    def expected_after(self):
         return 125
 
 
@@ -150,10 +150,10 @@ async def test_integer_multiple_operations_changes_preserved_during_pipeline_com
 class TestListAppend(AllTypesModelListFieldOpBase):
     covered_method = RedisList.append
 
-    async def perform_action(self, piped, **_):
+    async def perform_action(self, piped):
         piped.list_field.append("item1")
 
-    def expected_after(self, **_):
+    def expected_after(self):
         return ["item1"]
 
 
@@ -179,10 +179,10 @@ async def test_list_aappend_changes_preserved_during_pipeline_committed_after_sa
 class TestListExtend(AllTypesModelListFieldOpBase):
     covered_method = RedisList.extend
 
-    async def perform_action(self, piped, **_):
+    async def perform_action(self, piped):
         piped.list_field.extend(["item1", "item2"])
 
-    def expected_after(self, **_):
+    def expected_after(self):
         return ["item1", "item2"]
 
 
@@ -237,10 +237,10 @@ async def test_list_mixed_operations_changes_preserved_during_pipeline_committed
 class TestDictUpdate(AllTypesModelDictFieldOpBase):
     covered_method = RedisDict.update
 
-    async def perform_action(self, piped, **_):
+    async def perform_action(self, piped):
         piped.dict_field.update({"key1": "value1", "key2": "value2"})
 
-    def expected_after(self, **_):
+    def expected_after(self):
         return {"key1": "value1", "key2": "value2"}
 
 
@@ -271,10 +271,10 @@ async def test_dict_aupdate_changes_preserved_during_pipeline_committed_after_sa
 class TestDictSetitem(AllTypesModelDictFieldOpBase):
     covered_method = RedisDict.__setitem__
 
-    async def perform_action(self, piped, **_):
+    async def perform_action(self, piped):
         piped.dict_field["direct_key"] = "direct_value"
 
-    def expected_after(self, **_):
+    def expected_after(self):
         return {"direct_key": "direct_value"}
 
 
@@ -430,22 +430,22 @@ async def test_float_division_changes_preserved_during_pipeline_committed_after_
 class TestFloatAincrease(PipelineAtomicityBase):
     covered_method = RedisFloat.aincrease
 
-    async def setup_data(self, **_):
+    async def setup_data(self):
         model = FloatModel(value=50.0)
         await model.asave()
         return model
 
-    async def perform_action(self, piped, **_):
+    async def perform_action(self, piped):
         await piped.value.aincrease(10.5)
 
-    async def load_data(self, model):
-        loaded = await FloatModel.aget(model.key)
+    async def load_data(self):
+        loaded = await FloatModel.aget(self.handle.key)
         return loaded.value
 
-    def expected_before(self, **_):
+    def expected_before(self):
         return 50.0
 
-    def expected_after(self, **_):
+    def expected_after(self):
         return 60.5
 
 

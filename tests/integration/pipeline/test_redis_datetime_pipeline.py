@@ -4,7 +4,10 @@ import pytest
 
 import rapyer
 from rapyer.types.datetime import RedisDatetime, RedisDatetimeTimestamp
-from tests.integration.pipeline.pipeline_atomicity_base import PipelineAtomicityBase
+from tests.integration.pipeline.pipeline_atomicity_base import (
+    BinaryOpCase,
+    PipelineAtomicityBase,
+)
 from tests.models.simple_types import DatetimeModel, DatetimeTimestampModel
 
 
@@ -17,81 +20,80 @@ class _DatetimeBothModelsOpBase(PipelineAtomicityBase):
     via the context var set by ``apipeline()``.
     """
 
-    param_names = ["initial", "delta", "expected"]
-
-    async def setup_data(self, *, initial, **_):
+    async def setup_data(self):
+        initial = self.test_input.initial
         ts_model = DatetimeTimestampModel(created_at=initial, updated_at=initial)
         str_date_model = DatetimeModel(created_at=initial, updated_at=initial)
         await rapyer.ainsert(str_date_model, ts_model)
         return ts_model, str_date_model
 
-    def pipeline_owner(self, handle):
-        ts_model, _str_date_model = handle
+    def pipeline_owner(self):
+        ts_model, _str_date_model = self.handle
         return ts_model
 
-    async def load_data(self, handle):
-        ts_model, str_date_model = handle
+    async def load_data(self):
+        ts_model, str_date_model = self.handle
         loaded_ts = await DatetimeTimestampModel.aget(ts_model.key)
         loaded_str = await DatetimeModel.aget(str_date_model.key)
         return loaded_ts.created_at, loaded_str.created_at
 
-    def expected_before(self, *, initial, **_):
-        return initial, initial
+    def expected_before(self):
+        return self.test_input.initial, self.test_input.initial
 
-    def expected_after(self, *, expected, **_):
-        return expected, expected
+    def expected_after(self):
+        return self.test_input.expected, self.test_input.expected
 
 
 class TestRedisDatetimeIadd(_DatetimeBothModelsOpBase):
     covered_method = [RedisDatetime.__iadd__, RedisDatetimeTimestamp.__iadd__]
     params = [
-        [
+        BinaryOpCase(
             datetime(2023, 1, 1, 12, 0, 0),
             timedelta(days=1),
             datetime(2023, 1, 2, 12, 0, 0),
-        ],
-        [
+        ),
+        BinaryOpCase(
             datetime(2023, 1, 1, 12, 0, 0),
             timedelta(hours=6),
             datetime(2023, 1, 1, 18, 0, 0),
-        ],
-        [
+        ),
+        BinaryOpCase(
             datetime(2023, 12, 31, 23, 0, 0),
             timedelta(hours=2),
             datetime(2024, 1, 1, 1, 0, 0),
-        ],
+        ),
     ]
 
-    async def perform_action(self, piped, *, handle, delta, **_):
-        _, str_date_model = handle
-        piped.created_at += delta
-        str_date_model.created_at += delta
+    async def perform_action(self, piped):
+        _, str_date_model = self.handle
+        piped.created_at += self.test_input.operand
+        str_date_model.created_at += self.test_input.operand
 
 
 class TestRedisDatetimeIsub(_DatetimeBothModelsOpBase):
     covered_method = [RedisDatetime.__isub__, RedisDatetimeTimestamp.__isub__]
     params = [
-        [
+        BinaryOpCase(
             datetime(2023, 1, 2, 12, 0, 0),
             timedelta(days=1),
             datetime(2023, 1, 1, 12, 0, 0),
-        ],
-        [
+        ),
+        BinaryOpCase(
             datetime(2023, 1, 1, 18, 0, 0),
             timedelta(hours=6),
             datetime(2023, 1, 1, 12, 0, 0),
-        ],
-        [
+        ),
+        BinaryOpCase(
             datetime(2024, 1, 1, 1, 0, 0),
             timedelta(hours=2),
             datetime(2023, 12, 31, 23, 0, 0),
-        ],
+        ),
     ]
 
-    async def perform_action(self, piped, *, handle, delta, **_):
-        _, str_date_model = handle
-        piped.created_at -= delta
-        str_date_model.created_at -= delta
+    async def perform_action(self, piped):
+        _, str_date_model = self.handle
+        piped.created_at -= self.test_input.operand
+        str_date_model.created_at -= self.test_input.operand
 
 
 @pytest.mark.asyncio
