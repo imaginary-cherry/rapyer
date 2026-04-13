@@ -42,3 +42,10 @@ async def ensure_pipeline(meta):
             with with_pipe_context(pipe):
                 yield pipe
                 await pipe.execute()
+
+
+@contextlib.asynccontextmanager
+async def pipeline_with_execution(meta):
+    async with meta.redis.pipeline(transaction=True) as pipe:
+        yield pipe
+        await pipe.execute()

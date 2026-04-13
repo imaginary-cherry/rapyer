@@ -29,6 +29,7 @@ from rapyer.context import (
     _context_pipe,
     ensure_pipeline,
     pipe_ctx_from_redix,
+    pipeline_with_execution,
     with_pipe_context,
 )
 from rapyer.errors import (
@@ -183,11 +184,11 @@ class AtomicRedisModel(BaseModel):
     async def refresh_ttl_if_needed(self, can_use_pipeline: bool = False):
         if self.should_refresh():
             pipe_context = (
-                ensure_pipeline(self.Meta)
+                ensure_pipeline
                 if can_use_pipeline
-                else self.Meta.redis.pipeline()
+                else pipeline_with_execution
             )
-            async with pipe_context as pipe:
+            async with pipe_context(self.Meta) as pipe:
                 pipe.expire(self.key, self.Meta.ttl)
                 for fname in self._special_field_names:
                     field = getattr(self, fname)
