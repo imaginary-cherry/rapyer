@@ -1,3 +1,5 @@
+import functools
+import inspect
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, ClassVar
@@ -81,6 +83,7 @@ class PipelineAtomicityBase(ABC):
     async def _capture_real_redis(self, real_redis_client):
         self.real_redis_client = real_redis_client
 
+    @pytest.mark.asyncio
     async def test_pipeline_atomicity(self, test_input) -> None:
         self.test_input = test_input
         self.handle = await self.setup_data()
@@ -94,9 +97,19 @@ class PipelineAtomicityBase(ABC):
 
     def __init_subclass__(cls, **kwargs: Any):
         super().__init_subclass__(**kwargs)
+        if inspect.isabstract(cls):
+            return
         params = cls.params or [None]
-        mark = pytest.mark.parametrize("test_input", params, ids=params)
-        cls.test_pipeline_atomicity = mark(cls.test_pipeline_atomicity)
+        base_fn = cls.test_pipeline_atomicity
+
+        @functools.wraps(base_fn)
+        async def test_pipeline_atomicity(self, test_input):
+            return await base_fn(self, test_input)
+
+        mark = pytest.mark.parametrize(
+            "test_input", params, ids=[repr(p) for p in params]
+        )
+        cls.test_pipeline_atomicity = mark(test_pipeline_atomicity)
 
 
 # =============================================================================
