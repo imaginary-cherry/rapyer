@@ -299,7 +299,7 @@ Deletes multiple model instances from Redis. Supports three input modes: model i
 ```python
 # Delete using model instances
 result = await User.adelete_many(*users)
-print(result.count)  # 4
+print(result.models_deleted)  # 4
 
 # Delete using keys from .key or .pk or a string
 result = await User.adelete_many(users[0].key, users[1].pk, "User:123")
