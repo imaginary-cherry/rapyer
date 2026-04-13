@@ -182,12 +182,17 @@ class AtomicRedisModel(BaseModel):
 
     async def refresh_ttl_if_needed(self, can_use_pipeline: bool = False):
         if self.should_refresh():
-            client = self.client if can_use_pipeline else self.Meta.redis
-            await client.expire(self.key, self.Meta.ttl)
-            for fname in self._special_field_names:
-                field = getattr(self, fname)
-                if isinstance(field, SpecialFieldType):
-                    await client.expire(field.special_key, self.Meta.ttl)
+            pipe_context = (
+                ensure_pipeline(self.Meta)
+                if can_use_pipeline
+                else self.Meta.redis.pipeline()
+            )
+            async with pipe_context as pipe:
+                pipe.expire(self.key, self.Meta.ttl)
+                for fname in self._special_field_names:
+                    field = getattr(self, fname)
+                    if isinstance(field, SpecialFieldType):
+                        pipe.expire(field.special_key, self.Meta.ttl)
 
     @classmethod
     def redis_schema(cls, redis_name: str = ""):
