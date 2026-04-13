@@ -1,15 +1,14 @@
-import pytest
-
 import rapyer
 from rapyer.base import AtomicRedisModel
 from rapyer.types.dct import RedisDict
 from rapyer.types.integer import RedisInt
 from rapyer.types.lst import RedisList
-from tests.conftest import standalone_pipeline_test_for
 from tests.integration.pipeline.pipeline_atomicity_base import (
     ComprehensiveMetadataOpBase,
     ComprehensiveTagsOpBase,
     PipelineAtomicityBase,
+    RapyerPipelineBase,
+    TwoModelDeleteBase,
 )
 from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.simple_types import (
@@ -81,75 +80,59 @@ class TestPipelineModelAinsert(PipelineAtomicityBase):
         return 1, "inserted"
 
 
-# The standalone-pipeline ainsert test isn't in scope — kept as a plain function.
-@standalone_pipeline_test_for(AtomicRedisModel.ainsert)
-@pytest.mark.asyncio
-async def test_pipeline_model_ainsert__standalone_pipeline__check_atomicity(
-    real_redis_client,
-):
-    # Arrange
-    model1 = ComprehensiveTestModel(name="model1")
-    model2 = ComprehensiveTestModel(name="model2")
+# NOTE: mirrors TestPipelineModelAinsert but exercises the module-level
+# ``rapyer.apipeline()`` context instead of the instance pipeline.
+class TestRapyerPipelineAinsert(RapyerPipelineBase):
+    covered_method = AtomicRedisModel.ainsert
 
-    # Act
-    async with rapyer.apipeline():
-        await ComprehensiveTestModel.ainsert(model1, model2)
+    def create_models(self):
+        return [
+            ComprehensiveTestModel(name="model1"),
+            ComprehensiveTestModel(name="model2"),
+        ]
 
-        # Assert - models not visible during pipeline
-        exists1 = await real_redis_client.exists(model1.key)
-        exists2 = await real_redis_client.exists(model2.key)
-        assert exists1 == 0
-        assert exists2 == 0
+    async def setup_data(self):
+        # Don't pre-insert — the ``ainsert`` call inside the pipeline is the
+        # test subject, so ``handle`` is the (unsaved) models themselves.
+        return self.create_models()
 
-    # Assert - models exist after pipeline
-    loaded1 = await ComprehensiveTestModel.aget(model1.key)
-    loaded2 = await ComprehensiveTestModel.aget(model2.key)
-    assert loaded1.name == "model1"
-    assert loaded2.name == "model2"
+    async def perform_action(self, piped):
+        await ComprehensiveTestModel.ainsert(*self.handle)
 
+    async def load_data(self):
+        return tuple([await self.real_redis_client.exists(m.key) for m in self.handle])
 
-@standalone_pipeline_test_for(AtomicRedisModel.adelete)
-@pytest.mark.asyncio
-async def test_pipeline_model_adelete__standalone_pipeline__check_atomicity(
-    real_redis_client,
-):
-    # Arrange
-    model = ComprehensiveTestModel(name="to_delete")
-    await model.asave()
+    def expected_before(self):
+        return 0, 0
 
-    # Act
-    async with rapyer.apipeline():
-        await model.adelete()
-
-        # Assert - model still exists during pipeline
-        exists = await real_redis_client.exists(model.key)
-        assert exists == 1
-
-    # Assert - model deleted after pipeline
-    exists = await real_redis_client.exists(model.key)
-    assert exists == 0
+    def expected_after(self):
+        return 1, 1
 
 
-@standalone_pipeline_test_for(AtomicRedisModel.adelete_by_key)
-@pytest.mark.asyncio
-async def test_pipeline_model_adelete_by_key__standalone_pipeline__check_atomicity(
-    real_redis_client,
-):
-    # Arrange
-    model = ComprehensiveTestModel(name="to_delete")
-    await model.asave()
+# NOTE: mirrors TestPipelineDelete but exercises the module-level
+# ``rapyer.apipeline()`` context instead of the instance pipeline.
+class TestRapyerPipelineDelete(TwoModelDeleteBase):
+    covered_method = AtomicRedisModel.adelete
 
-    # Act
-    async with rapyer.apipeline():
-        await ComprehensiveTestModel.adelete_by_key(model.key)
+    def pipeline_owner(self):
+        return rapyer
 
-        # Assert - model still exists during pipeline
-        exists = await real_redis_client.exists(model.key)
-        assert exists == 1
+    async def perform_action(self, piped):
+        model1, _ = self.handle
+        await model1.adelete()
 
-    # Assert - model deleted after pipeline
-    exists = await real_redis_client.exists(model.key)
-    assert exists == 0
+
+# NOTE: mirrors TestPipelineTryDelete but exercises the module-level
+# ``rapyer.apipeline()`` context instead of the instance pipeline.
+class TestRapyerPipelineDeleteByKey(TwoModelDeleteBase):
+    covered_method = AtomicRedisModel.adelete_by_key
+
+    def pipeline_owner(self):
+        return rapyer
+
+    async def perform_action(self, piped):
+        model1, _ = self.handle
+        await ComprehensiveTestModel.adelete_by_key(model1.key)
 
 
 class TestPipelineModelAdeleteMany(PipelineAtomicityBase):
@@ -183,27 +166,40 @@ class TestPipelineModelAdeleteMany(PipelineAtomicityBase):
         return 0, 0
 
 
-@standalone_pipeline_test_for(AtomicRedisModel.aset_ttl)
-@pytest.mark.asyncio
-async def test_pipeline_model_aset_ttl__standalone_pipeline__check_atomicity(
-    real_redis_client,
-):
-    # Arrange
-    model = UserModelWithoutTTL(name="user1", age=25)
-    await model.asave()
-    assert await real_redis_client.ttl(model.key) == -1
+# NOTE: mirrors TestPipelineAsetTtl but exercises the module-level
+# ``rapyer.apipeline()`` context instead of the instance pipeline.
+class TestRapyerPipelineAsetTtl(RapyerPipelineBase):
+    covered_method = AtomicRedisModel.aset_ttl
 
-    # Act
-    async with rapyer.apipeline():
-        await model.aset_ttl(TTL_SECONDS)
+    def create_models(self):
+        return [
+            UserModelWithoutTTL(name="user1", age=25),
+            UserModelWithoutTTL(name="user2", age=30),
+            UserModelWithoutTTL(name="user3", age=35),
+        ]
 
-        # Assert - TTL not set during pipeline
-        ttl_during = await real_redis_client.ttl(model.key)
-        assert ttl_during == -1
+    async def setup_data(self):
+        models = await super().setup_data()
+        ttls_before = [await self.real_redis_client.ttl(m.key) for m in models]
+        assert all(ttl == -1 for ttl in ttls_before)
+        return models
 
-    # Assert - TTL set after pipeline
-    ttl_after = await real_redis_client.ttl(model.key)
-    assert 0 < ttl_after <= TTL_SECONDS
+    async def perform_action(self, piped):
+        for m in self.handle:
+            await m.aset_ttl(TTL_SECONDS)
+
+    async def load_data(self):
+        return [await self.real_redis_client.ttl(m.key) for m in self.handle]
+
+    def expected_before(self):
+        return [-1, -1, -1]
+
+    def assert_after_pipeline(self, loaded):
+        assert all(0 < ttl <= TTL_SECONDS for ttl in loaded), loaded
+
+    def expected_after(self):
+        # Unused — ``assert_after_pipeline`` does a range check instead.
+        return None
 
 
 class TestPipelineRedisIntAincrease(PipelineAtomicityBase):
@@ -290,101 +286,121 @@ class TestPipelineRedisDictClear(ComprehensiveMetadataOpBase):
         return {}
 
 
-@standalone_pipeline_test_for(AtomicRedisModel.aduplicate)
-@pytest.mark.asyncio
-async def test_pipeline_model_aduplicate__standalone_pipeline__check_atomicity():
-    # Arrange
-    model = ComprehensiveTestModel(name="original", counter=42, tags=["t1"])
-    await model.asave()
+class TestRapyerPipelineAduplicate(RapyerPipelineBase):
+    covered_method = AtomicRedisModel.aduplicate
 
-    # Act
-    async with rapyer.apipeline():
-        duplicate = await model.aduplicate()
+    duplicate: ComprehensiveTestModel | None = None
 
-        # Assert - duplicate not visible during pipeline
-        assert not await ComprehensiveTestModel.aexists(duplicate.key)
+    def create_models(self):
+        return ComprehensiveTestModel(name="original", counter=42, tags=["t1"])
 
-    # Assert - duplicate exists after pipeline with correct values
-    loaded = await ComprehensiveTestModel.aget(duplicate.key)
-    assert loaded.name == "original"
-    assert loaded.counter == 42
-    assert loaded.tags == ["t1"]
-    assert duplicate.pk != model.pk
+    async def perform_action(self, piped):
+        self.duplicate = await self.handle.aduplicate()
 
+    async def load_data(self):
+        exists = await self.real_redis_client.exists(self.duplicate.key)
+        if not exists:
+            return 0, None, None, None
+        loaded = await ComprehensiveTestModel.aget(self.duplicate.key)
+        return 1, loaded.name, loaded.counter, loaded.tags
 
-@standalone_pipeline_test_for(AtomicRedisModel.aduplicate_many)
-@pytest.mark.asyncio
-async def test_pipeline_model_aduplicate_many__standalone_pipeline__check_atomicity():
-    # Arrange
-    model = ComprehensiveTestModel(name="original", counter=42, tags=["t1"])
-    await model.asave()
+    def expected_before(self):
+        return 0, None, None, None
 
-    # Act
-    async with rapyer.apipeline():
-        duplicates = await model.aduplicate_many(3)
+    def expected_after(self):
+        return 1, "original", 42, ["t1"]
 
-        # Assert - duplicates not visible during pipeline
-        for dup in duplicates:
-            assert not await ComprehensiveTestModel.aexists(dup.key)
-
-    # Assert - all duplicates exist after pipeline
-    for dup in duplicates:
-        loaded = await ComprehensiveTestModel.aget(dup.key)
-        assert loaded.name == "original"
-        assert loaded.counter == 42
-        assert loaded.tags == ["t1"]
-
-    # All PKs should be unique
-    all_pks = [model.pk] + [d.pk for d in duplicates]
-    assert len(set(all_pks)) == 4
+    def assert_after_pipeline(self, loaded):
+        super().assert_after_pipeline(loaded)
+        assert self.duplicate.pk != self.handle.pk
 
 
-@standalone_pipeline_test_for(AtomicRedisModel.aupdate)
-@pytest.mark.asyncio
-async def test_pipeline_model_aupdate__standalone_pipeline__executes_immediately():
-    # Arrange
-    model = ComprehensiveTestModel(name="original", counter=10)
-    await model.asave()
+class TestRapyerPipelineAduplicateMany(RapyerPipelineBase):
+    covered_method = AtomicRedisModel.aduplicate_many
 
-    # Act - aupdate uses its own internal pipeline, so changes are
-    # visible immediately even inside an outer pipeline context
-    async with rapyer.apipeline():
-        await model.aupdate(name="updated", counter=99)
+    duplicates: list[ComprehensiveTestModel] | None = None
 
-        # Assert - changes visible during pipeline (aupdate is self-contained)
-        loaded = await ComprehensiveTestModel.aget(model.key)
-        assert loaded.name == "updated"
-        assert loaded.counter == 99
+    def create_models(self):
+        return ComprehensiveTestModel(name="original", counter=42, tags=["t1"])
 
-    # Assert - still correct after outer pipeline exits
-    final = await ComprehensiveTestModel.aget(model.key)
-    assert final.name == "updated"
-    assert final.counter == 99
+    async def perform_action(self, piped):
+        self.duplicates = await self.handle.aduplicate_many(3)
+
+    async def load_data(self):
+        results = []
+        for dup in self.duplicates:
+            exists = await self.real_redis_client.exists(dup.key)
+            if not exists:
+                results.append((0, None, None, None))
+                continue
+            loaded = await ComprehensiveTestModel.aget(dup.key)
+            results.append((1, loaded.name, loaded.counter, loaded.tags))
+        return results
+
+    def expected_before(self):
+        return [(0, None, None, None)] * 3
+
+    def expected_after(self):
+        return [(1, "original", 42, ["t1"])] * 3
+
+    def assert_after_pipeline(self, loaded):
+        super().assert_after_pipeline(loaded)
+        all_pks = [self.handle.pk] + [d.pk for d in self.duplicates]
+        assert len(set(all_pks)) == 4
 
 
-@standalone_pipeline_test_for(AtomicRedisModel.refresh_ttl_if_needed)
-@pytest.mark.asyncio
-async def test_pipeline_model_refresh_ttl__standalone_pipeline__check_atomicity(
-    real_redis_client,
-):
-    # Arrange
-    model = TTLRefreshTestModel(name="ttl_test", age=25)
-    await model.asave()
-    # Reduce TTL to create a measurable gap
-    reduced_ttl = 10
-    await real_redis_client.expire(model.key, reduced_ttl)
-    ttl_before = await real_redis_client.ttl(model.key)
-    assert 0 < ttl_before <= reduced_ttl
+class TestRapyerPipelineAupdate(RapyerPipelineBase):
+    """After aupdate was switched to ``ensure_pipeline``, it defers to an outer
+    pipeline like every other mutation."""
 
-    # Act
-    async with rapyer.apipeline():
-        await model.refresh_ttl_if_needed(can_use_pipeline=True)
+    covered_method = AtomicRedisModel.aupdate
 
-        # Assert - TTL not refreshed during pipeline
-        ttl_during = await real_redis_client.ttl(model.key)
-        assert ttl_during <= reduced_ttl
+    def create_models(self):
+        return ComprehensiveTestModel(name="original", counter=10)
 
-    # Assert - TTL refreshed after pipeline
-    ttl_after = await real_redis_client.ttl(model.key)
-    assert ttl_after > reduced_ttl
-    assert ttl_after <= TTL_TEST_SECONDS
+    async def perform_action(self, piped):
+        await self.handle.aupdate(name="updated", counter=99)
+
+    async def load_data(self):
+        loaded = await ComprehensiveTestModel.aget(self.handle.key)
+        return loaded.name, loaded.counter
+
+    def expected_before(self):
+        return "original", 10
+
+    def expected_after(self):
+        return "updated", 99
+
+
+class TestRapyerPipelineRefreshTtl(RapyerPipelineBase):
+    covered_method = AtomicRedisModel.refresh_ttl_if_needed
+    reduced_ttl: int = 10
+
+    def create_models(self):
+        return TTLRefreshTestModel(name="ttl_test", age=25)
+
+    async def setup_data(self):
+        model = await super().setup_data()
+        # Lower the TTL so there's a measurable gap to refresh.
+        await self.real_redis_client.expire(model.key, self.reduced_ttl)
+        ttl_before = await self.real_redis_client.ttl(model.key)
+        assert 0 < ttl_before <= self.reduced_ttl
+        return model
+
+    async def perform_action(self, piped):
+        await self.handle.refresh_ttl_if_needed(can_use_pipeline=True)
+
+    async def load_data(self):
+        return await self.real_redis_client.ttl(self.handle.key)
+
+    def assert_during_pipeline(self, loaded):
+        assert loaded <= self.reduced_ttl
+
+    def assert_after_pipeline(self, loaded):
+        assert self.reduced_ttl < loaded <= TTL_TEST_SECONDS
+
+    def expected_before(self):
+        return None
+
+    def expected_after(self):
+        return None

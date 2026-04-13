@@ -1,5 +1,3 @@
-from abc import ABC
-
 import pytest
 
 from rapyer.base import AtomicRedisModel
@@ -11,6 +9,7 @@ from tests.integration.pipeline.pipeline_atomicity_base import (
     ComprehensiveMetadataOpBase,
     ComprehensiveTagsOpBase,
     PipelineAtomicityBase,
+    TwoModelDeleteBase,
 )
 from tests.models.collection_types import ComprehensiveTestModel, PipelineTestModel
 
@@ -415,32 +414,6 @@ async def test_pipeline_exception_rollback__check_no_changes_applied_edge_case()
 # =============================================================================
 # Delete atomicity tests (use `real_redis_client.exists` rather than aget)
 # =============================================================================
-
-
-class TwoModelDeleteBase(PipelineAtomicityBase, ABC):
-    """Two-model delete atomicity: model1 deleted, model2 preserved."""
-
-    def create_models(self):
-        return [
-            ComprehensiveTestModel(tags=["tag1"], name="model1"),
-            ComprehensiveTestModel(tags=["tag2"], name="model2"),
-        ]
-
-    def pipeline_owner(self):
-        return self.handle[0]
-
-    async def load_data(self):
-        model1, model2 = self.handle
-        return (
-            await self.real_redis_client.exists(model1.key),
-            await self.real_redis_client.exists(model2.key),
-        )
-
-    def expected_before(self):
-        return 1, 1
-
-    def expected_after(self):
-        return 0, 1
 
 
 class TestPipelineDelete(TwoModelDeleteBase):

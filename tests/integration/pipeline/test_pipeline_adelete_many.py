@@ -4,7 +4,7 @@ import pytest_asyncio
 import rapyer
 from rapyer import DeleteResult, RapyerDeleteResult
 from rapyer.base import AtomicRedisModel
-from tests.conftest import standalone_pipeline_test_for
+from tests.integration.pipeline.pipeline_atomicity_base import RapyerPipelineBase
 from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.index_types import IndexTestModel
 from tests.models.simple_types import IntModel, StrModel
@@ -28,36 +28,46 @@ async def inserted_test_models(test_models):
 
 @pytest_asyncio.fixture
 async def create_index(real_redis_client):
+    IndexTestModel.init_class()
     await IndexTestModel.acreate_index()
     yield
     await IndexTestModel.adelete_index()
 
 
-@standalone_pipeline_test_for(AtomicRedisModel.adelete_many)
-@pytest.mark.asyncio
-async def test_pipeline_class_adelete_many__keys_deferred_until_execute(
-    real_redis_client,
-):
-    # Arrange
-    model1 = ComprehensiveTestModel(name="model1", tags=["a"])
-    model2 = ComprehensiveTestModel(name="model2", tags=["b"])
-    await model1.asave()
-    await model2.asave()
+# NOTE: mirrors TestPipelineModelAdeleteMany but exercises the module-level
+# ``rapyer.apipeline()`` context instead of the instance pipeline.
+class TestRapyerPipelineAdeleteMany(RapyerPipelineBase):
+    covered_method = AtomicRedisModel.adelete_many
 
-    # Act
-    async with rapyer.apipeline():
-        result = await ComprehensiveTestModel.adelete_many(model1, model2)
+    result: DeleteResult | None = None
 
-        key1_exists = await real_redis_client.exists(model1.key)
-        key2_exists = await real_redis_client.exists(model2.key)
-        assert key1_exists == 1
-        assert key2_exists == 1
+    def create_models(self):
+        return [
+            ComprehensiveTestModel(name="model1", tags=["a"]),
+            ComprehensiveTestModel(name="model2", tags=["b"]),
+        ]
 
-    # Assert
-    assert isinstance(result, DeleteResult)
-    assert result.models_deleted == 2
-    assert await real_redis_client.exists(model1.key) == 0
-    assert await real_redis_client.exists(model2.key) == 0
+    async def perform_action(self, piped):
+        model1, model2 = self.handle
+        self.result = await ComprehensiveTestModel.adelete_many(model1, model2)
+
+    async def load_data(self):
+        model1, model2 = self.handle
+        return (
+            await self.real_redis_client.exists(model1.key),
+            await self.real_redis_client.exists(model2.key),
+        )
+
+    def expected_before(self):
+        return 1, 1
+
+    def expected_after(self):
+        return 0, 0
+
+    def assert_after_pipeline(self, loaded):
+        super().assert_after_pipeline(loaded)
+        assert isinstance(self.result, DeleteResult)
+        assert self.result.models_deleted == 2
 
 
 @pytest.mark.asyncio

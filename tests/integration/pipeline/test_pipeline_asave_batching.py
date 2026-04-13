@@ -1,42 +1,39 @@
 import pytest
 
-import rapyer
 from rapyer.base import AtomicRedisModel
-from tests.conftest import standalone_pipeline_test_for
+from tests.integration.pipeline.pipeline_atomicity_base import RapyerPipelineBase
 from tests.models.collection_types import ComprehensiveTestModel
 
 
-@standalone_pipeline_test_for(AtomicRedisModel.asave)
-@pytest.mark.asyncio
-async def test_pipeline__multiple_model_asave__commands_batched_in_single_pipeline(
-    real_redis_client,
-):
-    # Arrange
-    model1 = ComprehensiveTestModel(name="model1", counter=1, tags=["tag1"])
-    model2 = ComprehensiveTestModel(name="model2", counter=2, tags=["tag2"])
-    model3 = ComprehensiveTestModel(name="model3", counter=3, tags=["tag3"])
+# NOTE: complementary to TestPipelineModelAsave (which covers a single-model
+# field update). This one exercises batching of multiple fresh-model asaves
+# under the module-level ``rapyer.apipeline()`` context.
+class TestRapyerPipelineAsaveBatching(RapyerPipelineBase):
+    covered_method = AtomicRedisModel.asave
 
-    model1_key = model1.key
-    model2_key = model2.key
-    model3_key = model3.key
+    def create_models(self):
+        return [
+            ComprehensiveTestModel(name="model1", counter=1, tags=["tag1"]),
+            ComprehensiveTestModel(name="model2", counter=2, tags=["tag2"]),
+            ComprehensiveTestModel(name="model3", counter=3, tags=["tag3"]),
+        ]
 
-    # Act
-    async with rapyer.apipeline():
-        await model1.asave()
-        is_model1_saved = await real_redis_client.exists(model1_key)
-        # Check that model1 is not saved yet
-        assert is_model1_saved == 0
+    async def setup_data(self):
+        # Don't pre-insert — the asave calls inside the pipeline are the subject.
+        return self.create_models()
 
-        await model2.asave()
-        await model3.asave()
+    async def perform_action(self, piped):
+        for model in self.handle:
+            await model.asave()
 
-    # Assert - verify all models persisted after single pipeline execute
-    loaded1, loaded2, loaded3 = await ComprehensiveTestModel.afind(
-        model1_key, model2_key, model3_key
-    )
-    assert loaded1 == model1
-    assert loaded2 == model2
-    assert loaded3 == model3
+    async def load_data(self):
+        return tuple([await self.real_redis_client.exists(m.key) for m in self.handle])
+
+    def expected_before(self):
+        return 0, 0, 0
+
+    def expected_after(self):
+        return 1, 1, 1
 
 
 @pytest.mark.asyncio

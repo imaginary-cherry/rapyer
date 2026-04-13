@@ -128,6 +128,13 @@ class PipelineAtomicityBase(ABC):
 # =============================================================================
 
 
+class RapyerPipelineBase(PipelineAtomicityBase, ABC):
+    """Atomicity via the module-level ``rapyer.apipeline()`` context."""
+
+    def pipeline_owner(self):
+        return rapyer
+
+
 class ComprehensiveCounterOpBase(PipelineAtomicityBase, ABC):
     """RedisInt binary ops on ``ComprehensiveTestModel.counter``. ``self.test_input`` is ``BinaryOpCase``."""
 
@@ -220,3 +227,29 @@ class AllTypesModelDictFieldOpBase(PipelineAtomicityBase, ABC):
 
     def expected_before(self):
         return {}
+
+
+class TwoModelDeleteBase(PipelineAtomicityBase, ABC):
+    """Two-model delete atomicity: model1 deleted, model2 preserved."""
+
+    def create_models(self):
+        return [
+            ComprehensiveTestModel(tags=["tag1"], name="model1"),
+            ComprehensiveTestModel(tags=["tag2"], name="model2"),
+        ]
+
+    def pipeline_owner(self):
+        return self.handle[0]
+
+    async def load_data(self):
+        model1, model2 = self.handle
+        return (
+            await self.real_redis_client.exists(model1.key),
+            await self.real_redis_client.exists(model2.key),
+        )
+
+    def expected_before(self):
+        return 1, 1
+
+    def expected_after(self):
+        return 0, 1
