@@ -614,9 +614,15 @@ class AtomicRedisModel(BaseModel):
     @classmethod
     async def adelete_by_key(cls, key: str) -> bool:
         key = cls._resolve_key(key)
-        async with ensure_pipeline(cls.Meta) as pipe:
-            pipe.delete(*cls._all_keys_for_key(key))
-        return True
+        keys_to_delete = cls._all_keys_for_key(key)
+        in_outer_pipe = _context_pipe.get() is not None
+        async with ensure_pipeline(cls.Meta, should_execute=False) as pipe:
+            pipe.delete(*keys_to_delete)
+            if in_outer_pipe:
+                # Outer caller owns execution; we cannot observe the result here.
+                return True
+            results = await pipe.execute()
+        return sum(results) > 0
 
     async def adelete(self):
         if self.is_inner_model():

@@ -63,7 +63,9 @@ await user.aload()  # Refreshes user with latest Redis data
 #### `adelete()`
 **Type:** `async` method  
 **Returns:** `bool`  
-**Description:** Deletes this model instance from Redis. Can only be called on top-level models (not nested ones).
+**Description:** Deletes this model instance from Redis. Can only be called on top-level models (not nested ones). Returns `True` only if at least one Redis key was actually removed; returns `False` if the model did not exist.
+
+> **Warning:** When called inside an active pipeline context (e.g. inside `apipeline()`), the deletion is queued on the outer caller's pipeline and executed later. In that case the actual Redis result is not observable here, so `adelete()` returns `True` unconditionally — it does not reflect whether a key was truly removed. Only the standalone (non-pipeline) call is guaranteed to return `False` for a missing key.
 
 ```python
 success = await user.adelete()
@@ -157,7 +159,9 @@ user = await User.aget("User:abc-123")
 **Parameters:**
 - `key` (str): The Redis key to delete
 **Returns:** `bool`
-**Description:** Deletes a model from Redis by its key without needing to load it first.
+**Description:** Deletes a model from Redis by its key without needing to load it first. Returns `True` only if at least one Redis key was actually removed; returns `False` if no key matched.
+
+> **Warning:** When called inside an active pipeline context (e.g. inside `apipeline()`), the deletion is queued on the outer caller's pipeline and executed later. In that case the actual Redis result is not observable here, so `adelete_by_key()` returns `True` unconditionally — it does not reflect whether a key was truly removed. Only the standalone (non-pipeline) call is guaranteed to return `False` for a missing key.
 
 ```python
 success = await User.adelete_by_key("User:abc-123")
