@@ -981,9 +981,15 @@ async def adelete_many(*args: RapyerKey | str | AtomicRedisModel) -> RapyerDelet
     max_batch = AtomicRedisModel.Meta.max_delete_per_transaction
     should_batch = _context_pipe.get() is None and max_batch is not None
 
-    batch_size = max_batch if should_batch else len(validated_keys)
-    batches = batched(validated_keys, batch_size)
+    all_keys = []
+    for key in validated_keys:
+        klass = key_to_class[key]
+        all_keys.extend(klass._all_keys_for_key(key))
+
+    batch_size = max_batch if should_batch else len(all_keys)
+    batches = batched(all_keys, batch_size)
     count, was_commited = await delete_in_batches(redis, batches)
+    count = len(validated_keys)
 
     per_class_count: dict[type[AtomicRedisModel], int] = {}
     for key in validated_keys:
