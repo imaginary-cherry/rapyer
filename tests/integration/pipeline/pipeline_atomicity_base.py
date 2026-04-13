@@ -7,6 +7,8 @@ from typing import Any, ClassVar
 import pytest
 import pytest_asyncio
 
+import rapyer
+from rapyer import AtomicRedisModel
 from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.functionality_types import AllTypesModel
 from tests.models.redis_types import PipelineAllTypesTestModel
@@ -50,8 +52,17 @@ class PipelineAtomicityBase(ABC):
     test_input: Any = None
 
     @abstractmethod
+    def create_models(self) -> list[AtomicRedisModel] | AtomicRedisModel:
+        """
+        Build (but don't insert) the test models.
+        """
+
     async def setup_data(self) -> Any:
-        """Create + asave() initial model(s). Return value is stored on ``self.handle``."""
+        """Default: build models via :meth:`create_models` and insert them."""
+        models = self.create_models()
+        to_insert = models if isinstance(models, list) else [models]
+        await rapyer.ainsert(*to_insert)
+        return models
 
     @abstractmethod
     async def perform_action(self, piped: Any) -> None:
@@ -120,10 +131,8 @@ class PipelineAtomicityBase(ABC):
 class ComprehensiveCounterOpBase(PipelineAtomicityBase, ABC):
     """RedisInt binary ops on ``ComprehensiveTestModel.counter``. ``self.test_input`` is ``BinaryOpCase``."""
 
-    async def setup_data(self):
-        model = ComprehensiveTestModel(counter=self.test_input.initial)
-        await model.asave()
-        return model
+    def create_models(self):
+        return ComprehensiveTestModel(counter=self.test_input.initial)
 
     async def load_data(self):
         loaded = await ComprehensiveTestModel.aget(self.handle.key)
@@ -139,10 +148,8 @@ class ComprehensiveCounterOpBase(PipelineAtomicityBase, ABC):
 class PipelineAllTypesAmountOpBase(PipelineAtomicityBase, ABC):
     """RedisFloat binary ops on ``PipelineAllTypesTestModel.amount``. ``self.test_input`` is ``BinaryOpCase``."""
 
-    async def setup_data(self):
-        model = PipelineAllTypesTestModel(amount=self.test_input.initial)
-        await model.asave()
-        return model
+    def create_models(self):
+        return PipelineAllTypesTestModel(amount=self.test_input.initial)
 
     async def load_data(self):
         loaded = await PipelineAllTypesTestModel.aget(self.handle.key)
@@ -190,10 +197,8 @@ class AllTypesModelIntFieldOpBase(PipelineAtomicityBase, ABC):
 class AllTypesModelListFieldOpBase(PipelineAtomicityBase, ABC):
     """RedisList ops on ``AllTypesModel.list_field``."""
 
-    async def setup_data(self):
-        model = AllTypesModel()
-        await model.asave()
-        return model
+    def create_models(self):
+        return AllTypesModel()
 
     async def load_data(self):
         loaded = await AllTypesModel.aget(self.handle.key)
@@ -206,10 +211,8 @@ class AllTypesModelListFieldOpBase(PipelineAtomicityBase, ABC):
 class AllTypesModelDictFieldOpBase(PipelineAtomicityBase, ABC):
     """RedisDict ops on ``AllTypesModel.dict_field``."""
 
-    async def setup_data(self):
-        model = AllTypesModel()
-        await model.asave()
-        return model
+    def create_models(self):
+        return AllTypesModel()
 
     async def load_data(self):
         loaded = await AllTypesModel.aget(self.handle.key)

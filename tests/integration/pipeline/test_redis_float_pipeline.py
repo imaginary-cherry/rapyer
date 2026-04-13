@@ -36,10 +36,8 @@ class TestRedisFloatAllOperationsCombined(PipelineAtomicityBase):
         RedisFloat.__imul__,
     ]
 
-    async def setup_data(self):
-        model = PipelineAllTypesTestModel(amount=100.0)
-        await model.asave()
-        return model
+    def create_models(self):
+        return PipelineAllTypesTestModel(amount=100.0)
 
     async def perform_action(self, piped):
         piped.amount += 50.0

@@ -103,10 +103,8 @@ async def test_integer_assignment_changes_persisted_after_pipeline_sanity():
 class TestIntegerAddition(PipelineAtomicityBase):
     covered_method = RedisInt.__iadd__
 
-    async def setup_data(self):
-        model = AllTypesModel(int_field=100)
-        await model.asave()
-        return model
+    def create_models(self):
+        return AllTypesModel(int_field=100)
 
     async def perform_action(self, piped):
         piped.int_field += 25
@@ -430,10 +428,8 @@ async def test_float_division_changes_preserved_during_pipeline_committed_after_
 class TestFloatAincrease(PipelineAtomicityBase):
     covered_method = RedisFloat.aincrease
 
-    async def setup_data(self):
-        model = FloatModel(value=50.0)
-        await model.asave()
-        return model
+    def create_models(self):
+        return FloatModel(value=50.0)
 
     async def perform_action(self, piped):
         await piped.value.aincrease(10.5)

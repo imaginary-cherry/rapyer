@@ -2,7 +2,6 @@ from datetime import datetime, timedelta
 
 import pytest
 
-import rapyer
 from rapyer.types.datetime import RedisDatetime, RedisDatetimeTimestamp
 from tests.integration.pipeline.pipeline_atomicity_base import (
     BinaryOpCase,
@@ -20,11 +19,10 @@ class _DatetimeBothModelsOpBase(PipelineAtomicityBase):
     via the context var set by ``apipeline()``.
     """
 
-    async def setup_data(self):
+    def create_models(self):
         initial = self.test_input.initial
         ts_model = DatetimeTimestampModel(created_at=initial, updated_at=initial)
         str_date_model = DatetimeModel(created_at=initial, updated_at=initial)
-        await rapyer.ainsert(str_date_model, ts_model)
         return ts_model, str_date_model
 
     def pipeline_owner(self):

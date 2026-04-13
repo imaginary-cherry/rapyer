@@ -171,10 +171,8 @@ async def test_pipeline_context_manager__pipeline_context_cleanup__check_context
 class TestPipelineListAappend(ComprehensiveTagsOpBase):
     covered_method = RedisList.aappend
 
-    async def setup_data(self):
-        model = ComprehensiveTestModel(tags=["initial"])
-        await model.asave()
-        return model
+    def create_models(self):
+        return ComprehensiveTestModel(tags=["initial"])
 
     async def perform_action(self, piped):
         await piped.tags.aappend("new_tag")
@@ -189,10 +187,8 @@ class TestPipelineListAappend(ComprehensiveTagsOpBase):
 class TestPipelineListAextend(ComprehensiveTagsOpBase):
     covered_method = RedisList.aextend
 
-    async def setup_data(self):
-        model = ComprehensiveTestModel(tags=["initial"])
-        await model.asave()
-        return model
+    def create_models(self):
+        return ComprehensiveTestModel(tags=["initial"])
 
     async def perform_action(self, piped):
         await piped.tags.aextend(["tag1", "tag2"])
@@ -207,10 +203,8 @@ class TestPipelineListAextend(ComprehensiveTagsOpBase):
 class TestPipelineListAinsert(ComprehensiveTagsOpBase):
     covered_method = RedisList.ainsert
 
-    async def setup_data(self):
-        model = ComprehensiveTestModel(tags=["first", "last"])
-        await model.asave()
-        return model
+    def create_models(self):
+        return ComprehensiveTestModel(tags=["first", "last"])
 
     async def perform_action(self, piped):
         await piped.tags.ainsert(1, "middle")
@@ -225,10 +219,8 @@ class TestPipelineListAinsert(ComprehensiveTagsOpBase):
 class TestPipelineListAclear(ComprehensiveTagsOpBase):
     covered_method = RedisList.aclear
 
-    async def setup_data(self):
-        model = ComprehensiveTestModel(tags=["tag1", "tag2"])
-        await model.asave()
-        return model
+    def create_models(self):
+        return ComprehensiveTestModel(tags=["tag1", "tag2"])
 
     async def perform_action(self, piped):
         await piped.tags.aclear()
@@ -248,10 +240,8 @@ class TestPipelineListAclear(ComprehensiveTagsOpBase):
 class TestPipelineDictAsetItem(ComprehensiveMetadataOpBase):
     covered_method = RedisDict.aset_item
 
-    async def setup_data(self):
-        model = ComprehensiveTestModel(metadata={"existing": "value"})
-        await model.asave()
-        return model
+    def create_models(self):
+        return ComprehensiveTestModel(metadata={"existing": "value"})
 
     async def perform_action(self, piped):
         await piped.metadata.aset_item("new_key", "new_value")
@@ -266,10 +256,8 @@ class TestPipelineDictAsetItem(ComprehensiveMetadataOpBase):
 class TestPipelineDictAdelItem(ComprehensiveMetadataOpBase):
     covered_method = RedisDict.adel_item
 
-    async def setup_data(self):
-        model = ComprehensiveTestModel(metadata={"key1": "value1", "key2": "value2"})
-        await model.asave()
-        return model
+    def create_models(self):
+        return ComprehensiveTestModel(metadata={"key1": "value1", "key2": "value2"})
 
     async def perform_action(self, piped):
         await piped.metadata.adel_item("key1")
@@ -284,10 +272,8 @@ class TestPipelineDictAdelItem(ComprehensiveMetadataOpBase):
 class TestPipelineDictAupdate(ComprehensiveMetadataOpBase):
     covered_method = RedisDict.aupdate
 
-    async def setup_data(self):
-        model = ComprehensiveTestModel(metadata={"existing": "value"})
-        await model.asave()
-        return model
+    def create_models(self):
+        return ComprehensiveTestModel(metadata={"existing": "value"})
 
     async def perform_action(self, piped):
         await piped.metadata.aupdate(key1="value1", key2="value2")
@@ -306,10 +292,8 @@ class TestPipelineDictAupdate(ComprehensiveMetadataOpBase):
 class TestPipelineDictAclear(ComprehensiveMetadataOpBase):
     covered_method = RedisDict.aclear
 
-    async def setup_data(self):
-        model = ComprehensiveTestModel(metadata={"key1": "value1", "key2": "value2"})
-        await model.asave()
-        return model
+    def create_models(self):
+        return ComprehensiveTestModel(metadata={"key1": "value1", "key2": "value2"})
 
     async def perform_action(self, piped):
         await piped.metadata.aclear()
@@ -329,10 +313,8 @@ class TestPipelineDictAclear(ComprehensiveMetadataOpBase):
 class TestPipelineStringSet(PipelineAtomicityBase):
     covered_method = RedisType.asave
 
-    async def setup_data(self):
-        model = ComprehensiveTestModel(name="original")
-        await model.asave()
-        return model
+    def create_models(self):
+        return ComprehensiveTestModel(name="original")
 
     async def perform_action(self, piped):
         piped.name = "updated"
@@ -436,12 +418,11 @@ async def test_pipeline_exception_rollback__check_no_changes_applied_edge_case()
 class _TwoModelDeleteBase(PipelineAtomicityBase):
     """Two-model delete atomicity: model1 deleted, model2 preserved."""
 
-    async def setup_data(self):
-        model1 = ComprehensiveTestModel(tags=["tag1"], name="model1")
-        model2 = ComprehensiveTestModel(tags=["tag2"], name="model2")
-        await model1.asave()
-        await model2.asave()
-        return model1, model2
+    def create_models(self):
+        return (
+            ComprehensiveTestModel(tags=["tag1"], name="model1"),
+            ComprehensiveTestModel(tags=["tag2"], name="model2"),
+        )
 
     def pipeline_owner(self):
         return self.handle[0]

@@ -6,10 +6,8 @@ from tests.models.simple_types import BytesModel
 class TestRedisBytesIadd(PipelineAtomicityBase):
     covered_method = RedisBytes.__iadd__
 
-    async def setup_data(self):
-        model = BytesModel(data=b"hello")
-        await model.asave()
-        return model
+    def create_models(self):
+        return BytesModel(data=b"hello")
 
     async def perform_action(self, piped):
         piped.data += b" world"
