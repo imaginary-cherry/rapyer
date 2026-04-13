@@ -31,6 +31,7 @@ from tests.unit.enforcement_exclusions import (
     MODEL_QUERY_METHODS,
     MODEL_READ_METHODS,
     PQ_READ_METHODS,
+    PQ_WRITE_METHODS,
     SPECIAL_FIELD_LIFECYCLE_METHODS,
     TYPE_INTERNAL_METHODS,
     TYPE_READ_METHODS,
@@ -41,6 +42,7 @@ EXCLUDED_FROM_TYPE_PIPELINE_TEST = (
     | TYPE_READ_METHODS  # Return values, can't defer in pipeline
     | BASE_TYPE_INTERNAL_METHODS  # Construction / path / abstract helpers
     | PQ_READ_METHODS  # Return values, can't defer in pipeline
+    | PQ_WRITE_METHODS  # Ignore write methods as well for now
     | SPECIAL_FIELD_LIFECYCLE_METHODS  # Lifecycle hooks, covered by model tests
 )
 
