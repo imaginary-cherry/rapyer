@@ -724,11 +724,15 @@ class AtomicRedisModel(BaseModel):
                     batches = batched(all_keys, len(all_keys))
 
         if batches is None:
-            return DeleteResult(count=0)
+            return DeleteResult(models_deleted=0, keys_deleted=0)
 
-        count, was_commited = await delete_in_batches(cls.Meta.redis, batches)
-        count = len(targeted_keys) if targeted_keys else 0
-        return DeleteResult(count=count, was_committed=was_commited)
+        keys_deleted, was_commited = await delete_in_batches(cls.Meta.redis, batches)
+        models_deleted = len(targeted_keys) if targeted_keys else 0
+        return DeleteResult(
+            models_deleted=models_deleted,
+            keys_deleted=keys_deleted,
+            was_committed=was_commited,
+        )
 
     @classmethod
     @contextlib.asynccontextmanager
@@ -987,8 +991,8 @@ async def adelete_many(*args: RapyerKey | str | AtomicRedisModel) -> RapyerDelet
 
     batch_size = max_batch if should_batch else len(all_keys)
     batches = batched(all_keys, batch_size)
-    count, was_commited = await delete_in_batches(redis, batches)
-    count = len(validated_keys)
+    keys_deleted, was_commited = await delete_in_batches(redis, batches)
+    models_deleted = len(validated_keys)
 
     per_class_count: dict[type[AtomicRedisModel], int] = {}
     for key in validated_keys:
@@ -996,7 +1000,10 @@ async def adelete_many(*args: RapyerKey | str | AtomicRedisModel) -> RapyerDelet
         per_class_count[klass] = per_class_count.get(klass, 0) + 1
 
     return RapyerDeleteResult(
-        count=count, by_model=per_class_count, was_committed=was_commited
+        models_deleted=models_deleted,
+        keys_deleted=keys_deleted,
+        by_model=per_class_count,
+        was_committed=was_commited,
     )
 
 
