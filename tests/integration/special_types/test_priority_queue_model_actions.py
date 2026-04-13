@@ -386,7 +386,8 @@ async def test_adelete_many_does_delete_pq_keys(real_redis_client):
     result = await PriorityQueueModel.adelete_many(*models)
 
     # Assert
-    assert result.count == 3
+    assert result.models_deleted == 3
+    assert result.keys_deleted == 6
     for key in model_keys:
         assert await real_redis_client.exists(key) == 0
     for key in pq_keys:
