@@ -74,10 +74,10 @@ class TestPipelineModelAinsert(PipelineAtomicityBase):
         return 1, loaded.name
 
     def expected_before(self, **_):
-        return (0, None)
+        return 0, None
 
     def expected_after(self, **_):
-        return (1, "inserted")
+        return 1, "inserted"
 
 
 # The standalone-pipeline ainsert test isn't in scope — kept as a plain function.
@@ -159,7 +159,7 @@ class TestPipelineModelAdeleteMany(PipelineAtomicityBase):
         model2 = ComprehensiveTestModel(name="model2")
         model3 = ComprehensiveTestModel(name="model3")
         await ComprehensiveTestModel.ainsert(model1, model2, model3)
-        return (model1, model2, model3)
+        return model1, model2, model3
 
     def pipeline_owner(self, handle):
         return handle[0]
@@ -176,10 +176,10 @@ class TestPipelineModelAdeleteMany(PipelineAtomicityBase):
         )
 
     def expected_before(self, **_):
-        return (1, 1)
+        return 1, 1
 
     def expected_after(self, **_):
-        return (0, 0)
+        return 0, 0
 
 
 @standalone_pipeline_test_for(AtomicRedisModel.aset_ttl)

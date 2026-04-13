@@ -23,7 +23,7 @@ class _DatetimeBothModelsOpBase(PipelineAtomicityBase):
         ts_model = DatetimeTimestampModel(created_at=initial, updated_at=initial)
         str_date_model = DatetimeModel(created_at=initial, updated_at=initial)
         await rapyer.ainsert(str_date_model, ts_model)
-        return (ts_model, str_date_model)
+        return ts_model, str_date_model
 
     def pipeline_owner(self, handle):
         ts_model, _str_date_model = handle
@@ -33,13 +33,13 @@ class _DatetimeBothModelsOpBase(PipelineAtomicityBase):
         ts_model, str_date_model = handle
         loaded_ts = await DatetimeTimestampModel.aget(ts_model.key)
         loaded_str = await DatetimeModel.aget(str_date_model.key)
-        return (loaded_ts.created_at, loaded_str.created_at)
+        return loaded_ts.created_at, loaded_str.created_at
 
     def expected_before(self, *, initial, **_):
-        return (initial, initial)
+        return initial, initial
 
     def expected_after(self, *, expected, **_):
-        return (expected, expected)
+        return expected, expected
 
 
 class TestRedisDatetimeIadd(_DatetimeBothModelsOpBase):

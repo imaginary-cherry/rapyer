@@ -441,7 +441,7 @@ class _TwoModelDeleteBase(PipelineAtomicityBase):
         model2 = ComprehensiveTestModel(tags=["tag2"], name="model2")
         await model1.asave()
         await model2.asave()
-        return (model1, model2)
+        return model1, model2
 
     def pipeline_owner(self, handle):
         return handle[0]
@@ -454,10 +454,10 @@ class _TwoModelDeleteBase(PipelineAtomicityBase):
         )
 
     def expected_before(self, **_):
-        return (1, 1)
+        return 1, 1
 
     def expected_after(self, **_):
-        return (0, 1)
+        return 0, 1
 
 
 class TestPipelineDelete(_TwoModelDeleteBase):
