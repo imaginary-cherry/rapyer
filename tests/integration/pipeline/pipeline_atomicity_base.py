@@ -44,9 +44,8 @@ class PipelineAtomicityBase(ABC):
     covered_method: ClassVar[Any] = None
     """Method (or list of methods) passed to ``@model_pipeline_test_for``."""
 
-    def __init__(self):
-        self.handle = None
-        self.test_input = None
+    handle: Any = None
+    test_input: Any = None
 
     @abstractmethod
     async def setup_data(self) -> Any:
