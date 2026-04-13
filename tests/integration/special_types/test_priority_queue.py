@@ -6,7 +6,6 @@ import pytest_asyncio
 from rapyer.base import AtomicRedisModel
 from rapyer.types.priority_queue import PriorityQueueItem, RedisPriorityQueue
 from tests.conftest import special_field_test_for
-
 from tests.models.special_types import (
     GenericPriorityQueueModel,
     OptionalPriorityQueueModel,

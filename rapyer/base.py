@@ -184,9 +184,7 @@ class AtomicRedisModel(BaseModel):
     async def refresh_ttl_if_needed(self, can_use_pipeline: bool = False):
         if self.should_refresh():
             pipe_context = (
-                ensure_pipeline
-                if can_use_pipeline
-                else pipeline_with_execution
+                ensure_pipeline if can_use_pipeline else pipeline_with_execution
             )
             async with pipe_context(self.Meta) as pipe:
                 pipe.expire(self.key, self.Meta.ttl)

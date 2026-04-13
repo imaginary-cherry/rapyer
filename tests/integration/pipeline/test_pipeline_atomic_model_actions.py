@@ -7,7 +7,11 @@ from rapyer.types.integer import RedisInt
 from rapyer.types.lst import RedisList
 from tests.conftest import model_pipeline_test_for, standalone_pipeline_test_for
 from tests.models.collection_types import ComprehensiveTestModel
-from tests.models.simple_types import TTL_TEST_SECONDS, TTLRefreshTestModel, UserModelWithoutTTL
+from tests.models.simple_types import (
+    TTL_TEST_SECONDS,
+    TTLRefreshTestModel,
+    UserModelWithoutTTL,
+)
 
 TTL_SECONDS = 300
 

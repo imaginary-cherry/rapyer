@@ -42,7 +42,9 @@ def _make_special_field_coverage_decorator(coverage_set: set[tuple[str, str, str
     return coverage_test_for
 
 
-special_field_test_for = _make_special_field_coverage_decorator(SPECIAL_FIELD_TESTED_METHODS)
+special_field_test_for = _make_special_field_coverage_decorator(
+    SPECIAL_FIELD_TESTED_METHODS
+)
 special_field_ttl_test_for = _make_special_field_coverage_decorator(
     SPECIAL_FIELD_TTL_TESTED_METHODS
 )

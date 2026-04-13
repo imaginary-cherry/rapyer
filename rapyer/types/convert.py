@@ -108,9 +108,7 @@ class RedisConverter(TypeConverter):
             # for serializing individual items, not the field itself.
             inner = generic_values[0]
             original_inner = (
-                inner.original_type
-                if safe_issubclass(inner, BaseRedisType)
-                else inner
+                inner.original_type if safe_issubclass(inner, BaseRedisType) else inner
             )
             new_type._value_adapter = TypeAdapter(original_inner)
             return new_type

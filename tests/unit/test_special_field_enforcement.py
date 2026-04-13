@@ -29,7 +29,9 @@ EXCLUDED_FROM_SPECIAL_FIELD_TTL_TEST = (
 
 
 def collect_model_method_field_pairs(excluded):
-    methods = sorted(m for m in get_async_methods(AtomicRedisModel) if m not in excluded)
+    methods = sorted(
+        m for m in get_async_methods(AtomicRedisModel) if m not in excluded
+    )
     field_types = SpecialFieldType.__subclasses__()
     return [
         (class_name, method_name, ft.__name__)

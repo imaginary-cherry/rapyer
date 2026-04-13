@@ -6,7 +6,6 @@ from rapyer.types.base import BaseRedisType
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.special import SpecialFieldType
 from tests.conftest import special_field_test_for
-
 from tests.models.special_types import (
     MixedSpecialModel,
     PriorityQueueIntModel,

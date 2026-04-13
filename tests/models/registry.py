@@ -78,7 +78,6 @@ from tests.models.simple_types import (
     UserModelWithoutTTL,
     UserModelWithTTL,
 )
-from tests.models.specialized import UserModel
 from tests.models.special_types import (
     GenericPriorityQueueModel,
     MixedSpecialModel,
@@ -90,6 +89,7 @@ from tests.models.special_types import (
     PriorityQueueTTLNoRefreshModel,
     SubSubPriorityQueueModel,
 )
+from tests.models.specialized import UserModel
 from tests.models.unknown_types import (
     ModelWithIntEnumDefault,
     ModelWithStrEnumDefault,
