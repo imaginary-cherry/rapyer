@@ -1,32 +1,9 @@
-"""
-Shared scaffolding for pipeline-atomicity tests.
-
-Every pipeline-atomicity test follows the same Arrange-Act-Assert shape:
-
-1. Create + save a model with initial data.
-2. Open ``async with model.apipeline():``.
-3. Perform a mutation.
-4. Re-load the data while still inside the pipeline and assert it has NOT changed
-   (the pipeline hasn't flushed yet).
-5. Exit the pipeline.
-6. Re-load and assert the data HAS changed.
-
-This module gives that flow one canonical implementation as an abstract base
-class. Leaf test classes subclass it and only declare what's genuinely unique
-(setup data, the mutation, how to load, the expected values).
-
-Intermediate bases live here too, grouping tests that share a model + field
-(e.g. every ``RedisInt`` binary op test on ``ComprehensiveTestModel.counter``).
-"""
-
-import inspect
 from abc import ABC, abstractmethod
 from typing import Any, ClassVar
 
 import pytest
 import pytest_asyncio
 
-from tests.conftest import model_pipeline_test_for
 from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.functionality_types import AllTypesModel
 from tests.models.redis_types import PipelineAllTypesTestModel
@@ -35,27 +12,12 @@ from tests.models.redis_types import PipelineAllTypesTestModel
 class PipelineAtomicityBase(ABC):
     """
     Abstract base for pipeline-atomicity tests.
-
-    A subclass implements the five required hooks (``setup_data``,
-    ``perform_action``, ``load_data``, ``expected_before``, ``expected_after``)
-    and sets ``covered_method`` to the Redis-type method it's proving atomic.
-    The base turns ``test_pipeline_atomicity`` into a runnable pytest test via
-    ``__init_subclass__``.
-
-    Parametrization: set ``params`` (list of cases) and ``param_names`` (names
-    for those cases); the base wires them through ``pytest.mark.parametrize``
-    and forwards them as kwargs to every hook.
     """
-
-    __test__ = False  # flipped True on concrete leaves via __init_subclass__
 
     # ---- subclass-overridable knobs -----------------------------------------
 
-    params: ClassVar[list[list[Any]]] = [[]]
+    params: ClassVar[list[list[Any]]] = [None]
     """Parametrize cases. Each inner list is one case; empty-inner means 'no params'."""
-
-    param_names: ClassVar[list[str]] = []
-    """Names of the parametrize arguments (must match ``params`` case width)."""
 
     covered_method: ClassVar[Any] = None
     """Method (or list of methods) passed to ``@model_pipeline_test_for``."""
@@ -115,7 +77,7 @@ class PipelineAtomicityBase(ABC):
 
     # ---- scaffold (leaves don't override this) ------------------------------
 
-    async def test_pipeline_atomicity(self, **params: Any) -> None:
+    async def test_pipeline_atomicity(self, test_input) -> None:
         handle = await self.setup_data(**params)
         owner = self.pipeline_owner(handle)
         async with owner.apipeline() as _piped:
@@ -129,47 +91,10 @@ class PipelineAtomicityBase(ABC):
 
     def __init_subclass__(cls, **kwargs: Any):
         super().__init_subclass__(**kwargs)
-        # Intermediate bases that still declare @abstractmethod shouldn't be collected.
-        if inspect.isabstract(cls):
-            cls.__test__ = False
-            return
-
-        cls.__test__ = True
-
-        scaffold = PipelineAtomicityBase.test_pipeline_atomicity
-
-        # Build a wrapper whose *real* signature names the parametrize args, so
-        # pytest's parametrize introspection is satisfied. We then forward to
-        # the scaffold as kwargs.
-        if cls.param_names:
-            args_sig = ", ".join(cls.param_names)
-            kw_pass = ", ".join(f"{n}={n}" for n in cls.param_names)
-            src = (
-                f"async def _parametrized_pipeline_test(self, {args_sig}):\n"
-                f"    await _scaffold(self, {kw_pass})\n"
-            )
-            ns: dict[str, Any] = {"_scaffold": scaffold}
-            exec(src, ns)
-            test = ns["_parametrized_pipeline_test"]
-            test.__name__ = "test_pipeline_atomicity"
-            test.__qualname__ = f"{cls.__name__}.test_pipeline_atomicity"
-        else:
-
-            async def test(self):  # type: ignore[no-redef]
-                await scaffold(self)
-
-            test.__name__ = "test_pipeline_atomicity"
-            test.__qualname__ = f"{cls.__name__}.test_pipeline_atomicity"
-
-        test = pytest.mark.asyncio(test)
-        if cls.param_names:
-            test = pytest.mark.parametrize(cls.param_names, cls.params)(test)
-        covered = cls.covered_method
-        if covered is not None:
-            methods = covered if isinstance(covered, (list, tuple)) else [covered]
-            for method in methods:
-                test = model_pipeline_test_for(method)(test)
-        cls.test_pipeline_atomicity = test
+        if cls.params:
+            ids, vals = zip(*[(c[0], c[1:]) for c in cls.params])
+            mark = pytest.mark.parametrize("test_input", vals, ids=ids)
+            cls.test_pipeline_atomicity = mark(cls.test_pipeline_atomicity)
 
 
 # =============================================================================
