@@ -620,14 +620,6 @@ class AtomicRedisModel(BaseModel):
     async def adelete(self):
         if self.is_inner_model():
             raise RuntimeError("Can only delete from inner model")
-        if self._special_field_names:
-            async with ensure_pipeline(self.Meta) as pipe:
-                pipe.delete(self.key)
-                for fname in self._special_field_names:
-                    field = getattr(self, fname)
-                    if isinstance(field, SpecialFieldType):
-                        await field.adelete_special()
-            return True
         return await self.adelete_by_key(self.key)
 
     @classmethod
