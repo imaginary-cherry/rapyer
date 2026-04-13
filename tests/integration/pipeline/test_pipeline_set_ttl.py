@@ -1,10 +1,13 @@
 import pytest
 
+from rapyer.base import AtomicRedisModel
+from tests.conftest import model_pipeline_test_for
 from tests.models.simple_types import UserModelWithoutTTL
 
 TTL_SECONDS = 300
 
 
+@model_pipeline_test_for(AtomicRedisModel.aset_ttl)
 @pytest.mark.asyncio
 async def test_pipeline_aset_ttl__multiple_models__check_ttl_set_atomically(
     real_redis_client,

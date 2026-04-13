@@ -1,43 +1,37 @@
-import inspect
-from typing import Callable
-
 import pytest
 
+import tests.integration.special_types.test_ttl_priority_queue  # noqa: F401 - triggers decorator registration
 import tests.integration.test_ttl_refresh  # noqa: F401 - triggers decorator registration
 from rapyer.base import AtomicRedisModel
-from rapyer.types.base import RedisType
-from tests.conftest import TTL_NO_REFRESH_TESTED_METHODS, TTL_TESTED_METHODS
+from rapyer.types.base import BaseRedisType
+from rapyer.types.special import SpecialFieldType
+from tests.conftest import (
+    BASE_MODEL_TTL_TESTED_METHODS,
+    TTL_NO_REFRESH_TESTED_METHODS,
+    TTL_TESTED_METHODS,
+    get_async_methods,
+)
+from tests.unit.enforcement_exclusions import (
+    MODEL_CHECK_METHODS,
+    MODEL_DELETE_METHODS,
+    MODEL_DUPLICATE_METHODS,
+    MODEL_INDEX_METHODS,
+    MODEL_INTERNAL_METHODS,
+    MODEL_TTL_METHODS,
+    SPECIAL_FIELD_LIFECYCLE_METHODS,
+    VIEW_ACTION_METHODS,
+)
 
-EXCLUDED_METHODS = [
-    # Delete operations - key/item is removed
-    AtomicRedisModel.adelete,
-    AtomicRedisModel.adelete_by_key,
-    AtomicRedisModel.adelete_many,
-    # Methods that create NEW keys (get their own TTL via asave)
-    AtomicRedisModel.aduplicate,
-    AtomicRedisModel.aduplicate_many,
-    # Existence check - no data access, no TTL refresh needed
-    AtomicRedisModel.aexists,
-    # Delegating methods (call other methods that handle TTL)
-    AtomicRedisModel.afind_keys,
-    AtomicRedisModel.acreate_index,
-    AtomicRedisModel.adelete_index,
-    # TTL operations - this method IS the TTL operation itself
-    AtomicRedisModel.aset_ttl,
-    AtomicRedisModel.refresh_ttl_if_needed,
-    RedisType.refresh_ttl_if_needed,
-    # Inner methods
-    AtomicRedisModel._search_keys_by_query,
-]
-
-
-def method_to_tuple(method: Callable) -> tuple[str, str]:
-    qualname = method.__qualname__
-    class_name, method_name = qualname.rsplit(".", 1)
-    return class_name, method_name
-
-
-EXCLUDED_FROM_TTL_TEST = {method_to_tuple(m) for m in EXCLUDED_METHODS}
+EXCLUDED_FROM_TTL_TEST = (
+    MODEL_DELETE_METHODS  # Key removed, no TTL to refresh
+    | MODEL_DUPLICATE_METHODS  # New keys get own TTL via asave
+    | MODEL_INDEX_METHODS  # Delegate to other methods
+    | MODEL_TTL_METHODS  # IS the TTL operation
+    | MODEL_INTERNAL_METHODS  # Internal query helpers
+    | SPECIAL_FIELD_LIFECYCLE_METHODS  # Abstract + concrete lifecycle
+    | MODEL_CHECK_METHODS  # Exists method doesn't need ttl update
+    | VIEW_ACTION_METHODS
+)
 
 
 def get_subclasses_recursive(cls):
@@ -51,18 +45,7 @@ def get_subclasses_recursive(cls):
 
 
 def get_all_redis_subclasses():
-    return get_subclasses_recursive(RedisType)
-
-
-def get_async_methods(cls):
-    methods = []
-    for name, method in inspect.getmembers(cls, predicate=inspect.iscoroutinefunction):
-        if name.startswith("__"):
-            continue
-        if method.__qualname__.split(".")[0] != cls.__name__:
-            continue
-        methods.append((cls.__name__, name))
-    return methods
+    return get_subclasses_recursive(BaseRedisType)
 
 
 def collect_all_methods():
@@ -71,6 +54,29 @@ def collect_all_methods():
         all_methods.update(get_async_methods(cls))
     all_methods.update(get_async_methods(AtomicRedisModel))
     return sorted([m for m in all_methods if m not in EXCLUDED_FROM_TTL_TEST])
+
+
+def collect_special_field_methods():
+    all_methods = set()
+    for cls in get_subclasses_recursive(SpecialFieldType):
+        all_methods.update(get_async_methods(cls))
+    return sorted([m for m in all_methods if m not in EXCLUDED_FROM_TTL_TEST])
+
+
+@pytest.mark.parametrize(["class_name", "method_name"], collect_special_field_methods())
+def test_special_field_method_has_base_model_ttl_test_coverage(class_name, method_name):
+    # Arrange
+    expected_entry = (class_name, method_name)
+
+    # Act
+    has_coverage = expected_entry in BASE_MODEL_TTL_TESTED_METHODS
+
+    # Assert
+    assert has_coverage, (
+        f"Method {class_name}.{method_name} needs a base model TTL test.\n"
+        f"Add @base_model_ttl_test_for({class_name}.{method_name}) to a test.\n"
+        f"Or add to EXCLUDED_FROM_TTL_TEST with justification."
+    )
 
 
 @pytest.mark.parametrize(["class_name", "method_name"], collect_all_methods())

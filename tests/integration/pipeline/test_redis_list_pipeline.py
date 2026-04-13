@@ -1,8 +1,11 @@
 import pytest
 
+from rapyer.types.lst import RedisList
+from tests.conftest import model_pipeline_test_for
 from tests.models.collection_types import ComprehensiveTestModel
 
 
+@model_pipeline_test_for(RedisList.__setitem__)
 @pytest.mark.asyncio
 async def test_redis_list_setitem_with_pipeline_sanity():
     # Arrange
@@ -60,6 +63,7 @@ async def test_redis_list_setitem_at_end_with_pipeline_sanity():
     assert final_model.tags == ["first", "middle", "new_last"]
 
 
+@model_pipeline_test_for(RedisList.__iadd__)
 @pytest.mark.asyncio
 async def test_redis_list_iadd_with_pipeline_sanity():
     # Arrange

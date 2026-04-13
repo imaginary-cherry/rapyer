@@ -372,6 +372,25 @@ async def test_ttl_refresh_on_redis_type_asave__sanity(
     assert loaded_age == 85
 
 
+@ttl_no_refresh_test_for(RedisType.asave)
+@pytest.mark.asyncio
+async def test_ttl_no_refresh_when_refresh_ttl_disabled_on_redis_type_asave__sanity(
+    real_redis_client, saved_no_refresh_model_with_reduced_ttl
+):
+    # Arrange
+    model = saved_no_refresh_model_with_reduced_ttl.model
+    initial_ttl = saved_no_refresh_model_with_reduced_ttl.initial_ttl
+
+    # Act
+    model.age = 85
+    await model.age.asave()
+
+    # Assert
+    final_ttl = await real_redis_client.ttl(model.key)
+    assert final_ttl <= initial_ttl
+    assert 0 < final_ttl <= REDUCED_TTL_SECONDS
+
+
 @ttl_test_for(AtomicRedisModel.asave)
 @pytest.mark.asyncio
 async def test_ttl_refresh_on_model_asave__sanity(

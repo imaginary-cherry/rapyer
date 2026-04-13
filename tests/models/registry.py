@@ -78,6 +78,17 @@ from tests.models.simple_types import (
     UserModelWithoutTTL,
     UserModelWithTTL,
 )
+from tests.models.special_types import (
+    GenericPriorityQueueModel,
+    MixedSpecialModel,
+    OptionalPriorityQueueModel,
+    PQContainerModel,
+    PriorityQueueIntModel,
+    PriorityQueueModel,
+    PriorityQueueTTLModel,
+    PriorityQueueTTLNoRefreshModel,
+    SubSubPriorityQueueModel,
+)
 from tests.models.specialized import UserModel
 from tests.models.unknown_types import (
     ModelWithIntEnumDefault,
@@ -171,4 +182,14 @@ TESTED_REDIS_MODELS = [
     RapyerKeyFieldModel,
     ListOfDictsRapyerKeyModel,
     DictOfListsRapyerKeyModel,
+    # Special types (priority queue)
+    PriorityQueueModel,
+    PriorityQueueIntModel,
+    MixedSpecialModel,
+    GenericPriorityQueueModel,
+    OptionalPriorityQueueModel,
+    PriorityQueueTTLModel,
+    PriorityQueueTTLNoRefreshModel,
+    SubSubPriorityQueueModel,
+    PQContainerModel,
 ]

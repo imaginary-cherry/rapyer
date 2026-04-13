@@ -5,6 +5,7 @@ from rapyer import DeleteResult
 from rapyer.errors import UnsupportedArgumentTypeError
 from rapyer.fields import RapyerKey
 from tests.models.index_types import IndexTestModel
+from tests.models.special_types import PriorityQueueModel
 from tests.models.specialized import UserModel
 
 
@@ -23,7 +24,7 @@ async def test_adelete_many_integration__delete_multiple_models_sanity(
 
     # Assert
     assert isinstance(result, DeleteResult)
-    assert result.count == 3
+    assert result.models_deleted == 3
     assert await real_redis_client.exists(user1.key) == 0
     assert await real_redis_client.exists(user2.key) == 0
     assert await real_redis_client.exists(user3.key) == 0
@@ -55,7 +56,7 @@ async def test_adelete_many_integration__single_redis_transaction_verification(
     ), f"Expected 3 DEL commands (one per key in pipeline), but {del_commands_executed} were executed"
 
     assert isinstance(result, DeleteResult)
-    assert result.count == 3
+    assert result.models_deleted == 3
     assert await real_redis_client.exists(user1.key) == 0
     assert await real_redis_client.exists(user2.key) == 0
     assert await real_redis_client.exists(user3.key) == 0
@@ -74,7 +75,7 @@ async def test_adelete_many__expression_delete_sanity(
 
     # Assert
     assert isinstance(result, DeleteResult)
-    assert result.count == 2
+    assert result.models_deleted == 2
     assert await real_redis_client.exists(alice.key) == 1
     assert await real_redis_client.exists(bob.key) == 1
     assert await real_redis_client.exists(charlie.key) == 0
@@ -96,7 +97,7 @@ async def test_adelete_many__multiple_expressions_combined(
 
     # Assert
     assert isinstance(result, DeleteResult)
-    assert result.count == 1
+    assert result.models_deleted == 1
     assert await real_redis_client.exists(alice.key) == 1
     assert await real_redis_client.exists(bob.key) == 1
     assert await real_redis_client.exists(charlie.key) == 0
@@ -116,7 +117,7 @@ async def test_adelete_many__expression_no_match_returns_zero(
 
     # Assert
     assert isinstance(result, DeleteResult)
-    assert result.count == 0
+    assert result.models_deleted == 0
     assert await real_redis_client.exists(alice.key) == 1
     assert await real_redis_client.exists(bob.key) == 1
     assert await real_redis_client.exists(charlie.key) == 1
@@ -158,7 +159,7 @@ async def test_adelete_many__key_auto_prefix(real_redis_client):
 
     # Assert
     assert isinstance(result, DeleteResult)
-    assert result.count == 1
+    assert result.models_deleted == 1
     assert await real_redis_client.exists(user.key) == 0
 
 
@@ -173,7 +174,7 @@ async def test_adelete_many__full_key_no_prefix(real_redis_client):
 
     # Assert
     assert isinstance(result, DeleteResult)
-    assert result.count == 1
+    assert result.models_deleted == 1
     assert await real_redis_client.exists(user.key) == 0
 
 
@@ -185,7 +186,9 @@ async def test_adelete_many__missing_key_silent_skip(real_redis_client):
 
     # Assert
     assert isinstance(result, DeleteResult)
-    assert result.count == 0
+    # We targeted 1 key, but Redis had nothing to delete
+    assert result.models_deleted == 1
+    assert result.keys_deleted == 0
 
 
 @pytest.mark.asyncio
@@ -200,7 +203,9 @@ async def test_adelete_many__stale_model_silent_skip(real_redis_client):
 
     # Assert
     assert isinstance(result, DeleteResult)
-    assert result.count == 0
+    # We targeted 1 model, but its key was already gone from Redis
+    assert result.models_deleted == 1
+    assert result.keys_deleted == 0
 
 
 @pytest.mark.asyncio
@@ -216,7 +221,7 @@ async def test_adelete_many__models_and_keys_mixed(real_redis_client):
 
     # Assert
     assert isinstance(result, DeleteResult)
-    assert result.count == 3
+    assert result.models_deleted == 3
     assert await real_redis_client.exists(user1.key) == 0
     assert await real_redis_client.exists(user2.key) == 0
     assert await real_redis_client.exists(user3.key) == 0
@@ -233,7 +238,7 @@ async def test_adelete_many__returns_delete_result_type(real_redis_client):
 
     # Assert
     assert isinstance(result, DeleteResult)
-    assert result.count == 1
+    assert result.models_deleted == 1
 
 
 @pytest.mark.asyncio
@@ -254,6 +259,56 @@ async def test_adelete_many__expression_with_cursor_pagination(
 
     # Assert
     assert isinstance(result, DeleteResult)
-    assert result.count == record_count
+    assert result.models_deleted == record_count
     for model in models[:5] + models[-5:]:
         assert await real_redis_client.exists(model.key) == 0
+
+
+@pytest.mark.asyncio
+async def test_adelete_many__keys_deleted_includes_special_fields(real_redis_client):
+    # Arrange
+    models = []
+    for i in range(3):
+        model = PriorityQueueModel(name=f"model_{i}")
+        await model.asave()
+        await model.tasks.apush(f"item_{i}", float(i))
+        models.append(model)
+
+    # Act
+    result = await PriorityQueueModel.adelete_many(*models)
+
+    # Assert
+    assert result.models_deleted == 3
+    # 3 model keys + 3 special-field (tasks) keys
+    assert result.keys_deleted == 6
+
+
+@pytest.mark.asyncio
+async def test_adelete_many__keys_deleted_equals_models_deleted_no_special_fields(
+    real_redis_client,
+):
+    # Arrange
+    users = [UserModel(tags=[f"tag_{i}"]) for i in range(3)]
+    await rapyer.ainsert(*users)
+
+    # Act
+    result = await UserModel.adelete_many(*users)
+
+    # Assert
+    assert result.models_deleted == 3
+    assert result.keys_deleted == 3
+
+
+@pytest.mark.asyncio
+async def test_adelete_many__count_property_is_deprecated(real_redis_client):
+    # Arrange
+    users = [UserModel(tags=[f"tag_{i}"]) for i in range(2)]
+    await rapyer.ainsert(*users)
+
+    # Act
+    result = await UserModel.adelete_many(*users)
+
+    # Assert
+    with pytest.warns(DeprecationWarning, match="count is deprecated"):
+        legacy_count = result.count
+    assert legacy_count == result.models_deleted == 2

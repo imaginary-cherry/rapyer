@@ -1,5 +1,10 @@
 import pytest
 
+from rapyer.types.dct import RedisDict
+from rapyer.types.float import RedisFloat
+from rapyer.types.integer import RedisInt
+from rapyer.types.lst import RedisList
+from tests.conftest import model_pipeline_test_for
 from tests.models.complex_types import InnerMostModel, MiddleModel, OuterModel
 from tests.models.functionality_types import AllTypesModel
 from tests.models.simple_types import FloatModel
@@ -85,6 +90,7 @@ class TestPipelineIntegerField:
         final_model = await AllTypesModel.aget(model.key)
         assert final_model.int_field == 50
 
+    @model_pipeline_test_for(RedisInt.__iadd__)
     @pytest.mark.asyncio
     async def test_addition_changes_preserved_during_pipeline_committed_after_sanity(
         self,
@@ -128,6 +134,7 @@ class TestPipelineIntegerField:
 
 
 class TestPipelineListField:
+    @model_pipeline_test_for(RedisList.append)
     @pytest.mark.asyncio
     async def test_append_changes_preserved_during_pipeline_committed_after_sanity(
         self,
@@ -168,6 +175,7 @@ class TestPipelineListField:
         final_model = await AllTypesModel.aget(model.key)
         assert final_model.list_field == ["async_item"]
 
+    @model_pipeline_test_for(RedisList.extend)
     @pytest.mark.asyncio
     async def test_extend_changes_preserved_during_pipeline_committed_after_sanity(
         self,
@@ -235,6 +243,7 @@ class TestPipelineListField:
 
 
 class TestPipelineDictField:
+    @model_pipeline_test_for(RedisDict.update)
     @pytest.mark.asyncio
     async def test_update_changes_preserved_during_pipeline_committed_after_sanity(
         self,
@@ -280,6 +289,7 @@ class TestPipelineDictField:
             "async_key2": "async_value2",
         }
 
+    @model_pipeline_test_for(RedisDict.__setitem__)
     @pytest.mark.asyncio
     async def test_setitem_changes_preserved_during_pipeline_committed_after_sanity(
         self,
@@ -448,6 +458,7 @@ class TestPipelineFloatField:
         final_model = await FloatModel.aget(model.key)
         assert final_model.value == 25.0
 
+    @model_pipeline_test_for(RedisFloat.aincrease)
     @pytest.mark.asyncio
     async def test_aincrease_changes_preserved_during_pipeline_committed_after_sanity(
         self,

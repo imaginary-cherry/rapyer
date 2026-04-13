@@ -5,6 +5,7 @@ from rapyer import RapyerDeleteResult
 from rapyer.errors import MissingParameterError, RapyerModelDoesntExistError
 from rapyer.fields import RapyerKey
 from tests.models.simple_types import IntModel, StrModel
+from tests.models.special_types import PriorityQueueModel
 from tests.models.specialized import UserModel
 
 
@@ -20,7 +21,7 @@ async def test_rapyer_adelete_many__string_keys_sanity(real_redis_client):
 
     # Assert
     assert isinstance(result, RapyerDeleteResult)
-    assert result.count == 2
+    assert result.models_deleted == 2
     assert result.by_model == {StrModel: 1, IntModel: 1}
     assert await real_redis_client.exists(str_model.key) == 0
     assert await real_redis_client.exists(int_model.key) == 0
@@ -38,7 +39,7 @@ async def test_rapyer_adelete_many__model_instances_sanity(real_redis_client):
 
     # Assert
     assert isinstance(result, RapyerDeleteResult)
-    assert result.count == 2
+    assert result.models_deleted == 2
     assert result.by_model == {StrModel: 1, IntModel: 1}
     assert await real_redis_client.exists(str_model.key) == 0
     assert await real_redis_client.exists(int_model.key) == 0
@@ -57,7 +58,7 @@ async def test_rapyer_adelete_many__mixed_keys_and_instances(real_redis_client):
 
     # Assert
     assert isinstance(result, RapyerDeleteResult)
-    assert result.count == 3
+    assert result.models_deleted == 3
     assert result.by_model == {StrModel: 1, IntModel: 1, UserModel: 1}
     assert await real_redis_client.exists(str_model.key) == 0
     assert await real_redis_client.exists(int_model.key) == 0
@@ -77,7 +78,7 @@ async def test_rapyer_adelete_many__multiple_same_class(real_redis_client):
 
     # Assert
     assert isinstance(result, RapyerDeleteResult)
-    assert result.count == 3
+    assert result.models_deleted == 3
     assert result.by_model == {UserModel: 3}
     assert await real_redis_client.exists(user1.key) == 0
     assert await real_redis_client.exists(user2.key) == 0
@@ -112,7 +113,9 @@ async def test_rapyer_adelete_many__nonexistent_key_silent_skip(real_redis_clien
 
     # Assert
     assert isinstance(result, RapyerDeleteResult)
-    assert result.count == 0
+    # We targeted 1 model, but Redis had nothing to actually delete
+    assert result.models_deleted == 1
+    assert result.keys_deleted == 0
     assert result.by_model == {StrModel: 1}
 
 
@@ -128,7 +131,9 @@ async def test_rapyer_adelete_many__stale_model_silent_skip(real_redis_client):
 
     # Assert
     assert isinstance(result, RapyerDeleteResult)
-    assert result.count == 0
+    # We targeted 1 model, but its key was already gone from Redis
+    assert result.models_deleted == 1
+    assert result.keys_deleted == 0
     assert result.by_model == {UserModel: 1}
 
 
@@ -145,7 +150,7 @@ async def test_rapyer_adelete_many__returns_module_delete_result_type(
 
     # Assert
     assert isinstance(result, RapyerDeleteResult)
-    assert result.count == 1
+    assert result.models_deleted == 1
     assert result.by_model == {StrModel: 1}
 
 
@@ -165,7 +170,9 @@ async def test_rapyer_adelete_many__per_model_breakdown_only_counts_deleted(
 
     # Assert
     assert isinstance(result, RapyerDeleteResult)
-    assert result.count == 2
+    # 3 models were targeted; only 2 keys actually existed in Redis to delete
+    assert result.models_deleted == 3
+    assert result.keys_deleted == 2
     assert result.by_model == {StrModel: 2, IntModel: 1}
     assert await real_redis_client.exists(str_model1.key) == 0
     assert await real_redis_client.exists(str_model2.key) == 0
@@ -229,7 +236,30 @@ async def test_rapyer_adelete_many__single_redis_transaction_verification(
     ), f"Expected 1 DEL command (bulk delete per class), but {del_commands_executed} were executed"
 
     assert isinstance(result, RapyerDeleteResult)
-    assert result.count == 3
+    assert result.models_deleted == 3
     assert await real_redis_client.exists(user1.key) == 0
     assert await real_redis_client.exists(user2.key) == 0
     assert await real_redis_client.exists(user3.key) == 0
+
+
+@pytest.mark.asyncio
+async def test_rapyer_adelete_many__keys_deleted_includes_special_fields(
+    real_redis_client,
+):
+    # Arrange
+    models = []
+    for i in range(2):
+        model = PriorityQueueModel(name=f"model_{i}")
+        await model.asave()
+        await model.tasks.apush(f"item_{i}", float(i))
+        models.append(model)
+
+    # Act
+    result = await rapyer.adelete_many(*models)
+
+    # Assert
+    assert isinstance(result, RapyerDeleteResult)
+    assert result.models_deleted == 2
+    # 2 model keys + 2 special-field (tasks) keys
+    assert result.keys_deleted == 4
+    assert result.by_model == {PriorityQueueModel: 2}

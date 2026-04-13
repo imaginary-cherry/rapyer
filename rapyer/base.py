@@ -25,7 +25,13 @@ from redis.commands.search.query import Query
 from redis.exceptions import NoScriptError, ResponseError
 
 from rapyer.config import RedisConfig
-from rapyer.context import _context_pipe, with_pipe_context
+from rapyer.context import (
+    _context_pipe,
+    ensure_pipeline,
+    pipe_ctx_from_redix,
+    pipeline_with_execution,
+    with_pipe_context,
+)
 from rapyer.errors import (
     CantSerializeRedisValueError,
     KeyNotFound,
@@ -35,6 +41,7 @@ from rapyer.errors import (
     UnsupportedArgumentTypeError,
     UnsupportedArgumentValueError,
     UnsupportedIndexedFieldError,
+    UpdateAtomicModelError,
 )
 from rapyer.fields.expression import AtomicField, Expression, ExpressionField
 from rapyer.fields.index import IndexAnnotation
@@ -43,8 +50,14 @@ from rapyer.fields.safe_load import SafeLoadAnnotation
 from rapyer.links import ATOMIC_MODEL_API_REF_LINK, REDIS_SUPPORTED_LINK
 from rapyer.result import DeleteResult, RapyerDeleteResult
 from rapyer.scripts import registry as scripts_registry
-from rapyer.types.base import FAILED_FIELDS_KEY, REDIS_DUMP_FLAG_NAME, RedisType
+from rapyer.types.base import (
+    FAILED_FIELDS_KEY,
+    REDIS_DUMP_FLAG_NAME,
+    BaseRedisType,
+    RedisType,
+)
 from rapyer.types.convert import RedisConverter
+from rapyer.types.special import SpecialFieldType
 from rapyer.typing_support import Self, Unpack
 from rapyer.utils.annotation import (
     DYNAMIC_CLASS_DOC,
@@ -114,12 +127,13 @@ def make_pickle_field_serializer(
 
 class AtomicRedisModel(BaseModel):
     _pk: str = PrivateAttr(default_factory=lambda: str(uuid.uuid4()))
-    _base_model_link: Self | RedisType = PrivateAttr(default=None)
+    _base_model_link: Self | BaseRedisType = PrivateAttr(default=None)
     _failed_fields: set[str] = PrivateAttr(default_factory=set)
 
     Meta: ClassVar[RedisConfig] = RedisConfig()
     _key_field_name: ClassVar[str | None] = None
     _safe_load_fields: ClassVar[set[str]] = set()
+    _special_field_names: ClassVar[set[str]] = set()
     _field_name: str = PrivateAttr(default="")
     model_config = ConfigDict(validate_assignment=True, validate_default=True)
 
@@ -167,9 +181,17 @@ class AtomicRedisModel(BaseModel):
     def should_refresh(cls):
         return cls.Meta.refresh_ttl and cls.Meta.ttl is not None
 
-    async def refresh_ttl_if_needed(self):
+    async def refresh_ttl_if_needed(self, can_use_pipeline: bool = False):
         if self.should_refresh():
-            await self.Meta.redis.expire(self.key, self.Meta.ttl)
+            pipe_context = (
+                ensure_pipeline if can_use_pipeline else pipeline_with_execution
+            )
+            async with pipe_context(self.Meta) as pipe:
+                pipe.expire(self.key, self.Meta.ttl)
+                for fname in self._special_field_names:
+                    field = getattr(self, fname)
+                    if isinstance(field, SpecialFieldType):
+                        pipe.expire(field.special_key, self.Meta.ttl)
 
     @classmethod
     def redis_schema(cls, redis_name: str = ""):
@@ -276,6 +298,13 @@ class AtomicRedisModel(BaseModel):
         for field_name, field in pydantic_annotation.items():
             setattr(cls, field_name, field)
 
+        # Detect special field types
+        cls._special_field_names = set(getattr(cls, "_special_field_names", set()))
+        for field_name, annotation in cls.__annotations__.items():
+            origin = get_origin(annotation) or annotation
+            if safe_issubclass(origin, SpecialFieldType):
+                cls._special_field_names.add(field_name)
+
         super().__init_subclass__(**kwargs)
 
         # Set new default values if needed
@@ -283,6 +312,9 @@ class AtomicRedisModel(BaseModel):
             if not is_redis_field(attr_name, attr_type):
                 continue
             if safe_issubclass(attr_type, RapyerKey):
+                continue
+            # Skip special fields — they handle their own serialization
+            if attr_name in cls._special_field_names:
                 continue
             if original_annotations[attr_name] == attr_type:
                 default_value = cls.__dict__.get(attr_name, None)
@@ -327,24 +359,44 @@ class AtomicRedisModel(BaseModel):
 
     async def asave(self) -> Self:
         model_dump = self.redis_dump()
-        await self.client.json().set(self.key, self.json_path, model_dump)  # type: ignore[misc]
-        if self.Meta.ttl is not None:
-            nx = not self.Meta.refresh_ttl
-            await self.client.expire(self.key, self.Meta.ttl, nx=nx)
+        async with ensure_pipeline(self.Meta) as pipe:
+            pipe.json().set(self.key, self.json_path, model_dump)
+            if self.Meta.ttl is not None:
+                nx = not self.Meta.refresh_ttl
+                pipe.expire(self.key, self.Meta.ttl, nx=nx)
+            for fname in self._special_field_names:
+                field = getattr(self, fname)
+                if isinstance(field, SpecialFieldType):
+                    await field.asave_special()
+                    if self.Meta.ttl is not None:
+                        pipe.expire(field.special_key, self.Meta.ttl, nx=nx)
         return self
 
     def redis_dump(self):
-        return self.model_dump(mode="json", context={REDIS_DUMP_FLAG_NAME: True})
+        return self.model_dump(
+            mode="json",
+            context={REDIS_DUMP_FLAG_NAME: True},
+            exclude=self._special_field_names or None,
+        )
 
     def redis_dump_json(self):
-        return self.model_dump_json(context={REDIS_DUMP_FLAG_NAME: True})
+        return self.model_dump_json(
+            context={REDIS_DUMP_FLAG_NAME: True},
+            exclude=self._special_field_names or None,
+        )
 
     async def aduplicate(self) -> Self:
         if self.is_inner_model():
             raise RuntimeError("Can only duplicate from top level model")
 
         duplicated = self.__class__(**self.model_dump())
-        await duplicated.asave()
+        async with ensure_pipeline(self.Meta):
+            await duplicated.asave()
+            for fname in self._special_field_names:
+                source_field = getattr(self, fname)
+                target_field = getattr(duplicated, fname)
+                if isinstance(source_field, SpecialFieldType):
+                    await source_field.aduplicate_special(target_field.special_key)
         return duplicated
 
     async def aduplicate_many(self, num: int) -> list[Self]:
@@ -352,7 +404,14 @@ class AtomicRedisModel(BaseModel):
             raise RuntimeError("Can only duplicate from top level model")
 
         duplicated_models = [self.__class__(**self.model_dump()) for _ in range(num)]
-        await self.ainsert(*duplicated_models)
+        async with ensure_pipeline(self.Meta):
+            await self.ainsert(*duplicated_models)
+            for fname in self._special_field_names:
+                source_field = getattr(self, fname)
+                if isinstance(source_field, SpecialFieldType):
+                    for dup in duplicated_models:
+                        target_field = getattr(dup, fname)
+                        await source_field.aduplicate_special(target_field.special_key)
         return duplicated_models
 
     def update(self, **kwargs):
@@ -360,6 +419,15 @@ class AtomicRedisModel(BaseModel):
             setattr(self, field_name, value)
 
     async def aupdate(self, **kwargs):
+        # Special fields (e.g. RedisPriorityQueue) manage their own separate
+        # Redis storage and cannot be serialized as JSON path updates.
+        special_in_kwargs = self._special_field_names & set(kwargs.keys())
+        if special_in_kwargs:
+            raise UpdateAtomicModelError(
+                f"Cannot update special fields via aupdate: {special_in_kwargs}. "
+                f"Special fields manage their own Redis storage and cannot be "
+                f"serialized as JSON path updates."
+            )
         self.update(**kwargs)
 
         # Only serialize the updated fields using the include parameters
@@ -381,11 +449,23 @@ class AtomicRedisModel(BaseModel):
     async def aset_ttl(self, ttl: int) -> None:
         if self.is_inner_model():
             raise RuntimeError("Can only set TTL from top level model")
-        pipeline = _context_pipe.get()
-        if pipeline is not None:
-            pipeline.expire(self.key, ttl)
-        else:
-            await self.Meta.redis.expire(self.key, ttl)
+        async with ensure_pipeline(self.Meta) as pipe:
+            pipe.expire(self.key, ttl)
+            for fname in self._special_field_names:
+                field = getattr(self, fname)
+                if isinstance(field, SpecialFieldType):
+                    pipe.expire(field.special_key, ttl)
+
+    @functools.cached_property
+    def all_keys(self) -> list[str]:
+        return self._all_keys_for_key(self.key)
+
+    @classmethod
+    def _all_keys_for_key(cls, key: str) -> list[str]:
+        keys = [key]
+        for fname in cls._special_field_names:
+            keys.append(f"{key}:{fname}")
+        return keys
 
     @classmethod
     def _resolve_key(cls, key: str | Self) -> str:
@@ -408,7 +488,7 @@ class AtomicRedisModel(BaseModel):
         instance.key = key
         instance._failed_fields = context.get(FAILED_FIELDS_KEY, set())
         if cls.should_refresh():
-            await cls.Meta.redis.expire(key, cls.Meta.ttl)
+            await instance.refresh_ttl_if_needed()
         return instance
 
     async def aload(self) -> Self:
@@ -494,9 +574,9 @@ class AtomicRedisModel(BaseModel):
             instances.append(model)
 
         if cls.should_refresh():
-            async with cls.Meta.redis.pipeline() as pipe:
+            async with pipe_ctx_from_redix(cls.Meta.redis) as pipe:
                 for model in instances:
-                    pipe.expire(model.key, cls.Meta.ttl)
+                    await model.refresh_ttl_if_needed(can_use_pipeline=True)
                 await pipe.execute()
 
         return instances
@@ -517,17 +597,30 @@ class AtomicRedisModel(BaseModel):
 
     @classmethod
     async def ainsert(cls, *models: Unpack[Self]):
-        async with cls.Meta.redis.pipeline() as pipe:
+        async with ensure_pipeline(cls.Meta) as pipe:
             for model in models:
                 pipe.json().set(model.key, model.json_path, model.redis_dump())
                 if cls.Meta.ttl is not None:
                     pipe.expire(model.key, cls.Meta.ttl)
-            await pipe.execute()
+                for fname in cls._special_field_names:
+                    field = getattr(model, fname)
+                    if isinstance(field, SpecialFieldType):
+                        await field.asave_special()
+                        if cls.Meta.ttl is not None:
+                            pipe.expire(field.special_key, cls.Meta.ttl)
 
     @classmethod
     async def adelete_by_key(cls, key: str) -> bool:
-        client = _context_pipe.get() or cls.Meta.redis
-        return await client.delete(key) == 1
+        key = cls._resolve_key(key)
+        keys_to_delete = cls._all_keys_for_key(key)
+        in_outer_pipe = _context_pipe.get() is not None
+        async with ensure_pipeline(cls.Meta, should_execute=False) as pipe:
+            pipe.delete(*keys_to_delete)
+            if in_outer_pipe:
+                # Outer caller owns execution; we cannot observe the result here.
+                return True
+            results = await pipe.execute()
+        return sum(results) > 0
 
     async def adelete(self):
         if self.is_inner_model():
@@ -568,6 +661,17 @@ class AtomicRedisModel(BaseModel):
                 yield [row[1] for row in result.rows]
 
     @classmethod
+    async def _iter_expanded_filter_batches(
+        cls,
+        query_string: str,
+        batch_size: int,
+        collected_keys: list[str],
+    ) -> AsyncIterator[list[str]]:
+        async for batch in cls.iter_filter_batches(query_string, batch_size):
+            collected_keys.extend(batch)
+            yield [k for key in batch for k in cls._all_keys_for_key(key)]
+
+    @classmethod
     async def adelete_many(
         cls, *args: Self | RapyerKey | str | Expression
     ) -> DeleteResult:
@@ -588,29 +692,45 @@ class AtomicRedisModel(BaseModel):
         max_batch = cls.Meta.max_delete_per_transaction
         should_batch = _context_pipe.get() is None and max_batch is not None
         batches = None
+        targeted_keys = None
 
         if provided_keys or model_instances:
-            model_keys = [m.key for m in model_instances]
-            prefixed_keys = [cls._resolve_key(k) for k in provided_keys]
-            targeted_keys = model_keys + prefixed_keys
-            if targeted_keys:
-                batch_size = max_batch if should_batch else len(targeted_keys)
-                batches = batched(targeted_keys, batch_size)
+            # Get all keys for the models, including detached speical field keys
+            all_keys = [k for m in model_instances for k in m.all_keys]
+            for key in provided_keys:
+                all_keys.extend(cls._all_keys_for_key(cls._resolve_key(key)))
+            targeted_keys = [
+                cls._resolve_key(k) for k in provided_keys + model_instances
+            ]
+            if all_keys:
+                batch_size = max_batch if should_batch else len(all_keys)
+                batches = batched(all_keys, batch_size)
         elif expressions:
             combined_expression = functools.reduce(lambda a, b: a & b, expressions)
             query_string = combined_expression.create_filter()
             if should_batch:
-                batches = cls.iter_filter_batches(query_string, max_batch)
+                targeted_keys = []
+                batches = cls._iter_expanded_filter_batches(
+                    query_string, max_batch, targeted_keys
+                )
             else:
                 targeted_keys = await cls._search_keys_by_query(query_string)
                 if targeted_keys:
-                    batches = batched(targeted_keys, len(targeted_keys))
+                    all_keys = [
+                        k for key in targeted_keys for k in cls._all_keys_for_key(key)
+                    ]
+                    batches = batched(all_keys, len(all_keys))
 
         if batches is None:
-            return DeleteResult(count=0)
+            return DeleteResult(models_deleted=0, keys_deleted=0)
 
-        count, was_commited = await delete_in_batches(cls.Meta.redis, batches)
-        return DeleteResult(count=count, was_committed=was_commited)
+        keys_deleted, was_commited = await delete_in_batches(cls.Meta.redis, batches)
+        models_deleted = len(targeted_keys) if targeted_keys else 0
+        return DeleteResult(
+            models_deleted=models_deleted,
+            keys_deleted=keys_deleted,
+            was_committed=was_commited,
+        )
 
     @classmethod
     @contextlib.asynccontextmanager
@@ -661,7 +781,7 @@ class AtomicRedisModel(BaseModel):
 
     def __setattr__(self, name: str, value: Any) -> None:
         skip_redis_set = False
-        if isinstance(value, RedisType):
+        if isinstance(value, BaseRedisType):
             skip_redis_set = value._redis_updated
             value._redis_updated = False
 
@@ -671,11 +791,14 @@ class AtomicRedisModel(BaseModel):
 
         if value is not None:
             attr = getattr(self, name)
-            is_redis_type = isinstance(attr, RedisType)
-            if is_redis_type:
+            if isinstance(attr, BaseRedisType):
                 attr._base_model_link = self
 
         if skip_redis_set:
+            return
+
+        # Special fields manage their own Redis storage
+        if name in self.__class__._special_field_names:
             return
 
         pipeline = _context_pipe.get()
@@ -708,7 +831,7 @@ class AtomicRedisModel(BaseModel):
     def assign_fields_links(self):
         for field_name in self.__class__.model_fields.keys():
             attr = getattr(self, field_name)
-            if isinstance(attr, RedisType) or isinstance(attr, AtomicRedisModel):
+            if isinstance(attr, (BaseRedisType, AtomicRedisModel)):
                 attr._base_model_link = self
         return self
 
@@ -816,11 +939,18 @@ def find_redis_models() -> list[type[AtomicRedisModel]]:
 
 async def ainsert(*models: Unpack[AtomicRedisModel]) -> list[AtomicRedisModel]:
     async with AtomicRedisModel.Meta.redis.pipeline() as pipe:
-        for model in models:
-            pipe.json().set(model.key, model.json_path, model.redis_dump())
-            if model.Meta.ttl is not None:
-                pipe.expire(model.key, model.Meta.ttl)
-        await pipe.execute()
+        with with_pipe_context(pipe):
+            for model in models:
+                pipe.json().set(model.key, model.json_path, model.redis_dump())
+                if model.Meta.ttl is not None:
+                    pipe.expire(model.key, model.Meta.ttl)
+                for fname in model.__class__._special_field_names:
+                    field = getattr(model, fname)
+                    if isinstance(field, SpecialFieldType):
+                        await field.asave_special()
+                        if model.Meta.ttl is not None:
+                            pipe.expire(field.special_key, model.Meta.ttl)
+            await pipe.execute()
     return models
 
 
@@ -852,9 +982,15 @@ async def adelete_many(*args: RapyerKey | str | AtomicRedisModel) -> RapyerDelet
     max_batch = AtomicRedisModel.Meta.max_delete_per_transaction
     should_batch = _context_pipe.get() is None and max_batch is not None
 
-    batch_size = max_batch if should_batch else len(validated_keys)
-    batches = batched(validated_keys, batch_size)
-    count, was_commited = await delete_in_batches(redis, batches)
+    all_keys = []
+    for key in validated_keys:
+        klass = key_to_class[key]
+        all_keys.extend(klass._all_keys_for_key(key))
+
+    batch_size = max_batch if should_batch else len(all_keys)
+    batches = batched(all_keys, batch_size)
+    keys_deleted, was_commited = await delete_in_batches(redis, batches)
+    models_deleted = len(validated_keys)
 
     per_class_count: dict[type[AtomicRedisModel], int] = {}
     for key in validated_keys:
@@ -862,7 +998,10 @@ async def adelete_many(*args: RapyerKey | str | AtomicRedisModel) -> RapyerDelet
         per_class_count[klass] = per_class_count.get(klass, 0) + 1
 
     return RapyerDeleteResult(
-        count=count, by_model=per_class_count, was_committed=was_commited
+        models_deleted=models_deleted,
+        keys_deleted=keys_deleted,
+        by_model=per_class_count,
+        was_committed=was_commited,
     )
 
 

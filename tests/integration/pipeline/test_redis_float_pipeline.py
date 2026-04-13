@@ -1,8 +1,13 @@
 import pytest
 
+from rapyer.types.float import RedisFloat
+from tests.conftest import model_pipeline_test_for
 from tests.models.redis_types import PipelineAllTypesTestModel
 
 
+@model_pipeline_test_for(RedisFloat.__iadd__)
+@model_pipeline_test_for(RedisFloat.__isub__)
+@model_pipeline_test_for(RedisFloat.__imul__)
 @pytest.mark.asyncio
 async def test_redis_float_operations__all_operations_combined__check_atomicity_sanity():
     # Arrange
@@ -57,6 +62,7 @@ async def test_redis_float_operations__changes_outside_pipeline_ignored_sanity()
         [10.0, 3.0, pytest.approx(3.3333333333333335)],
     ],
 )
+@model_pipeline_test_for(RedisFloat.__itruediv__)
 async def test_redis_float_itruediv_with_pipeline_sanity(
     initial_value: float, operand: float, expected: float
 ):
@@ -86,6 +92,7 @@ async def test_redis_float_itruediv_with_pipeline_sanity(
         [25.9, 4.0, 6.0],
     ],
 )
+@model_pipeline_test_for(RedisFloat.__ifloordiv__)
 async def test_redis_float_ifloordiv_with_pipeline_sanity(
     initial_value, operand, expected
 ):
@@ -115,6 +122,7 @@ async def test_redis_float_ifloordiv_with_pipeline_sanity(
         [100.3, 9.0, pytest.approx(1.3)],
     ],
 )
+@model_pipeline_test_for(RedisFloat.__imod__)
 async def test_redis_float_imod_with_pipeline_sanity(
     initial_value: float, operand, expected
 ):
@@ -144,6 +152,7 @@ async def test_redis_float_imod_with_pipeline_sanity(
         [4.0, 0.5, 2.0],
     ],
 )
+@model_pipeline_test_for(RedisFloat.__ipow__)
 async def test_redis_float_ipow_with_pipeline_sanity(initial_value, operand, expected):
     # Arrange
     model = PipelineAllTypesTestModel(amount=initial_value)

@@ -3,6 +3,8 @@ from datetime import datetime, timedelta
 import pytest
 
 import rapyer
+from rapyer.types.datetime import RedisDatetime, RedisDatetimeTimestamp
+from tests.conftest import model_pipeline_test_for
 from tests.models.simple_types import DatetimeModel, DatetimeTimestampModel
 
 
@@ -47,6 +49,8 @@ async def test_redis_datetime_timestamp_operations__changes_outside_pipeline_ign
         ],
     ],
 )
+@model_pipeline_test_for(RedisDatetime.__iadd__)
+@model_pipeline_test_for(RedisDatetimeTimestamp.__iadd__)
 async def test_redis_datetime_iadd_with_pipeline_sanity(initial, delta, expected):
     # Arrange
     model = DatetimeTimestampModel(created_at=initial, updated_at=initial)
@@ -92,6 +96,8 @@ async def test_redis_datetime_iadd_with_pipeline_sanity(initial, delta, expected
         ],
     ],
 )
+@model_pipeline_test_for(RedisDatetime.__isub__)
+@model_pipeline_test_for(RedisDatetimeTimestamp.__isub__)
 async def test_redis_datetime_timestamp_isub_with_pipeline_sanity(
     initial, delta, expected
 ):

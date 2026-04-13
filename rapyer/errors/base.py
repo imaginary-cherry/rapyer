@@ -24,3 +24,7 @@ class MissingParameterError(RapyerError):
 
 class UnsupportedArgumentValueError(RapyerError):
     pass
+
+
+class UpdateAtomicModelError(RapyerError):
+    pass

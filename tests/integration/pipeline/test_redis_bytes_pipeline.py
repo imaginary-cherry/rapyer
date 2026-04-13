@@ -1,8 +1,11 @@
 import pytest
 
+from rapyer.types.byte import RedisBytes
+from tests.conftest import model_pipeline_test_for
 from tests.models.simple_types import BytesModel
 
 
+@model_pipeline_test_for(RedisBytes.__iadd__)
 @pytest.mark.asyncio
 async def test_redis_bytes_iadd_with_pipeline_sanity():
     # Arrange

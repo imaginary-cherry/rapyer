@@ -1,8 +1,11 @@
 import pytest
 
+from rapyer.types.string import RedisStr
+from tests.conftest import model_pipeline_test_for
 from tests.models.redis_types import PipelineAllTypesTestModel
 
 
+@model_pipeline_test_for(RedisStr.__iadd__)
 @pytest.mark.asyncio
 async def test_redis_str_operations__all_operations_combined__check_atomicity_sanity():
     # Arrange
@@ -47,6 +50,7 @@ async def test_redis_str_operations__changes_outside_pipeline_ignored_sanity():
     ["initial_value", "multiplier", "expected"],
     [["test", 0, ""]],
 )
+@model_pipeline_test_for(RedisStr.__imul__)
 async def test_redis_str_imul_with_pipeline_sanity(initial_value, multiplier, expected):
     # Arrange
     model = PipelineAllTypesTestModel(name=initial_value)

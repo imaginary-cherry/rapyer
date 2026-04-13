@@ -6,6 +6,7 @@ from rapyer.errors.base import (
     RapyerError,
     RapyerModelDoesntExistError,
     UnsupportedArgumentValueError,
+    UpdateAtomicModelError,
 )
 from rapyer.errors.find import (
     BadFilterError,
@@ -30,6 +31,7 @@ def __getattr__(name):
 
 
 __all__ = [
+    "UpdateAtomicModelError",
     "BadFilterError",
     "FindError",
     "PersistentNoScriptError",

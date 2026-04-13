@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.7]
+
+### ✨ Added
+
+- **`SpecialFieldType` Base Class**: Added abstract base for field types that manage their own separate Redis data structures (e.g., Sorted Sets, Streams). Special fields are not found in the json model and can execute complex logic in atomic actions.
+- **`RedisPriorityQueue` Type**: Added a new priority queue field type. Lower priority score = higher precedence.
+  - Supports generic value types: `tasks: RedisPriorityQueue[MyModel]`
+  - Operations: `apush(value, priority)`, `apush_many(items)`, `apop()`, `apeek()`, `asize()`, `aclear()`, `aitems()`, `aremove(value)`
+  - `PriorityQueueItem[T]` dataclass for typed push/list results
+  - Stored as a separate Redis key (`{model_key}:{field_name}`), not inline in the model JSON
+- **`BaseRedisType` Hierarchy**: Introduced a common abstract base (`BaseRedisType`) for all Redis-aware field types, unifying inline `RedisType` fields and separate `SpecialFieldType` fields under one type hierarchy.
+- **`UpdateAtomicModelError`**: New error raised when attempting to use `aupdate()` on special fields, which manage their own Redis storage.
+
+
 ## [1.2.6]
 
 ### ✨ Added
