@@ -1,3 +1,4 @@
+from abc import ABC
 from datetime import datetime, timedelta
 
 import pytest
@@ -10,7 +11,7 @@ from tests.integration.pipeline.pipeline_atomicity_base import (
 from tests.models.simple_types import DatetimeModel, DatetimeTimestampModel
 
 
-class _DatetimeBothModelsOpBase(PipelineAtomicityBase):
+class DatetimeBothModelsOpBase(PipelineAtomicityBase, ABC):
     """Datetime iadd/isub tests that mutate both storage flavors at once.
 
     Setup creates a :class:`DatetimeTimestampModel` and a :class:`DatetimeModel`
@@ -23,7 +24,7 @@ class _DatetimeBothModelsOpBase(PipelineAtomicityBase):
         initial = self.test_input.initial
         ts_model = DatetimeTimestampModel(created_at=initial, updated_at=initial)
         str_date_model = DatetimeModel(created_at=initial, updated_at=initial)
-        return ts_model, str_date_model
+        return [ts_model, str_date_model]
 
     def pipeline_owner(self):
         ts_model, _str_date_model = self.handle
@@ -42,7 +43,7 @@ class _DatetimeBothModelsOpBase(PipelineAtomicityBase):
         return self.test_input.expected, self.test_input.expected
 
 
-class TestRedisDatetimeIadd(_DatetimeBothModelsOpBase):
+class TestRedisDatetimeIadd(DatetimeBothModelsOpBase):
     covered_method = [RedisDatetime.__iadd__, RedisDatetimeTimestamp.__iadd__]
     params = [
         BinaryOpCase(
@@ -68,7 +69,7 @@ class TestRedisDatetimeIadd(_DatetimeBothModelsOpBase):
         str_date_model.created_at += self.test_input.operand
 
 
-class TestRedisDatetimeIsub(_DatetimeBothModelsOpBase):
+class TestRedisDatetimeIsub(DatetimeBothModelsOpBase):
     covered_method = [RedisDatetime.__isub__, RedisDatetimeTimestamp.__isub__]
     params = [
         BinaryOpCase(

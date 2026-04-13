@@ -10,13 +10,15 @@ class TestPipelineAsetTtl(PipelineAtomicityBase):
 
     covered_method = AtomicRedisModel.aset_ttl
 
-    async def setup_data(self):
-        models = [
+    def create_models(self):
+        return [
             UserModelWithoutTTL(name="user1", age=25),
             UserModelWithoutTTL(name="user2", age=30),
             UserModelWithoutTTL(name="user3", age=35),
         ]
-        await UserModelWithoutTTL.ainsert(*models)
+
+    async def setup_data(self):
+        models = await super().setup_data()
         ttls_before = [await self.real_redis_client.ttl(model.key) for model in models]
         assert all(ttl == -1 for ttl in ttls_before)
         return models

@@ -1,3 +1,5 @@
+from abc import ABC
+
 import pytest
 
 from rapyer.base import AtomicRedisModel
@@ -415,14 +417,14 @@ async def test_pipeline_exception_rollback__check_no_changes_applied_edge_case()
 # =============================================================================
 
 
-class _TwoModelDeleteBase(PipelineAtomicityBase):
+class TwoModelDeleteBase(PipelineAtomicityBase, ABC):
     """Two-model delete atomicity: model1 deleted, model2 preserved."""
 
     def create_models(self):
-        return (
+        return [
             ComprehensiveTestModel(tags=["tag1"], name="model1"),
             ComprehensiveTestModel(tags=["tag2"], name="model2"),
-        )
+        ]
 
     def pipeline_owner(self):
         return self.handle[0]
@@ -441,14 +443,14 @@ class _TwoModelDeleteBase(PipelineAtomicityBase):
         return 0, 1
 
 
-class TestPipelineDelete(_TwoModelDeleteBase):
+class TestPipelineDelete(TwoModelDeleteBase):
     covered_method = AtomicRedisModel.adelete
 
     async def perform_action(self, piped):
         await piped.adelete()
 
 
-class TestPipelineTryDelete(_TwoModelDeleteBase):
+class TestPipelineTryDelete(TwoModelDeleteBase):
     covered_method = AtomicRedisModel.adelete_by_key
 
     async def perform_action(self, piped):

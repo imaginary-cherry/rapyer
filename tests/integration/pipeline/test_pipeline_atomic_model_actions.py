@@ -48,9 +48,12 @@ class TestPipelineModelAinsert(PipelineAtomicityBase):
 
     covered_method = AtomicRedisModel.ainsert
 
+    def create_models(self):
+        # Only the existing model is inserted; the new model is the test subject.
+        return ComprehensiveTestModel(name="existing")
+
     async def setup_data(self):
-        existing_model = ComprehensiveTestModel(name="existing")
-        await existing_model.asave()
+        existing_model = await super().setup_data()
         new_model = ComprehensiveTestModel(name="inserted")
         return existing_model, new_model
 
@@ -153,11 +156,11 @@ class TestPipelineModelAdeleteMany(PipelineAtomicityBase):
     covered_method = AtomicRedisModel.adelete_many
 
     def create_models(self):
-        return (
+        return [
             ComprehensiveTestModel(name="model1"),
             ComprehensiveTestModel(name="model2"),
             ComprehensiveTestModel(name="model3"),
-        )
+        ]
 
     def pipeline_owner(self):
         return self.handle[0]
