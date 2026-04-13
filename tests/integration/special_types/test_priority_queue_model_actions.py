@@ -286,6 +286,8 @@ async def test_aupdate_regular_and_pq_field_together_raises_error(saved_mixed_mo
     # Assert
     assert model.name == "mixed_test"
     assert await model.tasks.asize() == 2
+    loaded_model = await MixedSpecialModel.aget(model.key)
+    assert loaded_model.name == "mixed_test"
 
 
 # --- aduplicate ---
