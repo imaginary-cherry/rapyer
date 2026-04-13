@@ -1,29 +1,29 @@
 import pytest
 
 from rapyer.types.string import RedisStr
-from tests.conftest import model_pipeline_test_for
+from tests.integration.pipeline.pipeline_atomicity_base import (
+    PipelineAllTypesNameOpBase,
+)
 from tests.models.redis_types import PipelineAllTypesTestModel
 
 
-@model_pipeline_test_for(RedisStr.__iadd__)
-@pytest.mark.asyncio
-async def test_redis_str_operations__all_operations_combined__check_atomicity_sanity():
-    # Arrange
-    model = PipelineAllTypesTestModel(name="hello")
-    await model.asave()
+class TestRedisStrAllOperationsCombined(PipelineAllTypesNameOpBase):
+    covered_method = RedisStr.__iadd__
 
-    # Act
-    async with model.apipeline() as m:
-        m.name += "_world"
-        m.name += "_test"
+    async def setup_data(self, **_):
+        model = PipelineAllTypesTestModel(name="hello")
+        await model.asave()
+        return model
 
-        # Assert - changes not visible during pipeline
-        loaded = await PipelineAllTypesTestModel.aget(model.key)
-        assert loaded.name == "hello"
+    async def perform_action(self, piped, **_):
+        piped.name += "_world"
+        piped.name += "_test"
 
-    # Assert - all changes applied after pipeline
-    final = await PipelineAllTypesTestModel.aget(model.key)
-    assert final.name == "hello_world_test"
+    def expected_before(self, **_):
+        return "hello"
+
+    def expected_after(self, **_):
+        return "hello_world_test"
 
 
 @pytest.mark.asyncio
@@ -45,28 +45,24 @@ async def test_redis_str_operations__changes_outside_pipeline_ignored_sanity():
     assert final.name == "hello_inside"
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ["initial_value", "multiplier", "expected"],
-    [["test", 0, ""]],
-)
-@model_pipeline_test_for(RedisStr.__imul__)
-async def test_redis_str_imul_with_pipeline_sanity(initial_value, multiplier, expected):
-    # Arrange
-    model = PipelineAllTypesTestModel(name=initial_value)
-    await model.asave()
+class TestRedisStrImul(PipelineAllTypesNameOpBase):
+    covered_method = RedisStr.__imul__
+    param_names = ["initial_value", "multiplier", "expected"]
+    params = [["test", 0, ""]]
 
-    # Act
-    async with model.apipeline() as redis_model:
-        redis_model.name *= multiplier
+    async def setup_data(self, *, initial_value, **_):
+        model = PipelineAllTypesTestModel(name=initial_value)
+        await model.asave()
+        return model
 
-        # Assert - Change should not be applied yet
-        loaded_model = await PipelineAllTypesTestModel.aget(model.key)
-        assert loaded_model.name == initial_value
+    async def perform_action(self, piped, *, multiplier, **_):
+        piped.name *= multiplier
 
-    # Assert - Change should be applied after pipeline
-    final_model = await PipelineAllTypesTestModel.aget(model.key)
-    assert final_model.name == expected
+    def expected_before(self, *, initial_value, **_):
+        return initial_value
+
+    def expected_after(self, *, expected, **_):
+        return expected
 
 
 @pytest.mark.asyncio

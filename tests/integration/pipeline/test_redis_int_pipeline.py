@@ -1,147 +1,44 @@
-import pytest
-
 from rapyer.types.integer import RedisInt
-from tests.conftest import model_pipeline_test_for
-from tests.models.collection_types import ComprehensiveTestModel
-
-
-@model_pipeline_test_for(RedisInt.__isub__)
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ["initial_value", "operand", "expected"],
-    [
-        [20, 5, 15],
-        [100, 30, 70],
-        [50, 50, 0],
-    ],
+from tests.integration.pipeline.pipeline_atomicity_base import (
+    ComprehensiveCounterOpBase,
 )
-async def test_redis_int_isub_with_pipeline_sanity(initial_value, operand, expected):
-    # Arrange
-    model = ComprehensiveTestModel(counter=initial_value)
-    await model.asave()
-
-    # Act
-    async with model.apipeline() as redis_model:
-        redis_model.counter -= operand
-
-        # Assert - Change should not be applied yet
-        loaded_model = await ComprehensiveTestModel.aget(model.key)
-        assert loaded_model.counter == initial_value
-
-    # Assert - Change should be applied after pipeline
-    final_model = await ComprehensiveTestModel.aget(model.key)
-    assert final_model.counter == expected
 
 
-@model_pipeline_test_for(RedisInt.__imul__)
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ["initial_value", "operand", "expected"],
-    [
-        [5, 4, 20],
-        [10, 3, 30],
-        [7, 0, 0],
-    ],
-)
-async def test_redis_int_imul_with_pipeline_sanity(initial_value, operand, expected):
-    # Arrange
-    model = ComprehensiveTestModel(counter=initial_value)
-    await model.asave()
+class TestRedisIntIsub(ComprehensiveCounterOpBase):
+    covered_method = RedisInt.__isub__
+    params = [[20, 5, 15], [100, 30, 70], [50, 50, 0]]
 
-    # Act
-    async with model.apipeline() as redis_model:
-        redis_model.counter *= operand
-
-        # Assert - Change should not be applied yet
-        loaded_model = await ComprehensiveTestModel.aget(model.key)
-        assert loaded_model.counter == initial_value
-
-    # Assert - Change should be applied after pipeline
-    final_model = await ComprehensiveTestModel.aget(model.key)
-    assert final_model.counter == expected
+    async def perform_action(self, piped, *, operand, **_):
+        piped.counter -= operand
 
 
-@model_pipeline_test_for(RedisInt.__ifloordiv__)
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ["initial_value", "operand", "expected"],
-    [
-        [17, 5, 3],
-        [100, 7, 14],
-        [25, 4, 6],
-    ],
-)
-async def test_redis_int_ifloordiv_with_pipeline_sanity(
-    initial_value, operand, expected
-):
-    # Arrange
-    model = ComprehensiveTestModel(counter=initial_value)
-    await model.asave()
+class TestRedisIntImul(ComprehensiveCounterOpBase):
+    covered_method = RedisInt.__imul__
+    params = [[5, 4, 20], [10, 3, 30], [7, 0, 0]]
 
-    # Act
-    async with model.apipeline() as redis_model:
-        redis_model.counter //= operand
-
-        # Assert - Change should not be applied yet
-        loaded_model = await ComprehensiveTestModel.aget(model.key)
-        assert loaded_model.counter == initial_value
-
-    # Assert - Change should be applied after pipeline
-    final_model = await ComprehensiveTestModel.aget(model.key)
-    assert final_model.counter == expected
+    async def perform_action(self, piped, *, operand, **_):
+        piped.counter *= operand
 
 
-@model_pipeline_test_for(RedisInt.__imod__)
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ["initial_value", "operand", "expected"],
-    [
-        [17, 5, 2],
-        [23, 7, 2],
-        [100, 9, 1],
-    ],
-)
-async def test_redis_int_imod_with_pipeline_sanity(initial_value, operand, expected):
-    # Arrange
-    model = ComprehensiveTestModel(counter=initial_value)
-    await model.asave()
+class TestRedisIntIfloordiv(ComprehensiveCounterOpBase):
+    covered_method = RedisInt.__ifloordiv__
+    params = [[17, 5, 3], [100, 7, 14], [25, 4, 6]]
 
-    # Act
-    async with model.apipeline() as redis_model:
-        redis_model.counter %= operand
-
-        # Assert - Change should not be applied yet
-        loaded_model = await ComprehensiveTestModel.aget(model.key)
-        assert loaded_model.counter == initial_value
-
-    # Assert - Change should be applied after pipeline
-    final_model = await ComprehensiveTestModel.aget(model.key)
-    assert final_model.counter == expected
+    async def perform_action(self, piped, *, operand, **_):
+        piped.counter //= operand
 
 
-@model_pipeline_test_for(RedisInt.__ipow__)
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ["initial_value", "operand", "expected"],
-    [
-        [2, 3, 8],
-        [3, 2, 9],
-        [5, 2, 25],
-    ],
-)
-async def test_redis_int_ipow_with_pipeline_sanity(initial_value, operand, expected):
-    # Arrange
-    model = ComprehensiveTestModel(counter=initial_value)
-    await model.asave()
+class TestRedisIntImod(ComprehensiveCounterOpBase):
+    covered_method = RedisInt.__imod__
+    params = [[17, 5, 2], [23, 7, 2], [100, 9, 1]]
 
-    # Act
-    async with model.apipeline() as redis_model:
-        redis_model.counter **= operand
+    async def perform_action(self, piped, *, operand, **_):
+        piped.counter %= operand
 
-        # Assert - Change should not be applied yet
-        loaded_model = await ComprehensiveTestModel.aget(model.key)
-        assert loaded_model.counter == initial_value
 
-    # Assert - Change should be applied after pipeline
-    final_model = await ComprehensiveTestModel.aget(model.key)
-    assert final_model.counter == expected
+class TestRedisIntIpow(ComprehensiveCounterOpBase):
+    covered_method = RedisInt.__ipow__
+    params = [[2, 3, 8], [3, 2, 9], [5, 2, 25]]
+
+    async def perform_action(self, piped, *, operand, **_):
+        piped.counter **= operand

@@ -1,36 +1,11 @@
 import pytest
 
 from rapyer.types.float import RedisFloat
-from tests.conftest import model_pipeline_test_for
+from tests.integration.pipeline.pipeline_atomicity_base import (
+    PipelineAllTypesAmountOpBase,
+    PipelineAtomicityBase,
+)
 from tests.models.redis_types import PipelineAllTypesTestModel
-
-
-@model_pipeline_test_for(RedisFloat.__iadd__)
-@model_pipeline_test_for(RedisFloat.__isub__)
-@model_pipeline_test_for(RedisFloat.__imul__)
-@pytest.mark.asyncio
-async def test_redis_float_operations__all_operations_combined__check_atomicity_sanity():
-    # Arrange
-    model = PipelineAllTypesTestModel(amount=100.0)
-    await model.asave()
-
-    # Act
-    async with model.apipeline() as m:
-        m.amount += 50.0
-        m.amount -= 25.0
-        m.amount *= 2.0
-        m.amount /= 5.0
-        m.amount //= 3.0
-        m.amount %= 10.0
-        m.amount **= 2.0
-
-        # Assert - changes not visible during pipeline
-        loaded = await PipelineAllTypesTestModel.aget(model.key)
-        assert loaded.amount == 100.0
-
-    # Assert - all changes applied after pipeline
-    final = await PipelineAllTypesTestModel.aget(model.key)
-    assert final.amount == 36.0
 
 
 @pytest.mark.asyncio
@@ -53,119 +28,81 @@ async def test_redis_float_operations__changes_outside_pipeline_ignored_sanity()
     assert final.amount == 220.0
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ["initial_value", "operand", "expected"],
-    [
+class TestRedisFloatAllOperationsCombined(PipelineAtomicityBase):
+    covered_method = [
+        RedisFloat.__iadd__,
+        RedisFloat.__isub__,
+        RedisFloat.__imul__,
+    ]
+
+    async def setup_data(self, **_):
+        model = PipelineAllTypesTestModel(amount=100.0)
+        await model.asave()
+        return model
+
+    async def perform_action(self, piped, **_):
+        piped.amount += 50.0
+        piped.amount -= 25.0
+        piped.amount *= 2.0
+        piped.amount /= 5.0
+        piped.amount //= 3.0
+        piped.amount %= 10.0
+        piped.amount **= 2.0
+
+    async def load_data(self, model):
+        loaded = await PipelineAllTypesTestModel.aget(model.key)
+        return loaded.amount
+
+    def expected_before(self, **_):
+        return 100.0
+
+    def expected_after(self, **_):
+        return 36.0
+
+
+class TestRedisFloatItruediv(PipelineAllTypesAmountOpBase):
+    covered_method = RedisFloat.__itruediv__
+    params = [
         [100.0, 4.0, 25.0],
         [15.0, 2.0, 7.5],
         [10.0, 3.0, pytest.approx(3.3333333333333335)],
-    ],
-)
-@model_pipeline_test_for(RedisFloat.__itruediv__)
-async def test_redis_float_itruediv_with_pipeline_sanity(
-    initial_value: float, operand: float, expected: float
-):
-    # Arrange
-    model = PipelineAllTypesTestModel(amount=initial_value)
-    await model.asave()
+    ]
 
-    # Act
-    async with model.apipeline() as redis_model:
-        redis_model.amount /= operand
-
-        # Assert - Change should not be applied yet
-        loaded_model = await PipelineAllTypesTestModel.aget(model.key)
-        assert loaded_model.amount == initial_value
-
-    # Assert - Change should be applied after pipeline
-    final_model = await PipelineAllTypesTestModel.aget(model.key)
-    assert final_model.amount == expected
+    async def perform_action(self, piped, *, operand, **_):
+        piped.amount /= operand
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ["initial_value", "operand", "expected"],
-    [
+class TestRedisFloatIfloordiv(PipelineAllTypesAmountOpBase):
+    covered_method = RedisFloat.__ifloordiv__
+    params = [
         [17.0, 5.0, 3.0],
         [100.5, 7.0, 14.0],
         [25.9, 4.0, 6.0],
-    ],
-)
-@model_pipeline_test_for(RedisFloat.__ifloordiv__)
-async def test_redis_float_ifloordiv_with_pipeline_sanity(
-    initial_value, operand, expected
-):
-    # Arrange
-    model = PipelineAllTypesTestModel(amount=initial_value)
-    await model.asave()
+    ]
 
-    # Act
-    async with model.apipeline() as redis_model:
-        redis_model.amount //= operand
-
-        # Assert - Change should not be applied yet
-        loaded_model = await PipelineAllTypesTestModel.aget(model.key)
-        assert loaded_model.amount == initial_value
-
-    # Assert - Change should be applied after pipeline
-    final_model = await PipelineAllTypesTestModel.aget(model.key)
-    assert final_model.amount == expected
+    async def perform_action(self, piped, *, operand, **_):
+        piped.amount //= operand
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ["initial_value", "operand", "expected"],
-    [
+class TestRedisFloatImod(PipelineAllTypesAmountOpBase):
+    covered_method = RedisFloat.__imod__
+    params = [
         [17.5, 5.0, 2.5],
         [23.0, 7.0, 2.0],
         [100.3, 9.0, pytest.approx(1.3)],
-    ],
-)
-@model_pipeline_test_for(RedisFloat.__imod__)
-async def test_redis_float_imod_with_pipeline_sanity(
-    initial_value: float, operand, expected
-):
-    # Arrange
-    model = PipelineAllTypesTestModel(amount=initial_value)
-    await model.asave()
+    ]
 
-    # Act
-    async with model.apipeline() as redis_model:
-        redis_model.amount %= operand
-
-        # Assert - Change should not be applied yet
-        loaded_model = await PipelineAllTypesTestModel.aget(model.key)
-        assert loaded_model.amount == initial_value
-
-    # Assert - Change should be applied after pipeline
-    final_model = await PipelineAllTypesTestModel.aget(model.key)
-    assert final_model.amount == expected
+    async def perform_action(self, piped, *, operand, **_):
+        piped.amount %= operand
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ["initial_value", "operand", "expected"],
-    [
+class TestRedisFloatIpow(PipelineAllTypesAmountOpBase):
+    covered_method = RedisFloat.__ipow__
+    params = [
         [2.0, 3.0, 8.0],
         [3.0, 2.0, 9.0],
         [4.0, 0.5, 2.0],
-    ],
-)
-@model_pipeline_test_for(RedisFloat.__ipow__)
-async def test_redis_float_ipow_with_pipeline_sanity(initial_value, operand, expected):
-    # Arrange
-    model = PipelineAllTypesTestModel(amount=initial_value)
-    await model.asave()
+    ]
 
-    # Act
-    async with model.apipeline() as redis_model:
-        redis_model.amount **= operand
-
-        # Assert - Change should not be applied yet
-        loaded_model = await PipelineAllTypesTestModel.aget(model.key)
-        assert loaded_model.amount == initial_value
-
-    # Assert - Change should be applied after pipeline
-    final_model = await PipelineAllTypesTestModel.aget(model.key)
-    assert final_model.amount == expected
+    async def perform_action(self, piped, *, operand, **_):
+        piped.amount **= operand

@@ -5,7 +5,11 @@ from rapyer.context import _context_pipe
 from rapyer.types.base import RedisType
 from rapyer.types.dct import RedisDict
 from rapyer.types.lst import RedisList
-from tests.conftest import model_pipeline_test_for
+from tests.integration.pipeline.pipeline_atomicity_base import (
+    ComprehensiveMetadataOpBase,
+    ComprehensiveTagsOpBase,
+    PipelineAtomicityBase,
+)
 from tests.models.collection_types import ComprehensiveTestModel, PipelineTestModel
 
 
@@ -159,189 +163,190 @@ async def test_pipeline_context_manager__pipeline_context_cleanup__check_context
     assert final_model.metadata == {"test": "value", "updated": "true"}
 
 
-@model_pipeline_test_for(RedisList.aappend)
-@pytest.mark.asyncio
-async def test_pipeline_list_aappend__check_atomicity_sanity():
-    # Arrange
-    model = ComprehensiveTestModel(tags=["initial"])
-    await model.asave()
-
-    # Act
-    async with model.apipeline() as redis_model:
-        await redis_model.tags.aappend("new_tag")
-
-        # Check if the change is not applied yet (atomicity test)
-        loaded_model = await ComprehensiveTestModel.aget(model.key)
-        assert loaded_model.tags == ["initial"]
-
-    # Assert - Check if a change was applied after a pipeline
-    final_model = await ComprehensiveTestModel.aget(model.key)
-    assert final_model.tags == ["initial", "new_tag"]
+# =============================================================================
+# RedisList atomicity tests
+# =============================================================================
 
 
-@model_pipeline_test_for(RedisList.aextend)
-@pytest.mark.asyncio
-async def test_pipeline_list_aextend__check_atomicity_sanity():
-    # Arrange
-    model = ComprehensiveTestModel(tags=["initial"])
-    await model.asave()
+class TestPipelineListAappend(ComprehensiveTagsOpBase):
+    covered_method = RedisList.aappend
 
-    # Act
-    async with model.apipeline() as redis_model:
-        await redis_model.tags.aextend(["tag1", "tag2"])
+    async def setup_data(self, **_):
+        model = ComprehensiveTestModel(tags=["initial"])
+        await model.asave()
+        return model
 
-        # Check if the change is not applied yet (atomicity test)
-        loaded_model = await ComprehensiveTestModel.aget(model.key)
-        assert loaded_model.tags == ["initial"]
+    async def perform_action(self, piped, **_):
+        await piped.tags.aappend("new_tag")
 
-    # Assert - Check if a change was applied after a pipeline
-    final_model = await ComprehensiveTestModel.aget(model.key)
-    assert final_model.tags == ["initial", "tag1", "tag2"]
+    def expected_before(self, **_):
+        return ["initial"]
+
+    def expected_after(self, **_):
+        return ["initial", "new_tag"]
 
 
-@model_pipeline_test_for(RedisList.ainsert)
-@pytest.mark.asyncio
-async def test_pipeline_list_ainsert__check_atomicity_sanity():
-    # Arrange
-    model = ComprehensiveTestModel(tags=["first", "last"])
-    await model.asave()
+class TestPipelineListAextend(ComprehensiveTagsOpBase):
+    covered_method = RedisList.aextend
 
-    # Act
-    async with model.apipeline() as redis_model:
-        await redis_model.tags.ainsert(1, "middle")
+    async def setup_data(self, **_):
+        model = ComprehensiveTestModel(tags=["initial"])
+        await model.asave()
+        return model
 
-        # Check if the change is not applied yet (atomicity test)
-        loaded_model = await ComprehensiveTestModel.aget(model.key)
-        assert loaded_model.tags == ["first", "last"]
+    async def perform_action(self, piped, **_):
+        await piped.tags.aextend(["tag1", "tag2"])
 
-    # Assert - Check if a change was applied after a pipeline
-    final_model = await ComprehensiveTestModel.aget(model.key)
-    assert final_model.tags == ["first", "middle", "last"]
+    def expected_before(self, **_):
+        return ["initial"]
+
+    def expected_after(self, **_):
+        return ["initial", "tag1", "tag2"]
 
 
-@model_pipeline_test_for(RedisList.aclear)
-@pytest.mark.asyncio
-async def test_pipeline_list_aclear__check_atomicity_sanity():
-    # Arrange
-    model = ComprehensiveTestModel(tags=["tag1", "tag2"])
-    await model.asave()
+class TestPipelineListAinsert(ComprehensiveTagsOpBase):
+    covered_method = RedisList.ainsert
 
-    # Act
-    async with model.apipeline() as redis_model:
-        await redis_model.tags.aclear()
+    async def setup_data(self, **_):
+        model = ComprehensiveTestModel(tags=["first", "last"])
+        await model.asave()
+        return model
 
-        # Check if the change is not applied yet (atomicity test)
-        loaded_model = await ComprehensiveTestModel.aget(model.key)
-        assert loaded_model.tags == ["tag1", "tag2"]
+    async def perform_action(self, piped, **_):
+        await piped.tags.ainsert(1, "middle")
 
-    # Assert - Check if change was applied after pipeline
-    final_model = await ComprehensiveTestModel.aget(model.key)
-    assert final_model.tags == []
+    def expected_before(self, **_):
+        return ["first", "last"]
+
+    def expected_after(self, **_):
+        return ["first", "middle", "last"]
 
 
-@model_pipeline_test_for(RedisDict.aset_item)
-@pytest.mark.asyncio
-async def test_pipeline_dict_aset_item__check_atomicity_sanity():
-    # Arrange
-    model = ComprehensiveTestModel(metadata={"existing": "value"})
-    await model.asave()
+class TestPipelineListAclear(ComprehensiveTagsOpBase):
+    covered_method = RedisList.aclear
 
-    # Act
-    async with model.apipeline() as redis_model:
-        await redis_model.metadata.aset_item("new_key", "new_value")
+    async def setup_data(self, **_):
+        model = ComprehensiveTestModel(tags=["tag1", "tag2"])
+        await model.asave()
+        return model
 
-        # Check if the change is not applied yet (atomicity test)
-        loaded_model = await ComprehensiveTestModel.aget(model.key)
-        assert loaded_model.metadata == {"existing": "value"}
+    async def perform_action(self, piped, **_):
+        await piped.tags.aclear()
 
-    # Assert - Check if change was applied after pipeline
-    final_model = await ComprehensiveTestModel.aget(model.key)
-    assert final_model.metadata == {"existing": "value", "new_key": "new_value"}
+    def expected_before(self, **_):
+        return ["tag1", "tag2"]
+
+    def expected_after(self, **_):
+        return []
 
 
-@model_pipeline_test_for(RedisDict.adel_item)
-@pytest.mark.asyncio
-async def test_pipeline_dict_adel_item__check_atomicity_sanity():
-    # Arrange
-    model = ComprehensiveTestModel(metadata={"key1": "value1", "key2": "value2"})
-    await model.asave()
-
-    # Act
-    async with model.apipeline() as redis_model:
-        await redis_model.metadata.adel_item("key1")
-
-        # Check if the change is not applied yet (atomicity test)
-        loaded_model = await ComprehensiveTestModel.aget(model.key)
-        assert loaded_model.metadata == {"key1": "value1", "key2": "value2"}
-
-    # Assert - Check if a change was applied after a pipeline
-    final_model = await ComprehensiveTestModel.aget(model.key)
-    assert final_model.metadata == {"key2": "value2"}
+# =============================================================================
+# RedisDict atomicity tests
+# =============================================================================
 
 
-@model_pipeline_test_for(RedisDict.aupdate)
-@pytest.mark.asyncio
-async def test_pipeline_dict_aupdate__check_atomicity_sanity():
-    # Arrange
-    model = ComprehensiveTestModel(metadata={"existing": "value"})
-    await model.asave()
+class TestPipelineDictAsetItem(ComprehensiveMetadataOpBase):
+    covered_method = RedisDict.aset_item
 
-    # Act
-    async with model.apipeline() as redis_model:
-        await redis_model.metadata.aupdate(key1="value1", key2="value2")
+    async def setup_data(self, **_):
+        model = ComprehensiveTestModel(metadata={"existing": "value"})
+        await model.asave()
+        return model
 
-        # Check if the change is not applied yet (atomicity test)
-        loaded_model = await ComprehensiveTestModel.aget(model.key)
-        assert loaded_model.metadata == {"existing": "value"}
+    async def perform_action(self, piped, **_):
+        await piped.metadata.aset_item("new_key", "new_value")
 
-    # Assert - Check if a change was applied after a pipeline
-    final_model = await ComprehensiveTestModel.aget(model.key)
-    assert final_model.metadata == {
-        "existing": "value",
-        "key1": "value1",
-        "key2": "value2",
-    }
+    def expected_before(self, **_):
+        return {"existing": "value"}
+
+    def expected_after(self, **_):
+        return {"existing": "value", "new_key": "new_value"}
 
 
-@model_pipeline_test_for(RedisDict.aclear)
-@pytest.mark.asyncio
-async def test_pipeline_dict_aclear__check_atomicity_sanity():
-    # Arrange
-    model = ComprehensiveTestModel(metadata={"key1": "value1", "key2": "value2"})
-    await model.asave()
+class TestPipelineDictAdelItem(ComprehensiveMetadataOpBase):
+    covered_method = RedisDict.adel_item
 
-    # Act
-    async with model.apipeline() as redis_model:
-        await redis_model.metadata.aclear()
+    async def setup_data(self, **_):
+        model = ComprehensiveTestModel(metadata={"key1": "value1", "key2": "value2"})
+        await model.asave()
+        return model
 
-        # Check if the change is not applied yet (atomicity test)
-        loaded_model = await ComprehensiveTestModel.aget(model.key)
-        assert loaded_model.metadata == {"key1": "value1", "key2": "value2"}
+    async def perform_action(self, piped, **_):
+        await piped.metadata.adel_item("key1")
 
-    # Assert - Check if a change was applied after pipeline
-    final_model = await ComprehensiveTestModel.aget(model.key)
-    assert final_model.metadata == {}
+    def expected_before(self, **_):
+        return {"key1": "value1", "key2": "value2"}
+
+    def expected_after(self, **_):
+        return {"key2": "value2"}
 
 
-@model_pipeline_test_for(RedisType.asave)
-@pytest.mark.asyncio
-async def test_pipeline_string_set__check_atomicity_sanity():
-    # Arrange
-    model = ComprehensiveTestModel(name="original")
-    await model.asave()
+class TestPipelineDictAupdate(ComprehensiveMetadataOpBase):
+    covered_method = RedisDict.aupdate
 
-    # Act
-    async with model.apipeline() as redis_model:
-        redis_model.name = "updated"
-        await redis_model.name.asave()
+    async def setup_data(self, **_):
+        model = ComprehensiveTestModel(metadata={"existing": "value"})
+        await model.asave()
+        return model
 
-        # Check if the change is not applied yet (atomicity test)
-        loaded_model = await ComprehensiveTestModel.aget(model.key)
-        assert loaded_model.name == "original"
+    async def perform_action(self, piped, **_):
+        await piped.metadata.aupdate(key1="value1", key2="value2")
 
-    # Assert - Check if a change was applied after a pipeline
-    final_model = await ComprehensiveTestModel.aget(model.key)
-    assert final_model.name == "updated"
+    def expected_before(self, **_):
+        return {"existing": "value"}
+
+    def expected_after(self, **_):
+        return {
+            "existing": "value",
+            "key1": "value1",
+            "key2": "value2",
+        }
+
+
+class TestPipelineDictAclear(ComprehensiveMetadataOpBase):
+    covered_method = RedisDict.aclear
+
+    async def setup_data(self, **_):
+        model = ComprehensiveTestModel(metadata={"key1": "value1", "key2": "value2"})
+        await model.asave()
+        return model
+
+    async def perform_action(self, piped, **_):
+        await piped.metadata.aclear()
+
+    def expected_before(self, **_):
+        return {"key1": "value1", "key2": "value2"}
+
+    def expected_after(self, **_):
+        return {}
+
+
+# =============================================================================
+# String / scalar atomicity
+# =============================================================================
+
+
+class TestPipelineStringSet(PipelineAtomicityBase):
+    covered_method = RedisType.asave
+
+    async def setup_data(self, **_):
+        model = ComprehensiveTestModel(name="original")
+        await model.asave()
+        return model
+
+    async def perform_action(self, piped, **_):
+        piped.name = "updated"
+        await piped.name.asave()
+
+    async def load_data(self, model):
+        loaded = await ComprehensiveTestModel.aget(model.key)
+        return loaded.name
+
+    def expected_before(self, **_):
+        return "original"
+
+    def expected_after(self, **_):
+        return "updated"
 
 
 @pytest.mark.asyncio
@@ -423,56 +428,51 @@ async def test_pipeline_exception_rollback__check_no_changes_applied_edge_case()
     assert final_model.metadata == original_state.metadata
 
 
-@model_pipeline_test_for(AtomicRedisModel.adelete)
-@pytest.mark.asyncio
-async def test_pipeline_delete__check_atomicity_sanity(real_redis_client):
-    # Arrange
-    model1 = ComprehensiveTestModel(tags=["tag1"], name="model1")
-    model2 = ComprehensiveTestModel(tags=["tag2"], name="model2")
-    await model1.asave()
-    await model2.asave()
-
-    # Act
-    async with model1.apipeline() as redis_model:
-        await redis_model.adelete()
-
-        # Check if models still exist during a pipeline (atomicity test)
-        key1_exists = await real_redis_client.exists(model1.key)
-        key2_exists = await real_redis_client.exists(model2.key)
-        assert key1_exists == 1
-        assert key2_exists == 1
-
-    # Assert - Check if model1 was deleted after a pipeline
-    key1_exists = await real_redis_client.exists(model1.key)
-    key2_exists = await real_redis_client.exists(model2.key)
-    assert key1_exists == 0
-    assert key2_exists == 1
+# =============================================================================
+# Delete atomicity tests (use `real_redis_client.exists` rather than aget)
+# =============================================================================
 
 
-@model_pipeline_test_for(AtomicRedisModel.adelete_by_key)
-@pytest.mark.asyncio
-async def test_pipeline_try_delete__check_atomicity_sanity(real_redis_client):
-    # Arrange
-    model1 = ComprehensiveTestModel(tags=["tag1"], name="model1")
-    model2 = ComprehensiveTestModel(tags=["tag2"], name="model2")
-    await model1.asave()
-    await model2.asave()
+class _TwoModelDeleteBase(PipelineAtomicityBase):
+    """Two-model delete atomicity: model1 deleted, model2 preserved."""
 
-    # Act
-    async with model1.apipeline() as redis_model:
+    async def setup_data(self, **_):
+        model1 = ComprehensiveTestModel(tags=["tag1"], name="model1")
+        model2 = ComprehensiveTestModel(tags=["tag2"], name="model2")
+        await model1.asave()
+        await model2.asave()
+        return (model1, model2)
+
+    def pipeline_owner(self, handle):
+        return handle[0]
+
+    async def load_data(self, handle):
+        model1, model2 = handle
+        return (
+            await self.real_redis_client.exists(model1.key),
+            await self.real_redis_client.exists(model2.key),
+        )
+
+    def expected_before(self, **_):
+        return (1, 1)
+
+    def expected_after(self, **_):
+        return (0, 1)
+
+
+class TestPipelineDelete(_TwoModelDeleteBase):
+    covered_method = AtomicRedisModel.adelete
+
+    async def perform_action(self, piped, **_):
+        await piped.adelete()
+
+
+class TestPipelineTryDelete(_TwoModelDeleteBase):
+    covered_method = AtomicRedisModel.adelete_by_key
+
+    async def perform_action(self, piped, *, handle, **_):
+        model1, _model2 = handle
         await ComprehensiveTestModel.adelete_by_key(model1.key)
-
-        # Check if models still exist during pipeline (atomicity test)
-        key1_exists = await real_redis_client.exists(model1.key)
-        key2_exists = await real_redis_client.exists(model2.key)
-        assert key1_exists == 1
-        assert key2_exists == 1
-
-    # Assert - Check if model1 was deleted after pipeline and result was True
-    key1_exists = await real_redis_client.exists(model1.key)
-    key2_exists = await real_redis_client.exists(model2.key)
-    assert key1_exists == 0
-    assert key2_exists == 1
 
 
 @pytest.mark.asyncio

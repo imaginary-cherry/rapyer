@@ -1,25 +1,25 @@
-import pytest
-
 from rapyer.types.byte import RedisBytes
-from tests.conftest import model_pipeline_test_for
+from tests.integration.pipeline.pipeline_atomicity_base import PipelineAtomicityBase
 from tests.models.simple_types import BytesModel
 
 
-@model_pipeline_test_for(RedisBytes.__iadd__)
-@pytest.mark.asyncio
-async def test_redis_bytes_iadd_with_pipeline_sanity():
-    # Arrange
-    model = BytesModel(data=b"hello")
-    await model.asave()
+class TestRedisBytesIadd(PipelineAtomicityBase):
+    covered_method = RedisBytes.__iadd__
 
-    # Act
-    async with model.apipeline() as redis_model:
-        redis_model.data += b" world"
+    async def setup_data(self, **_):
+        model = BytesModel(data=b"hello")
+        await model.asave()
+        return model
 
-        # Assert - Change should not be applied yet
-        loaded_model = await BytesModel.aget(model.key)
-        assert loaded_model.data == b"hello"
+    async def perform_action(self, piped, **_):
+        piped.data += b" world"
 
-    # Assert - Change should be applied after pipeline
-    final_model = await BytesModel.aget(model.key)
-    assert final_model.data == b"hello world"
+    async def load_data(self, model):
+        loaded = await BytesModel.aget(model.key)
+        return loaded.data
+
+    def expected_before(self, **_):
+        return b"hello"
+
+    def expected_after(self, **_):
+        return b"hello world"

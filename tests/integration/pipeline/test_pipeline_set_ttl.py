@@ -1,36 +1,44 @@
-import pytest
-
 from rapyer.base import AtomicRedisModel
-from tests.conftest import model_pipeline_test_for
+from tests.integration.pipeline.pipeline_atomicity_base import PipelineAtomicityBase
 from tests.models.simple_types import UserModelWithoutTTL
 
 TTL_SECONDS = 300
 
 
-@model_pipeline_test_for(AtomicRedisModel.aset_ttl)
-@pytest.mark.asyncio
-async def test_pipeline_aset_ttl__multiple_models__check_ttl_set_atomically(
-    real_redis_client,
-):
-    # Arrange
-    models = [
-        UserModelWithoutTTL(name="user1", age=25),
-        UserModelWithoutTTL(name="user2", age=30),
-        UserModelWithoutTTL(name="user3", age=35),
-    ]
-    await UserModelWithoutTTL.ainsert(*models)
+class TestPipelineAsetTtl(PipelineAtomicityBase):
+    """Verify ``aset_ttl`` applied in a pipeline is not flushed until exit."""
 
-    ttls_before = [await real_redis_client.ttl(model.key) for model in models]
-    assert all(ttl == -1 for ttl in ttls_before)
+    covered_method = AtomicRedisModel.aset_ttl
 
-    # Act
-    async with models[0].apipeline():
-        for model in models:
+    async def setup_data(self, **_):
+        models = [
+            UserModelWithoutTTL(name="user1", age=25),
+            UserModelWithoutTTL(name="user2", age=30),
+            UserModelWithoutTTL(name="user3", age=35),
+        ]
+        await UserModelWithoutTTL.ainsert(*models)
+        ttls_before = [await self.real_redis_client.ttl(model.key) for model in models]
+        assert all(ttl == -1 for ttl in ttls_before)
+        return models
+
+    def pipeline_owner(self, handle):
+        return handle[0]
+
+    async def perform_action(self, piped, *, handle, **_):
+        for model in handle:
             await model.aset_ttl(TTL_SECONDS)
 
-        ttls_during = [await real_redis_client.ttl(model.key) for model in models]
-        assert all(ttl == -1 for ttl in ttls_during)
+    async def load_data(self, handle):
+        return [await self.real_redis_client.ttl(model.key) for model in handle]
 
-    # Assert
-    ttls_after = [await real_redis_client.ttl(model.key) for model in models]
-    assert all(0 < ttl <= TTL_SECONDS for ttl in ttls_after)
+    def expected_before(self, **_):
+        # All TTLs are still -1 (unset) while the pipeline is open.
+        return [-1, -1, -1]
+
+    def assert_after_pipeline(self, loaded, **_):
+        # After the pipeline commits, each TTL should be positive and bounded by TTL_SECONDS.
+        assert all(0 < ttl <= TTL_SECONDS for ttl in loaded), loaded
+
+    def expected_after(self, **_):
+        # Unused because ``assert_after_pipeline`` is overridden with a range check.
+        return None
