@@ -10,7 +10,7 @@ of the groups it needs.
 from typing import Callable
 
 from rapyer.base import AtomicRedisModel
-from rapyer.types.base import RedisType
+from rapyer.types.base import BaseRedisType, GenericRedisType, RedisType
 from rapyer.types.byte import RedisBytes
 from rapyer.types.datetime import RedisDatetime
 from rapyer.types.dct import RedisDict
@@ -53,6 +53,8 @@ TYPE_INTERNAL_METHODS = _group_rapyer_actions(
     RedisList.sub_field_path,
     RedisDict.iterate_items,
     RedisDict.validate_dict,
+    RedisPriorityQueue._serialize_value,
+    RedisPriorityQueue._deserialize_value,
 )
 
 # ── Type-level: operations that return values (read-only or Lua/direct redis) ──
@@ -151,4 +153,29 @@ SPECIAL_FIELD_LIFECYCLE_METHODS = _group_rapyer_actions(
     RedisPriorityQueue.asave_special,
     RedisPriorityQueue.adelete_special,
     RedisPriorityQueue.aduplicate_special,
+)
+
+# ── Base-class utility methods (not Redis operations) ──
+# These live on BaseRedisType/GenericRedisType/SpecialFieldType and are
+# construction/path/abstract helpers, not mutations that need pipeline tests.
+
+BASE_TYPE_INTERNAL_METHODS = _group_rapyer_actions(
+    BaseRedisType.__init__,
+    BaseRedisType.refresh_ttl_if_needed,
+    BaseRedisType.init_redis_field,
+    BaseRedisType.sub_field_path,
+    BaseRedisType.json_field_path,
+    GenericRedisType.__init__,
+    GenericRedisType.iterate_items,
+    SpecialFieldType.clone,
+)
+
+# ── Priority queue: write operations ──
+
+PQ_WRITE_METHODS = _group_rapyer_actions(
+    RedisPriorityQueue.apush,
+    RedisPriorityQueue.apush_many,
+    RedisPriorityQueue.apop,
+    RedisPriorityQueue.aclear,
+    RedisPriorityQueue.aremove,
 )

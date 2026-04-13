@@ -1,5 +1,6 @@
 import pytest
 
+import rapyer.types  # noqa: F401  # ensure every BaseRedisType subclass is registered
 import tests.integration.pipeline.test__update_method_dont_set_redis  # noqa: F401
 import tests.integration.pipeline.test_pipeline_adelete_many  # noqa: F401
 import tests.integration.pipeline.test_pipeline_asave_batching  # noqa: F401
@@ -16,14 +17,7 @@ import tests.integration.pipeline.test_redis_int_pipeline  # noqa: F401
 import tests.integration.pipeline.test_redis_list_pipeline  # noqa: F401
 import tests.integration.pipeline.test_redis_str_pipeline  # noqa: F401
 from rapyer.base import AtomicRedisModel
-from rapyer.types.base import RedisType
-from rapyer.types.byte import RedisBytes
-from rapyer.types.datetime import RedisDatetime, RedisDatetimeTimestamp
-from rapyer.types.dct import RedisDict
-from rapyer.types.float import RedisFloat
-from rapyer.types.integer import RedisInt
-from rapyer.types.lst import RedisList
-from rapyer.types.string import RedisStr
+from rapyer.types.base import BaseRedisType
 from tests.conftest import (
     MODEL_PIPELINE_TESTED_METHODS,
     STANDALONE_PIPELINE_TESTED_METHODS,
@@ -31,29 +25,23 @@ from tests.conftest import (
     get_async_methods,
 )
 from tests.unit.enforcement_exclusions import (
+    BASE_TYPE_INTERNAL_METHODS,
     MODEL_INDEX_METHODS,
     MODEL_INTERNAL_METHODS,
     MODEL_QUERY_METHODS,
     MODEL_READ_METHODS,
+    PQ_READ_METHODS,
+    SPECIAL_FIELD_LIFECYCLE_METHODS,
     TYPE_INTERNAL_METHODS,
     TYPE_READ_METHODS,
 )
 
-PIPELINE_TYPES = [
-    RedisType,
-    RedisInt,
-    RedisFloat,
-    RedisStr,
-    RedisBytes,
-    RedisDatetime,
-    RedisDatetimeTimestamp,
-    RedisList,
-    RedisDict,
-]
-
 EXCLUDED_FROM_TYPE_PIPELINE_TEST = (
     TYPE_INTERNAL_METHODS  # Not Redis operations
     | TYPE_READ_METHODS  # Return values, can't defer in pipeline
+    | BASE_TYPE_INTERNAL_METHODS  # Construction / path / abstract helpers
+    | PQ_READ_METHODS  # Return values, can't defer in pipeline
+    | SPECIAL_FIELD_LIFECYCLE_METHODS  # Lifecycle hooks, covered by model tests
 )
 
 EXCLUDED_FROM_MODEL_PIPELINE_TEST = (
@@ -64,9 +52,17 @@ EXCLUDED_FROM_MODEL_PIPELINE_TEST = (
 )
 
 
+def _all_subclasses(cls):
+    result = set()
+    for sub in cls.__subclasses__():
+        result.add(sub)
+        result.update(_all_subclasses(sub))
+    return result
+
+
 def collect_all_pipeline_methods():
     all_methods = set()
-    for cls in PIPELINE_TYPES:
+    for cls in _all_subclasses(BaseRedisType):
         all_methods.update(get_all_type_methods(cls))
     all_methods.update(get_async_methods(AtomicRedisModel))
     excluded = EXCLUDED_FROM_TYPE_PIPELINE_TEST | EXCLUDED_FROM_MODEL_PIPELINE_TEST
