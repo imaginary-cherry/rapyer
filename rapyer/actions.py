@@ -58,9 +58,6 @@ def refresh_action(*groups: ActionGroup):
 def marks_redis_updated(*groups: ActionGroup):
     """Decorator for sync pipeline methods. Tags with action groups AND marks _redis_updated.
 
-    Replaces the old marks_redis_updated from types/base.py.
-    Sets _action_groups on the returned value so pipeline exit can check group membership.
-
     Usage:
         @marks_redis_updated(ActionGroup.UPDATE)
         def __iadd__(self, other):
@@ -78,7 +75,6 @@ def marks_redis_updated(*groups: ActionGroup):
             result = method(self, *args, **kwargs)
             if result is not NotImplemented and _context_pipe.get() is not None:
                 result._redis_updated = True
-                result._last_action_groups = combined
             return result
 
         wrapper._action_groups = combined

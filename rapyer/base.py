@@ -782,24 +782,13 @@ class AtomicRedisModel(BaseModel):
                     raise
             yield redis_model
 
-            pending = getattr(self, "_pending_action_groups", None)
-            if pending is None:
-                # No marks_redis_updated method ran; use all groups for backward compat
-                pending = ActionGroup.all()
-            if self.should_refresh_for_action(pending):
+            if self.should_refresh():
                 pipe.expire(self.key, self.Meta.ttl)
-            object.__setattr__(self, "_pending_action_groups", None)
 
     def __setattr__(self, name: str, value: Any) -> None:
         skip_redis_set = False
         if isinstance(value, BaseRedisType):
             skip_redis_set = value._redis_updated
-            if value._redis_updated and hasattr(value, "_last_action_groups") and value._last_action_groups is not None:
-                current = getattr(self, "_pending_action_groups", None)
-                if current is None:
-                    current = ActionGroup(0)
-                object.__setattr__(self, "_pending_action_groups", current | value._last_action_groups)
-                value._last_action_groups = None
             value._redis_updated = False
 
         super().__setattr__(name, value)

@@ -68,7 +68,6 @@ class BaseRedisType(ABC):
     def __init__(self, *args, **kwargs):
         self._base_model_link = None
         self._redis_updated = False
-        self._last_action_groups = None
 
     def init_redis_field(self, key, val):
         if hasattr(val, "_base_model_link"):
