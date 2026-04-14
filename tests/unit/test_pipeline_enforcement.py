@@ -1,3 +1,5 @@
+import inspect
+
 import pytest
 
 import rapyer.types  # noqa: F401  # ensure every BaseRedisType subclass is registered
@@ -19,11 +21,10 @@ import tests.integration.pipeline.test_redis_str_pipeline  # noqa: F401
 from rapyer.base import AtomicRedisModel
 from rapyer.types.base import BaseRedisType
 from tests.conftest import (
-    MODEL_PIPELINE_TESTED_METHODS,
-    STANDALONE_PIPELINE_TESTED_METHODS,
     get_all_type_methods,
     get_async_methods,
 )
+from tests.integration.pipeline.pipeline_atomicity_base import PipelineAtomicityBase
 from tests.unit.enforcement_exclusions import (
     BASE_TYPE_INTERNAL_METHODS,
     MODEL_INDEX_METHODS,
@@ -71,21 +72,40 @@ def collect_all_pipeline_methods():
     return sorted(m for m in all_methods if m not in excluded)
 
 
+def collect_covered_methods_from_subclasses():
+    covered: set[tuple[str, str]] = set()
+    for cls in _all_subclasses(PipelineAtomicityBase):
+        if inspect.isabstract(cls):
+            continue
+        methods = cls.covered_method
+        if methods is None:
+            raise AssertionError(
+                f"{cls.__qualname__} is a concrete PipelineAtomicityBase subclass "
+                f"but does not set `covered_method`."
+            )
+        if not isinstance(methods, list):
+            methods = [methods]
+        for method in methods:
+            class_name, method_name = method.__qualname__.rsplit(".", 1)
+            covered.add((class_name, method_name))
+    return covered
+
+
 @pytest.mark.parametrize(["class_name", "method_name"], collect_all_pipeline_methods())
 def test_method_has_pipeline_test_coverage(class_name, method_name):
     # Arrange
     expected_entry = (class_name, method_name)
+    covered_pipeline_methods = collect_covered_methods_from_subclasses()
 
     # Act
-    has_coverage = (
-        expected_entry in MODEL_PIPELINE_TESTED_METHODS
-        or expected_entry in STANDALONE_PIPELINE_TESTED_METHODS
-    )
+    has_coverage = expected_entry in covered_pipeline_methods
 
     # Assert
     assert has_coverage, (
         f"Method {class_name}.{method_name} needs a pipeline atomicity test.\n"
-        f"Add @model_pipeline_test_for({class_name}.{method_name}) or "
-        f"@standalone_pipeline_test_for({class_name}.{method_name}) to a test.\n"
-        f"Or add to the appropriate group in enforcement_exclusions.py with justification."
+        f"Add a concrete subclass of PipelineAtomicityBase with "
+        f"`covered_method = {class_name}.{method_name}` (or include it in the list "
+        f"form if the test covers multiple methods).\n"
+        f"Or add the method to the appropriate group in enforcement_exclusions.py "
+        f"with justification."
     )
