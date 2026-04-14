@@ -6,13 +6,13 @@ from pydantic_core import core_schema
 from pydantic_core.core_schema import SerializationInfo, ValidationInfo
 from typing_extensions import TypeAlias
 
+from rapyer.actions import ActionGroup, marks_redis_updated, refresh_action
 from rapyer.scripts import REMOVE_RANGE_SCRIPT_NAME, run_sha
 from rapyer.types.base import (
     REDIS_DUMP_FLAG_NAME,
     SKIP_SENTINEL,
     GenericRedisType,
     RedisType,
-    marks_redis_updated,
 )
 
 logger = logging.getLogger("rapyer")
@@ -56,7 +56,7 @@ class RedisList(list, GenericRedisType[T]):
         new_val = self.create_new_value(key, value)
         return super().__setitem__(key, new_val)
 
-    @marks_redis_updated
+    @marks_redis_updated(ActionGroup.UPDATE, ActionGroup.APPEND)
     def __iadd__(self, other):
         self.extend(other)
         return self
@@ -117,6 +117,7 @@ class RedisList(list, GenericRedisType[T]):
                 "No changes were made. Use 'async with model.apipeline():' to execute."
             )
 
+    @refresh_action(ActionGroup.UPDATE, ActionGroup.APPEND)
     async def aappend(self, __object):
         self.append(__object)
 
@@ -128,8 +129,8 @@ class RedisList(list, GenericRedisType[T]):
             await self.redis.json().arrappend(  # type: ignore[misc]
                 self.key, self.json_path, *serialized_object
             )
-            await self.refresh_ttl_if_needed()
 
+    @refresh_action(ActionGroup.UPDATE, ActionGroup.APPEND)
     async def aextend(self, __iterable):
         items = list(__iterable)
         self.extend(items)
@@ -145,13 +146,12 @@ class RedisList(list, GenericRedisType[T]):
                 self.json_path,
                 *serialized_items,
             )
-            await self.refresh_ttl_if_needed()
 
+    @refresh_action(ActionGroup.UPDATE, ActionGroup.DELETE)
     async def apop(self, index=-1):
         if self:
             self.pop(index)
         arrpop = await self.redis.json().arrpop(self.key, self.json_path, index)  # type: ignore[misc]
-        await self.refresh_ttl_if_needed()
 
         # Handle case where arrpop returns [None] for an empty list
         if arrpop[0] is None:
@@ -161,6 +161,7 @@ class RedisList(list, GenericRedisType[T]):
             arrpop, context={REDIS_DUMP_FLAG_NAME: True}
         )[0]
 
+    @refresh_action(ActionGroup.UPDATE, ActionGroup.APPEND)
     async def ainsert(self, index, __object):
         self.insert(index, __object)
 
@@ -172,8 +173,8 @@ class RedisList(list, GenericRedisType[T]):
             await self.redis.json().arrinsert(  # type: ignore[misc]
                 self.key, self.json_path, index, *serialized_object
             )
-            await self.refresh_ttl_if_needed()
 
+    @refresh_action(ActionGroup.UPDATE, ActionGroup.DELETE)
     async def aclear(self):
         # Clear local list
         self.clear()
@@ -181,7 +182,6 @@ class RedisList(list, GenericRedisType[T]):
         # Clear Redis list
         if not self.pipeline:
             await self.client.json().set(self.key, self.json_path, [])  # type: ignore[misc]
-            await self.refresh_ttl_if_needed()
 
     def clone(self):
         return [v.clone() if isinstance(v, RedisType) else v for v in self]

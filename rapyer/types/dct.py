@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, Any, Generic, TypeAlias, TypeVar, get_args
 
 from pydantic_core import core_schema
 
+from rapyer.actions import ActionGroup, refresh_action
 from rapyer.scripts import DICT_POP_SCRIPT_NAME, DICT_POPITEM_SCRIPT_NAME, arun_sha
 from rapyer.types.base import (
     REDIS_DUMP_FLAG_NAME,
@@ -80,6 +81,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         new_val = self.validate_dict({key: value})[key]
         super().__setitem__(key, new_val)
 
+    @refresh_action(ActionGroup.UPDATE)
     async def aset_item(self, key, value):
         self.__setitem__(key, value)
 
@@ -90,15 +92,15 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         result = await self.client.json().set(  # type: ignore[misc]
             self.key, self.json_field_path(key), serialized_value[key]
         )
-        await self.refresh_ttl_if_needed()
         return result
 
+    @refresh_action(ActionGroup.UPDATE, ActionGroup.DELETE)
     async def adel_item(self, key):
         super().__delitem__(key)
         result = await self.client.json().delete(self.key, self.json_field_path(key))  # type: ignore[misc]
-        await self.refresh_ttl_if_needed()
         return result
 
+    @refresh_action(ActionGroup.UPDATE)
     async def aupdate(self, **kwargs):
         self.update(**kwargs)
 
@@ -112,8 +114,8 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
             async with self.redis.pipeline() as pipeline:
                 update_keys_in_pipeline(pipeline, self.key, **redis_params)
                 await pipeline.execute()
-            await self.refresh_ttl_if_needed()
 
+    @refresh_action(ActionGroup.UPDATE, ActionGroup.DELETE)
     async def apop(self, key, default=None):
         result = await arun_sha(
             self.client,
@@ -125,7 +127,6 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
             key,
         )
         super().pop(key, None)
-        await self.refresh_ttl_if_needed()
 
         if result is None:
             return default
@@ -134,6 +135,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
             {key: result}, context={REDIS_DUMP_FLAG_NAME: True}
         )[key]
 
+    @refresh_action(ActionGroup.UPDATE, ActionGroup.DELETE)
     async def apopitem(self):
         result = await arun_sha(
             self.client,
@@ -143,7 +145,6 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
             self.key,
             self.json_path,
         )
-        await self.refresh_ttl_if_needed()
 
         if result is not None:
             redis_key, redis_value = result
@@ -158,11 +159,11 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
             # If Redis is empty but local dict has items, raise an error for consistency
             raise KeyError("popitem(): dictionary is empty")
 
+    @refresh_action(ActionGroup.UPDATE, ActionGroup.DELETE)
     async def aclear(self):
         self.clear()
         # Clear Redis dict
         result = await self.client.json().set(self.key, self.json_path, {})  # type: ignore[misc]
-        await self.refresh_ttl_if_needed()
         return result
 
     def clone(self):

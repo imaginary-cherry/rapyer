@@ -24,6 +24,7 @@ from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 from redis.exceptions import NoScriptError, ResponseError
 
+from rapyer.actions import ActionGroup, should_refresh_for_action
 from rapyer.config import RedisConfig
 from rapyer.context import (
     _context_pipe,
@@ -178,11 +179,17 @@ class AtomicRedisModel(BaseModel):
         return _context_pipe.get() or self.Meta.redis
 
     @classmethod
-    def should_refresh(cls):
-        return cls.Meta.refresh_ttl and cls.Meta.ttl is not None
+    def should_refresh_for_action(cls, action=None):
+        if action is None:
+            action = ActionGroup.all()
+        return should_refresh_for_action(cls.Meta, action)
 
-    async def refresh_ttl_if_needed(self, can_use_pipeline: bool = False):
-        if self.should_refresh():
+    @classmethod
+    def should_refresh(cls):
+        return cls.should_refresh_for_action()
+
+    async def refresh_ttl_if_needed(self, can_use_pipeline: bool = False, action=None):
+        if self.should_refresh_for_action(action):
             pipe_context = (
                 ensure_pipeline if can_use_pipeline else pipeline_with_execution
             )
@@ -362,7 +369,7 @@ class AtomicRedisModel(BaseModel):
         async with ensure_pipeline(self.Meta) as pipe:
             pipe.json().set(self.key, self.json_path, model_dump)
             if self.Meta.ttl is not None:
-                nx = not self.Meta.refresh_ttl
+                nx = self.Meta.refresh_ttl is False  # Only NX when refresh is explicitly disabled
                 pipe.expire(self.key, self.Meta.ttl, nx=nx)
             for fname in self._special_field_names:
                 field = getattr(self, fname)
@@ -443,7 +450,7 @@ class AtomicRedisModel(BaseModel):
 
         async with ensure_pipeline(self.Meta) as pipe:
             update_keys_in_pipeline(pipe, self.key, **json_path_kwargs)
-        await self.refresh_ttl_if_needed()
+        await self.refresh_ttl_if_needed(action=ActionGroup.UPDATE)
 
     async def aset_ttl(self, ttl: int) -> None:
         if self.is_inner_model():
@@ -486,8 +493,8 @@ class AtomicRedisModel(BaseModel):
         instance = cls.model_validate(model_dump, context=context)
         instance.key = key
         instance._failed_fields = context.get(FAILED_FIELDS_KEY, set())
-        if cls.should_refresh():
-            await instance.refresh_ttl_if_needed()
+        if cls.should_refresh_for_action(ActionGroup.READ):
+            await instance.refresh_ttl_if_needed(action=ActionGroup.READ)
         return instance
 
     async def aload(self) -> Self:
@@ -500,7 +507,7 @@ class AtomicRedisModel(BaseModel):
         instance._pk = self._pk
         instance._base_model_link = self._base_model_link
         instance._failed_fields = context.get(FAILED_FIELDS_KEY, set())
-        await self.refresh_ttl_if_needed()
+        await self.refresh_ttl_if_needed(action=ActionGroup.READ)
         return instance
 
     @classmethod
@@ -572,10 +579,10 @@ class AtomicRedisModel(BaseModel):
                 continue
             instances.append(model)
 
-        if cls.should_refresh():
+        if cls.should_refresh_for_action(ActionGroup.READ):
             async with pipe_ctx_from_redix(cls.Meta.redis) as pipe:
                 for model in instances:
-                    await model.refresh_ttl_if_needed(can_use_pipeline=True)
+                    await model.refresh_ttl_if_needed(can_use_pipeline=True, action=ActionGroup.READ)
                 await pipe.execute()
 
         return instances
@@ -775,13 +782,24 @@ class AtomicRedisModel(BaseModel):
                     raise
             yield redis_model
 
-            if self.should_refresh():
+            pending = getattr(self, "_pending_action_groups", None)
+            if pending is None:
+                # No marks_redis_updated method ran; use all groups for backward compat
+                pending = ActionGroup.all()
+            if self.should_refresh_for_action(pending):
                 pipe.expire(self.key, self.Meta.ttl)
+            object.__setattr__(self, "_pending_action_groups", None)
 
     def __setattr__(self, name: str, value: Any) -> None:
         skip_redis_set = False
         if isinstance(value, BaseRedisType):
             skip_redis_set = value._redis_updated
+            if value._redis_updated and hasattr(value, "_last_action_groups") and value._last_action_groups is not None:
+                current = getattr(self, "_pending_action_groups", None)
+                if current is None:
+                    current = ActionGroup(0)
+                object.__setattr__(self, "_pending_action_groups", current | value._last_action_groups)
+                value._last_action_groups = None
             value._redis_updated = False
 
         super().__setattr__(name, value)
@@ -924,7 +942,7 @@ async def afind(*redis_keys: str, skip_missing: bool = False) -> list[AtomicRedi
 
     async with AtomicRedisModel.Meta.redis.pipeline() as pipe:
         for klass, class_instances in instances_by_class.items():
-            if klass.should_refresh():
+            if klass.should_refresh_for_action(ActionGroup.READ):
                 for model in class_instances:
                     pipe.expire(model.key, klass.Meta.ttl)
         await pipe.execute()
