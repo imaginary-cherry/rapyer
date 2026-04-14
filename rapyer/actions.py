@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from rapyer.context import _context_pipe
 
 if TYPE_CHECKING:
+    from rapyer import AtomicRedisModel
     from rapyer.config import RedisConfig
 
 
@@ -23,7 +24,7 @@ class ActionGroup(enum.Flag):
     def all(cls) -> "ActionGroup":
         result = cls(0)
         for member in cls:
-            result = result | member
+            result |= member
         return result
 
 
@@ -37,13 +38,13 @@ def refresh_action(*groups: ActionGroup):
     """
     combined = ActionGroup(0)
     for g in groups:
-        combined = combined | g
+        combined |= g
 
     def decorator(method):
         method._action_groups = combined
 
         @functools.wraps(method)
-        async def wrapper(self, *args, **kwargs):
+        async def wrapper(self: "AtomicRedisModel", *args, **kwargs):
             result = await method(self, *args, **kwargs)
             await self.refresh_ttl_if_needed(action=combined)
             return result
@@ -67,7 +68,7 @@ def marks_redis_updated(*groups: ActionGroup):
     """
     combined = ActionGroup(0)
     for g in groups:
-        combined = combined | g
+        combined |= g
 
     def decorator(method):
         method._action_groups = combined
