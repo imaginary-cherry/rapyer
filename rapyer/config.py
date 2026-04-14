@@ -1,7 +1,13 @@
+from __future__ import annotations
+
 import dataclasses
+from typing import TYPE_CHECKING, Union
 
 import redis
 from redis.asyncio import Redis
+
+if TYPE_CHECKING:
+    from rapyer.actions import ActionGroup
 
 DEFAULT_CONNECTION = "redis://localhost:6379/0"
 
@@ -22,8 +28,9 @@ class RedisConfig:
     redis_type: dict[type, type] = dataclasses.field(default_factory=create_all_types)
     ttl: int | None = None
     init_with_rapyer: bool = True
-    # Enable TTL refresh on read/write operations by default
-    refresh_ttl: bool = True
+    # Enable TTL refresh on read/write operations by default.
+    # Accepts bool (True=all actions, False=none) or ActionGroup flag set for fine-grained control.
+    refresh_ttl: Union[bool, "ActionGroup"] = True
     # If True, all non-Redis-supported fields are treated as SafeLoad
     safe_load_all: bool = False
     # If True, use JSON serialization for fields that support it instead of pickle
