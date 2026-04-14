@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, TypeAlias
 from pydantic_core import core_schema
 from pydantic_core.core_schema import SerializationInfo, ValidationInfo
 
-from rapyer.actions import ActionGroup, marks_redis_updated
+from rapyer.actions import marks_redis_updated
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME, RedisType
 
 
@@ -13,7 +13,7 @@ class RedisBytes(bytes, RedisType):
     def clone(self):
         return bytes(self)
 
-    @marks_redis_updated(ActionGroup.UPDATE, ActionGroup.APPEND)
+    @marks_redis_updated
     def __iadd__(self, other):
         new_value = self + other
         if self.pipeline:

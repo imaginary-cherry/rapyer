@@ -48,13 +48,6 @@ def test_refresh_action_sets_action_groups_on_method():
     assert ActionGroup.ARITHMETIC in RedisInt.aincrease._action_groups
 
 
-def test_marks_redis_updated_sets_action_groups_on_method():
-    from rapyer.types.integer import RedisInt
-
-    assert hasattr(RedisInt.__iadd__, "_action_groups")
-    assert ActionGroup.UPDATE in RedisInt.__iadd__._action_groups
-    assert ActionGroup.ARITHMETIC in RedisInt.__iadd__._action_groups
-
 
 def test_list_aappend_has_update_and_append_groups():
     from rapyer.types.lst import RedisList

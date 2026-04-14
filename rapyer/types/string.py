@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, TypeAlias
 
-from rapyer.actions import ActionGroup, marks_redis_updated
+from rapyer.actions import marks_redis_updated
 from rapyer.scripts import STR_APPEND_SCRIPT_NAME, STR_MUL_SCRIPT_NAME, run_sha
 from rapyer.types.base import RedisType
 
@@ -11,7 +11,7 @@ class RedisStr(str, RedisType):
     def clone(self):
         return str(self)
 
-    @marks_redis_updated(ActionGroup.UPDATE, ActionGroup.APPEND)
+    @marks_redis_updated
     def __iadd__(self, other):
         new_value = self + other
         if self.pipeline:
@@ -25,7 +25,7 @@ class RedisStr(str, RedisType):
             )
         return self.__class__(new_value)
 
-    @marks_redis_updated(ActionGroup.UPDATE)
+    @marks_redis_updated
     def __imul__(self, other):
         new_value = self * other
         if self.pipeline:

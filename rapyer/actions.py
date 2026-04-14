@@ -55,32 +55,26 @@ def refresh_action(*groups: ActionGroup):
     return decorator
 
 
-def marks_redis_updated(*groups: ActionGroup):
-    """Decorator for sync pipeline methods. Tags with action groups AND marks _redis_updated.
+def marks_redis_updated(method):
+    """Decorator for sync pipeline methods. Marks _redis_updated on the result.
+
+    Pipeline TTL refresh is handled at pipeline exit via should_refresh(),
+    not per-operation. This decorator only signals that Redis was modified.
 
     Usage:
-        @marks_redis_updated(ActionGroup.UPDATE)
+        @marks_redis_updated
         def __iadd__(self, other):
             ...
     """
-    combined = ActionGroup(0)
-    for g in groups:
-        combined |= g
 
-    def decorator(method):
-        method._action_groups = combined
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        result = method(self, *args, **kwargs)
+        if result is not NotImplemented and _context_pipe.get() is not None:
+            result._redis_updated = True
+        return result
 
-        @functools.wraps(method)
-        def wrapper(self, *args, **kwargs):
-            result = method(self, *args, **kwargs)
-            if result is not NotImplemented and _context_pipe.get() is not None:
-                result._redis_updated = True
-            return result
-
-        wrapper._action_groups = combined
-        return wrapper
-
-    return decorator
+    return wrapper
 
 
 def should_refresh_for_action(meta: "RedisConfig", action: "ActionGroup") -> bool:
