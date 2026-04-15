@@ -4,9 +4,9 @@ from rapyer.types.dct import RedisDict
 from rapyer.types.integer import RedisInt
 from rapyer.types.lst import RedisList
 from tests.integration.pipeline.pipeline_atomicity_base import (
+    ActionTestBase,
     ComprehensiveMetadataOpBase,
     ComprehensiveTagsOpBase,
-    PipelineAtomicityBase,
     RapyerPipelineBase,
     TwoModelDeleteBase,
 )
@@ -20,7 +20,7 @@ from tests.models.simple_types import (
 TTL_SECONDS = 300
 
 
-class TestPipelineModelAsave(PipelineAtomicityBase):
+class TestPipelineModelAsave(ActionTestBase):
     covered_method = AtomicRedisModel.asave
 
     def create_models(self):
@@ -42,7 +42,7 @@ class TestPipelineModelAsave(PipelineAtomicityBase):
         return "updated", 99
 
 
-class TestPipelineModelAinsert(PipelineAtomicityBase):
+class TestPipelineModelAinsert(ActionTestBase):
     """Verify ``ainsert`` inside a model pipeline defers the new model's creation."""
 
     covered_method = AtomicRedisModel.ainsert
@@ -135,7 +135,7 @@ class TestRapyerPipelineDeleteByKey(TwoModelDeleteBase):
         await ComprehensiveTestModel.adelete_by_key(model1.key)
 
 
-class TestPipelineModelAdeleteMany(PipelineAtomicityBase):
+class TestPipelineModelAdeleteMany(ActionTestBase):
     covered_method = AtomicRedisModel.adelete_many
 
     def create_models(self):
@@ -202,7 +202,7 @@ class TestRapyerPipelineAsetTtl(RapyerPipelineBase):
         return None
 
 
-class TestPipelineRedisIntAincrease(PipelineAtomicityBase):
+class TestPipelineRedisIntAincrease(ActionTestBase):
     covered_method = RedisInt.aincrease
 
     def create_models(self):

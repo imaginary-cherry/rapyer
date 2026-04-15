@@ -5,13 +5,13 @@ import pytest
 
 from rapyer.types.datetime import RedisDatetime, RedisDatetimeTimestamp
 from tests.integration.pipeline.pipeline_atomicity_base import (
+    ActionTestBase,
     BinaryOpCase,
-    PipelineAtomicityBase,
 )
 from tests.models.simple_types import DatetimeModel, DatetimeTimestampModel
 
 
-class DatetimeBothModelsOpBase(PipelineAtomicityBase, ABC):
+class DatetimeBothModelsOpBase(ActionTestBase, ABC):
     """Datetime iadd/isub tests that mutate both storage flavors at once.
 
     Setup creates a :class:`DatetimeTimestampModel` and a :class:`DatetimeModel`

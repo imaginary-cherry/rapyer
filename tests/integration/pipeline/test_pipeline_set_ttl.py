@@ -1,11 +1,11 @@
 from rapyer.base import AtomicRedisModel
-from tests.integration.pipeline.pipeline_atomicity_base import PipelineAtomicityBase
+from tests.integration.pipeline.pipeline_atomicity_base import ActionTestBase
 from tests.models.simple_types import UserModelWithoutTTL
 
 TTL_SECONDS = 300
 
 
-class TestPipelineAsetTtl(PipelineAtomicityBase):
+class TestPipelineAsetTtl(ActionTestBase):
     """Verify ``aset_ttl`` applied in a pipeline is not flushed until exit."""
 
     covered_method = AtomicRedisModel.aset_ttl

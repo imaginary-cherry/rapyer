@@ -24,7 +24,7 @@ from tests.conftest import (
     get_all_type_methods,
     get_async_methods,
 )
-from tests.integration.pipeline.pipeline_atomicity_base import PipelineAtomicityBase
+from tests.integration.pipeline.pipeline_atomicity_base import ActionTestBase
 from tests.unit.enforcement_exclusions import (
     BASE_TYPE_INTERNAL_METHODS,
     MODEL_INDEX_METHODS,
@@ -74,7 +74,7 @@ def collect_all_pipeline_methods():
 
 def collect_covered_methods_from_subclasses():
     covered: set[tuple[str, str]] = set()
-    for cls in _all_subclasses(PipelineAtomicityBase):
+    for cls in _all_subclasses(ActionTestBase):
         if inspect.isabstract(cls):
             continue
         methods = cls.covered_method

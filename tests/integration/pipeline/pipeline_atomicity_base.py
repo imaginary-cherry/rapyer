@@ -33,7 +33,7 @@ class BinaryOpCase:
 # =============================================================================
 
 
-class PipelineAtomicityBase(ABC):
+class ActionTestBase(ABC):
     """
     Abstract base for pipeline-atomicity tests.
 
@@ -128,14 +128,14 @@ class PipelineAtomicityBase(ABC):
 # =============================================================================
 
 
-class RapyerPipelineBase(PipelineAtomicityBase, ABC):
+class RapyerPipelineBase(ActionTestBase, ABC):
     """Atomicity via the module-level ``rapyer.apipeline()`` context."""
 
     def pipeline_owner(self):
         return rapyer
 
 
-class ComprehensiveCounterOpBase(PipelineAtomicityBase, ABC):
+class ComprehensiveCounterOpBase(ActionTestBase, ABC):
     """RedisInt binary ops on ``ComprehensiveTestModel.counter``. ``self.test_input`` is ``BinaryOpCase``."""
 
     def create_models(self):
@@ -152,7 +152,7 @@ class ComprehensiveCounterOpBase(PipelineAtomicityBase, ABC):
         return self.test_input.expected
 
 
-class PipelineAllTypesAmountOpBase(PipelineAtomicityBase, ABC):
+class PipelineAllTypesAmountOpBase(ActionTestBase, ABC):
     """RedisFloat binary ops on ``PipelineAllTypesTestModel.amount``. ``self.test_input`` is ``BinaryOpCase``."""
 
     def create_models(self):
@@ -169,7 +169,7 @@ class PipelineAllTypesAmountOpBase(PipelineAtomicityBase, ABC):
         return self.test_input.expected
 
 
-class PipelineAllTypesNameOpBase(PipelineAtomicityBase, ABC):
+class PipelineAllTypesNameOpBase(ActionTestBase, ABC):
     """RedisStr ops on ``PipelineAllTypesTestModel.name``."""
 
     async def load_data(self):
@@ -177,7 +177,7 @@ class PipelineAllTypesNameOpBase(PipelineAtomicityBase, ABC):
         return loaded.name
 
 
-class ComprehensiveTagsOpBase(PipelineAtomicityBase, ABC):
+class ComprehensiveTagsOpBase(ActionTestBase, ABC):
     """List ops on ``ComprehensiveTestModel.tags``."""
 
     async def load_data(self):
@@ -185,7 +185,7 @@ class ComprehensiveTagsOpBase(PipelineAtomicityBase, ABC):
         return loaded.tags
 
 
-class ComprehensiveMetadataOpBase(PipelineAtomicityBase, ABC):
+class ComprehensiveMetadataOpBase(ActionTestBase, ABC):
     """Dict ops on ``ComprehensiveTestModel.metadata``."""
 
     async def load_data(self):
@@ -193,7 +193,7 @@ class ComprehensiveMetadataOpBase(PipelineAtomicityBase, ABC):
         return loaded.metadata
 
 
-class AllTypesModelIntFieldOpBase(PipelineAtomicityBase, ABC):
+class AllTypesModelIntFieldOpBase(ActionTestBase, ABC):
     """RedisInt ops on ``AllTypesModel.int_field``."""
 
     async def load_data(self):
@@ -201,7 +201,7 @@ class AllTypesModelIntFieldOpBase(PipelineAtomicityBase, ABC):
         return loaded.int_field
 
 
-class AllTypesModelListFieldOpBase(PipelineAtomicityBase, ABC):
+class AllTypesModelListFieldOpBase(ActionTestBase, ABC):
     """RedisList ops on ``AllTypesModel.list_field``."""
 
     def create_models(self):
@@ -215,7 +215,7 @@ class AllTypesModelListFieldOpBase(PipelineAtomicityBase, ABC):
         return []
 
 
-class AllTypesModelDictFieldOpBase(PipelineAtomicityBase, ABC):
+class AllTypesModelDictFieldOpBase(ActionTestBase, ABC):
     """RedisDict ops on ``AllTypesModel.dict_field``."""
 
     def create_models(self):
@@ -229,7 +229,7 @@ class AllTypesModelDictFieldOpBase(PipelineAtomicityBase, ABC):
         return {}
 
 
-class TwoModelDeleteBase(PipelineAtomicityBase, ABC):
+class TwoModelDeleteBase(ActionTestBase, ABC):
     """Two-model delete atomicity: model1 deleted, model2 preserved."""
 
     def create_models(self):
