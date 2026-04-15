@@ -248,14 +248,25 @@ class AsyncActionTestBase(ActionTestBase, ABC):
 
 
 class RapyerPipelineBase(ActionTestBase, ABC):
-    """Atomicity via the module-level ``rapyer.apipeline()`` context."""
+    """Atomicity via the module-level ``rapyer.apipeline()`` context. Sync / pipeline-only."""
+
+    def pipeline_owner(self):
+        return rapyer
+
+
+class AsyncRapyerPipelineBase(AsyncActionTestBase, ABC):
+    """Atomicity via module-level ``rapyer.apipeline()`` context, with TTL coverage.
+
+    Parallel to :class:`RapyerPipelineBase` for async actions.
+    Subclasses declare their own ``ttl_model_cls`` / ``no_refresh_ttl_model_cls``.
+    """
 
     def pipeline_owner(self):
         return rapyer
 
 
 class ComprehensiveCounterOpBase(ActionTestBase, ABC):
-    """RedisInt binary ops on ``ComprehensiveTestModel.counter``. ``self.test_input`` is ``BinaryOpCase``."""
+    """RedisInt binary ops on ``ComprehensiveTestModel.counter``. ``self.test_input`` is ``BinaryOpCase``. Sync / pipeline-only."""
 
     def create_models(self):
         return ComprehensiveTestModel(counter=self.test_input.initial)
@@ -269,6 +280,33 @@ class ComprehensiveCounterOpBase(ActionTestBase, ABC):
 
     def expected_after(self):
         return self.test_input.expected
+
+
+class AsyncComprehensiveCounterOpBase(AsyncActionTestBase, ABC):
+    """Async ops on ``ComprehensiveTestModel.counter`` (RedisInt) with TTL coverage.
+
+    Parallel to :class:`ComprehensiveCounterOpBase`; used by async mutations
+    like ``RedisInt.aincrease`` and field-level ``RedisType.aload`` /
+    ``RedisType.asave``.
+    """
+
+    ttl_model_cls = TTLComprehensiveTestModel
+    no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
+
+    async def load_data(self):
+        loaded = await ComprehensiveTestModel.aget(self.handle.key)
+        return loaded.counter
+
+
+class AsyncFloatModelValueOpBase(AsyncActionTestBase, ABC):
+    """Async ops on ``FloatModel.value`` (RedisFloat) with TTL coverage."""
+
+    ttl_model_cls = TTLFloatModel
+    no_refresh_ttl_model_cls = NoRefreshTTLFloatModel
+
+    async def load_data(self):
+        loaded = await FloatModel.aget(self.handle.key)
+        return loaded.value
 
 
 class PipelineAllTypesAmountOpBase(ActionTestBase, ABC):
@@ -297,7 +335,16 @@ class PipelineAllTypesNameOpBase(ActionTestBase, ABC):
 
 
 class ComprehensiveTagsOpBase(ActionTestBase, ABC):
-    """List ops on ``ComprehensiveTestModel.tags``."""
+    """List ops on ``ComprehensiveTestModel.tags``. Sync / pipeline-only actions."""
+
+    async def load_data(self):
+        loaded = await ComprehensiveTestModel.aget(self.handle.key)
+        return loaded.tags
+
+
+class AsyncComprehensiveTagsOpBase(AsyncActionTestBase, ABC):
+    ttl_model_cls = TTLComprehensiveTestModel
+    no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
 
     async def load_data(self):
         loaded = await ComprehensiveTestModel.aget(self.handle.key)
@@ -305,7 +352,16 @@ class ComprehensiveTagsOpBase(ActionTestBase, ABC):
 
 
 class ComprehensiveMetadataOpBase(ActionTestBase, ABC):
-    """Dict ops on ``ComprehensiveTestModel.metadata``."""
+    """Dict ops on ``ComprehensiveTestModel.metadata``. Sync / pipeline-only."""
+
+    async def load_data(self):
+        loaded = await ComprehensiveTestModel.aget(self.handle.key)
+        return loaded.metadata
+
+
+class AsyncComprehensiveMetadataOpBase(AsyncActionTestBase, ABC):
+    ttl_model_cls = TTLComprehensiveTestModel
+    no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
 
     async def load_data(self):
         loaded = await ComprehensiveTestModel.aget(self.handle.key)

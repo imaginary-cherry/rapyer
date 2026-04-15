@@ -32,6 +32,20 @@ class FloatModel(AtomicRedisModel):
     temperature: float = 20.5
 
 
+class TTLFloatModel(FloatModel):
+    """Variant of :class:`FloatModel` with TTL refresh enabled."""
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=TTL_TEST_SECONDS)
+
+
+class NoRefreshTTLFloatModel(FloatModel):
+    """Variant of :class:`FloatModel` with TTL set but refresh disabled."""
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(
+        ttl=TTL_TEST_SECONDS, refresh_ttl=False
+    )
+
+
 class BoolModel(AtomicRedisModel):
     is_active: bool = False
     is_deleted: bool = True

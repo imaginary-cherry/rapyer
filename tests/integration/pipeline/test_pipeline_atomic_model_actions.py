@@ -1,3 +1,5 @@
+import pytest
+
 import rapyer
 from rapyer.base import AtomicRedisModel
 from rapyer.types.dct import RedisDict
@@ -5,12 +7,19 @@ from rapyer.types.integer import RedisInt
 from rapyer.types.lst import RedisList
 from tests.integration.pipeline.pipeline_atomicity_base import (
     ActionTestBase,
+    AsyncActionTestBase,
+    AsyncComprehensiveCounterOpBase,
+    AsyncRapyerPipelineBase,
     ComprehensiveMetadataOpBase,
     ComprehensiveTagsOpBase,
     RapyerPipelineBase,
     TwoModelDeleteBase,
 )
-from tests.models.collection_types import ComprehensiveTestModel
+from tests.models.collection_types import (
+    ComprehensiveTestModel,
+    NoRefreshTTLComprehensiveTestModel,
+    TTLComprehensiveTestModel,
+)
 from tests.models.simple_types import (
     TTL_TEST_SECONDS,
     TTLRefreshTestModel,
@@ -20,8 +29,10 @@ from tests.models.simple_types import (
 TTL_SECONDS = 300
 
 
-class TestPipelineModelAsave(ActionTestBase):
+class TestPipelineModelAsave(AsyncActionTestBase):
     covered_method = AtomicRedisModel.asave
+    ttl_model_cls = TTLComprehensiveTestModel
+    no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
 
     def create_models(self):
         return ComprehensiveTestModel(name="original", counter=10)
@@ -42,10 +53,18 @@ class TestPipelineModelAsave(ActionTestBase):
         return "updated", 99
 
 
-class TestPipelineModelAinsert(ActionTestBase):
-    """Verify ``ainsert`` inside a model pipeline defers the new model's creation."""
+class TestPipelineModelAinsert(AsyncActionTestBase):
+    """Verify ``ainsert`` inside a model pipeline defers the new model's creation.
+
+    ``ainsert`` is the only async action whose subject is a fresh (unsaved)
+    model, so the standard ``_setup_ttl_data`` flow (pre-insert + reduce TTL)
+    doesn't apply. The TTL tests are overridden to assert that the initial
+    TTL set by ``asave`` matches the configured value.
+    """
 
     covered_method = AtomicRedisModel.ainsert
+    ttl_model_cls = TTLComprehensiveTestModel
+    no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
 
     def create_models(self):
         # Only the existing model is inserted; the new model is the test subject.
@@ -75,6 +94,29 @@ class TestPipelineModelAinsert(ActionTestBase):
 
     def expected_before(self):
         return 0, None
+
+    @pytest.mark.asyncio
+    async def test_ttl_refresh_on_action(self, test_input):
+        self.test_input = test_input
+        model = self.ttl_model_cls(name="inserted")
+        await self.ttl_model_cls.ainsert(model)
+        ttl = await self.real_redis_client.ttl(model.key)
+        configured = self.ttl_model_cls.Meta.ttl
+        assert configured - 2 < ttl <= configured, (
+            f"TTL for {model.key}={ttl}; expected close to {configured}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_ttl_no_refresh_on_action(self, test_input):
+        self.test_input = test_input
+        model = self.no_refresh_ttl_model_cls(name="inserted")
+        await self.no_refresh_ttl_model_cls.ainsert(model)
+        ttl = await self.real_redis_client.ttl(model.key)
+        configured = self.no_refresh_ttl_model_cls.Meta.ttl
+        # Even with refresh disabled, the initial save sets TTL.
+        assert 0 < ttl <= configured, (
+            f"TTL for {model.key}={ttl}; expected in (0, {configured}]"
+        )
 
     def expected_after(self):
         return 1, "inserted"
@@ -202,7 +244,7 @@ class TestRapyerPipelineAsetTtl(RapyerPipelineBase):
         return None
 
 
-class TestPipelineRedisIntAincrease(ActionTestBase):
+class TestPipelineRedisIntAincrease(AsyncComprehensiveCounterOpBase):
     covered_method = RedisInt.aincrease
 
     def create_models(self):
@@ -210,10 +252,6 @@ class TestPipelineRedisIntAincrease(ActionTestBase):
 
     async def perform_action(self, piped):
         await piped.counter.aincrease(5)
-
-    async def load_data(self):
-        loaded = await ComprehensiveTestModel.aget(self.handle.key)
-        return loaded.counter
 
     def expected_before(self):
         return 10
@@ -349,11 +387,13 @@ class TestRapyerPipelineAduplicateMany(RapyerPipelineBase):
         assert len(set(all_pks)) == 4
 
 
-class TestRapyerPipelineAupdate(RapyerPipelineBase):
+class TestRapyerPipelineAupdate(AsyncRapyerPipelineBase):
     """After aupdate was switched to ``ensure_pipeline``, it defers to an outer
     pipeline like every other mutation."""
 
     covered_method = AtomicRedisModel.aupdate
+    ttl_model_cls = TTLComprehensiveTestModel
+    no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
 
     def create_models(self):
         return ComprehensiveTestModel(name="original", counter=10)

@@ -8,6 +8,7 @@ from tests.integration.pipeline.pipeline_atomicity_base import (
     ActionTestBase,
     AllTypesModelDictFieldOpBase,
     AllTypesModelListFieldOpBase,
+    AsyncFloatModelValueOpBase,
 )
 from tests.models.complex_types import InnerMostModel, MiddleModel, OuterModel
 from tests.models.functionality_types import AllTypesModel
@@ -425,7 +426,7 @@ async def test_float_division_changes_preserved_during_pipeline_committed_after_
     assert final_model.value == 25.0
 
 
-class TestFloatAincrease(ActionTestBase):
+class TestFloatAincrease(AsyncFloatModelValueOpBase):
     covered_method = RedisFloat.aincrease
 
     def create_models(self):
@@ -433,10 +434,6 @@ class TestFloatAincrease(ActionTestBase):
 
     async def perform_action(self, piped):
         await piped.value.aincrease(10.5)
-
-    async def load_data(self):
-        loaded = await FloatModel.aget(self.handle.key)
-        return loaded.value
 
     def expected_before(self):
         return 50.0

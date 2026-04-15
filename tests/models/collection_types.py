@@ -1,9 +1,10 @@
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, ClassVar, Dict, List
 
 from pydantic import Field
 
 from rapyer.base import AtomicRedisModel
+from rapyer.config import RedisConfig
 from tests.models.common import (
     Address,
     Company,
@@ -15,6 +16,8 @@ from tests.models.common import (
     User,
     UserProfile,
 )
+
+TTL_REFRESH_TEST_SECONDS = 24
 
 
 class SimpleListModel(AtomicRedisModel):
@@ -127,6 +130,20 @@ class ComprehensiveTestModel(AtomicRedisModel):
     metadata: dict[str, str] = Field(default_factory=dict)
     name: str = ""
     counter: int = 0
+
+
+class TTLComprehensiveTestModel(ComprehensiveTestModel):
+    """Variant of :class:`ComprehensiveTestModel` with TTL refresh enabled."""
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=TTL_REFRESH_TEST_SECONDS)
+
+
+class NoRefreshTTLComprehensiveTestModel(ComprehensiveTestModel):
+    """Variant of :class:`ComprehensiveTestModel` with TTL set but refresh disabled."""
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(
+        ttl=TTL_REFRESH_TEST_SECONDS, refresh_ttl=False
+    )
 
 
 class PipelineTestModel(AtomicRedisModel):
