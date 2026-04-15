@@ -11,7 +11,7 @@ class TestRedisListSetitem(ComprehensiveTagsOpBase):
     covered_method = RedisList.__setitem__
 
     def create_models(self):
-        return ComprehensiveTestModel(tags=["first", "second", "third"])
+        return [ComprehensiveTestModel(tags=["first", "second", "third"])]
 
     async def perform_action(self, piped):
         piped.tags[1] = "modified"
@@ -65,7 +65,7 @@ class TestRedisListIadd(ComprehensiveTagsOpBase):
     covered_method = RedisList.__iadd__
 
     def create_models(self):
-        return ComprehensiveTestModel(tags=["initial"])
+        return [ComprehensiveTestModel(tags=["initial"])]
 
     async def perform_action(self, piped):
         piped.tags += ["added1", "added2"]

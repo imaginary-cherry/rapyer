@@ -31,7 +31,7 @@ class PQActionBase(AsyncActionTestBase, ABC):
     no_refresh_ttl_model_cls = PriorityQueueTTLNoRefreshModel
 
     def create_models(self):
-        return PriorityQueueModel(name="pq_test")
+        return [PriorityQueueModel(name="pq_test")]
 
     def ttl_keys(self, model: PriorityQueueModel):
         return [model.key, model.tasks.special_key]
@@ -47,9 +47,7 @@ class PQActionBase(AsyncActionTestBase, ABC):
 
     async def _setup_ttl_data(self, model_cls: type[PriorityQueueModel]):
         originals = self.create_models()
-        source = originals if isinstance(originals, list) else [originals]
-
-        recreated = [model_cls(**m.model_dump()) for m in source]
+        recreated = [model_cls(**m.model_dump()) for m in originals]
         await rapyer.ainsert(*recreated)
 
         for inst in recreated:
@@ -61,14 +59,14 @@ class PQActionBase(AsyncActionTestBase, ABC):
             for key in self.ttl_keys(inst):
                 await self.real_redis_client.expire(key, REDUCED_TTL_SECONDS)
 
-        return recreated[0] if not isinstance(originals, list) else recreated
+        return recreated[0]
 
 
 class TestPQApush(PQActionBase):
     covered_method = RedisPriorityQueue.apush
 
     async def perform_action(self, piped: PriorityQueueModel):
-        await self.created_models.tasks.apush("new_item", 0.5)
+        await self.created_models[0].tasks.apush("new_item", 0.5)
 
     @pytest.mark.asyncio
     async def test_pipeline_atomicity(self, test_input):
@@ -79,7 +77,7 @@ class TestPQApushMany(PQActionBase):
     covered_method = RedisPriorityQueue.apush_many
 
     async def perform_action(self, piped: PriorityQueueModel):
-        await self.created_models.tasks.apush_many(
+        await self.created_models[0].tasks.apush_many(
             [
                 PriorityQueueItem(value="a", priority=0.1),
                 PriorityQueueItem(value="b", priority=0.2),
@@ -95,7 +93,7 @@ class TestPQApop(PQActionBase):
     covered_method = RedisPriorityQueue.apop
 
     async def perform_action(self, piped: PriorityQueueModel):
-        await self.created_models.tasks.apop()
+        await self.created_models[0].tasks.apop()
 
     @pytest.mark.asyncio
     async def test_pipeline_atomicity(self, test_input):
@@ -106,7 +104,7 @@ class TestPQAremove(PQActionBase):
     covered_method = RedisPriorityQueue.aremove
 
     async def perform_action(self, piped: PriorityQueueModel):
-        await self.created_models.tasks.aremove("medium")
+        await self.created_models[0].tasks.aremove("medium")
 
     @pytest.mark.asyncio
     async def test_pipeline_atomicity(self, test_input):
@@ -122,7 +120,7 @@ class TestPQAclear(PQActionBase):
         return [model.key]
 
     async def perform_action(self, piped: PriorityQueueModel):
-        await self.created_models.tasks.aclear()
+        await self.created_models[0].tasks.aclear()
 
     @pytest.mark.asyncio
     async def test_pipeline_atomicity(self, test_input):

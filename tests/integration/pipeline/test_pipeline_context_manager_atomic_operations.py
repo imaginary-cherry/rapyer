@@ -178,7 +178,7 @@ class TestPipelineListAappend(AsyncComprehensiveTagsOpBase):
     covered_method = RedisList.aappend
 
     def create_models(self):
-        return ComprehensiveTestModel(tags=["initial"])
+        return [ComprehensiveTestModel(tags=["initial"])]
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.tags.aappend("new_tag")
@@ -194,7 +194,7 @@ class TestPipelineListAextend(AsyncComprehensiveTagsOpBase):
     covered_method = RedisList.aextend
 
     def create_models(self):
-        return ComprehensiveTestModel(tags=["initial"])
+        return [ComprehensiveTestModel(tags=["initial"])]
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.tags.aextend(["tag1", "tag2"])
@@ -210,7 +210,7 @@ class TestPipelineListAinsert(AsyncComprehensiveTagsOpBase):
     covered_method = RedisList.ainsert
 
     def create_models(self):
-        return ComprehensiveTestModel(tags=["first", "last"])
+        return [ComprehensiveTestModel(tags=["first", "last"])]
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.tags.ainsert(1, "middle")
@@ -226,7 +226,7 @@ class TestPipelineListAclear(AsyncComprehensiveTagsOpBase):
     covered_method = RedisList.aclear
 
     def create_models(self):
-        return ComprehensiveTestModel(tags=["tag1", "tag2"])
+        return [ComprehensiveTestModel(tags=["tag1", "tag2"])]
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.tags.aclear()
@@ -242,7 +242,7 @@ class TestListApop(AsyncComprehensiveTagsOpBase):
     covered_method = RedisList.apop
 
     def create_models(self):
-        return ComprehensiveTestModel(tags=["tag1", "tag2"])
+        return [ComprehensiveTestModel(tags=["tag1", "tag2"])]
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.tags.apop()
@@ -267,7 +267,7 @@ class TestPipelineDictAsetItem(AsyncComprehensiveMetadataOpBase):
     covered_method = RedisDict.aset_item
 
     def create_models(self):
-        return ComprehensiveTestModel(metadata={"existing": "value"})
+        return [ComprehensiveTestModel(metadata={"existing": "value"})]
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.metadata.aset_item("new_key", "new_value")
@@ -283,7 +283,7 @@ class TestPipelineDictAdelItem(AsyncComprehensiveMetadataOpBase):
     covered_method = RedisDict.adel_item
 
     def create_models(self):
-        return ComprehensiveTestModel(metadata={"key1": "value1", "key2": "value2"})
+        return [ComprehensiveTestModel(metadata={"key1": "value1", "key2": "value2"})]
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.metadata.adel_item("key1")
@@ -299,7 +299,7 @@ class TestPipelineDictAupdate(AsyncComprehensiveMetadataOpBase):
     covered_method = RedisDict.aupdate
 
     def create_models(self):
-        return ComprehensiveTestModel(metadata={"existing": "value"})
+        return [ComprehensiveTestModel(metadata={"existing": "value"})]
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.metadata.aupdate(key1="value1", key2="value2")
@@ -319,7 +319,7 @@ class TestPipelineDictAclear(AsyncComprehensiveMetadataOpBase):
     covered_method = RedisDict.aclear
 
     def create_models(self):
-        return ComprehensiveTestModel(metadata={"key1": "value1", "key2": "value2"})
+        return [ComprehensiveTestModel(metadata={"key1": "value1", "key2": "value2"})]
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.metadata.aclear()
@@ -335,7 +335,7 @@ class TestDictApop(AsyncComprehensiveMetadataOpBase):
     covered_method = RedisDict.apop
 
     def create_models(self):
-        return ComprehensiveTestModel(metadata={"key1": "value1", "key2": "value2"})
+        return [ComprehensiveTestModel(metadata={"key1": "value1", "key2": "value2"})]
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.metadata.apop("key1")
@@ -356,7 +356,7 @@ class TestDictApopitem(AsyncComprehensiveMetadataOpBase):
 
     def create_models(self):
         # Single-entry dict so the popped item is deterministic.
-        return ComprehensiveTestModel(metadata={"only": "value"})
+        return [ComprehensiveTestModel(metadata={"only": "value"})]
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.metadata.apopitem()
@@ -385,14 +385,14 @@ class TestPipelineStringSet(AsyncActionTestBase):
     no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
 
     def create_models(self):
-        return ComprehensiveTestModel(name="original")
+        return [ComprehensiveTestModel(name="original")]
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         piped.name = "updated"
         await piped.name.asave()
 
     async def load_data(self):
-        loaded = await ComprehensiveTestModel.aget(self.created_models.key)
+        loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
         return loaded.name
 
     def expected_before(self):

@@ -35,7 +35,7 @@ class TestPipelineModelAsave(AsyncActionTestBase):
     no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
 
     def create_models(self):
-        return ComprehensiveTestModel(name="original", counter=10)
+        return [ComprehensiveTestModel(name="original", counter=10)]
 
     async def perform_action(self, piped: ComprehensiveTestModel) -> None:
         piped.name = "updated"
@@ -43,7 +43,7 @@ class TestPipelineModelAsave(AsyncActionTestBase):
         await piped.asave()
 
     async def load_data(self):
-        loaded = await ComprehensiveTestModel.aget(self.created_models.key)
+        loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
         return loaded.name, loaded.counter
 
     def expected_before(self):
@@ -69,12 +69,12 @@ class TestPipelineModelAinsert(AsyncActionTestBase):
 
     def create_models(self):
         # Only the existing model is inserted; the new model is the test subject.
-        return ComprehensiveTestModel(name="existing")
+        return [ComprehensiveTestModel(name="existing")]
 
     async def setup_data(self):
-        existing_model = await super().setup_data()
+        existing_models = await super().setup_data()
         new_model = ComprehensiveTestModel(name="inserted")
-        return existing_model, new_model
+        return [*existing_models, new_model]
 
     def pipeline_owner(self):
         existing, _new = self.created_models
@@ -247,7 +247,7 @@ class TestPipelineRedisIntAincrease(AsyncComprehensiveCounterOpBase):
     covered_method = RedisInt.aincrease
 
     def create_models(self):
-        return ComprehensiveTestModel(counter=10)
+        return [ComprehensiveTestModel(counter=10)]
 
     async def perform_action(self, piped: ComprehensiveTestModel) -> None:
         await piped.counter.aincrease(5)
@@ -263,7 +263,7 @@ class TestPipelineRedisListInsert(ComprehensiveTagsOpBase):
     covered_method = RedisList.insert
 
     def create_models(self):
-        return ComprehensiveTestModel(tags=["first", "last"])
+        return [ComprehensiveTestModel(tags=["first", "last"])]
 
     async def perform_action(self, piped):
         piped.tags.insert(1, "middle")
@@ -279,7 +279,7 @@ class TestPipelineRedisListClear(ComprehensiveTagsOpBase):
     covered_method = RedisList.clear
 
     def create_models(self):
-        return ComprehensiveTestModel(tags=["tag1", "tag2", "tag3"])
+        return [ComprehensiveTestModel(tags=["tag1", "tag2", "tag3"])]
 
     async def perform_action(self, piped):
         piped.tags.clear()
@@ -295,7 +295,7 @@ class TestPipelineRedisListRemoveRange(ComprehensiveTagsOpBase):
     covered_method = RedisList.remove_range
 
     def create_models(self):
-        return ComprehensiveTestModel(tags=["a", "b", "c", "d", "e"])
+        return [ComprehensiveTestModel(tags=["a", "b", "c", "d", "e"])]
 
     async def perform_action(self, piped):
         piped.tags.remove_range(1, 3)
@@ -311,7 +311,7 @@ class TestPipelineRedisDictClear(ComprehensiveMetadataOpBase):
     covered_method = RedisDict.clear
 
     def create_models(self):
-        return ComprehensiveTestModel(metadata={"key1": "val1", "key2": "val2"})
+        return [ComprehensiveTestModel(metadata={"key1": "val1", "key2": "val2"})]
 
     async def perform_action(self, piped):
         piped.metadata.clear()
@@ -329,10 +329,10 @@ class TestRapyerPipelineAduplicate(RapyerPipelineBase):
     duplicate: ComprehensiveTestModel | None = None
 
     def create_models(self):
-        return ComprehensiveTestModel(name="original", counter=42, tags=["t1"])
+        return [ComprehensiveTestModel(name="original", counter=42, tags=["t1"])]
 
     async def perform_action(self, piped):
-        self.duplicate = await self.created_models.aduplicate()
+        self.duplicate = await self.created_models[0].aduplicate()
 
     async def load_data(self):
         exists = await self.real_redis_client.exists(self.duplicate.key)
@@ -349,7 +349,7 @@ class TestRapyerPipelineAduplicate(RapyerPipelineBase):
 
     def assert_after_pipeline(self, loaded):
         super().assert_after_pipeline(loaded)
-        assert self.duplicate.pk != self.created_models.pk
+        assert self.duplicate.pk != self.created_models[0].pk
 
 
 class TestRapyerPipelineAduplicateMany(RapyerPipelineBase):
@@ -358,10 +358,10 @@ class TestRapyerPipelineAduplicateMany(RapyerPipelineBase):
     duplicates: list[ComprehensiveTestModel] | None = None
 
     def create_models(self):
-        return ComprehensiveTestModel(name="original", counter=42, tags=["t1"])
+        return [ComprehensiveTestModel(name="original", counter=42, tags=["t1"])]
 
     async def perform_action(self, piped):
-        self.duplicates = await self.created_models.aduplicate_many(3)
+        self.duplicates = await self.created_models[0].aduplicate_many(3)
 
     async def load_data(self):
         results = []
@@ -382,7 +382,7 @@ class TestRapyerPipelineAduplicateMany(RapyerPipelineBase):
 
     def assert_after_pipeline(self, loaded):
         super().assert_after_pipeline(loaded)
-        all_pks = [self.created_models.pk] + [d.pk for d in self.duplicates]
+        all_pks = [self.created_models[0].pk] + [d.pk for d in self.duplicates]
         assert len(set(all_pks)) == 4
 
 
@@ -395,13 +395,13 @@ class TestRapyerPipelineAupdate(AsyncRapyerPipelineBase):
     no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
 
     def create_models(self):
-        return ComprehensiveTestModel(name="original", counter=10)
+        return [ComprehensiveTestModel(name="original", counter=10)]
 
     async def perform_action(self, piped: ComprehensiveTestModel) -> None:
-        await self.created_models.aupdate(name="updated", counter=99)
+        await self.created_models[0].aupdate(name="updated", counter=99)
 
     async def load_data(self):
-        loaded = await ComprehensiveTestModel.aget(self.created_models.key)
+        loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
         return loaded.name, loaded.counter
 
     def expected_before(self):
@@ -416,21 +416,22 @@ class TestRapyerPipelineRefreshTtl(RapyerPipelineBase):
     reduced_ttl: int = 10
 
     def create_models(self):
-        return TTLRefreshTestModel(name="ttl_test", age=25)
+        return [TTLRefreshTestModel(name="ttl_test", age=25)]
 
     async def setup_data(self):
-        model = await super().setup_data()
+        models = await super().setup_data()
+        model = models[0]
         # Lower the TTL so there's a measurable gap to refresh.
         await self.real_redis_client.expire(model.key, self.reduced_ttl)
         ttl_before = await self.real_redis_client.ttl(model.key)
         assert 0 < ttl_before <= self.reduced_ttl
-        return model
+        return models
 
     async def perform_action(self, piped):
-        await self.created_models.refresh_ttl_if_needed(can_use_pipeline=True)
+        await self.created_models[0].refresh_ttl_if_needed(can_use_pipeline=True)
 
     async def load_data(self):
-        return await self.real_redis_client.ttl(self.created_models.key)
+        return await self.real_redis_client.ttl(self.created_models[0].key)
 
     def assert_during_pipeline(self, loaded):
         assert loaded <= self.reduced_ttl

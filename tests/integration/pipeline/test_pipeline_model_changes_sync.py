@@ -105,13 +105,13 @@ class TestIntegerAddition(ActionTestBase):
     covered_method = RedisInt.__iadd__
 
     def create_models(self):
-        return AllTypesModel(int_field=100)
+        return [AllTypesModel(int_field=100)]
 
     async def perform_action(self, piped):
         piped.int_field += 25
 
     async def load_data(self):
-        loaded = await AllTypesModel.aget(self.created_models.key)
+        loaded = await AllTypesModel.aget(self.created_models[0].key)
         return loaded.int_field
 
     def expected_before(self):
@@ -430,7 +430,7 @@ class TestFloatAincrease(AsyncFloatModelValueOpBase):
     covered_method = RedisFloat.aincrease
 
     def create_models(self):
-        return FloatModel(value=50.0)
+        return [FloatModel(value=50.0)]
 
     async def perform_action(self, piped: FloatModel):
         await piped.value.aincrease(10.5)

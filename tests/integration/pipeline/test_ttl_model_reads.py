@@ -19,10 +19,11 @@ class TestModelAget(AsyncActionTestBase):
     no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
 
     def create_models(self):
-        return ComprehensiveTestModel(name="test", counter=1)
+        return [ComprehensiveTestModel(name="test", counter=1)]
 
     async def perform_action(self, piped: ComprehensiveTestModel) -> None:
-        await type(self.created_models).aget(self.created_models.key)
+        model = self.created_models[0]
+        await type(model).aget(model.key)
 
     async def load_data(self):
         return None
@@ -44,10 +45,10 @@ class TestModelAload(AsyncActionTestBase):
     no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
 
     def create_models(self):
-        return ComprehensiveTestModel(name="test", counter=1)
+        return [ComprehensiveTestModel(name="test", counter=1)]
 
     async def perform_action(self, piped: ComprehensiveTestModel) -> None:
-        await self.created_models.aload()
+        await self.created_models[0].aload()
 
     async def load_data(self):
         return None
@@ -69,10 +70,10 @@ class TestModelAfind(AsyncActionTestBase):
     no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
 
     def create_models(self):
-        return ComprehensiveTestModel(name="test", counter=1)
+        return [ComprehensiveTestModel(name="test", counter=1)]
 
     async def perform_action(self, piped: ComprehensiveTestModel) -> None:
-        await type(self.created_models).afind()
+        await type(self.created_models[0]).afind()
 
     async def load_data(self):
         return None
@@ -94,10 +95,10 @@ class TestModelAfindOne(AsyncActionTestBase):
     no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
 
     def create_models(self):
-        return ComprehensiveTestModel(name="test", counter=1)
+        return [ComprehensiveTestModel(name="test", counter=1)]
 
     async def perform_action(self, piped: ComprehensiveTestModel) -> None:
-        await type(self.created_models).afind_one()
+        await type(self.created_models[0]).afind_one()
 
     async def load_data(self):
         return None
@@ -117,10 +118,10 @@ class TestRedisTypeAload(AsyncComprehensiveCounterOpBase):
     covered_method = RedisType.aload
 
     def create_models(self):
-        return ComprehensiveTestModel(counter=42)
+        return [ComprehensiveTestModel(counter=42)]
 
     async def perform_action(self, piped: ComprehensiveTestModel) -> None:
-        await self.created_models.counter.aload()
+        await self.created_models[0].counter.aload()
 
     def expected_before(self):
         return 42

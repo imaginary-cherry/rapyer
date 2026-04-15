@@ -12,7 +12,7 @@ class TestRedisStrAllOperationsCombined(PipelineAllTypesNameOpBase):
     covered_method = RedisStr.__iadd__
 
     def create_models(self):
-        return PipelineAllTypesTestModel(name="hello")
+        return [PipelineAllTypesTestModel(name="hello")]
 
     async def perform_action(self, piped):
         piped.name += "_world"
@@ -49,7 +49,7 @@ class TestRedisStrImul(PipelineAllTypesNameOpBase):
     params = [BinaryOpCase("test", 0, "")]
 
     def create_models(self):
-        return PipelineAllTypesTestModel(name=self.test_input.initial)
+        return [PipelineAllTypesTestModel(name=self.test_input.initial)]
 
     async def perform_action(self, piped):
         piped.name *= self.test_input.operand

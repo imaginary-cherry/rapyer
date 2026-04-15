@@ -37,7 +37,7 @@ class TestRedisFloatAllOperationsCombined(ActionTestBase):
     ]
 
     def create_models(self):
-        return PipelineAllTypesTestModel(amount=100.0)
+        return [PipelineAllTypesTestModel(amount=100.0)]
 
     async def perform_action(self, piped):
         piped.amount += 50.0
@@ -49,7 +49,7 @@ class TestRedisFloatAllOperationsCombined(ActionTestBase):
         piped.amount **= 2.0
 
     async def load_data(self):
-        loaded = await PipelineAllTypesTestModel.aget(self.created_models.key)
+        loaded = await PipelineAllTypesTestModel.aget(self.created_models[0].key)
         return loaded.amount
 
     def expected_before(self):

@@ -7,13 +7,13 @@ class TestRedisBytesIadd(ActionTestBase):
     covered_method = RedisBytes.__iadd__
 
     def create_models(self):
-        return BytesModel(data=b"hello")
+        return [BytesModel(data=b"hello")]
 
     async def perform_action(self, piped):
         piped.data += b" world"
 
     async def load_data(self):
-        loaded = await BytesModel.aget(self.created_models.key)
+        loaded = await BytesModel.aget(self.created_models[0].key)
         return loaded.data
 
     def expected_before(self):
