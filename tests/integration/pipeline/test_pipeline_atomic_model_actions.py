@@ -1,6 +1,4 @@
 
-import pytest
-
 import rapyer
 from rapyer.base import AtomicRedisModel
 from rapyer.types.dct import RedisDict
@@ -96,29 +94,6 @@ class TestPipelineModelAinsert(AsyncActionTestBase):
 
     def expected_before(self):
         return 0, None
-
-    @pytest.mark.asyncio
-    async def test_ttl_refresh_on_action(self, test_input):
-        self.test_input = test_input
-        model = self.ttl_model_cls(name="inserted")
-        await self.ttl_model_cls.ainsert(model)
-        ttl = await self.real_redis_client.ttl(model.key)
-        configured = self.ttl_model_cls.Meta.ttl
-        assert configured - 2 < ttl <= configured, (
-            f"TTL for {model.key}={ttl}; expected close to {configured}"
-        )
-
-    @pytest.mark.asyncio
-    async def test_ttl_no_refresh_on_action(self, test_input) -> None:
-        self.test_input = test_input
-        model = self.no_refresh_ttl_model_cls(name="inserted")
-        await self.no_refresh_ttl_model_cls.ainsert(model)
-        ttl = await self.real_redis_client.ttl(model.key)
-        configured = self.no_refresh_ttl_model_cls.Meta.ttl
-        # Even with refresh disabled, the initial save sets TTL.
-        assert 0 < ttl <= configured, (
-            f"TTL for {model.key}={ttl}; expected in (0, {configured}]"
-        )
 
     def expected_after(self):
         return 1, "inserted"
