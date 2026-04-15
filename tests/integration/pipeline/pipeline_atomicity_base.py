@@ -156,7 +156,9 @@ class AsyncActionTestBase(ActionTestBase, ABC):
         """
         return [model.key]
 
-    async def _setup_ttl_data(self, model_cls: type[AtomicRedisModel]) -> Any:
+    async def _setup_ttl_data(
+        self, model_cls: type[AtomicRedisModel]
+    ) -> list[AtomicRedisModel]:
         originals = self.create_models()
         recreated = [model_cls(**m.model_dump()) for m in originals]
         await rapyer.ainsert(*recreated)
@@ -165,16 +167,19 @@ class AsyncActionTestBase(ActionTestBase, ABC):
             for key in self.ttl_keys(inst):
                 await self.real_redis_client.expire(key, REDUCED_TTL_SECONDS)
 
-        return recreated[0]
+        return recreated
 
     @pytest.mark.asyncio
     async def test_ttl_refresh_on_action(self):
         assert (
             self.ttl_model_cls is not None
         ), f"{type(self).__name__}.ttl_model_cls is not set"
-        model_for_keys = await self._setup_ttl_data(self.ttl_model_cls)
+        self.created_models = await self._setup_ttl_data(self.ttl_model_cls)
+        model_for_keys = self.created_models
 
-        keys = self.ttl_keys(model_for_keys)
+        keys = []
+        for model in model_for_keys:
+            keys.extend(self.ttl_keys(model))
         ttls_before = None
         if self.model_exists_before_action:
             ttls_before: list[int] = await asyncio.gather(
@@ -203,9 +208,12 @@ class AsyncActionTestBase(ActionTestBase, ABC):
         assert (
             self.no_refresh_ttl_model_cls is not None
         ), f"{type(self).__name__}.no_refresh_ttl_model_cls is not set"
-        model_for_keys = await self._setup_ttl_data(self.no_refresh_ttl_model_cls)
+        self.created_models = await self._setup_ttl_data(self.no_refresh_ttl_model_cls)
+        model_for_keys = self.created_models
 
-        keys = self.ttl_keys(model_for_keys)
+        keys = []
+        for model in model_for_keys:
+            keys.extend(self.ttl_keys(model))
         ttls_before = None
         if self.model_exists_before_action:
             ttls_before: list[int] = await asyncio.gather(
