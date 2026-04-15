@@ -9,8 +9,12 @@ import pytest_asyncio
 
 import rapyer
 from rapyer import AtomicRedisModel
-from rapyer.actions import ActionGroup
-from tests.models.collection_types import ComprehensiveTestModel
+from tests.integration.conftest import REDUCED_TTL_SECONDS
+from tests.models.collection_types import (
+    ComprehensiveTestModel,
+    NoRefreshTTLComprehensiveTestModel,
+    TTLComprehensiveTestModel,
+)
 from tests.models.functionality_types import AllTypesModel
 from tests.models.redis_types import PipelineAllTypesTestModel
 
@@ -137,26 +141,27 @@ class AsyncActionTestBase(ActionTestBase, ABC):
     Concrete subclasses automatically get three tests:
 
     * ``test_pipeline_atomicity`` — inherited from :class:`ActionTestBase`.
-    * ``test_ttl_refresh_on_action`` — runs the action with the class's
-      ``Meta.refresh_ttl`` set to the action's ``ActionGroup`` flags and
-      asserts every key returned by :meth:`ttl_keys` was refreshed.
-    * ``test_ttl_no_refresh_on_action`` — runs the action with
-      ``Meta.refresh_ttl=False`` and asserts no key was refreshed.
+    * ``test_ttl_refresh_on_action`` — reruns the pipeline setup but with
+      models recreated as :attr:`ttl_model_cls`, then artificially reduces
+      TTL, performs the action, and asserts every key in :meth:`ttl_keys`
+      had its TTL refreshed.
+    * ``test_ttl_no_refresh_on_action`` — same pattern but with
+      :attr:`no_refresh_ttl_model_cls`; asserts TTL was NOT refreshed.
+
+    Both TTL tests use :meth:`create_models` + :meth:`perform_action` from
+    the base class — subclasses define those once. ``ttl_model_cls`` and
+    ``no_refresh_ttl_model_cls`` are lightweight subclasses of the original
+    model that override ``Meta`` (ttl / refresh_ttl) only.
 
     Subclasses whose action runs on a special field (e.g. ``RedisPriorityQueue``)
-    simply override :meth:`ttl_keys` to return ``[model.key, field.special_key]``
-    — no separate base class is required.
+    override :meth:`ttl_keys` to return ``[model.key, field.special_key]``.
     """
 
-    @abstractmethod
-    def create_ttl_model(self) -> AtomicRedisModel:
-        """Build (but don't insert) the TTL-enabled model used for TTL tests."""
+    ttl_model_cls: ClassVar[type[AtomicRedisModel]]
+    """Model subclass with ``Meta.ttl`` set. Used in ``test_ttl_refresh_on_action``."""
 
-    async def setup_ttl_data(self) -> AtomicRedisModel:
-        """Build and insert the TTL model. Override when pre-action state is needed."""
-        model = self.create_ttl_model()
-        await rapyer.ainsert(model)
-        return model
+    no_refresh_ttl_model_cls: ClassVar[type[AtomicRedisModel]]
+    """Model subclass with ``Meta.ttl`` set and ``refresh_ttl=False``."""
 
     def ttl_keys(self, model: AtomicRedisModel) -> list[str]:
         """Redis keys whose TTL should be asserted. Default: ``[model.key]``.
@@ -166,43 +171,69 @@ class AsyncActionTestBase(ActionTestBase, ABC):
         """
         return [model.key]
 
-    @pytest.mark.asyncio
-    async def test_ttl_refresh_on_action(self, test_input, monkeypatch) -> None:
-        self.test_input = test_input
-        model = await self.setup_ttl_data()
-        groups = (
-            getattr(self.covered_method, "_action_groups", None) or ActionGroup.all()
-        )
-        monkeypatch.setattr(type(model).Meta, "refresh_ttl", groups)
+    async def _setup_ttl_data(self, model_cls: type[AtomicRedisModel]) -> Any:
+        """
+        Build models via :meth:`create_models`, recreate them as instances of
+        ``model_cls``, insert, then artificially reduce TTL to make the
+        refresh check observable.
+        """
+        originals = self.create_models()
+        source = originals if isinstance(originals, list) else [originals]
 
-        keys = self.ttl_keys(model)
-        pttls_before = [await self.real_redis_client.pttl(k) for k in keys]
-        await self.perform_action(model)
+        recreated = [model_cls(**m.model_dump()) for m in source]
+        await rapyer.ainsert(*recreated)
 
-        ttl_ms = type(model).Meta.ttl * 1000
-        for key, before in zip(keys, pttls_before):
-            after = await self.real_redis_client.pttl(key)
-            assert ttl_ms - 2000 < after <= ttl_ms, (
-                f"TTL not refreshed for {key}: before={before} after={after} "
-                f"ttl_ms={ttl_ms}"
-            )
+        for inst in recreated:
+            for key in self.ttl_keys(inst):
+                await self.real_redis_client.expire(key, REDUCED_TTL_SECONDS)
+
+        return recreated[0]
 
     @pytest.mark.asyncio
-    async def test_ttl_no_refresh_on_action(self, test_input, monkeypatch) -> None:
+    async def test_ttl_refresh_on_action(self, test_input) -> None:
         self.test_input = test_input
-        model = await self.setup_ttl_data()
-        monkeypatch.setattr(type(model).Meta, "refresh_ttl", False)
+        assert (
+            self.ttl_model_cls is not None
+        ), f"{type(self).__name__}.ttl_model_cls is not set"
+        model_for_keys = await self._setup_ttl_data(self.ttl_model_cls)
 
-        keys = self.ttl_keys(model)
-        pttls_before = [await self.real_redis_client.pttl(k) for k in keys]
-        await self.perform_action(model)
+        keys = self.ttl_keys(model_for_keys)
+        ttls_before = [await self.real_redis_client.ttl(k) for k in keys]
 
-        for key, before in zip(keys, pttls_before):
-            after = await self.real_redis_client.pttl(key)
+        await self.perform_action(self.handle)
+
+        ttl_configured = self.ttl_model_cls.Meta.ttl
+        for key, before in zip(keys, ttls_before):
+            after = await self.real_redis_client.ttl(key)
+            assert (
+                after > before
+            ), f"TTL not refreshed for {key}: before={before} after={after}"
+            assert (
+                ttl_configured - 2 < after <= ttl_configured
+            ), f"TTL for {key}={after}; expected close to {ttl_configured}"
+
+    @pytest.mark.asyncio
+    async def test_ttl_no_refresh_on_action(self, test_input) -> None:
+        self.test_input = test_input
+        assert (
+            self.no_refresh_ttl_model_cls is not None
+        ), f"{type(self).__name__}.no_refresh_ttl_model_cls is not set"
+        model_for_keys = await self._setup_ttl_data(self.no_refresh_ttl_model_cls)
+
+        keys = self.ttl_keys(model_for_keys)
+        ttls_before = [await self.real_redis_client.ttl(k) for k in keys]
+
+        await self.perform_action(self.handle)
+
+        for key, before in zip(keys, ttls_before):
+            after = await self.real_redis_client.ttl(key)
             assert after <= before, (
                 f"TTL unexpectedly refreshed for {key}: before={before} "
                 f"after={after}"
             )
+            assert (
+                0 < after <= REDUCED_TTL_SECONDS
+            ), f"TTL for {key}={after}; expected in (0, {REDUCED_TTL_SECONDS}]"
 
 
 # =============================================================================
