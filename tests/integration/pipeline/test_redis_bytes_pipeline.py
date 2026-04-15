@@ -13,7 +13,7 @@ class TestRedisBytesIadd(ActionTestBase):
         piped.data += b" world"
 
     async def load_data(self):
-        loaded = await BytesModel.aget(self.handle.key)
+        loaded = await BytesModel.aget(self.created_models.key)
         return loaded.data
 
     def expected_before(self):

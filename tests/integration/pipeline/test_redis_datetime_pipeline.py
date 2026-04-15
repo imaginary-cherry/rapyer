@@ -27,11 +27,11 @@ class DatetimeBothModelsOpBase(ActionTestBase, ABC):
         return [ts_model, str_date_model]
 
     def pipeline_owner(self):
-        ts_model, _str_date_model = self.handle
+        ts_model, _str_date_model = self.created_models
         return ts_model
 
     async def load_data(self):
-        ts_model, str_date_model = self.handle
+        ts_model, str_date_model = self.created_models
         loaded_ts = await DatetimeTimestampModel.aget(ts_model.key)
         loaded_str = await DatetimeModel.aget(str_date_model.key)
         return loaded_ts.created_at, loaded_str.created_at
@@ -64,7 +64,7 @@ class TestRedisDatetimeIadd(DatetimeBothModelsOpBase):
     ]
 
     async def perform_action(self, piped):
-        _, str_date_model = self.handle
+        _, str_date_model = self.created_models
         piped.created_at += self.test_input.operand
         str_date_model.created_at += self.test_input.operand
 
@@ -90,7 +90,7 @@ class TestRedisDatetimeIsub(DatetimeBothModelsOpBase):
     ]
 
     async def perform_action(self, piped):
-        _, str_date_model = self.handle
+        _, str_date_model = self.created_models
         piped.created_at -= self.test_input.operand
         str_date_model.created_at -= self.test_input.operand
 

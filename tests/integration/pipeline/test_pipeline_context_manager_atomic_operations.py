@@ -392,7 +392,7 @@ class TestPipelineStringSet(AsyncActionTestBase):
         await piped.name.asave()
 
     async def load_data(self):
-        loaded = await ComprehensiveTestModel.aget(self.handle.key)
+        loaded = await ComprehensiveTestModel.aget(self.created_models.key)
         return loaded.name
 
     def expected_before(self):
@@ -497,7 +497,7 @@ class TestPipelineTryDelete(TwoModelDeleteBase):
     covered_method = AtomicRedisModel.adelete_by_key
 
     async def perform_action(self, piped):
-        model1, _model2 = self.handle
+        model1, _model2 = self.created_models
         await ComprehensiveTestModel.adelete_by_key(model1.key)
 
 

@@ -24,14 +24,14 @@ class TestPipelineAsetTtl(ActionTestBase):
         return models
 
     def pipeline_owner(self):
-        return self.handle[0]
+        return self.created_models[0]
 
     async def perform_action(self, piped):
-        for model in self.handle:
+        for model in self.created_models:
             await model.aset_ttl(TTL_SECONDS)
 
     async def load_data(self):
-        return [await self.real_redis_client.ttl(model.key) for model in self.handle]
+        return [await self.real_redis_client.ttl(model.key) for model in self.created_models]
 
     def expected_before(self):
         # All TTLs are still -1 (unset) while the pipeline is open.

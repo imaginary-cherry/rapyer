@@ -111,7 +111,7 @@ class TestIntegerAddition(ActionTestBase):
         piped.int_field += 25
 
     async def load_data(self):
-        loaded = await AllTypesModel.aget(self.handle.key)
+        loaded = await AllTypesModel.aget(self.created_models.key)
         return loaded.int_field
 
     def expected_before(self):

@@ -23,11 +23,11 @@ class TestRapyerPipelineAsaveBatching(RapyerPipelineBase):
         return self.create_models()
 
     async def perform_action(self, piped):
-        for model in self.handle:
+        for model in self.created_models:
             await model.asave()
 
     async def load_data(self):
-        return tuple([await self.real_redis_client.exists(m.key) for m in self.handle])
+        return tuple([await self.real_redis_client.exists(m.key) for m in self.created_models])
 
     def expected_before(self):
         return 0, 0, 0

@@ -55,7 +55,7 @@ class ActionTestBase(ABC):
     covered_method: ClassVar[Any] = None
     """Method (or list of methods) passed to ``@model_pipeline_test_for``."""
 
-    handle: Any = None
+    created_models: Any = None
     test_input: Any = None
 
     @abstractmethod
@@ -89,7 +89,7 @@ class ActionTestBase(ABC):
 
     def pipeline_owner(self) -> AtomicRedisModel | type[AtomicRedisModel]:
         """Return the object to call ``.apipeline()`` on. Default: ``self.handle``."""
-        return self.handle
+        return self.created_models
 
     def assert_during_pipeline(self, loaded: Any):
         assert loaded == self.expected_before()
@@ -104,7 +104,7 @@ class ActionTestBase(ABC):
     @pytest.mark.asyncio
     async def test_pipeline_atomicity(self, test_input):
         self.test_input = test_input
-        self.handle = await self.setup_data()
+        self.created_models = await self.setup_data()
         owner = self.pipeline_owner()
         async with owner.apipeline() as piped:
             await self.perform_action(piped)
@@ -261,7 +261,7 @@ class ComprehensiveCounterOpBase(ActionTestBase, ABC):
         return ComprehensiveTestModel(counter=self.test_input.initial)
 
     async def load_data(self):
-        loaded = await ComprehensiveTestModel.aget(self.handle.key)
+        loaded = await ComprehensiveTestModel.aget(self.created_models.key)
         return loaded.counter
 
     def expected_before(self):
@@ -283,7 +283,7 @@ class AsyncComprehensiveCounterOpBase(AsyncActionTestBase, ABC):
     no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
 
     async def load_data(self):
-        loaded = await ComprehensiveTestModel.aget(self.handle.key)
+        loaded = await ComprehensiveTestModel.aget(self.created_models.key)
         return loaded.counter
 
 
@@ -294,7 +294,7 @@ class AsyncFloatModelValueOpBase(AsyncActionTestBase, ABC):
     no_refresh_ttl_model_cls = NoRefreshTTLFloatModel
 
     async def load_data(self):
-        loaded = await FloatModel.aget(self.handle.key)
+        loaded = await FloatModel.aget(self.created_models.key)
         return loaded.value
 
 
@@ -305,7 +305,7 @@ class PipelineAllTypesAmountOpBase(ActionTestBase, ABC):
         return PipelineAllTypesTestModel(amount=self.test_input.initial)
 
     async def load_data(self):
-        loaded = await PipelineAllTypesTestModel.aget(self.handle.key)
+        loaded = await PipelineAllTypesTestModel.aget(self.created_models.key)
         return loaded.amount
 
     def expected_before(self):
@@ -319,7 +319,7 @@ class PipelineAllTypesNameOpBase(ActionTestBase, ABC):
     """RedisStr ops on ``PipelineAllTypesTestModel.name``."""
 
     async def load_data(self):
-        loaded = await PipelineAllTypesTestModel.aget(self.handle.key)
+        loaded = await PipelineAllTypesTestModel.aget(self.created_models.key)
         return loaded.name
 
 
@@ -327,7 +327,7 @@ class ComprehensiveTagsOpBase(ActionTestBase, ABC):
     """List ops on ``ComprehensiveTestModel.tags``. Sync / pipeline-only actions."""
 
     async def load_data(self):
-        loaded = await ComprehensiveTestModel.aget(self.handle.key)
+        loaded = await ComprehensiveTestModel.aget(self.created_models.key)
         return loaded.tags
 
 
@@ -336,7 +336,7 @@ class AsyncComprehensiveTagsOpBase(AsyncActionTestBase, ABC):
     no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
 
     async def load_data(self):
-        loaded = await ComprehensiveTestModel.aget(self.handle.key)
+        loaded = await ComprehensiveTestModel.aget(self.created_models.key)
         return loaded.tags
 
 
@@ -344,7 +344,7 @@ class ComprehensiveMetadataOpBase(ActionTestBase, ABC):
     """Dict ops on ``ComprehensiveTestModel.metadata``. Sync / pipeline-only."""
 
     async def load_data(self):
-        loaded = await ComprehensiveTestModel.aget(self.handle.key)
+        loaded = await ComprehensiveTestModel.aget(self.created_models.key)
         return loaded.metadata
 
 
@@ -353,7 +353,7 @@ class AsyncComprehensiveMetadataOpBase(AsyncActionTestBase, ABC):
     no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
 
     async def load_data(self):
-        loaded = await ComprehensiveTestModel.aget(self.handle.key)
+        loaded = await ComprehensiveTestModel.aget(self.created_models.key)
         return loaded.metadata
 
 
@@ -361,7 +361,7 @@ class AllTypesModelIntFieldOpBase(ActionTestBase, ABC):
     """RedisInt ops on ``AllTypesModel.int_field``."""
 
     async def load_data(self):
-        loaded = await AllTypesModel.aget(self.handle.key)
+        loaded = await AllTypesModel.aget(self.created_models.key)
         return loaded.int_field
 
 
@@ -372,7 +372,7 @@ class AllTypesModelListFieldOpBase(ActionTestBase, ABC):
         return AllTypesModel()
 
     async def load_data(self):
-        loaded = await AllTypesModel.aget(self.handle.key)
+        loaded = await AllTypesModel.aget(self.created_models.key)
         return loaded.list_field
 
     def expected_before(self):
@@ -386,7 +386,7 @@ class AllTypesModelDictFieldOpBase(ActionTestBase, ABC):
         return AllTypesModel()
 
     async def load_data(self):
-        loaded = await AllTypesModel.aget(self.handle.key)
+        loaded = await AllTypesModel.aget(self.created_models.key)
         return loaded.dict_field
 
     def expected_before(self):
@@ -403,10 +403,10 @@ class TwoModelDeleteBase(ActionTestBase, ABC):
         ]
 
     def pipeline_owner(self):
-        return self.handle[0]
+        return self.created_models[0]
 
     async def load_data(self):
-        model1, model2 = self.handle
+        model1, model2 = self.created_models
         return (
             await self.real_redis_client.exists(model1.key),
             await self.real_redis_client.exists(model2.key),

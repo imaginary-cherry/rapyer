@@ -48,11 +48,11 @@ class TestRapyerPipelineAdeleteMany(RapyerPipelineBase):
         ]
 
     async def perform_action(self, piped):
-        model1, model2 = self.handle
+        model1, model2 = self.created_models
         self.result = await ComprehensiveTestModel.adelete_many(model1, model2)
 
     async def load_data(self):
-        model1, model2 = self.handle
+        model1, model2 = self.created_models
         return (
             await self.real_redis_client.exists(model1.key),
             await self.real_redis_client.exists(model2.key),

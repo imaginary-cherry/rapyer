@@ -49,7 +49,7 @@ class TestRedisFloatAllOperationsCombined(ActionTestBase):
         piped.amount **= 2.0
 
     async def load_data(self):
-        loaded = await PipelineAllTypesTestModel.aget(self.handle.key)
+        loaded = await PipelineAllTypesTestModel.aget(self.created_models.key)
         return loaded.amount
 
     def expected_before(self):
