@@ -168,8 +168,7 @@ class AsyncActionTestBase(ActionTestBase, ABC):
         return recreated[0]
 
     @pytest.mark.asyncio
-    async def test_ttl_refresh_on_action(self, test_input):
-        self.test_input = test_input
+    async def test_ttl_refresh_on_action(self):
         assert (
             self.ttl_model_cls is not None
         ), f"{type(self).__name__}.ttl_model_cls is not set"
@@ -178,7 +177,7 @@ class AsyncActionTestBase(ActionTestBase, ABC):
         keys = self.ttl_keys(model_for_keys)
         ttls_before = [await self.real_redis_client.ttl(k) for k in keys]
 
-        await self.perform_action(self.handle)
+        await self.perform_action(model_for_keys)
 
         ttl_configured = self.ttl_model_cls.Meta.ttl
         for key, before in zip(keys, ttls_before):
@@ -191,8 +190,7 @@ class AsyncActionTestBase(ActionTestBase, ABC):
             ), f"TTL for {key}={after}; expected close to {ttl_configured}"
 
     @pytest.mark.asyncio
-    async def test_ttl_no_refresh_on_action(self, test_input):
-        self.test_input = test_input
+    async def test_ttl_no_refresh_on_action(self):
         assert (
             self.no_refresh_ttl_model_cls is not None
         ), f"{type(self).__name__}.no_refresh_ttl_model_cls is not set"
@@ -201,7 +199,7 @@ class AsyncActionTestBase(ActionTestBase, ABC):
         keys = self.ttl_keys(model_for_keys)
         ttls_before = [await self.real_redis_client.ttl(k) for k in keys]
 
-        await self.perform_action(self.handle)
+        await self.perform_action(model_for_keys)
 
         for key, before in zip(keys, ttls_before):
             after = await self.real_redis_client.ttl(key)
