@@ -158,15 +158,6 @@ class AsyncActionTestBase(ActionTestBase, ABC):
         await rapyer.ainsert(model)
         return model
 
-    @abstractmethod
-    async def perform_ttl_action(self, model: AtomicRedisModel) -> None:
-        """
-        Execute the action under test outside any pipeline.
-
-        The ``@refresh_action`` wrapper on the method will invoke
-        ``refresh_ttl_if_needed`` after the call returns.
-        """
-
     def ttl_keys(self, model: AtomicRedisModel) -> list[str]:
         """Redis keys whose TTL should be asserted. Default: ``[model.key]``.
 
@@ -186,7 +177,7 @@ class AsyncActionTestBase(ActionTestBase, ABC):
 
         keys = self.ttl_keys(model)
         pttls_before = [await self.real_redis_client.pttl(k) for k in keys]
-        await self.perform_ttl_action(model)
+        await self.perform_action(model)
 
         ttl_ms = type(model).Meta.ttl * 1000
         for key, before in zip(keys, pttls_before):
@@ -204,7 +195,7 @@ class AsyncActionTestBase(ActionTestBase, ABC):
 
         keys = self.ttl_keys(model)
         pttls_before = [await self.real_redis_client.pttl(k) for k in keys]
-        await self.perform_ttl_action(model)
+        await self.perform_action(model)
 
         for key, before in zip(keys, pttls_before):
             after = await self.real_redis_client.pttl(key)
