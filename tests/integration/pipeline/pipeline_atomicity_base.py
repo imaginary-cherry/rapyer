@@ -175,10 +175,10 @@ class AsyncActionTestBase(ActionTestBase, ABC):
             self.ttl_model_cls is not None
         ), f"{type(self).__name__}.ttl_model_cls is not set"
         self.created_models = await self._setup_ttl_data(self.ttl_model_cls)
-        model_for_keys = self.created_models
+        model_for_keys = self.created_models[0]
 
         keys = []
-        for model in model_for_keys:
+        for model in self.created_models:
             keys.extend(self.ttl_keys(model))
         ttls_before = None
         if self.model_exists_before_action:
@@ -209,10 +209,10 @@ class AsyncActionTestBase(ActionTestBase, ABC):
             self.no_refresh_ttl_model_cls is not None
         ), f"{type(self).__name__}.no_refresh_ttl_model_cls is not set"
         self.created_models = await self._setup_ttl_data(self.no_refresh_ttl_model_cls)
-        model_for_keys = self.created_models
+        model_for_keys = self.created_models[0]
 
         keys = []
-        for model in model_for_keys:
+        for model in self.created_models:
             keys.extend(self.ttl_keys(model))
         ttls_before = None
         if self.model_exists_before_action:
