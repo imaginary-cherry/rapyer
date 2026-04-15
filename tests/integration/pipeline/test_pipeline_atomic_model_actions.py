@@ -1,3 +1,4 @@
+
 import pytest
 
 import rapyer
@@ -37,7 +38,7 @@ class TestPipelineModelAsave(AsyncActionTestBase):
     def create_models(self):
         return ComprehensiveTestModel(name="original", counter=10)
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: ComprehensiveTestModel) -> None:
         piped.name = "updated"
         piped.counter = 99
         await piped.asave()
@@ -79,7 +80,7 @@ class TestPipelineModelAinsert(AsyncActionTestBase):
         existing, _new = self.handle
         return existing
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: ComprehensiveTestModel) -> None:
         _existing, new_model = self.handle
         await ComprehensiveTestModel.ainsert(new_model)
 
@@ -107,7 +108,7 @@ class TestPipelineModelAinsert(AsyncActionTestBase):
         )
 
     @pytest.mark.asyncio
-    async def test_ttl_no_refresh_on_action(self, test_input):
+    async def test_ttl_no_refresh_on_action(self, test_input) -> None:
         self.test_input = test_input
         model = self.no_refresh_ttl_model_cls(name="inserted")
         await self.no_refresh_ttl_model_cls.ainsert(model)
@@ -250,7 +251,7 @@ class TestPipelineRedisIntAincrease(AsyncComprehensiveCounterOpBase):
     def create_models(self):
         return ComprehensiveTestModel(counter=10)
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: ComprehensiveTestModel) -> None:
         await piped.counter.aincrease(5)
 
     def expected_before(self):
@@ -398,7 +399,7 @@ class TestRapyerPipelineAupdate(AsyncRapyerPipelineBase):
     def create_models(self):
         return ComprehensiveTestModel(name="original", counter=10)
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: ComprehensiveTestModel) -> None:
         await self.handle.aupdate(name="updated", counter=99)
 
     async def load_data(self):

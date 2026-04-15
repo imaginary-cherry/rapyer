@@ -432,7 +432,7 @@ class TestFloatAincrease(AsyncFloatModelValueOpBase):
     def create_models(self):
         return FloatModel(value=50.0)
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: FloatModel):
         await piped.value.aincrease(10.5)
 
     def expected_before(self):

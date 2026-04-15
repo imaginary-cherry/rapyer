@@ -8,8 +8,8 @@ Pipeline atomicity tests are skipped for now — PQ actions have no existing
 pipeline-atomicity coverage in the codebase; adding it is orthogonal to
 TTL migration.
 """
+
 from abc import ABC
-from typing import Any
 
 import pytest
 
@@ -33,7 +33,7 @@ class PQActionBase(AsyncActionTestBase, ABC):
     def create_models(self):
         return PriorityQueueModel(name="pq_test")
 
-    def ttl_keys(self, model):
+    def ttl_keys(self, model: PriorityQueueModel):
         return [model.key, model.tasks.special_key]
 
     async def load_data(self):
@@ -45,7 +45,7 @@ class PQActionBase(AsyncActionTestBase, ABC):
     def expected_after(self):
         return None
 
-    async def _setup_ttl_data(self, model_cls) -> Any:
+    async def _setup_ttl_data(self, model_cls: type[PriorityQueueModel]):
         originals = self.create_models()
         source = originals if isinstance(originals, list) else [originals]
 
@@ -67,7 +67,7 @@ class PQActionBase(AsyncActionTestBase, ABC):
 class TestPQApush(PQActionBase):
     covered_method = RedisPriorityQueue.apush
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: PriorityQueueModel):
         await self.handle.tasks.apush("new_item", 0.5)
 
     @pytest.mark.asyncio
@@ -78,7 +78,7 @@ class TestPQApush(PQActionBase):
 class TestPQApushMany(PQActionBase):
     covered_method = RedisPriorityQueue.apush_many
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: PriorityQueueModel):
         await self.handle.tasks.apush_many(
             [
                 PriorityQueueItem(value="a", priority=0.1),
@@ -94,7 +94,7 @@ class TestPQApushMany(PQActionBase):
 class TestPQApop(PQActionBase):
     covered_method = RedisPriorityQueue.apop
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: PriorityQueueModel):
         await self.handle.tasks.apop()
 
     @pytest.mark.asyncio
@@ -105,7 +105,7 @@ class TestPQApop(PQActionBase):
 class TestPQAremove(PQActionBase):
     covered_method = RedisPriorityQueue.aremove
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: PriorityQueueModel):
         await self.handle.tasks.aremove("medium")
 
     @pytest.mark.asyncio
@@ -121,7 +121,7 @@ class TestPQAclear(PQActionBase):
     def ttl_keys(self, model):
         return [model.key]
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: PriorityQueueModel):
         await self.handle.tasks.aclear()
 
     @pytest.mark.asyncio

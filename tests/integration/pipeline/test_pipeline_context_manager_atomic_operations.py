@@ -180,7 +180,7 @@ class TestPipelineListAappend(AsyncComprehensiveTagsOpBase):
     def create_models(self):
         return ComprehensiveTestModel(tags=["initial"])
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.tags.aappend("new_tag")
 
     def expected_before(self):
@@ -196,7 +196,7 @@ class TestPipelineListAextend(AsyncComprehensiveTagsOpBase):
     def create_models(self):
         return ComprehensiveTestModel(tags=["initial"])
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.tags.aextend(["tag1", "tag2"])
 
     def expected_before(self):
@@ -212,7 +212,7 @@ class TestPipelineListAinsert(AsyncComprehensiveTagsOpBase):
     def create_models(self):
         return ComprehensiveTestModel(tags=["first", "last"])
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.tags.ainsert(1, "middle")
 
     def expected_before(self):
@@ -228,7 +228,7 @@ class TestPipelineListAclear(AsyncComprehensiveTagsOpBase):
     def create_models(self):
         return ComprehensiveTestModel(tags=["tag1", "tag2"])
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.tags.aclear()
 
     def expected_before(self):
@@ -244,7 +244,7 @@ class TestListApop(AsyncComprehensiveTagsOpBase):
     def create_models(self):
         return ComprehensiveTestModel(tags=["tag1", "tag2"])
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.tags.apop()
 
     def expected_before(self):
@@ -269,7 +269,7 @@ class TestPipelineDictAsetItem(AsyncComprehensiveMetadataOpBase):
     def create_models(self):
         return ComprehensiveTestModel(metadata={"existing": "value"})
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.metadata.aset_item("new_key", "new_value")
 
     def expected_before(self):
@@ -285,7 +285,7 @@ class TestPipelineDictAdelItem(AsyncComprehensiveMetadataOpBase):
     def create_models(self):
         return ComprehensiveTestModel(metadata={"key1": "value1", "key2": "value2"})
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.metadata.adel_item("key1")
 
     def expected_before(self):
@@ -301,7 +301,7 @@ class TestPipelineDictAupdate(AsyncComprehensiveMetadataOpBase):
     def create_models(self):
         return ComprehensiveTestModel(metadata={"existing": "value"})
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.metadata.aupdate(key1="value1", key2="value2")
 
     def expected_before(self):
@@ -321,7 +321,7 @@ class TestPipelineDictAclear(AsyncComprehensiveMetadataOpBase):
     def create_models(self):
         return ComprehensiveTestModel(metadata={"key1": "value1", "key2": "value2"})
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.metadata.aclear()
 
     def expected_before(self):
@@ -337,7 +337,7 @@ class TestDictApop(AsyncComprehensiveMetadataOpBase):
     def create_models(self):
         return ComprehensiveTestModel(metadata={"key1": "value1", "key2": "value2"})
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.metadata.apop("key1")
 
     def expected_before(self):
@@ -358,7 +358,7 @@ class TestDictApopitem(AsyncComprehensiveMetadataOpBase):
         # Single-entry dict so the popped item is deterministic.
         return ComprehensiveTestModel(metadata={"only": "value"})
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.metadata.apopitem()
 
     def expected_before(self):
@@ -387,7 +387,7 @@ class TestPipelineStringSet(AsyncActionTestBase):
     def create_models(self):
         return ComprehensiveTestModel(name="original")
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: ComprehensiveTestModel):
         piped.name = "updated"
         await piped.name.asave()
 

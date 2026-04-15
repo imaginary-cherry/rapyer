@@ -21,7 +21,7 @@ class TestModelAget(AsyncActionTestBase):
     def create_models(self):
         return ComprehensiveTestModel(name="test", counter=1)
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: ComprehensiveTestModel) -> None:
         await type(self.handle).aget(self.handle.key)
 
     async def load_data(self):
@@ -46,7 +46,7 @@ class TestModelAload(AsyncActionTestBase):
     def create_models(self):
         return ComprehensiveTestModel(name="test", counter=1)
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: ComprehensiveTestModel) -> None:
         await self.handle.aload()
 
     async def load_data(self):
@@ -71,7 +71,7 @@ class TestModelAfind(AsyncActionTestBase):
     def create_models(self):
         return ComprehensiveTestModel(name="test", counter=1)
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: ComprehensiveTestModel) -> None:
         await type(self.handle).afind()
 
     async def load_data(self):
@@ -96,7 +96,7 @@ class TestModelAfindOne(AsyncActionTestBase):
     def create_models(self):
         return ComprehensiveTestModel(name="test", counter=1)
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: ComprehensiveTestModel) -> None:
         await type(self.handle).afind_one()
 
     async def load_data(self):
@@ -119,7 +119,7 @@ class TestRedisTypeAload(AsyncComprehensiveCounterOpBase):
     def create_models(self):
         return ComprehensiveTestModel(counter=42)
 
-    async def perform_action(self, piped):
+    async def perform_action(self, piped: ComprehensiveTestModel) -> None:
         await self.handle.counter.aload()
 
     def expected_before(self):
