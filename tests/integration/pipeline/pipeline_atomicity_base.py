@@ -142,24 +142,6 @@ class AsyncActionTestBase(ActionTestBase, ABC):
     """
     Extension of :class:`ActionTestBase` that also exercises TTL refresh
     behavior for async actions decorated with ``@refresh_action``.
-
-    Concrete subclasses automatically get three tests:
-
-    * ``test_pipeline_atomicity`` — inherited from :class:`ActionTestBase`.
-    * ``test_ttl_refresh_on_action`` — reruns the pipeline setup but with
-      models recreated as :attr:`ttl_model_cls`, then artificially reduces
-      TTL, performs the action, and asserts every key in :meth:`ttl_keys`
-      had its TTL refreshed.
-    * ``test_ttl_no_refresh_on_action`` — same pattern but with
-      :attr:`no_refresh_ttl_model_cls`; asserts TTL was NOT refreshed.
-
-    Both TTL tests use :meth:`create_models` + :meth:`perform_action` from
-    the base class — subclasses define those once. ``ttl_model_cls`` and
-    ``no_refresh_ttl_model_cls`` are lightweight subclasses of the original
-    model that override ``Meta`` (ttl / refresh_ttl) only.
-
-    Subclasses whose action runs on a special field (e.g. ``RedisPriorityQueue``)
-    override :meth:`ttl_keys` to return ``[model.key, field.special_key]``.
     """
 
     ttl_model_cls: ClassVar[type[AtomicRedisModel]]
@@ -177,12 +159,6 @@ class AsyncActionTestBase(ActionTestBase, ABC):
         return [model.key]
 
     async def _setup_ttl_data(self, model_cls: type[AtomicRedisModel]) -> Any:
-        """
-        Build models via :meth:`create_models`, recreate them as instances of
-        ``model_cls``, insert, then artificially reduce TTL to make the
-        refresh check observable. Returns the same shape as ``create_models``
-        (single model or list) so the caller can assign to ``self.handle``.
-        """
         originals = self.create_models()
         source = originals if isinstance(originals, list) else [originals]
 
