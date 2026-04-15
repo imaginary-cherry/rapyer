@@ -45,11 +45,7 @@ class BinaryOpCase:
 
 class ActionTestBase(ABC):
     """
-    Abstract base for pipeline-atomicity tests.
-
-    Each ``params`` entry is one dataclass instance — the scaffold stores it on
-    ``self.test_input`` before every hook runs, so hooks read
-    ``self.test_input.<field>`` directly.
+    Define tests for all the actions in this package, so each action will be tested for all the behaviors
     """
 
     params: ClassVar[list[Any]] = []
