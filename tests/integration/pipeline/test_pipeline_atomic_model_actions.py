@@ -1,4 +1,3 @@
-
 import pytest
 
 import rapyer
@@ -104,9 +103,9 @@ class TestPipelineModelAinsert(AsyncActionTestBase):
         await self.ttl_model_cls.ainsert(model)
         ttl = await self.real_redis_client.ttl(model.key)
         configured = self.ttl_model_cls.Meta.ttl
-        assert configured - 2 < ttl <= configured, (
-            f"TTL for {model.key}={ttl}; expected close to {configured}"
-        )
+        assert (
+            configured - 2 < ttl <= configured
+        ), f"TTL for {model.key}={ttl}; expected close to {configured}"
 
     @pytest.mark.asyncio
     async def test_ttl_no_refresh_on_action(self, test_input) -> None:
@@ -116,9 +115,9 @@ class TestPipelineModelAinsert(AsyncActionTestBase):
         ttl = await self.real_redis_client.ttl(model.key)
         configured = self.no_refresh_ttl_model_cls.Meta.ttl
         # Even with refresh disabled, the initial save sets TTL.
-        assert 0 < ttl <= configured, (
-            f"TTL for {model.key}={ttl}; expected in (0, {configured}]"
-        )
+        assert (
+            0 < ttl <= configured
+        ), f"TTL for {model.key}={ttl}; expected in (0, {configured}]"
 
     def expected_after(self):
         return 1, "inserted"
