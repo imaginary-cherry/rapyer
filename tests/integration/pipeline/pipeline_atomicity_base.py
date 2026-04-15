@@ -75,7 +75,7 @@ class ActionTestBase(ABC):
         return models
 
     @abstractmethod
-    async def perform_action(self, piped: Any) -> None:
+    async def perform_action(self, piped: Any):
         """Perform the mutation inside the pipeline."""
 
     @abstractmethod
@@ -94,10 +94,10 @@ class ActionTestBase(ABC):
         """Return the object to call ``.apipeline()`` on. Default: ``self.handle``."""
         return self.handle
 
-    def assert_during_pipeline(self, loaded: Any) -> None:
+    def assert_during_pipeline(self, loaded: Any):
         assert loaded == self.expected_before()
 
-    def assert_after_pipeline(self, loaded: Any) -> None:
+    def assert_after_pipeline(self, loaded: Any):
         assert loaded == self.expected_after()
 
     @pytest_asyncio.fixture(autouse=True)
@@ -105,7 +105,7 @@ class ActionTestBase(ABC):
         self.real_redis_client = real_redis_client
 
     @pytest.mark.asyncio
-    async def test_pipeline_atomicity(self, test_input) -> None:
+    async def test_pipeline_atomicity(self, test_input):
         self.test_input = test_input
         self.handle = await self.setup_data()
         owner = self.pipeline_owner()
@@ -196,7 +196,7 @@ class AsyncActionTestBase(ActionTestBase, ABC):
         return recreated[0]
 
     @pytest.mark.asyncio
-    async def test_ttl_refresh_on_action(self, test_input) -> None:
+    async def test_ttl_refresh_on_action(self, test_input):
         self.test_input = test_input
         assert (
             self.ttl_model_cls is not None
@@ -219,7 +219,7 @@ class AsyncActionTestBase(ActionTestBase, ABC):
             ), f"TTL for {key}={after}; expected close to {ttl_configured}"
 
     @pytest.mark.asyncio
-    async def test_ttl_no_refresh_on_action(self, test_input) -> None:
+    async def test_ttl_no_refresh_on_action(self, test_input):
         self.test_input = test_input
         assert (
             self.no_refresh_ttl_model_cls is not None
