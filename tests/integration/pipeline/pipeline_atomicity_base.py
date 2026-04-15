@@ -147,6 +147,8 @@ class AsyncActionTestBase(ActionTestBase, ABC):
     no_refresh_ttl_model_cls: ClassVar[type[AtomicRedisModel]]
     """Model subclass with ``Meta.ttl`` set and ``refresh_ttl=False``."""
 
+    model_exists_before_action: bool = True
+
     def ttl_keys(self, model: AtomicRedisModel) -> list[str]:
         """Redis keys whose TTL should be asserted. Default: ``[model.key]``.
 
@@ -176,18 +178,25 @@ class AsyncActionTestBase(ActionTestBase, ABC):
         model_for_keys = await self._setup_ttl_data(self.ttl_model_cls)
 
         keys = self.ttl_keys(model_for_keys)
-        ttls_before = await asyncio.gather(
-            *[self.real_redis_client.ttl(k) for k in keys]
-        )
+        ttls_before = None
+        if self.model_exists_before_action:
+            ttls_before: list[int] = await asyncio.gather(
+                *[self.real_redis_client.ttl(k) for k in keys]
+            )
 
         await self.perform_action(model_for_keys)
 
         ttl_configured = self.ttl_model_cls.Meta.ttl
-        afters = await asyncio.gather(*[self.real_redis_client.ttl(key) for key in keys])
-        for key, after, before in zip(keys, afters, ttls_before):
-            assert (
-                after > before
-            ), f"TTL not refreshed for {key}: before={before} after={after}"
+        afters = await asyncio.gather(
+            *[self.real_redis_client.ttl(key) for key in keys]
+        )
+        if self.model_exists_before_action and ttls_before is not None:
+            for key, after, before in zip(keys, afters, ttls_before):
+                assert (
+                    after > before
+                ), f"TTL not refreshed for {key}: before={before} after={after}"
+
+        for key, after in zip(keys, afters):
             assert (
                 ttl_configured - 2 < after <= ttl_configured
             ), f"TTL for {key}={after}; expected close to {ttl_configured}"
@@ -200,16 +209,23 @@ class AsyncActionTestBase(ActionTestBase, ABC):
         model_for_keys = await self._setup_ttl_data(self.no_refresh_ttl_model_cls)
 
         keys = self.ttl_keys(model_for_keys)
-        ttls_before = [await self.real_redis_client.ttl(k) for k in keys]
-
+        ttls_before = None
+        if self.model_exists_before_action:
+            ttls_before: list[int] = await asyncio.gather(
+                *[self.real_redis_client.ttl(k) for k in keys]
+            )
         await self.perform_action(model_for_keys)
 
-        for key, before in zip(keys, ttls_before):
-            after = await self.real_redis_client.ttl(key)
-            assert after <= before, (
-                f"TTL unexpectedly refreshed for {key}: before={before} "
-                f"after={after}"
-            )
+        afters = await asyncio.gather(
+            *[self.real_redis_client.ttl(key) for key in keys]
+        )
+        if self.model_exists_before_action and ttls_before is not None:
+            for key, after, before in zip(keys, afters, ttls_before):
+                assert after <= before, (
+                    f"TTL unexpectedly refreshed for {key}: before={before} "
+                    f"after={after}"
+                )
+        for key, after in zip(keys, afters):
             assert (
                 0 < after <= REDUCED_TTL_SECONDS
             ), f"TTL for {key}={after}; expected in (0, {REDUCED_TTL_SECONDS}]"

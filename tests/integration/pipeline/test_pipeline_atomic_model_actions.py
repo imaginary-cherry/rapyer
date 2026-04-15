@@ -66,6 +66,7 @@ class TestPipelineModelAinsert(AsyncActionTestBase):
     covered_method = AtomicRedisModel.ainsert
     ttl_model_cls = TTLComprehensiveTestModel
     no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
+    model_exists_before_action = False
 
     def create_models(self):
         # Only the existing model is inserted; the new model is the test subject.
