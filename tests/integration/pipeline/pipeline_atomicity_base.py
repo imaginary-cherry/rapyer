@@ -17,6 +17,11 @@ from tests.models.collection_types import (
 )
 from tests.models.functionality_types import AllTypesModel
 from tests.models.redis_types import PipelineAllTypesTestModel
+from tests.models.simple_types import (
+    FloatModel,
+    NoRefreshTTLFloatModel,
+    TTLFloatModel,
+)
 
 # =============================================================================
 # Shared case dataclasses
@@ -175,7 +180,8 @@ class AsyncActionTestBase(ActionTestBase, ABC):
         """
         Build models via :meth:`create_models`, recreate them as instances of
         ``model_cls``, insert, then artificially reduce TTL to make the
-        refresh check observable.
+        refresh check observable. Returns the same shape as ``create_models``
+        (single model or list) so the caller can assign to ``self.handle``.
         """
         originals = self.create_models()
         source = originals if isinstance(originals, list) else [originals]
