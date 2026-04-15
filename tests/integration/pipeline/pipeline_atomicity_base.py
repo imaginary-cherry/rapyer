@@ -9,6 +9,7 @@ import pytest_asyncio
 
 import rapyer
 from rapyer import AtomicRedisModel
+from rapyer.actions import ActionGroup
 from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.functionality_types import AllTypesModel
 from tests.models.redis_types import PipelineAllTypesTestModel
@@ -121,6 +122,96 @@ class ActionTestBase(ABC):
             "test_input", params, ids=[repr(p) for p in params]
         )
         cls.test_pipeline_atomicity = mark(test_pipeline_atomicity)
+
+
+# =============================================================================
+# Async action base — pipeline atomicity + TTL refresh / no-refresh
+# =============================================================================
+
+
+class AsyncActionTestBase(ActionTestBase, ABC):
+    """
+    Extension of :class:`ActionTestBase` that also exercises TTL refresh
+    behavior for async actions decorated with ``@refresh_action``.
+
+    Concrete subclasses automatically get three tests:
+
+    * ``test_pipeline_atomicity`` — inherited from :class:`ActionTestBase`.
+    * ``test_ttl_refresh_on_action`` — runs the action with the class's
+      ``Meta.refresh_ttl`` set to the action's ``ActionGroup`` flags and
+      asserts every key returned by :meth:`ttl_keys` was refreshed.
+    * ``test_ttl_no_refresh_on_action`` — runs the action with
+      ``Meta.refresh_ttl=False`` and asserts no key was refreshed.
+
+    Subclasses whose action runs on a special field (e.g. ``RedisPriorityQueue``)
+    simply override :meth:`ttl_keys` to return ``[model.key, field.special_key]``
+    — no separate base class is required.
+    """
+
+    @abstractmethod
+    def create_ttl_model(self) -> AtomicRedisModel:
+        """Build (but don't insert) the TTL-enabled model used for TTL tests."""
+
+    async def setup_ttl_data(self) -> AtomicRedisModel:
+        """Build and insert the TTL model. Override when pre-action state is needed."""
+        model = self.create_ttl_model()
+        await rapyer.ainsert(model)
+        return model
+
+    @abstractmethod
+    async def perform_ttl_action(self, model: AtomicRedisModel) -> None:
+        """
+        Execute the action under test outside any pipeline.
+
+        The ``@refresh_action`` wrapper on the method will invoke
+        ``refresh_ttl_if_needed`` after the call returns.
+        """
+
+    def ttl_keys(self, model: AtomicRedisModel) -> list[str]:
+        """Redis keys whose TTL should be asserted. Default: ``[model.key]``.
+
+        Override for actions on special fields to include extra keys such
+        as ``model.<field>.special_key``.
+        """
+        return [model.key]
+
+    @pytest.mark.asyncio
+    async def test_ttl_refresh_on_action(self, test_input, monkeypatch) -> None:
+        self.test_input = test_input
+        model = await self.setup_ttl_data()
+        groups = (
+            getattr(self.covered_method, "_action_groups", None) or ActionGroup.all()
+        )
+        monkeypatch.setattr(type(model).Meta, "refresh_ttl", groups)
+
+        keys = self.ttl_keys(model)
+        pttls_before = [await self.real_redis_client.pttl(k) for k in keys]
+        await self.perform_ttl_action(model)
+
+        ttl_ms = type(model).Meta.ttl * 1000
+        for key, before in zip(keys, pttls_before):
+            after = await self.real_redis_client.pttl(key)
+            assert ttl_ms - 2000 < after <= ttl_ms, (
+                f"TTL not refreshed for {key}: before={before} after={after} "
+                f"ttl_ms={ttl_ms}"
+            )
+
+    @pytest.mark.asyncio
+    async def test_ttl_no_refresh_on_action(self, test_input, monkeypatch) -> None:
+        self.test_input = test_input
+        model = await self.setup_ttl_data()
+        monkeypatch.setattr(type(model).Meta, "refresh_ttl", False)
+
+        keys = self.ttl_keys(model)
+        pttls_before = [await self.real_redis_client.pttl(k) for k in keys]
+        await self.perform_ttl_action(model)
+
+        for key, before in zip(keys, pttls_before):
+            after = await self.real_redis_client.pttl(key)
+            assert after <= before, (
+                f"TTL unexpectedly refreshed for {key}: before={before} "
+                f"after={after}"
+            )
 
 
 # =============================================================================
