@@ -59,7 +59,7 @@ class ActionTestBase(ABC):
     test_input: Any = None
 
     @abstractmethod
-    def create_models(self) -> list[AtomicRedisModel] | AtomicRedisModel:
+    def create_models(self) -> list[AtomicRedisModel]:
         """
         Build (but don't insert) the test models.
         """
