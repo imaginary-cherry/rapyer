@@ -1,3 +1,4 @@
+
 import rapyer
 from rapyer.base import AtomicRedisModel
 from rapyer.types.dct import RedisDict
@@ -35,7 +36,7 @@ class TestPipelineModelAsave(AsyncActionTestBase):
     def create_models(self):
         return ComprehensiveTestModel(name="original", counter=10)
 
-    async def perform_action(self, piped: ComprehensiveTestModel):
+    async def perform_action(self, piped: ComprehensiveTestModel) -> None:
         piped.name = "updated"
         piped.counter = 99
         await piped.asave()
@@ -78,7 +79,7 @@ class TestPipelineModelAinsert(AsyncActionTestBase):
         existing, _new = self.handle
         return existing
 
-    async def perform_action(self, piped: ComprehensiveTestModel):
+    async def perform_action(self, piped: ComprehensiveTestModel) -> None:
         _existing, new_model = self.handle
         await ComprehensiveTestModel.ainsert(new_model)
 
@@ -226,7 +227,7 @@ class TestPipelineRedisIntAincrease(AsyncComprehensiveCounterOpBase):
     def create_models(self):
         return ComprehensiveTestModel(counter=10)
 
-    async def perform_action(self, piped: ComprehensiveTestModel):
+    async def perform_action(self, piped: ComprehensiveTestModel) -> None:
         await piped.counter.aincrease(5)
 
     def expected_before(self):
@@ -374,7 +375,7 @@ class TestRapyerPipelineAupdate(AsyncRapyerPipelineBase):
     def create_models(self):
         return ComprehensiveTestModel(name="original", counter=10)
 
-    async def perform_action(self, piped: ComprehensiveTestModel):
+    async def perform_action(self, piped: ComprehensiveTestModel) -> None:
         await self.handle.aupdate(name="updated", counter=99)
 
     async def load_data(self):

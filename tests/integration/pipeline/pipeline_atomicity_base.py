@@ -87,7 +87,7 @@ class ActionTestBase(ABC):
     def expected_after(self) -> Any:
         """Value ``load_data`` should return after the pipeline exits."""
 
-    def pipeline_owner(self) -> Any:
+    def pipeline_owner(self) -> AtomicRedisModel | type[AtomicRedisModel]:
         """Return the object to call ``.apipeline()`` on. Default: ``self.handle``."""
         return self.handle
 
