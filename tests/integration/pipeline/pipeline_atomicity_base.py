@@ -55,6 +55,11 @@ class ActionTestBase(ABC):
     covered_method: ClassVar[Any] = None
     """Method (or list of methods) passed to ``@model_pipeline_test_for``."""
 
+    skip_pipeline_atomicity: ClassVar[bool] = False
+    """If True, :meth:`test_pipeline_atomicity` is skipped. Use for actions that
+    return a value (and so can't be deferred in a pipeline) or that otherwise
+    don't have pipeline atomicity coverage."""
+
     created_models: Any = None
     test_input: Any = None
 
@@ -102,6 +107,10 @@ class ActionTestBase(ABC):
 
     @pytest.mark.asyncio
     async def test_pipeline_atomicity(self, test_input):
+        if self.skip_pipeline_atomicity:
+            pytest.skip(
+                f"{type(self).__name__} has skip_pipeline_atomicity=True"
+            )
         self.test_input = test_input
         self.created_models = await self.setup_data()
         owner = self.pipeline_owner()

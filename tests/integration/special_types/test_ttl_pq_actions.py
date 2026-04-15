@@ -11,8 +11,6 @@ TTL migration.
 
 from abc import ABC
 
-import pytest
-
 import rapyer
 from rapyer.types.priority_queue import PriorityQueueItem, RedisPriorityQueue
 from tests.integration.conftest import REDUCED_TTL_SECONDS
@@ -29,6 +27,7 @@ from tests.models.special_types import (
 class PQActionBase(AsyncActionTestBase, ABC):
     ttl_model_cls = PriorityQueueTTLModel
     no_refresh_ttl_model_cls = PriorityQueueTTLNoRefreshModel
+    skip_pipeline_atomicity = True
 
     def create_models(self):
         return [PriorityQueueModel(name="pq_test")]
@@ -68,10 +67,6 @@ class TestPQApush(PQActionBase):
     async def perform_action(self, piped: PriorityQueueModel):
         await self.created_models[0].tasks.apush("new_item", 0.5)
 
-    @pytest.mark.asyncio
-    async def test_pipeline_atomicity(self, test_input):
-        pytest.skip("PQ actions have no pipeline atomicity tests yet")
-
 
 class TestPQApushMany(PQActionBase):
     covered_method = RedisPriorityQueue.apush_many
@@ -84,10 +79,6 @@ class TestPQApushMany(PQActionBase):
             ]
         )
 
-    @pytest.mark.asyncio
-    async def test_pipeline_atomicity(self, test_input):
-        pytest.skip("PQ actions have no pipeline atomicity tests yet")
-
 
 class TestPQApop(PQActionBase):
     covered_method = RedisPriorityQueue.apop
@@ -95,20 +86,12 @@ class TestPQApop(PQActionBase):
     async def perform_action(self, piped: PriorityQueueModel):
         await self.created_models[0].tasks.apop()
 
-    @pytest.mark.asyncio
-    async def test_pipeline_atomicity(self, test_input):
-        pytest.skip("PQ actions have no pipeline atomicity tests yet")
-
 
 class TestPQAremove(PQActionBase):
     covered_method = RedisPriorityQueue.aremove
 
     async def perform_action(self, piped: PriorityQueueModel):
         await self.created_models[0].tasks.aremove("medium")
-
-    @pytest.mark.asyncio
-    async def test_pipeline_atomicity(self, test_input):
-        pytest.skip("PQ actions have no pipeline atomicity tests yet")
 
 
 class TestPQAclear(PQActionBase):
@@ -121,7 +104,3 @@ class TestPQAclear(PQActionBase):
 
     async def perform_action(self, piped: PriorityQueueModel):
         await self.created_models[0].tasks.aclear()
-
-    @pytest.mark.asyncio
-    async def test_pipeline_atomicity(self, test_input):
-        pytest.skip("PQ actions have no pipeline atomicity tests yet")

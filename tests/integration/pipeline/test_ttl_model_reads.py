@@ -1,5 +1,3 @@
-import pytest
-
 from rapyer.base import AtomicRedisModel
 from rapyer.types.base import RedisType
 from tests.integration.pipeline.pipeline_atomicity_base import (
@@ -17,6 +15,7 @@ class TestModelAget(AsyncActionTestBase):
     covered_method = AtomicRedisModel.aget
     ttl_model_cls = TTLComprehensiveTestModel
     no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
+    skip_pipeline_atomicity = True
 
     def create_models(self):
         return [ComprehensiveTestModel(name="test", counter=1)]
@@ -34,15 +33,12 @@ class TestModelAget(AsyncActionTestBase):
     def expected_after(self):
         return None
 
-    @pytest.mark.asyncio
-    async def test_pipeline_atomicity(self, test_input):
-        pytest.skip("aget returns a value; cannot be deferred in a pipeline")
-
 
 class TestModelAload(AsyncActionTestBase):
     covered_method = AtomicRedisModel.aload
     ttl_model_cls = TTLComprehensiveTestModel
     no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
+    skip_pipeline_atomicity = True
 
     def create_models(self):
         return [ComprehensiveTestModel(name="test", counter=1)]
@@ -59,15 +55,12 @@ class TestModelAload(AsyncActionTestBase):
     def expected_after(self):
         return None
 
-    @pytest.mark.asyncio
-    async def test_pipeline_atomicity(self, test_input):
-        pytest.skip("aload returns a value; cannot be deferred in a pipeline")
-
 
 class TestModelAfind(AsyncActionTestBase):
     covered_method = AtomicRedisModel.afind
     ttl_model_cls = TTLComprehensiveTestModel
     no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
+    skip_pipeline_atomicity = True
 
     def create_models(self):
         return [ComprehensiveTestModel(name="test", counter=1)]
@@ -84,15 +77,12 @@ class TestModelAfind(AsyncActionTestBase):
     def expected_after(self):
         return None
 
-    @pytest.mark.asyncio
-    async def test_pipeline_atomicity(self, test_input):
-        pytest.skip("afind returns a value; cannot be deferred in a pipeline")
-
 
 class TestModelAfindOne(AsyncActionTestBase):
     covered_method = AtomicRedisModel.afind_one
     ttl_model_cls = TTLComprehensiveTestModel
     no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
+    skip_pipeline_atomicity = True
 
     def create_models(self):
         return [ComprehensiveTestModel(name="test", counter=1)]
@@ -109,13 +99,10 @@ class TestModelAfindOne(AsyncActionTestBase):
     def expected_after(self):
         return None
 
-    @pytest.mark.asyncio
-    async def test_pipeline_atomicity(self, test_input):
-        pytest.skip("afind_one returns a value; cannot be deferred in a pipeline")
-
 
 class TestRedisTypeAload(AsyncComprehensiveCounterOpBase):
     covered_method = RedisType.aload
+    skip_pipeline_atomicity = True
 
     def create_models(self):
         return [ComprehensiveTestModel(counter=42)]
@@ -128,9 +115,3 @@ class TestRedisTypeAload(AsyncComprehensiveCounterOpBase):
 
     def expected_after(self):
         return 42
-
-    @pytest.mark.asyncio
-    async def test_pipeline_atomicity(self, test_input):
-        pytest.skip(
-            "RedisType.aload returns a value; cannot be deferred in a pipeline"
-        )

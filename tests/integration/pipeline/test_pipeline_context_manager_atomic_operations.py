@@ -240,6 +240,7 @@ class TestListAclear(AsyncComprehensiveTagsOpBase):
 
 class TestListApop(AsyncComprehensiveTagsOpBase):
     covered_method = RedisList.apop
+    skip_pipeline_atomicity = True
 
     def create_models(self):
         return [ComprehensiveTestModel(tags=["tag1", "tag2"])]
@@ -252,10 +253,6 @@ class TestListApop(AsyncComprehensiveTagsOpBase):
 
     def expected_after(self):
         return ["tag1"]
-
-    @pytest.mark.asyncio
-    async def test_pipeline_atomicity(self, test_input):
-        pytest.skip("RedisList.apop returns a value; cannot be deferred in a pipeline")
 
 
 # =============================================================================
@@ -333,6 +330,7 @@ class TestDictAclear(AsyncComprehensiveMetadataOpBase):
 
 class TestDictApop(AsyncComprehensiveMetadataOpBase):
     covered_method = RedisDict.apop
+    skip_pipeline_atomicity = True
 
     def create_models(self):
         return [ComprehensiveTestModel(metadata={"key1": "value1", "key2": "value2"})]
@@ -346,13 +344,10 @@ class TestDictApop(AsyncComprehensiveMetadataOpBase):
     def expected_after(self):
         return {"key2": "value2"}
 
-    @pytest.mark.asyncio
-    async def test_pipeline_atomicity(self, test_input):
-        pytest.skip("RedisDict.apop returns a value; cannot be deferred in a pipeline")
-
 
 class TestDictApopitem(AsyncComprehensiveMetadataOpBase):
     covered_method = RedisDict.apopitem
+    skip_pipeline_atomicity = True
 
     def create_models(self):
         # Single-entry dict so the popped item is deterministic.
@@ -366,12 +361,6 @@ class TestDictApopitem(AsyncComprehensiveMetadataOpBase):
 
     def expected_after(self):
         return {}
-
-    @pytest.mark.asyncio
-    async def test_pipeline_atomicity(self, test_input):
-        pytest.skip(
-            "RedisDict.apopitem returns a value; cannot be deferred in a pipeline"
-        )
 
 
 # =============================================================================
