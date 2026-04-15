@@ -40,7 +40,3 @@ class TestAsetTtl(ActionTestBase):
     def assert_after_pipeline(self, loaded):
         # After the pipeline commits, each TTL should be positive and bounded by TTL_SECONDS.
         assert all(0 < ttl <= TTL_SECONDS for ttl in loaded), loaded
-
-    def expected_after(self):
-        # Unused because ``assert_after_pipeline`` is overridden with a range check.
-        return None

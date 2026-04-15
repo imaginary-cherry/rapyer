@@ -79,17 +79,17 @@ class ActionTestBase(ABC):
     async def perform_action(self, piped: Any):
         """Perform the mutation inside the pipeline."""
 
-    @abstractmethod
     async def load_data(self) -> Any:
-        """Read state from Redis via ``self.handle``."""
+        """Read state from Redis via ``self.handle``. Default: ``None``."""
+        return None
 
-    @abstractmethod
     def expected_before(self) -> Any:
         """Value ``load_data`` should return while the pipeline is still open."""
+        return None
 
-    @abstractmethod
     def expected_after(self) -> Any:
         """Value ``load_data`` should return after the pipeline exits."""
+        return None
 
     def pipeline_owner(self) -> AtomicRedisModel | type[AtomicRedisModel]:
         """Return the object to call ``.apipeline()`` on. Default: ``self.handle``."""

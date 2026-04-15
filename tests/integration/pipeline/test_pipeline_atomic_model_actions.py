@@ -238,10 +238,6 @@ class TestRapyerAsetTtl(RapyerActionBase):
     def assert_after_pipeline(self, loaded):
         assert all(0 < ttl <= TTL_SECONDS for ttl in loaded), loaded
 
-    def expected_after(self):
-        # Unused — ``assert_after_pipeline`` does a range check instead.
-        return None
-
 
 class TestRedisIntAincrease(AsyncComprehensiveCounterOpBase):
     covered_method = RedisInt.aincrease
@@ -438,9 +434,3 @@ class TestRapyerRefreshTtl(RapyerActionBase):
 
     def assert_after_pipeline(self, loaded):
         assert self.reduced_ttl < loaded <= TTL_TEST_SECONDS
-
-    def expected_before(self):
-        return None
-
-    def expected_after(self):
-        return None

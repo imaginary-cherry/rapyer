@@ -24,15 +24,6 @@ class TestModelAget(AsyncActionTestBase):
         model = self.created_models[0]
         await type(model).aget(model.key)
 
-    async def load_data(self):
-        return None
-
-    def expected_before(self):
-        return None
-
-    def expected_after(self):
-        return None
-
 
 class TestModelAload(AsyncActionTestBase):
     covered_method = AtomicRedisModel.aload
@@ -45,15 +36,6 @@ class TestModelAload(AsyncActionTestBase):
 
     async def perform_action(self, piped: ComprehensiveTestModel) -> None:
         await self.created_models[0].aload()
-
-    async def load_data(self):
-        return None
-
-    def expected_before(self):
-        return None
-
-    def expected_after(self):
-        return None
 
 
 class TestModelAfind(AsyncActionTestBase):
@@ -68,15 +50,6 @@ class TestModelAfind(AsyncActionTestBase):
     async def perform_action(self, piped: ComprehensiveTestModel) -> None:
         await type(self.created_models[0]).afind()
 
-    async def load_data(self):
-        return None
-
-    def expected_before(self):
-        return None
-
-    def expected_after(self):
-        return None
-
 
 class TestModelAfindOne(AsyncActionTestBase):
     covered_method = AtomicRedisModel.afind_one
@@ -89,15 +62,6 @@ class TestModelAfindOne(AsyncActionTestBase):
 
     async def perform_action(self, piped: ComprehensiveTestModel) -> None:
         await type(self.created_models[0]).afind_one()
-
-    async def load_data(self):
-        return None
-
-    def expected_before(self):
-        return None
-
-    def expected_after(self):
-        return None
 
 
 class TestRedisTypeAload(AsyncComprehensiveCounterOpBase):

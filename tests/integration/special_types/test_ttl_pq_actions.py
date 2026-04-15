@@ -35,15 +35,6 @@ class PQActionBase(AsyncActionTestBase, ABC):
     def ttl_keys(self, model: PriorityQueueModel):
         return [model.key, model.tasks.special_key]
 
-    async def load_data(self):
-        return None
-
-    def expected_before(self):
-        return None
-
-    def expected_after(self):
-        return None
-
     async def _setup_ttl_data(self, model_cls: type[PriorityQueueModel]):
         originals = self.create_models()
         recreated = [model_cls(**m.model_dump()) for m in originals]
