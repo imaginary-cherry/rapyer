@@ -4,7 +4,7 @@ from rapyer.types.float import RedisFloat
 from tests.integration.pipeline.pipeline_atomicity_base import (
     ActionTestBase,
     BinaryOpCase,
-    PipelineAllTypesAmountOpBase,
+    AllTypesAmountOpBase,
 )
 from tests.models.redis_types import PipelineAllTypesTestModel
 
@@ -59,7 +59,7 @@ class TestRedisFloatAllOperationsCombined(ActionTestBase):
         return 36.0
 
 
-class TestRedisFloatItruediv(PipelineAllTypesAmountOpBase):
+class TestRedisFloatItruediv(AllTypesAmountOpBase):
     covered_method = RedisFloat.__itruediv__
     params = [
         BinaryOpCase(100.0, 4.0, 25.0),
@@ -71,7 +71,7 @@ class TestRedisFloatItruediv(PipelineAllTypesAmountOpBase):
         piped.amount /= self.test_input.operand
 
 
-class TestRedisFloatIfloordiv(PipelineAllTypesAmountOpBase):
+class TestRedisFloatIfloordiv(AllTypesAmountOpBase):
     covered_method = RedisFloat.__ifloordiv__
     params = [
         BinaryOpCase(17.0, 5.0, 3.0),
@@ -83,7 +83,7 @@ class TestRedisFloatIfloordiv(PipelineAllTypesAmountOpBase):
         piped.amount //= self.test_input.operand
 
 
-class TestRedisFloatImod(PipelineAllTypesAmountOpBase):
+class TestRedisFloatImod(AllTypesAmountOpBase):
     covered_method = RedisFloat.__imod__
     params = [
         BinaryOpCase(17.5, 5.0, 2.5),
@@ -95,7 +95,7 @@ class TestRedisFloatImod(PipelineAllTypesAmountOpBase):
         piped.amount %= self.test_input.operand
 
 
-class TestRedisFloatIpow(PipelineAllTypesAmountOpBase):
+class TestRedisFloatIpow(AllTypesAmountOpBase):
     covered_method = RedisFloat.__ipow__
     params = [
         BinaryOpCase(2.0, 3.0, 8.0),

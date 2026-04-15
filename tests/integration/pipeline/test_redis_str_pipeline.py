@@ -3,12 +3,12 @@ import pytest
 from rapyer.types.string import RedisStr
 from tests.integration.pipeline.pipeline_atomicity_base import (
     BinaryOpCase,
-    PipelineAllTypesNameOpBase,
+    AllTypesNameOpBase,
 )
 from tests.models.redis_types import PipelineAllTypesTestModel
 
 
-class TestRedisStrAllOperationsCombined(PipelineAllTypesNameOpBase):
+class TestRedisStrAllOperationsCombined(AllTypesNameOpBase):
     covered_method = RedisStr.__iadd__
 
     def create_models(self):
@@ -44,7 +44,7 @@ async def test_redis_str_operations__changes_outside_pipeline_ignored_sanity():
     assert final.name == "hello_inside"
 
 
-class TestRedisStrImul(PipelineAllTypesNameOpBase):
+class TestRedisStrImul(AllTypesNameOpBase):
     covered_method = RedisStr.__imul__
     params = [BinaryOpCase("test", 0, "")]
 

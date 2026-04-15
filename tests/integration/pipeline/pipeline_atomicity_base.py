@@ -241,17 +241,17 @@ class AsyncActionTestBase(ActionTestBase, ABC):
 # =============================================================================
 
 
-class RapyerPipelineBase(ActionTestBase, ABC):
+class RapyerActionBase(ActionTestBase, ABC):
     """Atomicity via the module-level ``rapyer.apipeline()`` context. Sync / pipeline-only."""
 
     def pipeline_owner(self):
         return rapyer
 
 
-class AsyncRapyerPipelineBase(AsyncActionTestBase, ABC):
+class AsyncRapyerActionBase(AsyncActionTestBase, ABC):
     """Atomicity via module-level ``rapyer.apipeline()`` context, with TTL coverage.
 
-    Parallel to :class:`RapyerPipelineBase` for async actions.
+    Parallel to :class:`RapyerActionBase` for async actions.
     Subclasses declare their own ``ttl_model_cls`` / ``no_refresh_ttl_model_cls``.
     """
 
@@ -303,7 +303,7 @@ class AsyncFloatModelValueOpBase(AsyncActionTestBase, ABC):
         return loaded.value
 
 
-class PipelineAllTypesAmountOpBase(ActionTestBase, ABC):
+class AllTypesAmountOpBase(ActionTestBase, ABC):
     """RedisFloat binary ops on ``PipelineAllTypesTestModel.amount``. ``self.test_input`` is ``BinaryOpCase``."""
 
     def create_models(self):
@@ -320,7 +320,7 @@ class PipelineAllTypesAmountOpBase(ActionTestBase, ABC):
         return self.test_input.expected
 
 
-class PipelineAllTypesNameOpBase(ActionTestBase, ABC):
+class AllTypesNameOpBase(ActionTestBase, ABC):
     """RedisStr ops on ``PipelineAllTypesTestModel.name``."""
 
     async def load_data(self):

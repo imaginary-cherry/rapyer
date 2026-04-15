@@ -5,7 +5,7 @@ from tests.models.simple_types import UserModelWithoutTTL
 TTL_SECONDS = 300
 
 
-class TestPipelineAsetTtl(ActionTestBase):
+class TestAsetTtl(ActionTestBase):
     """Verify ``aset_ttl`` applied in a pipeline is not flushed until exit."""
 
     covered_method = AtomicRedisModel.aset_ttl

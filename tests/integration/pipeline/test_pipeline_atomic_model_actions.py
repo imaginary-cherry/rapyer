@@ -9,10 +9,10 @@ from tests.integration.pipeline.pipeline_atomicity_base import (
     ActionTestBase,
     AsyncActionTestBase,
     AsyncComprehensiveCounterOpBase,
-    AsyncRapyerPipelineBase,
+    AsyncRapyerActionBase,
     ComprehensiveMetadataOpBase,
     ComprehensiveTagsOpBase,
-    RapyerPipelineBase,
+    RapyerActionBase,
     TwoModelDeleteBase,
 )
 from tests.models.collection_types import (
@@ -29,7 +29,7 @@ from tests.models.simple_types import (
 TTL_SECONDS = 300
 
 
-class TestPipelineModelAsave(AsyncActionTestBase):
+class TestModelAsave(AsyncActionTestBase):
     covered_method = AtomicRedisModel.asave
     ttl_model_cls = TTLComprehensiveTestModel
     no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
@@ -53,7 +53,7 @@ class TestPipelineModelAsave(AsyncActionTestBase):
         return "updated", 99
 
 
-class TestPipelineModelAinsert(AsyncActionTestBase):
+class TestModelAinsert(AsyncActionTestBase):
     """Verify ``ainsert`` inside a model pipeline defers the new model's creation.
 
     ``ainsert`` is the only async action whose subject is a fresh (unsaved)
@@ -121,9 +121,9 @@ class TestPipelineModelAinsert(AsyncActionTestBase):
         return 1, "inserted"
 
 
-# NOTE: mirrors TestPipelineModelAinsert but exercises the module-level
+# NOTE: mirrors TestModelAinsert but exercises the module-level
 # ``rapyer.apipeline()`` context instead of the instance pipeline.
-class TestRapyerPipelineAinsert(RapyerPipelineBase):
+class TestRapyerAinsert(RapyerActionBase):
     covered_method = AtomicRedisModel.ainsert
 
     def create_models(self):
@@ -150,9 +150,9 @@ class TestRapyerPipelineAinsert(RapyerPipelineBase):
         return 1, 1
 
 
-# NOTE: mirrors TestPipelineDelete but exercises the module-level
+# NOTE: mirrors TestDelete but exercises the module-level
 # ``rapyer.apipeline()`` context instead of the instance pipeline.
-class TestRapyerPipelineDelete(TwoModelDeleteBase):
+class TestRapyerDelete(TwoModelDeleteBase):
     covered_method = AtomicRedisModel.adelete
 
     def pipeline_owner(self):
@@ -163,9 +163,9 @@ class TestRapyerPipelineDelete(TwoModelDeleteBase):
         await model1.adelete()
 
 
-# NOTE: mirrors TestPipelineTryDelete but exercises the module-level
+# NOTE: mirrors TestTryDelete but exercises the module-level
 # ``rapyer.apipeline()`` context instead of the instance pipeline.
-class TestRapyerPipelineDeleteByKey(TwoModelDeleteBase):
+class TestRapyerDeleteByKey(TwoModelDeleteBase):
     covered_method = AtomicRedisModel.adelete_by_key
 
     def pipeline_owner(self):
@@ -176,7 +176,7 @@ class TestRapyerPipelineDeleteByKey(TwoModelDeleteBase):
         await ComprehensiveTestModel.adelete_by_key(model1.key)
 
 
-class TestPipelineModelAdeleteMany(ActionTestBase):
+class TestModelAdeleteMany(ActionTestBase):
     covered_method = AtomicRedisModel.adelete_many
 
     def create_models(self):
@@ -207,9 +207,9 @@ class TestPipelineModelAdeleteMany(ActionTestBase):
         return 0, 0
 
 
-# NOTE: mirrors TestPipelineAsetTtl but exercises the module-level
+# NOTE: mirrors TestAsetTtl but exercises the module-level
 # ``rapyer.apipeline()`` context instead of the instance pipeline.
-class TestRapyerPipelineAsetTtl(RapyerPipelineBase):
+class TestRapyerAsetTtl(RapyerActionBase):
     covered_method = AtomicRedisModel.aset_ttl
 
     def create_models(self):
@@ -243,7 +243,7 @@ class TestRapyerPipelineAsetTtl(RapyerPipelineBase):
         return None
 
 
-class TestPipelineRedisIntAincrease(AsyncComprehensiveCounterOpBase):
+class TestRedisIntAincrease(AsyncComprehensiveCounterOpBase):
     covered_method = RedisInt.aincrease
 
     def create_models(self):
@@ -259,7 +259,7 @@ class TestPipelineRedisIntAincrease(AsyncComprehensiveCounterOpBase):
         return 15
 
 
-class TestPipelineRedisListInsert(ComprehensiveTagsOpBase):
+class TestRedisListInsert(ComprehensiveTagsOpBase):
     covered_method = RedisList.insert
 
     def create_models(self):
@@ -275,7 +275,7 @@ class TestPipelineRedisListInsert(ComprehensiveTagsOpBase):
         return ["first", "middle", "last"]
 
 
-class TestPipelineRedisListClear(ComprehensiveTagsOpBase):
+class TestRedisListClear(ComprehensiveTagsOpBase):
     covered_method = RedisList.clear
 
     def create_models(self):
@@ -291,7 +291,7 @@ class TestPipelineRedisListClear(ComprehensiveTagsOpBase):
         return []
 
 
-class TestPipelineRedisListRemoveRange(ComprehensiveTagsOpBase):
+class TestRedisListRemoveRange(ComprehensiveTagsOpBase):
     covered_method = RedisList.remove_range
 
     def create_models(self):
@@ -307,7 +307,7 @@ class TestPipelineRedisListRemoveRange(ComprehensiveTagsOpBase):
         return ["a", "d", "e"]
 
 
-class TestPipelineRedisDictClear(ComprehensiveMetadataOpBase):
+class TestRedisDictClear(ComprehensiveMetadataOpBase):
     covered_method = RedisDict.clear
 
     def create_models(self):
@@ -323,7 +323,7 @@ class TestPipelineRedisDictClear(ComprehensiveMetadataOpBase):
         return {}
 
 
-class TestRapyerPipelineAduplicate(RapyerPipelineBase):
+class TestRapyerAduplicate(RapyerActionBase):
     covered_method = AtomicRedisModel.aduplicate
 
     duplicate: ComprehensiveTestModel | None = None
@@ -352,7 +352,7 @@ class TestRapyerPipelineAduplicate(RapyerPipelineBase):
         assert self.duplicate.pk != self.created_models[0].pk
 
 
-class TestRapyerPipelineAduplicateMany(RapyerPipelineBase):
+class TestRapyerAduplicateMany(RapyerActionBase):
     covered_method = AtomicRedisModel.aduplicate_many
 
     duplicates: list[ComprehensiveTestModel] | None = None
@@ -386,7 +386,7 @@ class TestRapyerPipelineAduplicateMany(RapyerPipelineBase):
         assert len(set(all_pks)) == 4
 
 
-class TestRapyerPipelineAupdate(AsyncRapyerPipelineBase):
+class TestRapyerAupdate(AsyncRapyerActionBase):
     """After aupdate was switched to ``ensure_pipeline``, it defers to an outer
     pipeline like every other mutation."""
 
@@ -411,7 +411,7 @@ class TestRapyerPipelineAupdate(AsyncRapyerPipelineBase):
         return "updated", 99
 
 
-class TestRapyerPipelineRefreshTtl(RapyerPipelineBase):
+class TestRapyerRefreshTtl(RapyerActionBase):
     covered_method = AtomicRedisModel.refresh_ttl_if_needed
     reduced_ttl: int = 10
 

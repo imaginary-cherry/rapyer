@@ -174,7 +174,7 @@ async def test_pipeline_context_manager__pipeline_context_cleanup__check_context
 # =============================================================================
 
 
-class TestPipelineListAappend(AsyncComprehensiveTagsOpBase):
+class TestListAappend(AsyncComprehensiveTagsOpBase):
     covered_method = RedisList.aappend
 
     def create_models(self):
@@ -190,7 +190,7 @@ class TestPipelineListAappend(AsyncComprehensiveTagsOpBase):
         return ["initial", "new_tag"]
 
 
-class TestPipelineListAextend(AsyncComprehensiveTagsOpBase):
+class TestListAextend(AsyncComprehensiveTagsOpBase):
     covered_method = RedisList.aextend
 
     def create_models(self):
@@ -206,7 +206,7 @@ class TestPipelineListAextend(AsyncComprehensiveTagsOpBase):
         return ["initial", "tag1", "tag2"]
 
 
-class TestPipelineListAinsert(AsyncComprehensiveTagsOpBase):
+class TestListAinsert(AsyncComprehensiveTagsOpBase):
     covered_method = RedisList.ainsert
 
     def create_models(self):
@@ -222,7 +222,7 @@ class TestPipelineListAinsert(AsyncComprehensiveTagsOpBase):
         return ["first", "middle", "last"]
 
 
-class TestPipelineListAclear(AsyncComprehensiveTagsOpBase):
+class TestListAclear(AsyncComprehensiveTagsOpBase):
     covered_method = RedisList.aclear
 
     def create_models(self):
@@ -263,7 +263,7 @@ class TestListApop(AsyncComprehensiveTagsOpBase):
 # =============================================================================
 
 
-class TestPipelineDictAsetItem(AsyncComprehensiveMetadataOpBase):
+class TestDictAsetItem(AsyncComprehensiveMetadataOpBase):
     covered_method = RedisDict.aset_item
 
     def create_models(self):
@@ -279,7 +279,7 @@ class TestPipelineDictAsetItem(AsyncComprehensiveMetadataOpBase):
         return {"existing": "value", "new_key": "new_value"}
 
 
-class TestPipelineDictAdelItem(AsyncComprehensiveMetadataOpBase):
+class TestDictAdelItem(AsyncComprehensiveMetadataOpBase):
     covered_method = RedisDict.adel_item
 
     def create_models(self):
@@ -295,7 +295,7 @@ class TestPipelineDictAdelItem(AsyncComprehensiveMetadataOpBase):
         return {"key2": "value2"}
 
 
-class TestPipelineDictAupdate(AsyncComprehensiveMetadataOpBase):
+class TestDictAupdate(AsyncComprehensiveMetadataOpBase):
     covered_method = RedisDict.aupdate
 
     def create_models(self):
@@ -315,7 +315,7 @@ class TestPipelineDictAupdate(AsyncComprehensiveMetadataOpBase):
         }
 
 
-class TestPipelineDictAclear(AsyncComprehensiveMetadataOpBase):
+class TestDictAclear(AsyncComprehensiveMetadataOpBase):
     covered_method = RedisDict.aclear
 
     def create_models(self):
@@ -379,7 +379,7 @@ class TestDictApopitem(AsyncComprehensiveMetadataOpBase):
 # =============================================================================
 
 
-class TestPipelineStringSet(AsyncActionTestBase):
+class TestStringSet(AsyncActionTestBase):
     covered_method = RedisType.asave
     ttl_model_cls = TTLComprehensiveTestModel
     no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
@@ -486,14 +486,14 @@ async def test_pipeline_exception_rollback__check_no_changes_applied_edge_case()
 # =============================================================================
 
 
-class TestPipelineDelete(TwoModelDeleteBase):
+class TestDelete(TwoModelDeleteBase):
     covered_method = AtomicRedisModel.adelete
 
     async def perform_action(self, piped):
         await piped.adelete()
 
 
-class TestPipelineTryDelete(TwoModelDeleteBase):
+class TestTryDelete(TwoModelDeleteBase):
     covered_method = AtomicRedisModel.adelete_by_key
 
     async def perform_action(self, piped):
