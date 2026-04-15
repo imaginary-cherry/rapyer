@@ -59,7 +59,7 @@ class PQActionBase(AsyncActionTestBase, ABC):
             for key in self.ttl_keys(inst):
                 await self.real_redis_client.expire(key, REDUCED_TTL_SECONDS)
 
-        return recreated[0]
+        return recreated
 
 
 class TestPQApush(PQActionBase):
