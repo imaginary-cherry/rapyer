@@ -1,3 +1,4 @@
+import asyncio
 import functools
 import inspect
 from abc import ABC, abstractmethod
@@ -175,13 +176,15 @@ class AsyncActionTestBase(ActionTestBase, ABC):
         model_for_keys = await self._setup_ttl_data(self.ttl_model_cls)
 
         keys = self.ttl_keys(model_for_keys)
-        ttls_before = [await self.real_redis_client.ttl(k) for k in keys]
+        ttls_before = await asyncio.gather(
+            *[self.real_redis_client.ttl(k) for k in keys]
+        )
 
         await self.perform_action(model_for_keys)
 
         ttl_configured = self.ttl_model_cls.Meta.ttl
-        for key, before in zip(keys, ttls_before):
-            after = await self.real_redis_client.ttl(key)
+        afters = await asyncio.gather(*[self.real_redis_client.ttl(key) for key in keys])
+        for key, after, before in zip(keys, afters, ttls_before):
             assert (
                 after > before
             ), f"TTL not refreshed for {key}: before={before} after={after}"
