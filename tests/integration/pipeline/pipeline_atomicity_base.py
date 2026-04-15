@@ -67,8 +67,7 @@ class ActionTestBase(ABC):
     async def setup_data(self) -> Any:
         """Default: build models via :meth:`create_models` and insert them."""
         models = self.create_models()
-        to_insert = models if isinstance(models, list) else [models]
-        await rapyer.ainsert(*to_insert)
+        await rapyer.ainsert(*models)
         return models
 
     @abstractmethod
@@ -89,7 +88,7 @@ class ActionTestBase(ABC):
 
     def pipeline_owner(self) -> AtomicRedisModel | type[AtomicRedisModel]:
         """Return the object to call ``.apipeline()`` on. Default: ``self.handle``."""
-        return self.created_models
+        return self.created_models[0]
 
     def assert_during_pipeline(self, loaded: Any):
         assert loaded == self.expected_before()
