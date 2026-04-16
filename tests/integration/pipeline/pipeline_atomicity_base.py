@@ -137,6 +137,17 @@ class ActionTestBase(ABC):
         )
         cls.test_pipeline_atomicity = mark(test_pipeline_atomicity)
 
+        methods = cls.covered_method
+        if methods is not None:
+            if not isinstance(methods, list):
+                methods = [methods]
+            normalized = []
+            for method in methods:
+                class_name, method_name = method.__qualname__.rsplit(".", 1)
+                normalized.append((class_name, method_name))
+            conver_marker = pytest.mark.cover_pipeline_atom(*normalized)
+            cls.test_pipeline_atomicity = conver_marker(cls.test_pipeline_atomicity)
+
 
 # =============================================================================
 # Async action base — pipeline atomicity + TTL refresh / no-refresh
