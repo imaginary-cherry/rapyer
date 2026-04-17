@@ -2,6 +2,11 @@ import inspect
 from typing import Callable
 
 import pytest
+from _pytest.reports import TestReport
+
+import rapyer.types  # noqa: F401  # ensure all BaseRedisType subclasses are registered
+from rapyer.base import AtomicRedisModel
+from rapyer.types.base import BaseRedisType
 
 TTL_TESTED_METHODS: set[tuple[str, str]] = set()
 TTL_NO_REFRESH_TESTED_METHODS: set[tuple[str, str]] = set()
@@ -85,6 +90,15 @@ def get_all_type_methods(cls):
 _covered_pipeline_atom_methods: set[tuple[str, str]] = set()
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--skip-pipeline-coverage",
+        action="store_true",
+        default=False,
+        help="Skip the pipeline atomicity coverage check at session end.",
+    )
+
+
 def pytest_configure(config):
     config.addinivalue_line(
         "markers",
@@ -113,10 +127,8 @@ def _all_subclasses(cls):
 
 @pytest.hookimpl(trylast=True)
 def pytest_sessionfinish(session, exitstatus):
-    import rapyer.types  # noqa: F401  # ensure all BaseRedisType subclasses are registered
-
-    from rapyer.base import AtomicRedisModel
-    from rapyer.types.base import BaseRedisType
+    if session.config.getoption("--skip-pipeline-coverage", default=False):
+        return
 
     all_methods = set()
     for cls in _all_subclasses(BaseRedisType):
@@ -125,19 +137,20 @@ def pytest_sessionfinish(session, exitstatus):
 
     uncovered = sorted(all_methods - _covered_pipeline_atom_methods)
     if uncovered:
-        tr = session.config.pluginmanager.get_plugin("terminalreporter")
-        if tr:
-            tr.section("Pipeline Atomicity Coverage GAPS")
-            tr.write_line(
-                f"{len(uncovered)} method(s) lack a non-skipped "
-                f"pipeline atomicity test:"
+        for class_name, method_name in uncovered:
+            report = TestReport(
+                nodeid=f"cover_pipeline_atom::{class_name}.{method_name}",
+                location=("cover_pipeline_atom", 0, f"{class_name}.{method_name}"),
+                keywords={"cover_pipeline_atom": True},
+                outcome="failed",
+                longrepr=(
+                    f"{class_name}.{method_name} lacks a non-skipped pipeline "
+                    f"atomicity test.\n"
+                    f"Add a concrete ActionTestBase subclass with "
+                    f"`covered_method = {class_name}.{method_name}`, "
+                    f"or add an exclusion with justification."
+                ),
+                when="call",
             )
-            for class_name, method_name in uncovered:
-                tr.write_line(f"  - {class_name}.{method_name}")
-            tr.write_line("")
-            tr.write_line(
-                "Add a concrete ActionTestBase subclass with "
-                "`covered_method = ClassName.method_name`, "
-                "or add an exclusion with justification."
-            )
+            session.config.hook.pytest_runtest_logreport(report=report)
         session.exitstatus = pytest.ExitCode.TESTS_FAILED
