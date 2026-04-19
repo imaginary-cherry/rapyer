@@ -6,7 +6,7 @@ from pydantic_core import core_schema
 from pydantic_core.core_schema import SerializationInfo, ValidationInfo
 from typing_extensions import TypeAlias
 
-from rapyer.actions import ActionGroup, marks_redis_updated, refresh_action
+from rapyer.actions import ActionGroup, marks_redis_updated, pipeline_action, refresh_action
 from rapyer.scripts import REMOVE_RANGE_SCRIPT_NAME, run_sha
 from rapyer.types.base import (
     REDIS_DUMP_FLAG_NAME,
@@ -47,6 +47,7 @@ class RedisList(list, GenericRedisType[T]):
     def sub_field_path(self, key: str):
         return f"{self.field_path}[{key}]"
 
+    @pipeline_action(ActionGroup.UPDATE)
     def __setitem__(self, key, value):
         if self.pipeline:
             serialized = self._adapter.dump_python(
@@ -57,10 +58,12 @@ class RedisList(list, GenericRedisType[T]):
         return super().__setitem__(key, new_val)
 
     @marks_redis_updated
+    @pipeline_action(ActionGroup.UPDATE, ActionGroup.APPEND)
     def __iadd__(self, other):
         self.extend(other)
         return self
 
+    @pipeline_action(ActionGroup.UPDATE, ActionGroup.APPEND)
     def append(self, __object):
         if self.pipeline:
             serialized_object = self._adapter.dump_python(
@@ -73,6 +76,7 @@ class RedisList(list, GenericRedisType[T]):
         new_val = self.create_new_value(key, __object)
         return super().append(new_val)
 
+    @pipeline_action(ActionGroup.UPDATE, ActionGroup.APPEND)
     def extend(self, new_lst):
         if self.pipeline and new_lst:
             serialized = self._adapter.dump_python(
@@ -83,6 +87,7 @@ class RedisList(list, GenericRedisType[T]):
         new_vals = self.create_new_values(list(new_keys), new_lst)
         return super().extend(new_vals)
 
+    @pipeline_action(ActionGroup.UPDATE, ActionGroup.APPEND)
     def insert(self, index, __object):
         if self.pipeline:
             serialized = self._adapter.dump_python(
@@ -94,11 +99,13 @@ class RedisList(list, GenericRedisType[T]):
         new_val = self.create_new_value(index, __object)
         return super().insert(index, new_val)
 
+    @pipeline_action(ActionGroup.UPDATE, ActionGroup.DELETE)
     def clear(self):
         if self.pipeline:
             self.pipeline.json().set(self.key, self.json_path, [])
         return super().clear()
 
+    @pipeline_action(ActionGroup.UPDATE, ActionGroup.DELETE)
     def remove_range(self, start: int, end: int):
         if self.pipeline:
             run_sha(

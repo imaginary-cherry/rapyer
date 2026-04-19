@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, TypeAlias
 
 from redis.commands.search.field import NumericField
 
-from rapyer.actions import ActionGroup, marks_redis_updated, refresh_action
+from rapyer.actions import ActionGroup, marks_redis_updated, pipeline_action, refresh_action
 from rapyer.scripts import (
     NUM_FLOORDIV_SCRIPT_NAME,
     NUM_MOD_SCRIPT_NAME,
@@ -29,6 +29,7 @@ class RedisInt(int, RedisType):
         return int(self)
 
     @marks_redis_updated
+    @pipeline_action(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
     def __iadd__(self, other):
         if self.pipeline:
             self.pipeline.json().numincrby(self.key, self.json_path, other)
@@ -36,6 +37,7 @@ class RedisInt(int, RedisType):
         return self.__class__(new_value)
 
     @marks_redis_updated
+    @pipeline_action(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
     def __isub__(self, other):
         if self.pipeline:
             self.pipeline.json().numincrby(self.key, self.json_path, -other)
@@ -43,6 +45,7 @@ class RedisInt(int, RedisType):
         return self.__class__(new_value)
 
     @marks_redis_updated
+    @pipeline_action(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
     def __imul__(self, other):
         new_value = self * other
         if self.pipeline:
@@ -52,6 +55,7 @@ class RedisInt(int, RedisType):
         return self.__class__(new_value)
 
     @marks_redis_updated
+    @pipeline_action(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
     def __ifloordiv__(self, other):
         new_value = self // other
         if self.pipeline:
@@ -66,6 +70,7 @@ class RedisInt(int, RedisType):
         return self.__class__(new_value)
 
     @marks_redis_updated
+    @pipeline_action(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
     def __imod__(self, other):
         new_value = self % other
         if self.pipeline:
@@ -75,6 +80,7 @@ class RedisInt(int, RedisType):
         return self.__class__(new_value)
 
     @marks_redis_updated
+    @pipeline_action(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
     def __ipow__(self, other):
         new_value = self**other
         if self.pipeline:

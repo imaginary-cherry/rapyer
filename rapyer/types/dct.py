@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, Any, Generic, TypeAlias, TypeVar, get_args
 
 from pydantic_core import core_schema
 
-from rapyer.actions import ActionGroup, refresh_action
+from rapyer.actions import ActionGroup, pipeline_action, refresh_action
 from rapyer.scripts import DICT_POP_SCRIPT_NAME, DICT_POPITEM_SCRIPT_NAME, arun_sha
 from rapyer.types.base import (
     REDIS_DUMP_FLAG_NAME,
@@ -44,6 +44,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
                 self.init_redis_field(f".{key}", value)
         return new_dct
 
+    @pipeline_action(ActionGroup.UPDATE)
     def update(self, m=None, /, **kwargs):
         if self.pipeline:
             m_redis_val = (
@@ -65,11 +66,13 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         kwargs_new_val = self.validate_dict(kwargs)
         return super().update(m_new_val, **kwargs_new_val)
 
+    @pipeline_action(ActionGroup.UPDATE, ActionGroup.DELETE)
     def clear(self):
         if self.pipeline:
             self.pipeline.json().set(self.key, self.json_path, {})
         return super().clear()
 
+    @pipeline_action(ActionGroup.UPDATE)
     def __setitem__(self, key, value):
         if self.pipeline:
             serialized = self._adapter.dump_python(

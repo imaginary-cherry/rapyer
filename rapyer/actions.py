@@ -77,6 +77,21 @@ def marks_redis_updated(method):
     return wrapper
 
 
+def pipeline_action(*groups: ActionGroup):
+    """
+    Decorator that tags a sync pipeline method with action groups.
+    """
+    combined = ActionGroup(0)
+    for g in groups:
+        combined |= g
+
+    def decorator(method):
+        method._action_groups = combined
+        return method
+
+    return decorator
+
+
 def should_refresh_for_action(meta: "RedisConfig", action: "ActionGroup") -> bool:
     """Check whether the given action groups should trigger TTL refresh."""
     if meta.ttl is None:
