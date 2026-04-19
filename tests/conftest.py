@@ -160,7 +160,8 @@ def _collect_async_methods():
     return all_methods
 
 
-def _emit_coverage_failures(session, check_name, uncovered):
+def _emit_coverage_reports(session, check_name, expected, covered):
+    uncovered = sorted(expected - covered)
     for class_name, method_name in uncovered:
         report = TestReport(
             nodeid=f"{check_name}::{class_name}.{method_name}",
@@ -170,13 +171,26 @@ def _emit_coverage_failures(session, check_name, uncovered):
             longrepr=(
                 f"{class_name}.{method_name} lacks a non-skipped "
                 f"{check_name} test.\n"
-                f"Add a concrete AsyncActionTestBase subclass with "
+                f"Add a concrete ActionTestBase subclass with "
                 f"`covered_method = {class_name}.{method_name}`, "
                 f"or add an exclusion with justification."
             ),
             when="call",
         )
         session.config.hook.pytest_runtest_logreport(report=report)
+
+    for class_name, method_name in sorted(expected & covered):
+        report = TestReport(
+            nodeid=f"{check_name}::{class_name}.{method_name}",
+            location=(check_name, 0, f"{class_name}.{method_name}"),
+            keywords={check_name: True},
+            outcome="passed",
+            longrepr=None,
+            when="call",
+        )
+        session.config.hook.pytest_runtest_logreport(report=report)
+
+    return len(uncovered) > 0
 
 
 @pytest.hookimpl(trylast=True)
@@ -188,24 +202,27 @@ def pytest_sessionfinish(session, exitstatus):
 
     # Pipeline atomicity: all methods (sync + async)
     all_methods = _collect_all_methods()
-    uncovered_atom = sorted(all_methods - _covered_pipeline_atom_methods)
-    if uncovered_atom:
-        _emit_coverage_failures(session, "cover_pipeline_atom", uncovered_atom)
-        has_failures = True
+    has_failures |= _emit_coverage_reports(
+        session,
+        "cover_pipeline_atom",
+        all_methods,
+        _covered_pipeline_atom_methods,
+    )
 
     # TTL refresh / no-refresh: async methods only
     async_methods = _collect_async_methods()
-    uncovered_ttl = sorted(async_methods - _covered_ttl_refresh_methods)
-    if uncovered_ttl:
-        _emit_coverage_failures(session, "cover_ttl_refresh", uncovered_ttl)
-        has_failures = True
-
-    uncovered_no_ttl = sorted(async_methods - _covered_ttl_no_refresh_methods)
-    if uncovered_no_ttl:
-        _emit_coverage_failures(
-            session, "cover_ttl_no_refresh", uncovered_no_ttl
-        )
-        has_failures = True
+    has_failures |= _emit_coverage_reports(
+        session,
+        "cover_ttl_refresh",
+        async_methods,
+        _covered_ttl_refresh_methods,
+    )
+    has_failures |= _emit_coverage_reports(
+        session,
+        "cover_ttl_no_refresh",
+        async_methods,
+        _covered_ttl_no_refresh_methods,
+    )
 
     if has_failures:
         session.exitstatus = pytest.ExitCode.TESTS_FAILED
