@@ -88,6 +88,8 @@ def get_all_type_methods(cls):
 # ── Pipeline atomicity coverage hook ──────────────────────────────────────────
 
 _covered_pipeline_atom_methods: set[tuple[str, str]] = set()
+_covered_ttl_refresh_methods: set[tuple[str, str]] = set()
+_covered_ttl_no_refresh_methods: set[tuple[str, str]] = set()
 
 
 def pytest_addoption(parser):
@@ -105,6 +107,16 @@ def pytest_configure(config):
         "cover_pipeline_atom(*methods): marks test as covering pipeline "
         "atomicity for given (class_name, method_name) tuples",
     )
+    config.addinivalue_line(
+        "markers",
+        "cover_ttl_refresh(*methods): marks test as covering TTL refresh "
+        "for given (class_name, method_name) tuples",
+    )
+    config.addinivalue_line(
+        "markers",
+        "cover_ttl_no_refresh(*methods): marks test as covering TTL "
+        "no-refresh for given (class_name, method_name) tuples",
+    )
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -112,9 +124,14 @@ def pytest_runtest_makereport(item, call):
     outcome = yield
     report = outcome.get_result()
     if report.when == "call" and report.outcome != "skipped":
-        marker = item.get_closest_marker("cover_pipeline_atom")
-        if marker:
-            _covered_pipeline_atom_methods.update(marker.args)
+        for mark_name, coverage_set in (
+            ("cover_pipeline_atom", _covered_pipeline_atom_methods),
+            ("cover_ttl_refresh", _covered_ttl_refresh_methods),
+            ("cover_ttl_no_refresh", _covered_ttl_no_refresh_methods),
+        ):
+            marker = item.get_closest_marker(mark_name)
+            if marker:
+                coverage_set.update(marker.args)
 
 
 def _all_subclasses(cls):
@@ -125,32 +142,70 @@ def _all_subclasses(cls):
     return result
 
 
+def _collect_all_methods():
+    """All callable methods on BaseRedisType subclasses + async methods on AtomicRedisModel."""
+    all_methods = set()
+    for cls in _all_subclasses(BaseRedisType):
+        all_methods.update(get_all_type_methods(cls))
+    all_methods.update(get_async_methods(AtomicRedisModel))
+    return all_methods
+
+
+def _collect_async_methods():
+    """Async methods on BaseRedisType subclasses + AtomicRedisModel."""
+    all_methods = set()
+    for cls in _all_subclasses(BaseRedisType):
+        all_methods.update(get_async_methods(cls))
+    all_methods.update(get_async_methods(AtomicRedisModel))
+    return all_methods
+
+
+def _emit_coverage_failures(session, check_name, uncovered):
+    for class_name, method_name in uncovered:
+        report = TestReport(
+            nodeid=f"{check_name}::{class_name}.{method_name}",
+            location=(check_name, 0, f"{class_name}.{method_name}"),
+            keywords={check_name: True},
+            outcome="failed",
+            longrepr=(
+                f"{class_name}.{method_name} lacks a non-skipped "
+                f"{check_name} test.\n"
+                f"Add a concrete AsyncActionTestBase subclass with "
+                f"`covered_method = {class_name}.{method_name}`, "
+                f"or add an exclusion with justification."
+            ),
+            when="call",
+        )
+        session.config.hook.pytest_runtest_logreport(report=report)
+
+
 @pytest.hookimpl(trylast=True)
 def pytest_sessionfinish(session, exitstatus):
     if session.config.getoption("--skip-pipeline-coverage", default=False):
         return
 
-    all_methods = set()
-    for cls in _all_subclasses(BaseRedisType):
-        all_methods.update(get_all_type_methods(cls))
-    all_methods.update(get_async_methods(AtomicRedisModel))
+    has_failures = False
 
-    uncovered = sorted(all_methods - _covered_pipeline_atom_methods)
-    if uncovered:
-        for class_name, method_name in uncovered:
-            report = TestReport(
-                nodeid=f"cover_pipeline_atom::{class_name}.{method_name}",
-                location=("cover_pipeline_atom", 0, f"{class_name}.{method_name}"),
-                keywords={"cover_pipeline_atom": True},
-                outcome="failed",
-                longrepr=(
-                    f"{class_name}.{method_name} lacks a non-skipped pipeline "
-                    f"atomicity test.\n"
-                    f"Add a concrete ActionTestBase subclass with "
-                    f"`covered_method = {class_name}.{method_name}`, "
-                    f"or add an exclusion with justification."
-                ),
-                when="call",
-            )
-            session.config.hook.pytest_runtest_logreport(report=report)
+    # Pipeline atomicity: all methods (sync + async)
+    all_methods = _collect_all_methods()
+    uncovered_atom = sorted(all_methods - _covered_pipeline_atom_methods)
+    if uncovered_atom:
+        _emit_coverage_failures(session, "cover_pipeline_atom", uncovered_atom)
+        has_failures = True
+
+    # TTL refresh / no-refresh: async methods only
+    async_methods = _collect_async_methods()
+    uncovered_ttl = sorted(async_methods - _covered_ttl_refresh_methods)
+    if uncovered_ttl:
+        _emit_coverage_failures(session, "cover_ttl_refresh", uncovered_ttl)
+        has_failures = True
+
+    uncovered_no_ttl = sorted(async_methods - _covered_ttl_no_refresh_methods)
+    if uncovered_no_ttl:
+        _emit_coverage_failures(
+            session, "cover_ttl_no_refresh", uncovered_no_ttl
+        )
+        has_failures = True
+
+    if has_failures:
         session.exitstatus = pytest.ExitCode.TESTS_FAILED

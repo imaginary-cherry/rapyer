@@ -255,6 +255,26 @@ class AsyncActionTestBase(ActionTestBase, ABC):
                 0 < after <= REDUCED_TTL_SECONDS
             ), f"TTL for {key}={after}; expected in (0, {REDUCED_TTL_SECONDS}]"
 
+    def __init_subclass__(cls, **kwargs: Any):
+        super().__init_subclass__(**kwargs)
+        if inspect.isabstract(cls):
+            return
+
+        methods = cls.covered_method
+        if methods is not None:
+            if not isinstance(methods, list):
+                methods = [methods]
+            normalized = []
+            for method in methods:
+                class_name, method_name = method.__qualname__.rsplit(".", 1)
+                normalized.append((class_name, method_name))
+            cls.test_ttl_refresh_on_action = pytest.mark.cover_ttl_refresh(
+                *normalized
+            )(cls.test_ttl_refresh_on_action)
+            cls.test_ttl_no_refresh_on_action = pytest.mark.cover_ttl_no_refresh(
+                *normalized
+            )(cls.test_ttl_no_refresh_on_action)
+
 
 # =============================================================================
 # Intermediate bases — shared setup/load per (model, field)
