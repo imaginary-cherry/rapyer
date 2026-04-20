@@ -7,7 +7,7 @@ from rapyer.context import _context_pipe
 
 
 def acquire_lock(
-    redis: Redis, key: str, sleep_time: int = 0.1
+    redis: Redis, key: str, sleep_time: float = 0.1
 ) -> AbstractAsyncContextManager[None]:
     lock_key = f"{key}:lock"
     return redis.lock(lock_key, sleep=sleep_time)
