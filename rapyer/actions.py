@@ -120,6 +120,7 @@ def mark_actions(
     *groups: ActionGroup,
     target: TargetSource = TargetSource.SELF,
     initial: bool = False,
+    ignore_refresh: bool = False,
 ):
     """Tag a method with action groups for TTL refresh.
 
@@ -136,6 +137,10 @@ def mark_actions(
     ``ainsert``). Auto-registered targets will request "set TTL only if absent"
     semantics (EXPIRE NX), so that even with ``refresh_ttl=False`` the TTL is
     still established on first save.
+
+    ``ignore_refresh=True`` skips wrapping entirely — the method is tagged with
+    ``ACTION_GROUPS_ATTR`` for inspection/grouping, but no action context is
+    opened and no TTL refresh is triggered (e.g. ``adelete``, ``aset_ttl``).
     """
     combined = ActionGroup(0)
     for g in groups:
@@ -144,7 +149,7 @@ def mark_actions(
     def decorator(method):
         setattr(method, ACTION_GROUPS_ATTR, combined)
 
-        if not inspect.iscoroutinefunction(method):
+        if not inspect.iscoroutinefunction(method) or ignore_refresh:
             return method
 
         @functools.wraps(method)

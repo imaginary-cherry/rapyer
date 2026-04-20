@@ -467,6 +467,7 @@ class AtomicRedisModel(BaseModel):
         async with ensure_pipeline(self.Meta) as pipe:
             update_keys_in_pipeline(pipe, self.key, **json_path_kwargs)
 
+    @mark_actions(ActionGroup.UPDATE, ignore_refresh=True)
     async def aset_ttl(self, ttl: int) -> None:
         if self.is_inner_model():
             raise RuntimeError("Can only set TTL from top level model")
@@ -603,11 +604,13 @@ class AtomicRedisModel(BaseModel):
         return instances
 
     @classmethod
+    @mark_actions(ActionGroup.READ, ignore_refresh=True)
     async def afind_one(cls, *args) -> Optional[Self]:
         results = await cls.afind(*args, max_results=1)
         return results[0] if results else None
 
     @classmethod
+    @mark_actions(ActionGroup.READ, ignore_refresh=True)
     async def afind_keys(cls, max_results: Optional[int] = None) -> list[RapyerKey]:
         pattern = f"{cls.class_key_initials()}:*"
         if max_results is None:
@@ -629,6 +632,7 @@ class AtomicRedisModel(BaseModel):
                         await field.asave_special()
 
     @classmethod
+    @mark_actions(ActionGroup.DELETE, ignore_refresh=True)
     async def adelete_by_key(cls, key: str) -> bool:
         key = cls._resolve_key(key)
         keys_to_delete = cls._all_keys_for_key(key)
@@ -641,12 +645,14 @@ class AtomicRedisModel(BaseModel):
             results = await pipe.execute()
         return sum(results) > 0
 
+    @mark_actions(ActionGroup.DELETE, ignore_refresh=True)
     async def adelete(self):
         if self.is_inner_model():
             raise RuntimeError("Can only delete from inner model")
         return await self.adelete_by_key(self.key)
 
     @classmethod
+    @mark_actions(ActionGroup.READ, ignore_refresh=True)
     async def aexists(cls, key: str | Self) -> bool:
         key = cls._resolve_key(key)
         client = _context_pipe.get() or cls.Meta.redis
@@ -691,6 +697,7 @@ class AtomicRedisModel(BaseModel):
             yield [k for key in batch for k in cls._all_keys_for_key(key)]
 
     @classmethod
+    @mark_actions(ActionGroup.DELETE, ignore_refresh=True)
     async def adelete_many(
         cls, *args: Self | RapyerKey | str | Expression
     ) -> DeleteResult:
@@ -884,6 +891,7 @@ def _resolve_model_class(redis_key: str) -> type[AtomicRedisModel] | None:
     return redis_model_mapping.get(class_name)
 
 
+@mark_actions(ActionGroup.READ, ignore_refresh=True)
 async def aget(redis_key: str) -> AtomicRedisModel:
     klass = _resolve_model_class(redis_key)
     if klass is None:
@@ -891,6 +899,7 @@ async def aget(redis_key: str) -> AtomicRedisModel:
     return await klass.aget(redis_key)
 
 
+@mark_actions(ActionGroup.READ, ignore_refresh=True)
 async def afind_one(redis_key: str) -> Optional[AtomicRedisModel]:
     try:
         return await aget(redis_key)
@@ -898,6 +907,7 @@ async def afind_one(redis_key: str) -> Optional[AtomicRedisModel]:
         return None
 
 
+@mark_actions(ActionGroup.READ, ignore_refresh=True)
 async def aexists(redis_key: str | AtomicRedisModel) -> bool:
     if isinstance(redis_key, AtomicRedisModel):
         redis_key = redis_key.key
@@ -963,6 +973,7 @@ async def ainsert(*models: Unpack[AtomicRedisModel]) -> list[AtomicRedisModel]:
     return models
 
 
+@mark_actions(ActionGroup.DELETE, ignore_refresh=True)
 async def adelete_many(*args: RapyerKey | str | AtomicRedisModel) -> RapyerDeleteResult:
     if not args:
         raise MissingParameterError("adelete_many requires at least one argument")
