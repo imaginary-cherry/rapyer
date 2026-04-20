@@ -3,7 +3,7 @@ import functools
 import inspect
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 import pytest
 import pytest_asyncio
@@ -17,6 +17,7 @@ from tests.models.collection_types import (
     TTLComprehensiveTestModel,
 )
 from tests.models.functionality_types import AllTypesModel
+from tests.models.pipeline_base import INIT_CLOBBER_SENTINEL, PipelineActionModel
 from tests.models.redis_types import PipelineAllTypesTestModel
 from tests.models.simple_types import (
     FloatModel,
@@ -64,12 +65,12 @@ class ActionTestBase(ABC):
     test_input: Any = None
 
     @abstractmethod
-    def create_models(self) -> list[AtomicRedisModel]:
+    def create_models(self) -> list[PipelineActionModel]:
         """
         Build (but don't insert) the test models.
         """
 
-    async def setup_data(self) -> Any:
+    async def setup_data(self) -> list[PipelineActionModel]:
         """Default: build models via :meth:`create_models` and insert them."""
         models = self.create_models()
         await rapyer.ainsert(*models)
@@ -147,6 +148,81 @@ class ActionTestBase(ABC):
                 normalized.append((class_name, method_name))
             conver_marker = pytest.mark.cover_pipeline_atom(*normalized)
             cls.test_pipeline_atomicity = conver_marker(cls.test_pipeline_atomicity)
+
+
+# =============================================================================
+# Update action base — pipeline atomicity + no-clobber
+# =============================================================================
+
+
+class UpdateActionTestBase(ActionTestBase, ABC):
+    """Base for actions that modify data in Redis.
+
+    Adds :meth:`test_no_clobber`: verifies that performing the action does
+    NOT overwrite fields that were changed externally (outside the pipeline).
+    """
+
+    NO_CLOBBER_SENTINEL_VALUE: ClassVar[str] = "NO_CLOBBER_SENTINEL_42"
+
+    @pytest.mark.asyncio
+    async def test_no_clobber(self, test_input):
+        if self.skip_pipeline_atomicity:
+            pytest.skip(f"{type(self).__name__} has skip_pipeline_atomicity=True")
+
+        self.test_input = test_input
+        self.created_models = await self.setup_data()
+        sentinel_models = self.created_models
+
+        # Inject sentinel directly into Redis for every existing model
+        for model in sentinel_models:
+            model.pipeline_no_clobber_sentinel = self.NO_CLOBBER_SENTINEL_VALUE
+
+        # Perform the action — use pipeline unless the action can't be deferred
+        owner = self.pipeline_owner()
+        async with owner.apipeline() as piped:
+            await self.perform_action(piped)
+
+        # Verify sentinel was NOT overwritten on surviving models
+        keys = [model.key for model in sentinel_models]
+        loaded_data = await rapyer.afind(*keys)
+        loaded_data = cast(list[PipelineActionModel], loaded_data)
+        for model in loaded_data:
+            sentinel = model.pipeline_no_clobber_sentinel
+            assert sentinel == INIT_CLOBBER_SENTINEL, (
+                f"pipeline_no_clobber_sentinel on {model.key} was overwritten by "
+                f"{type(self).__name__}.perform_action(). "
+                f"Expected [{self.NO_CLOBBER_SENTINEL_VALUE!r}], got {sentinel}"
+            )
+
+    def __init_subclass__(cls, **kwargs: Any):
+        super().__init_subclass__(**kwargs)
+        if inspect.isabstract(cls):
+            return
+
+        # Parametrize test_no_clobber (same params as test_pipeline_atomicity)
+        params = cls.params or [None]
+        base_fn = cls.test_no_clobber
+
+        @functools.wraps(base_fn)
+        async def test_no_clobber(self, test_input):
+            return await base_fn(self, test_input)
+
+        mark = pytest.mark.parametrize(
+            "test_input", params, ids=[repr(p) for p in params]
+        )
+        cls.test_no_clobber = mark(test_no_clobber)
+
+        # Apply cover_no_clobber marker
+        methods = cls.covered_method
+        if methods is not None:
+            if not isinstance(methods, list):
+                methods = [methods]
+            normalized = []
+            for method in methods:
+                class_name, method_name = method.__qualname__.rsplit(".", 1)
+                normalized.append((class_name, method_name))
+            no_clobber_marker = pytest.mark.cover_no_clobber(*normalized)
+            cls.test_no_clobber = no_clobber_marker(cls.test_no_clobber)
 
 
 # =============================================================================
