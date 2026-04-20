@@ -224,12 +224,12 @@ def pytest_sessionfinish(session, exitstatus):
 
     has_failures = False
 
-    # Pipeline atomicity: all methods (sync + async)
-    all_methods = _collect_all_methods()
+    # Pipeline atomicity: all methods (sync + async), excluding READ-only ones
+    pipeline_atom_methods = _collect_all_methods(ignore_groups=ActionGroup.READ)
     has_failures |= _emit_coverage_reports(
         session,
         "cover_pipeline_atom",
-        all_methods,
+        pipeline_atom_methods,
         _covered_pipeline_atom_methods,
     )
 
@@ -249,6 +249,7 @@ def pytest_sessionfinish(session, exitstatus):
     )
 
     # No-clobber: all methods (sync + async)
+    all_methods = _collect_all_methods()
     has_failures |= _emit_coverage_reports(
         session,
         "cover_no_clobber",
