@@ -9,6 +9,7 @@ import rapyer.types  # noqa: F401  # ensure all BaseRedisType subclasses are reg
 from rapyer.actions import ACTION_GROUPS_ATTR, ActionGroup
 from rapyer.base import AtomicRedisModel
 from rapyer.types.base import BaseRedisType
+from tests.action_groups import PRIVATE_METHODS
 
 TTL_TESTED_METHODS: set[tuple[str, str]] = set()
 TTL_NO_REFRESH_TESTED_METHODS: set[tuple[str, str]] = set()
@@ -188,24 +189,60 @@ def _all_subclasses(cls):
     return result
 
 
-def _collect_all_methods(ignore_groups: ActionGroup | None = None):
+def _iter_class_methods(cls, async_only: bool):
+    members = (
+        inspect.getmembers(cls, predicate=inspect.iscoroutinefunction)
+        if async_only
+        else vars(cls).items()
+    )
+    for name, method in members:
+        if name.startswith("__") or not callable(method):
+            continue
+        if getattr(method, "__qualname__", "").split(".")[0] != cls.__name__:
+            continue
+        yield cls.__name__, name, method
+
+
+def _iter_module_functions(module):
+    for name in getattr(module, "__all__", []):
+        obj = getattr(module, name, None)
+        if obj is None or inspect.isclass(obj) or not callable(obj):
+            continue
+        yield module.__name__, name, obj
+
+
+def _collect(candidates, ignore_groups, ignore_private):
+    result = set()
+    for class_name, name, method in candidates:
+        if should_ignore_group(method, ignore_groups):
+            continue
+        if ignore_private and (class_name, name) in PRIVATE_METHODS:
+            continue
+        result.add((class_name, name))
+    return result
+
+
+def _collect_all_methods(
+    ignore_groups: ActionGroup | None = None, ignore_private: bool = False
+):
     """All callable methods on BaseRedisType subclasses + async methods on AtomicRedisModel."""
-    all_methods = set()
+    candidates = []
     for cls in _all_subclasses(BaseRedisType):
-        all_methods.update(get_all_type_methods(cls, ignore_groups=ignore_groups))
-    all_methods.update(get_async_methods(AtomicRedisModel, ignore_groups=ignore_groups))
-    all_methods.update(get_module_level_functions(rapyer))
-    return all_methods
+        candidates.extend(_iter_class_methods(cls, async_only=False))
+    candidates.extend(_iter_class_methods(AtomicRedisModel, async_only=True))
+    candidates.extend(_iter_module_functions(rapyer))
+    return _collect(candidates, ignore_groups, ignore_private)
 
 
-def _collect_async_methods(ignore_groups: ActionGroup | None = None):
+def _collect_async_methods(
+    ignore_groups: ActionGroup | None = None, ignore_private: bool = False
+):
     """Async methods on BaseRedisType subclasses + AtomicRedisModel."""
-    all_methods = set()
-    for cls in _all_subclasses(BaseRedisType):
-        all_methods.update(get_async_methods(cls, ignore_groups=ignore_groups))
-    all_methods.update(get_async_methods(AtomicRedisModel, ignore_groups=ignore_groups))
-    all_methods.update(get_module_level_functions(rapyer))
-    return all_methods
+    candidates = []
+    for cls in (*_all_subclasses(BaseRedisType), AtomicRedisModel):
+        candidates.extend(_iter_class_methods(cls, async_only=True))
+    candidates.extend(_iter_module_functions(rapyer))
+    return _collect(candidates, ignore_groups, ignore_private)
 
 
 def _emit_coverage_reports(session, check_name, expected, covered):
