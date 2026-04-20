@@ -11,6 +11,9 @@ if TYPE_CHECKING:
     from rapyer.config import RedisConfig
 
 
+ACTION_GROUPS_ATTR = "_action_groups"
+
+
 class ActionGroup(enum.Flag):
     """Categories of operations that can trigger TTL refresh."""
 
@@ -41,7 +44,7 @@ def refresh_action(*groups: ActionGroup):
         combined |= g
 
     def decorator(method):
-        method._action_groups = combined
+        setattr(method, ACTION_GROUPS_ATTR, combined)
 
         @functools.wraps(method)
         async def wrapper(self: "AtomicRedisModel", *args, **kwargs):
@@ -49,7 +52,7 @@ def refresh_action(*groups: ActionGroup):
             await self.refresh_ttl_if_needed(action=combined)
             return result
 
-        wrapper._action_groups = combined
+        setattr(wrapper, ACTION_GROUPS_ATTR, combined)
         return wrapper
 
     return decorator
@@ -86,7 +89,7 @@ def pipeline_action(*groups: ActionGroup):
         combined |= g
 
     def decorator(method):
-        method._action_groups = combined
+        setattr(method, ACTION_GROUPS_ATTR, combined)
         return method
 
     return decorator
