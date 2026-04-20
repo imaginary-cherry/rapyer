@@ -144,7 +144,8 @@ def pytest_runtest_makereport(item, call):
 def _all_subclasses(cls):
     result = set()
     for sub in cls.__subclasses__():
-        result.add(sub)
+        if not inspect.isabstract(sub):
+            result.add(sub)
         result.update(_all_subclasses(sub))
     return result
 
