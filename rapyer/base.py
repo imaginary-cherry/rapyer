@@ -498,6 +498,7 @@ class AtomicRedisModel(BaseModel):
         return key
 
     @classmethod
+    @mark_actions(ActionGroup.READ, target=TargetSource.RESULT)
     async def aget(cls, key: str) -> Self:
         key = cls._resolve_key(key)
         model_dump = await cls.Meta.redis.json().get(key, "$")  # type: ignore[misc]
@@ -509,8 +510,6 @@ class AtomicRedisModel(BaseModel):
         instance = cls.model_validate(model_dump, context=context)
         instance.key = key
         instance._failed_fields = context.get(FAILED_FIELDS_KEY, set())
-        if cls.should_refresh_for_action(ActionGroup.READ):
-            await instance.refresh_ttl_if_needed(action=ActionGroup.READ)
         return instance
 
     @mark_actions(ActionGroup.READ)
@@ -544,6 +543,7 @@ class AtomicRedisModel(BaseModel):
         return model
 
     @classmethod
+    @mark_actions(ActionGroup.READ, target=TargetSource.RESULT)
     async def afind(cls, *args, max_results: Optional[int] = None) -> list[Self]:
         if max_results is not None and max_results < 0:
             raise UnsupportedArgumentValueError(
@@ -594,12 +594,6 @@ class AtomicRedisModel(BaseModel):
             if model is None:
                 continue
             instances.append(model)
-
-        if cls.should_refresh_for_action(ActionGroup.READ):
-            async with pipe_ctx_from_redix(cls.Meta.redis) as pipe:
-                for model in instances:
-                    await model.refresh_ttl_if_needed(can_use_pipeline=True, action=ActionGroup.READ)
-                await pipe.execute()
 
         return instances
 

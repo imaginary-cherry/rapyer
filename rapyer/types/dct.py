@@ -118,7 +118,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
                 update_keys_in_pipeline(pipeline, self.key, **redis_params)
                 await pipeline.execute()
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.DELETE)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.DELETE, ActionGroup.READ)
     async def apop(self, key, default=None):
         result = await arun_sha(
             self.client,
