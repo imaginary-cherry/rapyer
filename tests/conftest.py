@@ -11,7 +11,7 @@ import rapyer.types  # noqa: F401  # ensure all BaseRedisType subclasses are reg
 from rapyer.actions import ACTION_GROUPS_ATTR, ActionGroup
 from rapyer.base import AtomicRedisModel
 from rapyer.types.base import BaseRedisType
-from tests.action_groups import PRIVATE_METHODS
+from tests.action_groups import PRIVATE_INHERITED_METHODS, PRIVATE_METHODS
 
 TTL_TESTED_METHODS: set[tuple[str, str]] = set()
 TTL_NO_REFRESH_TESTED_METHODS: set[tuple[str, str]] = set()
@@ -210,7 +210,7 @@ def _iter_class_methods(cls, async_only: bool):
             continue
         if getattr(method, "__qualname__", "").split(".")[0] != cls.__name__:
             continue
-        yield cls.__name__, name, method
+        yield cls, name, method
 
 
 def _iter_module_functions(module: ModuleType):
@@ -218,7 +218,20 @@ def _iter_module_functions(module: ModuleType):
         obj = getattr(module, name, None)
         if obj is None or inspect.isclass(obj) or not callable(obj):
             continue
-        yield module.__name__, name, obj
+        yield module, name, obj
+
+
+def _is_private_method(holder, method_name: str) -> bool:
+    """Private if (holder, method_name) is an exact match in PRIVATE_METHODS,
+    or if any ancestor class lists method_name in PRIVATE_INHERITED_METHODS."""
+    if (holder.__name__, method_name) in PRIVATE_METHODS:
+        return True
+    if inspect.isclass(holder):
+        return any(
+            (ancestor.__name__, method_name) in PRIVATE_INHERITED_METHODS
+            for ancestor in holder.__mro__
+        )
+    return False
 
 
 def _collect_methods(
@@ -238,12 +251,12 @@ def _collect_methods(
     candidates.extend(_iter_module_functions(rapyer))
 
     result = set()
-    for class_name, name, method in candidates:
+    for holder, name, method in candidates:
         if should_ignore_group(method, ignore_groups):
             continue
-        if ignore_private and (class_name, name) in PRIVATE_METHODS:
+        if ignore_private and _is_private_method(holder, name):
             continue
-        result.add((class_name, name))
+        result.add((holder.__name__, name))
     return result
 
 
