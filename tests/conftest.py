@@ -211,7 +211,22 @@ def _iter_module_functions(module):
         yield module.__name__, name, obj
 
 
-def _collect(candidates, ignore_groups, ignore_private):
+def _collect_methods(
+    ignore_groups: ActionGroup | None = None,
+    ignore_private: bool = False,
+    only_async: bool = False,
+):
+    """Callable methods on BaseRedisType subclasses + async methods on AtomicRedisModel.
+
+    When only_async=True, BaseRedisType subclasses are also restricted to async.
+    AtomicRedisModel is always async-only since non-async members aren't Redis ops.
+    """
+    candidates = []
+    for cls in _all_subclasses(BaseRedisType):
+        candidates.extend(_iter_class_methods(cls, async_only=only_async))
+    candidates.extend(_iter_class_methods(AtomicRedisModel, async_only=True))
+    candidates.extend(_iter_module_functions(rapyer))
+
     result = set()
     for class_name, name, method in candidates:
         if should_ignore_group(method, ignore_groups):
@@ -220,29 +235,6 @@ def _collect(candidates, ignore_groups, ignore_private):
             continue
         result.add((class_name, name))
     return result
-
-
-def _collect_all_methods(
-    ignore_groups: ActionGroup | None = None, ignore_private: bool = False
-):
-    """All callable methods on BaseRedisType subclasses + async methods on AtomicRedisModel."""
-    candidates = []
-    for cls in _all_subclasses(BaseRedisType):
-        candidates.extend(_iter_class_methods(cls, async_only=False))
-    candidates.extend(_iter_class_methods(AtomicRedisModel, async_only=True))
-    candidates.extend(_iter_module_functions(rapyer))
-    return _collect(candidates, ignore_groups, ignore_private)
-
-
-def _collect_async_methods(
-    ignore_groups: ActionGroup | None = None, ignore_private: bool = False
-):
-    """Async methods on BaseRedisType subclasses + AtomicRedisModel."""
-    candidates = []
-    for cls in (*_all_subclasses(BaseRedisType), AtomicRedisModel):
-        candidates.extend(_iter_class_methods(cls, async_only=True))
-    candidates.extend(_iter_module_functions(rapyer))
-    return _collect(candidates, ignore_groups, ignore_private)
 
 
 def _emit_coverage_reports(session, check_name, expected, covered):
@@ -286,7 +278,7 @@ def pytest_sessionfinish(session, exitstatus):
     has_failures = False
 
     # Pipeline atomicity: all methods (sync + async), excluding READ-only ones
-    pipeline_atom_methods = _collect_all_methods(ignore_groups=ActionGroup.READ)
+    pipeline_atom_methods = _collect_methods(ignore_groups=ActionGroup.READ)
     has_failures |= _emit_coverage_reports(
         session,
         "cover_pipeline_atom",
@@ -295,7 +287,7 @@ def pytest_sessionfinish(session, exitstatus):
     )
 
     # TTL refresh / no-refresh: async methods only
-    async_methods = _collect_async_methods()
+    async_methods = _collect_methods(only_async=True)
     has_failures |= _emit_coverage_reports(
         session,
         "cover_ttl_refresh",
@@ -310,7 +302,7 @@ def pytest_sessionfinish(session, exitstatus):
     )
 
     # No-clobber: all methods (sync + async)
-    all_methods = _collect_all_methods()
+    all_methods = _collect_methods()
     has_failures |= _emit_coverage_reports(
         session,
         "cover_no_clobber",
