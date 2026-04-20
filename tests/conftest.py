@@ -214,7 +214,7 @@ def _iter_module_functions(module: ModuleType):
 
 def _collect_methods(
     ignore_groups: ActionGroup | None = None,
-    ignore_private: bool = False,
+    ignore_private: bool = True,
     only_async: bool = False,
 ):
     """Callable methods on BaseRedisType subclasses + async methods on AtomicRedisModel.
