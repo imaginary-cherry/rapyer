@@ -66,6 +66,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         member, score = result[0]
         return self._deserialize_value(member)
 
+    @mark_actions(ActionGroup.READ)
     async def apeek(self):
         """Return the item with the lowest priority score without removing it."""
         result = await self.client.zrange(self.special_key, 0, 0, withscores=True)
@@ -74,6 +75,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         member, score = result[0]
         return self._deserialize_value(member)
 
+    @mark_actions(ActionGroup.READ)
     async def asize(self) -> int:
         """Return the number of items in the queue."""
         return await self.client.zcard(self.special_key)
@@ -83,6 +85,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         """Remove all items from the queue."""
         await self.client.delete(self.special_key)
 
+    @mark_actions(ActionGroup.READ)
     async def aitems(self) -> list[PriorityQueueItem]:
         """Return all items sorted by priority (ascending)."""
         result = await self.client.zrange(self.special_key, 0, -1, withscores=True)

@@ -138,7 +138,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
             {key: result}, context={REDIS_DUMP_FLAG_NAME: True}
         )[key]
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.DELETE)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.DELETE, ActionGroup.READ)
     async def apopitem(self):
         result = await arun_sha(
             self.client,

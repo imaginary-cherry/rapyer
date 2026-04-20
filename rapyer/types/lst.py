@@ -154,7 +154,7 @@ class RedisList(list, GenericRedisType[T]):
                 *serialized_items,
             )
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.DELETE)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.DELETE, ActionGroup.READ)
     async def apop(self, index=-1):
         if self:
             self.pop(index)
