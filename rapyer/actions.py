@@ -6,7 +6,7 @@ import functools
 import inspect
 from typing import TYPE_CHECKING, Optional
 
-from rapyer.context import _context_pipe
+from rapyer.context import _context_pipe, ensure_pipeline
 
 if TYPE_CHECKING:
     from rapyer import AtomicRedisModel
@@ -105,8 +105,15 @@ async def flush_action_targets(targets: list[ActionContextEntryType]):
                 existing[2] or initial,
             )
 
-    for model, action, initial in merged.values():
-        await model.refresh_ttl_if_needed(action=action, initial=initial)
+    if not merged:
+        return
+    atomic_model = merged.popitem()[1][0]
+
+    async with ensure_pipeline(atomic_model.Meta):
+        for model, action, initial in merged.values():
+            await model.refresh_ttl_if_needed(
+                can_use_pipeline=True, action=action, initial=initial
+            )
 
 
 def mark_actions(
