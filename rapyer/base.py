@@ -24,7 +24,11 @@ from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 from redis.exceptions import NoScriptError, ResponseError
 
-from rapyer.actions import ActionGroup, should_refresh_for_action
+from rapyer.actions import (
+    ActionGroup,
+    refresh_action,
+    should_refresh_for_action,
+)
 from rapyer.config import RedisConfig
 from rapyer.context import (
     _context_pipe,
@@ -425,6 +429,7 @@ class AtomicRedisModel(BaseModel):
         for field_name, value in kwargs.items():
             setattr(self, field_name, value)
 
+    @refresh_action(ActionGroup.UPDATE)
     async def aupdate(self, **kwargs):
         # Special fields (e.g. RedisPriorityQueue) manage their own separate
         # Redis storage and cannot be serialized as JSON path updates.
@@ -450,7 +455,6 @@ class AtomicRedisModel(BaseModel):
 
         async with ensure_pipeline(self.Meta) as pipe:
             update_keys_in_pipeline(pipe, self.key, **json_path_kwargs)
-        await self.refresh_ttl_if_needed(action=ActionGroup.UPDATE)
 
     async def aset_ttl(self, ttl: int) -> None:
         if self.is_inner_model():
@@ -497,6 +501,7 @@ class AtomicRedisModel(BaseModel):
             await instance.refresh_ttl_if_needed(action=ActionGroup.READ)
         return instance
 
+    @refresh_action(ActionGroup.READ)
     async def aload(self) -> Self:
         model_dump = await self.Meta.redis.json().get(self.key, self.json_path)  # type: ignore[misc]
         if not model_dump:
@@ -507,7 +512,6 @@ class AtomicRedisModel(BaseModel):
         instance._pk = self._pk
         instance._base_model_link = self._base_model_link
         instance._failed_fields = context.get(FAILED_FIELDS_KEY, set())
-        await self.refresh_ttl_if_needed(action=ActionGroup.READ)
         return instance
 
     @classmethod
