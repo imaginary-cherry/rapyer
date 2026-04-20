@@ -49,6 +49,7 @@ classifiers = [
 dependencies = [
     "redis[async]>=6.0.0, <7.1.0",
     "pydantic>=2.11.0, <2.13.0",
+    "contextvars>=2.4",
 ]
 
 [project.optional-dependencies]
