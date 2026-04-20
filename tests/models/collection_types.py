@@ -5,6 +5,7 @@ from pydantic import Field
 
 from rapyer.base import AtomicRedisModel
 from rapyer.config import RedisConfig
+from tests.models.pipeline_base import PipelineActionModel
 from tests.models.common import (
     Address,
     Company,
@@ -125,7 +126,7 @@ class ProductListModel(AtomicRedisModel):
     products: list[Product] = Field(default_factory=list)
 
 
-class ComprehensiveTestModel(AtomicRedisModel):
+class ComprehensiveTestModel(PipelineActionModel):
     tags: list[str] = Field(default_factory=list)
     metadata: dict[str, str] = Field(default_factory=dict)
     name: str = ""
