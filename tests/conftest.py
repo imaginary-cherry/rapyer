@@ -90,6 +90,7 @@ def get_all_type_methods(cls):
 _covered_pipeline_atom_methods: set[tuple[str, str]] = set()
 _covered_ttl_refresh_methods: set[tuple[str, str]] = set()
 _covered_ttl_no_refresh_methods: set[tuple[str, str]] = set()
+_covered_no_clobber_methods: set[tuple[str, str]] = set()
 
 
 def pytest_addoption(parser):
@@ -117,6 +118,11 @@ def pytest_configure(config):
         "cover_ttl_no_refresh(*methods): marks test as covering TTL "
         "no-refresh for given (class_name, method_name) tuples",
     )
+    config.addinivalue_line(
+        "markers",
+        "cover_no_clobber(*methods): marks test as covering no-clobber "
+        "behavior for given (class_name, method_name) tuples",
+    )
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -128,6 +134,7 @@ def pytest_runtest_makereport(item, call):
             ("cover_pipeline_atom", _covered_pipeline_atom_methods),
             ("cover_ttl_refresh", _covered_ttl_refresh_methods),
             ("cover_ttl_no_refresh", _covered_ttl_no_refresh_methods),
+            ("cover_no_clobber", _covered_no_clobber_methods),
         ):
             marker = item.get_closest_marker(mark_name)
             if marker:
@@ -222,6 +229,14 @@ def pytest_sessionfinish(session, exitstatus):
         "cover_ttl_no_refresh",
         async_methods,
         _covered_ttl_no_refresh_methods,
+    )
+
+    # No-clobber: all methods (sync + async)
+    has_failures |= _emit_coverage_reports(
+        session,
+        "cover_no_clobber",
+        all_methods,
+        _covered_no_clobber_methods,
     )
 
     if has_failures:
