@@ -55,6 +55,10 @@ PRIVATE_INHERITED_METHODS = _group(
     RedisList.create_new_value,
     RedisList.create_new_values,
     SpecialFieldType.clone,
+    SpecialFieldType.asave_special,
+    SpecialFieldType.adelete_special,
+    SpecialFieldType.aduplicate_special,
+    RedisPriorityQueue.aremove,
 )
 
 # NON_ACTION_METHODS — module-level helpers that aren't Redis actions and
