@@ -1,10 +1,13 @@
 from typing import Callable
 
+import rapyer
+from rapyer import find_redis_models, init_rapyer, teardown_rapyer
 from rapyer.base import AtomicRedisModel
 from rapyer.types.base import BaseRedisType, GenericRedisType, RedisType
 from rapyer.types.byte import RedisBytes
 from rapyer.types.datetime import RedisDatetimeTimestamp
 from rapyer.types.dct import RedisDict
+from rapyer.types.lst import RedisList
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.special import SpecialFieldType
 
@@ -41,8 +44,7 @@ PRIVATE_METHODS = _group(
 
 # PRIVATE_INHERITED_METHODS — MRO-aware. Any subclass that inherits OR
 # overrides one of these methods is also filtered. Use this for internal
-# helpers whose contract is shared across the type hierarchy (clone,
-# iterate_items, (de)serialize_unknown, sub_field_path, validate_dict, …).
+# helpers whose contract is shared across the type hierarchy
 PRIVATE_INHERITED_METHODS = _group(
     BaseRedisType.sub_field_path,
     RedisType.clone,
@@ -50,5 +52,15 @@ PRIVATE_INHERITED_METHODS = _group(
     RedisType.deserialize_unknown,
     GenericRedisType.iterate_items,
     RedisDict.validate_dict,
+    RedisList.create_new_value,
+    RedisList.create_new_values,
     SpecialFieldType.clone,
+)
+
+# NON_ACTION_METHODS — module-level helpers that aren't Redis actions and
+# therefore don't participate in coverage checks.
+NON_ACTION_METHODS = _group(
+    init_rapyer,
+    teardown_rapyer,
+    find_redis_models,
 )

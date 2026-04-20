@@ -11,7 +11,11 @@ import rapyer.types  # noqa: F401  # ensure all BaseRedisType subclasses are reg
 from rapyer.actions import ACTION_GROUPS_ATTR, ActionGroup
 from rapyer.base import AtomicRedisModel
 from rapyer.types.base import BaseRedisType
-from tests.action_groups import PRIVATE_INHERITED_METHODS, PRIVATE_METHODS
+from tests.action_groups import (
+    NON_ACTION_METHODS,
+    PRIVATE_INHERITED_METHODS,
+    PRIVATE_METHODS,
+)
 
 TTL_TESTED_METHODS: set[tuple[str, str]] = set()
 TTL_NO_REFRESH_TESTED_METHODS: set[tuple[str, str]] = set()
@@ -234,6 +238,10 @@ def _is_private_method(holder, method_name: str) -> bool:
     return False
 
 
+def _is_non_action(holder, method_name: str) -> bool:
+    return (holder.__name__, method_name) in NON_ACTION_METHODS
+
+
 def _collect_methods(
     ignore_groups: ActionGroup | None = None,
     ignore_private: bool = True,
@@ -253,6 +261,8 @@ def _collect_methods(
     result = set()
     for holder, name, method in candidates:
         if should_ignore_group(method, ignore_groups):
+            continue
+        if _is_non_action(holder, name):
             continue
         if ignore_private and _is_private_method(holder, name):
             continue
