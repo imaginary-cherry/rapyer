@@ -26,7 +26,7 @@ from redis.exceptions import NoScriptError, ResponseError
 
 from rapyer.actions import (
     ActionGroup,
-    refresh_action,
+    mark_actions,
     should_refresh_for_action,
 )
 from rapyer.config import RedisConfig
@@ -429,7 +429,7 @@ class AtomicRedisModel(BaseModel):
         for field_name, value in kwargs.items():
             setattr(self, field_name, value)
 
-    @refresh_action(ActionGroup.UPDATE)
+    @mark_actions(ActionGroup.UPDATE)
     async def aupdate(self, **kwargs):
         # Special fields (e.g. RedisPriorityQueue) manage their own separate
         # Redis storage and cannot be serialized as JSON path updates.
@@ -501,7 +501,7 @@ class AtomicRedisModel(BaseModel):
             await instance.refresh_ttl_if_needed(action=ActionGroup.READ)
         return instance
 
-    @refresh_action(ActionGroup.READ)
+    @mark_actions(ActionGroup.READ)
     async def aload(self) -> Self:
         model_dump = await self.Meta.redis.json().get(self.key, self.json_path)  # type: ignore[misc]
         if not model_dump:

@@ -5,7 +5,7 @@ from typing import Any, Generic, TypeVar, get_args
 from pydantic import GetCoreSchemaHandler, TypeAdapter
 from pydantic_core import core_schema
 
-from rapyer.actions import ActionGroup, refresh_action
+from rapyer.actions import ActionGroup, mark_actions
 from rapyer.types.special import SpecialFieldType
 
 T = TypeVar("T")
@@ -48,17 +48,17 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
 
     # --- Queue operations ---
 
-    @refresh_action(ActionGroup.UPDATE, ActionGroup.APPEND)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND)
     async def apush(self, value: T, priority: float) -> None:
         serialized = self._serialize_value(value)
         await self.client.zadd(self.special_key, {serialized: priority})
 
-    @refresh_action(ActionGroup.UPDATE, ActionGroup.APPEND)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND)
     async def apush_many(self, items: list[PriorityQueueItem[T]]):
         mapping = {self._serialize_value(item.value): item.priority for item in items}
         await self.client.zadd(self.special_key, mapping)
 
-    @refresh_action(ActionGroup.UPDATE, ActionGroup.DELETE)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.DELETE)
     async def apop(self):
         result = await self.client.zpopmin(self.special_key, count=1)
         if not result:
@@ -78,7 +78,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         """Return the number of items in the queue."""
         return await self.client.zcard(self.special_key)
 
-    @refresh_action(ActionGroup.UPDATE, ActionGroup.DELETE)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.DELETE)
     async def aclear(self):
         """Remove all items from the queue."""
         await self.client.delete(self.special_key)
@@ -91,7 +91,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
             for m, s in result
         ]
 
-    @refresh_action(ActionGroup.UPDATE, ActionGroup.DELETE)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.DELETE)
     async def aremove(self, value) -> bool:
         """Remove a specific value from the queue. Returns True if removed."""
         serialized = self._serialize_value(value)

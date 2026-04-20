@@ -45,7 +45,7 @@ def test_action_group_all_includes_every_member():
 # --- Decorator _action_groups attribute tests ---
 
 
-def test_refresh_action_sets_action_groups_on_method():
+def test_mark_actions_sets_action_groups_on_method():
     from rapyer.types.integer import RedisInt
 
     assert hasattr(RedisInt.aincrease, ACTION_GROUPS_ATTR)

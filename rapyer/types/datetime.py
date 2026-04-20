@@ -5,7 +5,7 @@ from pydantic_core import core_schema
 from pydantic_core.core_schema import SerializationInfo, ValidationInfo
 from redis.commands.search.field import NumericField
 
-from rapyer.actions import ActionGroup, marks_redis_updated, pipeline_action
+from rapyer.actions import ActionGroup, mark_actions, marks_redis_updated
 from rapyer.scripts import DATETIME_ADD_SCRIPT_NAME, run_sha
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME, RedisType
 
@@ -34,7 +34,7 @@ class RedisDatetime(datetime, RedisType):
         return datetime.fromtimestamp(self.timestamp())
 
     @marks_redis_updated
-    @pipeline_action(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
     def __iadd__(self, other: timedelta) -> "RedisDatetime":
         if not isinstance(other, timedelta):
             return NotImplemented
@@ -52,7 +52,7 @@ class RedisDatetime(datetime, RedisType):
         return new_value
 
     @marks_redis_updated
-    @pipeline_action(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
     def __isub__(self, other: timedelta) -> "RedisDatetime":
         if not isinstance(other, timedelta):
             return NotImplemented
@@ -109,7 +109,7 @@ class RedisDatetimeTimestamp(RedisDatetime):
         return NumericField(f"$.{field_name}", as_name=field_name)
 
     @marks_redis_updated
-    @pipeline_action(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
     def __iadd__(self, other: timedelta) -> "RedisDatetimeTimestamp":
         if not isinstance(other, timedelta):
             return NotImplemented
@@ -122,7 +122,7 @@ class RedisDatetimeTimestamp(RedisDatetime):
         return new_value
 
     @marks_redis_updated
-    @pipeline_action(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
     def __isub__(self, other: timedelta) -> "RedisDatetimeTimestamp":
         if not isinstance(other, timedelta):
             return NotImplemented

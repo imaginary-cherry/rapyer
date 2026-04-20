@@ -15,7 +15,7 @@ from rapyer.errors import CantSerializeRedisValueError
 from rapyer.typing_support import Self
 
 # Imported here to avoid circular import issues; actions imports context, not types.base
-from rapyer.actions import ActionGroup, refresh_action
+from rapyer.actions import ActionGroup, mark_actions
 
 logger = logging.getLogger("rapyer")
 
@@ -93,7 +93,7 @@ class RedisType(BaseRedisType):
             await self.client.expire(self.key, self.Meta.ttl, nx=nx)
         return self
 
-    @refresh_action(ActionGroup.READ)
+    @mark_actions(ActionGroup.READ)
     async def aload(self):
         redis_value = await self.client.json().get(self.key, self.field_path)  # type: ignore[misc]
         if redis_value is None:

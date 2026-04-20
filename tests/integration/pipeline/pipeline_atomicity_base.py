@@ -231,7 +231,7 @@ class UpdateActionTestBase(ActionTestBase, ABC):
 class AsyncActionTestBase(ActionTestBase, ABC):
     """
     Extension of :class:`ActionTestBase` that also exercises TTL refresh
-    behavior for async actions decorated with ``@refresh_action``.
+    behavior for async actions decorated with ``@mark_actions``.
     """
 
     ttl_model_cls: ClassVar[type[AtomicRedisModel]]

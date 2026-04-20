@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 import functools
+import inspect
 from typing import TYPE_CHECKING
 
 from rapyer.context import _context_pipe
@@ -31,12 +32,21 @@ class ActionGroup(enum.Flag):
         return result
 
 
-def refresh_action(*groups: ActionGroup):
-    """Decorator that tags an async method with action groups for TTL refresh.
+def mark_actions(*groups: ActionGroup):
+    """Tag a method with action groups for TTL refresh.
+
+    - For async methods, wraps the method so that it calls
+      ``self.refresh_ttl_if_needed(action=combined)`` after execution.
+    - For sync methods, only tags the method with ``ACTION_GROUPS_ATTR``;
+      TTL refresh is deferred to pipeline-exit via ``should_refresh()``.
 
     Usage:
-        @refresh_action(ActionGroup.UPDATE, ActionGroup.APPEND)
+        @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND)
         async def aappend(self, item):
+            ...
+
+        @mark_actions(ActionGroup.UPDATE)
+        def __setitem__(self, key, value):
             ...
     """
     combined = ActionGroup(0)
@@ -45,6 +55,9 @@ def refresh_action(*groups: ActionGroup):
 
     def decorator(method):
         setattr(method, ACTION_GROUPS_ATTR, combined)
+
+        if not inspect.iscoroutinefunction(method):
+            return method
 
         @functools.wraps(method)
         async def wrapper(self: "AtomicRedisModel", *args, **kwargs):
@@ -78,21 +91,6 @@ def marks_redis_updated(method):
         return result
 
     return wrapper
-
-
-def pipeline_action(*groups: ActionGroup):
-    """
-    Decorator that tags a sync pipeline method with action groups.
-    """
-    combined = ActionGroup(0)
-    for g in groups:
-        combined |= g
-
-    def decorator(method):
-        setattr(method, ACTION_GROUPS_ATTR, combined)
-        return method
-
-    return decorator
 
 
 def should_refresh_for_action(meta: "RedisConfig", action: "ActionGroup") -> bool:
