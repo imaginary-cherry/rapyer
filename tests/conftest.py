@@ -1,4 +1,5 @@
 import inspect
+from types import ModuleType
 from typing import Callable
 
 import pytest
@@ -203,7 +204,7 @@ def _iter_class_methods(cls, async_only: bool):
         yield cls.__name__, name, method
 
 
-def _iter_module_functions(module):
+def _iter_module_functions(module: ModuleType):
     for name in getattr(module, "__all__", []):
         obj = getattr(module, name, None)
         if obj is None or inspect.isclass(obj) or not callable(obj):
