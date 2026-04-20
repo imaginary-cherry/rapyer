@@ -109,9 +109,7 @@ class ActionTestBase(ABC):
     @pytest.mark.asyncio
     async def test_pipeline_atomicity(self, test_input):
         if self.skip_pipeline_atomicity:
-            pytest.skip(
-                f"{type(self).__name__} has skip_pipeline_atomicity=True"
-            )
+            pytest.skip(f"{type(self).__name__} has skip_pipeline_atomicity=True")
         self.test_input = test_input
         self.created_models = await self.setup_data()
         owner = self.pipeline_owner()
@@ -344,9 +342,10 @@ class AsyncActionTestBase(ActionTestBase, ABC):
             for method in methods:
                 class_name, method_name = method.__qualname__.rsplit(".", 1)
                 normalized.append((class_name, method_name))
-            cls.test_ttl_refresh_on_action = pytest.mark.cover_ttl_refresh(
-                *normalized
-            )(cls.test_ttl_refresh_on_action)
+            cover_ttl_mark = pytest.mark.cover_ttl_refresh(*normalized)
+            cls.test_ttl_refresh_on_action = cover_ttl_mark(
+                cls.test_ttl_refresh_on_action
+            )
             cls.test_ttl_no_refresh_on_action = pytest.mark.cover_ttl_no_refresh(
                 *normalized
             )(cls.test_ttl_no_refresh_on_action)
