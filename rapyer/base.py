@@ -192,17 +192,28 @@ class AtomicRedisModel(BaseModel):
     def should_refresh(cls):
         return cls.should_refresh_for_action()
 
-    async def refresh_ttl_if_needed(self, can_use_pipeline: bool = False, action=None):
-        if self.should_refresh_for_action(action):
-            pipe_context = (
-                ensure_pipeline if can_use_pipeline else pipeline_with_execution
-            )
-            async with pipe_context(self.Meta) as pipe:
-                pipe.expire(self.key, self.Meta.ttl)
-                for fname in self._special_field_names:
-                    field = getattr(self, fname)
-                    if isinstance(field, SpecialFieldType):
-                        pipe.expire(field.special_key, self.Meta.ttl)
+    async def refresh_ttl_if_needed(
+        self,
+        can_use_pipeline: bool = False,
+        action=None,
+        initial: bool = False,
+    ):
+        if self.Meta.ttl is None:
+            return
+        should_refresh = self.should_refresh_for_action(action)
+        if not should_refresh and not initial:
+            return
+        # initial=True with refresh_ttl=False → set TTL only if none exists (NX)
+        nx = initial and not should_refresh
+        pipe_context = (
+            ensure_pipeline if can_use_pipeline else pipeline_with_execution
+        )
+        async with pipe_context(self.Meta) as pipe:
+            pipe.expire(self.key, self.Meta.ttl, nx=nx)
+            for fname in self._special_field_names:
+                field = getattr(self, fname)
+                if isinstance(field, SpecialFieldType):
+                    pipe.expire(field.special_key, self.Meta.ttl, nx=nx)
 
     @classmethod
     def redis_schema(cls, redis_name: str = ""):

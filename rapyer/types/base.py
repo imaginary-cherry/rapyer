@@ -43,9 +43,14 @@ class BaseRedisType(ABC):
     def Meta(self):
         return self._base_model_link.Meta
 
-    async def refresh_ttl_if_needed(self, can_use_pipeline: bool = False, action=None):
+    async def refresh_ttl_if_needed(
+        self,
+        can_use_pipeline: bool = False,
+        action=None,
+        initial: bool = False,
+    ):
         return await self._base_model_link.refresh_ttl_if_needed(
-            can_use_pipeline=can_use_pipeline, action=action
+            can_use_pipeline=can_use_pipeline, action=action, initial=initial
         )
 
     @property
