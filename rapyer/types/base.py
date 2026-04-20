@@ -88,14 +88,12 @@ class BaseRedisType(ABC):
 
 class RedisType(BaseRedisType):
 
+    @mark_actions(ActionGroup.UPDATE, initial=True)
     async def asave(self) -> Self:
         model_dump = self._adapter.dump_python(
             self, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
         )
         await self.client.json().set(self.key, self.json_path, model_dump)  # type: ignore[misc]
-        if self.Meta.ttl is not None:
-            nx = self.Meta.refresh_ttl is False  # Only NX when refresh is explicitly disabled
-            await self.client.expire(self.key, self.Meta.ttl, nx=nx)
         return self
 
     @mark_actions(ActionGroup.READ)
