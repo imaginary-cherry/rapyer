@@ -5,6 +5,7 @@ import pytest
 from _pytest.reports import TestReport
 
 import rapyer.types  # noqa: F401  # ensure all BaseRedisType subclasses are registered
+from rapyer.actions import ACTION_GROUPS_ATTR, ActionGroup
 from rapyer.base import AtomicRedisModel
 from rapyer.types.base import BaseRedisType
 
@@ -61,25 +62,41 @@ standalone_pipeline_test_for = _make_coverage_decorator(
     STANDALONE_PIPELINE_TESTED_METHODS
 )
 
+def should_ignore_group(method: Callable, ignore_groups: ActionGroup | None = None) ->bool:
+    if ignore_groups is None:
+        return False
 
-def get_async_methods(cls):
+    groups = getattr(method, ACTION_GROUPS_ATTR, None)
+    if groups is None:
+        return False
+    if groups & ignore_groups:
+        return True
+
+    return False
+
+
+def get_async_methods(cls, ignore_groups: ActionGroup | None = None):
     methods = []
     for name, method in inspect.getmembers(cls, predicate=inspect.iscoroutinefunction):
         if name.startswith("__"):
             continue
         if method.__qualname__.split(".")[0] != cls.__name__:
             continue
+        if should_ignore_group(method, ignore_groups):
+            continue
         methods.append((cls.__name__, name))
     return methods
 
 
-def get_all_type_methods(cls):
+def get_all_type_methods(cls, ignore_groups: ActionGroup | None = None):
     """Discover all callable methods defined directly on cls."""
     methods = []
     for name, method in vars(cls).items():
         if not callable(method):
             continue
         if getattr(method, "__qualname__", "").split(".")[0] != cls.__name__:
+            continue
+        if should_ignore_group(method, ignore_groups):
             continue
         methods.append((cls.__name__, name))
     return methods
@@ -149,21 +166,21 @@ def _all_subclasses(cls):
     return result
 
 
-def _collect_all_methods():
+def _collect_all_methods(ignore_groups: ActionGroup | None = None):
     """All callable methods on BaseRedisType subclasses + async methods on AtomicRedisModel."""
     all_methods = set()
     for cls in _all_subclasses(BaseRedisType):
-        all_methods.update(get_all_type_methods(cls))
-    all_methods.update(get_async_methods(AtomicRedisModel))
+        all_methods.update(get_all_type_methods(cls, ignore_groups=ignore_groups))
+    all_methods.update(get_async_methods(AtomicRedisModel, ignore_groups=ignore_groups))
     return all_methods
 
 
-def _collect_async_methods():
+def _collect_async_methods(ignore_groups: ActionGroup | None = None):
     """Async methods on BaseRedisType subclasses + AtomicRedisModel."""
     all_methods = set()
     for cls in _all_subclasses(BaseRedisType):
-        all_methods.update(get_async_methods(cls))
-    all_methods.update(get_async_methods(AtomicRedisModel))
+        all_methods.update(get_async_methods(cls, ignore_groups=ignore_groups))
+    all_methods.update(get_async_methods(AtomicRedisModel, ignore_groups=ignore_groups))
     return all_methods
 
 
