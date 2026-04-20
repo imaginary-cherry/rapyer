@@ -14,8 +14,12 @@ from rapyer.types.special import SpecialFieldType
 
 def _method_to_tuple(method: Callable) -> tuple[str, str]:
     qualname = method.__qualname__
-    class_name, method_name = qualname.rsplit(".", 1)
-    return class_name, method_name
+    if "." in qualname:
+        class_name, method_name = qualname.rsplit(".", 1)
+        return class_name, method_name
+    # Module-level function — match the (rapyer, name) shape produced by
+    # conftest._iter_module_functions.
+    return rapyer.__name__, qualname
 
 
 def _group(*methods: Callable) -> frozenset[tuple[str, str]]:
