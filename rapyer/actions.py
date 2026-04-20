@@ -46,7 +46,7 @@ class TargetSource(enum.Enum):
     MANUAL = "manual"
 
 
-ActionContextEntryType = tuple[object, "ActionGroup", bool]
+ActionContextEntryType = tuple["AtomicRedisModel", "ActionGroup", bool]
 _action_context: contextvars.ContextVar[Optional[list[ActionContextEntryType]]] = (
     contextvars.ContextVar("rapyer_action_context", default=None)
 )
