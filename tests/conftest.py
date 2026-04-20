@@ -4,6 +4,7 @@ from typing import Callable
 import pytest
 from _pytest.reports import TestReport
 
+import rapyer
 import rapyer.types  # noqa: F401  # ensure all BaseRedisType subclasses are registered
 from rapyer.actions import ACTION_GROUPS_ATTR, ActionGroup
 from rapyer.base import AtomicRedisModel
@@ -62,7 +63,17 @@ standalone_pipeline_test_for = _make_coverage_decorator(
     STANDALONE_PIPELINE_TESTED_METHODS
 )
 
-def should_ignore_group(method: Callable, ignore_groups: ActionGroup | None = None) ->bool:
+
+def _is_async_callable(obj) -> bool:
+    if inspect.iscoroutinefunction(obj):
+        return True
+    wrapped = getattr(obj, "__wrapped__", obj)
+    return inspect.isasyncgenfunction(wrapped)
+
+
+def should_ignore_group(
+    method: Callable, ignore_groups: ActionGroup | None = None
+) -> bool:
     if ignore_groups is None:
         return False
 
@@ -100,6 +111,17 @@ def get_all_type_methods(cls, ignore_groups: ActionGroup | None = None):
             continue
         methods.append((cls.__name__, name))
     return methods
+
+
+def get_module_level_functions(module):
+    """Collect public module-level functions listed in the module's __all__."""
+    functions = []
+    for name in getattr(module, "__all__", []):
+        obj = getattr(module, name, None)
+        if obj is None or inspect.isclass(obj) or not callable(obj):
+            continue
+        functions.append((rapyer.__name__, name))
+    return functions
 
 
 # ── Pipeline atomicity coverage hook ──────────────────────────────────────────
@@ -172,6 +194,7 @@ def _collect_all_methods(ignore_groups: ActionGroup | None = None):
     for cls in _all_subclasses(BaseRedisType):
         all_methods.update(get_all_type_methods(cls, ignore_groups=ignore_groups))
     all_methods.update(get_async_methods(AtomicRedisModel, ignore_groups=ignore_groups))
+    all_methods.update(get_module_level_functions(rapyer))
     return all_methods
 
 
@@ -181,6 +204,7 @@ def _collect_async_methods(ignore_groups: ActionGroup | None = None):
     for cls in _all_subclasses(BaseRedisType):
         all_methods.update(get_async_methods(cls, ignore_groups=ignore_groups))
     all_methods.update(get_async_methods(AtomicRedisModel, ignore_groups=ignore_groups))
+    all_methods.update(get_module_level_functions(rapyer))
     return all_methods
 
 
