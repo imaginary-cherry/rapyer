@@ -29,21 +29,21 @@ class SpecialFieldType(BaseRedisType, abc.ABC):
         return f"{self.key}:{clean_name}"
 
     @abc.abstractmethod
-    async def asave_special(self) -> None:
+    async def asave_special(self):
         """Save this field's data to its separate Redis structure.
 
         Uses ``self.client`` which is pipeline-aware.
         """
 
     @abc.abstractmethod
-    async def adelete_special(self) -> None:
+    async def adelete_special(self):
         """Delete this field's separate Redis data.
 
         Uses ``self.client`` which is pipeline-aware.
         """
 
     @abc.abstractmethod
-    async def aduplicate_special(self, target_special_key: str) -> None:
+    async def aduplicate_special(self, target_special_key: str):
         """Copy this field's data to a new key for a duplicated model.
 
         The *read* must use ``self.redis`` (direct client) so the data is
