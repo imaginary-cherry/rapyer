@@ -123,11 +123,7 @@ def mark_actions(
     - For sync methods, only tags the method with ``ACTION_GROUPS_ATTR``;
       TTL refresh is deferred to pipeline-exit via ``should_refresh()``.
 
-    ``target`` controls which models the wrapper auto-registers:
-    - ``TargetSource.SELF`` (default): the first positional arg.
-    - ``TargetSource.RESULT``: the return value (model or iterable of models).
-    - ``TargetSource.MANUAL``: nothing automatic; body registers via
-      ``register_action_target``.
+    ``target`` controls which models the wrapper auto-registers
 
     ``initial=True`` marks the method as one that creates a model (e.g. ``asave``,
     ``ainsert``). Auto-registered targets will request "set TTL only if absent"
