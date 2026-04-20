@@ -66,7 +66,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         kwargs_new_val = self.validate_dict(kwargs)
         return super().update(m_new_val, **kwargs_new_val)
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.DELETE)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     def clear(self):
         if self.pipeline:
             self.pipeline.json().set(self.key, self.json_path, {})
@@ -97,7 +97,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         )
         return result
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.DELETE)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     async def adel_item(self, key):
         super().__delitem__(key)
         result = await self.client.json().delete(self.key, self.json_field_path(key))  # type: ignore[misc]
@@ -118,7 +118,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
                 update_keys_in_pipeline(pipeline, self.key, **redis_params)
                 await pipeline.execute()
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.DELETE, ActionGroup.READ)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ)
     async def apop(self, key, default=None):
         result = await arun_sha(
             self.client,
@@ -138,7 +138,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
             {key: result}, context={REDIS_DUMP_FLAG_NAME: True}
         )[key]
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.DELETE, ActionGroup.READ)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ)
     async def apopitem(self):
         result = await arun_sha(
             self.client,
@@ -162,7 +162,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
             # If Redis is empty but local dict has items, raise an error for consistency
             raise KeyError("popitem(): dictionary is empty")
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.DELETE)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     async def aclear(self):
         self.clear()
         # Clear Redis dict

@@ -58,7 +58,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         mapping = {self._serialize_value(item.value): item.priority for item in items}
         await self.client.zadd(self.special_key, mapping)
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.DELETE)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ)
     async def apop(self):
         result = await self.client.zpopmin(self.special_key, count=1)
         if not result:
@@ -80,7 +80,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         """Return the number of items in the queue."""
         return await self.client.zcard(self.special_key)
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.DELETE)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     async def aclear(self):
         """Remove all items from the queue."""
         await self.client.delete(self.special_key)
@@ -94,7 +94,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
             for m, s in result
         ]
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.DELETE)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     async def aremove(self, value) -> bool:
         """Remove a specific value from the queue. Returns True if removed."""
         serialized = self._serialize_value(value)

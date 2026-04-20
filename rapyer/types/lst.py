@@ -99,13 +99,13 @@ class RedisList(list, GenericRedisType[T]):
         new_val = self.create_new_value(index, __object)
         return super().insert(index, new_val)
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.DELETE)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     def clear(self):
         if self.pipeline:
             self.pipeline.json().set(self.key, self.json_path, [])
         return super().clear()
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.DELETE)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     def remove_range(self, start: int, end: int):
         if self.pipeline:
             run_sha(
@@ -154,7 +154,7 @@ class RedisList(list, GenericRedisType[T]):
                 *serialized_items,
             )
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.DELETE, ActionGroup.READ)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ)
     async def apop(self, index=-1):
         if self:
             self.pop(index)
@@ -181,7 +181,7 @@ class RedisList(list, GenericRedisType[T]):
                 self.key, self.json_path, index, *serialized_object
             )
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.DELETE)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     async def aclear(self):
         # Clear local list
         self.clear()

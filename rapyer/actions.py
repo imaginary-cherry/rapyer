@@ -17,12 +17,24 @@ ACTION_GROUPS_ATTR = "_action_groups"
 
 
 class ActionGroup(enum.Flag):
-    """Categories of operations that can trigger TTL refresh."""
+    """Categories of operations that can trigger TTL refresh.
+
+    - ``READ``: reading any value from Redis (field-level reads, contains-checks, etc.).
+    - ``FETCH``: extracting a full model from Redis (``aget``, ``afind``, ``afind_one``).
+    - ``UPDATE``: modifying existing data.
+    - ``APPEND``: adding new items to a collection.
+    - ``DELETE``: removing an entire model/key from Redis (``adelete``, ``adelete_many``).
+    - ``ERASE``: removing item(s) from a collection while keeping the model (``apop``,
+      ``apopitem``, ``adel_item``, ``aremove``, ``aclear``).
+    - ``ARITHMETIC``: in-place numeric operations.
+    """
 
     READ = enum.auto()
+    FETCH = enum.auto()
     UPDATE = enum.auto()
     APPEND = enum.auto()
     DELETE = enum.auto()
+    ERASE = enum.auto()
     ARITHMETIC = enum.auto()
 
     @classmethod

@@ -498,7 +498,7 @@ class AtomicRedisModel(BaseModel):
         return key
 
     @classmethod
-    @mark_actions(ActionGroup.READ, target=TargetSource.RESULT)
+    @mark_actions(ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT)
     async def aget(cls, key: str) -> Self:
         key = cls._resolve_key(key)
         model_dump = await cls.Meta.redis.json().get(key, "$")  # type: ignore[misc]
@@ -543,7 +543,7 @@ class AtomicRedisModel(BaseModel):
         return model
 
     @classmethod
-    @mark_actions(ActionGroup.READ, target=TargetSource.RESULT)
+    @mark_actions(ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT)
     async def afind(cls, *args, max_results: Optional[int] = None) -> list[Self]:
         if max_results is not None and max_results < 0:
             raise UnsupportedArgumentValueError(
@@ -598,7 +598,7 @@ class AtomicRedisModel(BaseModel):
         return instances
 
     @classmethod
-    @mark_actions(ActionGroup.READ, ignore_refresh=True)
+    @mark_actions(ActionGroup.READ, ActionGroup.FETCH, ignore_refresh=True)
     async def afind_one(cls, *args) -> Optional[Self]:
         results = await cls.afind(*args, max_results=1)
         return results[0] if results else None
@@ -885,7 +885,7 @@ def _resolve_model_class(redis_key: str) -> type[AtomicRedisModel] | None:
     return redis_model_mapping.get(class_name)
 
 
-@mark_actions(ActionGroup.READ, ignore_refresh=True)
+@mark_actions(ActionGroup.READ, ActionGroup.FETCH, ignore_refresh=True)
 async def aget(redis_key: str) -> AtomicRedisModel:
     klass = _resolve_model_class(redis_key)
     if klass is None:
@@ -893,7 +893,7 @@ async def aget(redis_key: str) -> AtomicRedisModel:
     return await klass.aget(redis_key)
 
 
-@mark_actions(ActionGroup.READ, ignore_refresh=True)
+@mark_actions(ActionGroup.READ, ActionGroup.FETCH, ignore_refresh=True)
 async def afind_one(redis_key: str) -> Optional[AtomicRedisModel]:
     try:
         return await aget(redis_key)
@@ -911,7 +911,7 @@ async def aexists(redis_key: str | AtomicRedisModel) -> bool:
     return await klass.aexists(redis_key)
 
 
-@mark_actions(ActionGroup.READ, target=TargetSource.RESULT)
+@mark_actions(ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT)
 async def afind(*redis_keys: str, skip_missing: bool = False) -> list[AtomicRedisModel]:
     if not redis_keys:
         return []
