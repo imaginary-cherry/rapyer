@@ -16,6 +16,7 @@ from rapyer.types.priority_queue import PriorityQueueItem, RedisPriorityQueue
 from tests.integration.conftest import REDUCED_TTL_SECONDS
 from tests.integration.pipeline.pipeline_atomicity_base import (
     AsyncActionTestBase,
+    UpdateActionTestBase,
 )
 from tests.models.special_types import (
     PriorityQueueModel,
@@ -24,7 +25,7 @@ from tests.models.special_types import (
 )
 
 
-class PQActionBase(AsyncActionTestBase, ABC):
+class PQActionBase(UpdateActionTestBase, AsyncActionTestBase, ABC):
     ttl_model_cls = PriorityQueueTTLModel
     no_refresh_ttl_model_cls = PriorityQueueTTLNoRefreshModel
     skip_pipeline_atomicity = True

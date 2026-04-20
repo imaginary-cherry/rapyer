@@ -14,6 +14,7 @@ from tests.integration.pipeline.pipeline_atomicity_base import (
     ComprehensiveTagsOpBase,
     RapyerActionBase,
     TwoModelDeleteBase,
+    UpdateActionTestBase,
 )
 from tests.models.collection_types import (
     ComprehensiveTestModel,
@@ -29,7 +30,7 @@ from tests.models.simple_types import (
 TTL_SECONDS = 300
 
 
-class TestModelAsave(AsyncActionTestBase):
+class TestModelAsave(UpdateActionTestBase, AsyncActionTestBase):
     covered_method = AtomicRedisModel.asave
     ttl_model_cls = TTLComprehensiveTestModel
     no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
@@ -382,7 +383,7 @@ class TestRapyerAduplicateMany(RapyerActionBase):
         assert len(set(all_pks)) == 4
 
 
-class TestRapyerAupdate(AsyncRapyerActionBase):
+class TestRapyerAupdate(UpdateActionTestBase, AsyncRapyerActionBase):
     """After aupdate was switched to ``ensure_pipeline``, it defers to an outer
     pipeline like every other mutation."""
 

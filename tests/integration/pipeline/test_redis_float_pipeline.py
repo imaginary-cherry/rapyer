@@ -2,9 +2,9 @@ import pytest
 
 from rapyer.types.float import RedisFloat
 from tests.integration.pipeline.pipeline_atomicity_base import (
-    ActionTestBase,
-    BinaryOpCase,
     AllTypesAmountOpBase,
+    BinaryOpCase,
+    UpdateActionTestBase,
 )
 from tests.models.redis_types import PipelineAllTypesTestModel
 
@@ -29,7 +29,7 @@ async def test_redis_float_operations__changes_outside_pipeline_ignored_sanity()
     assert final.amount == 220.0
 
 
-class TestRedisFloatAllOperationsCombined(ActionTestBase):
+class TestRedisFloatAllOperationsCombined(UpdateActionTestBase):
     covered_method = [
         RedisFloat.__iadd__,
         RedisFloat.__isub__,

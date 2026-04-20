@@ -374,7 +374,7 @@ class AsyncRapyerActionBase(AsyncActionTestBase, ABC):
         return rapyer
 
 
-class ComprehensiveCounterOpBase(ActionTestBase, ABC):
+class ComprehensiveCounterOpBase(UpdateActionTestBase, ABC):
     """RedisInt binary ops on ``ComprehensiveTestModel.counter``. ``self.test_input`` is ``BinaryOpCase``. Sync / pipeline-only."""
 
     def create_models(self):
@@ -391,7 +391,7 @@ class ComprehensiveCounterOpBase(ActionTestBase, ABC):
         return self.test_input.expected
 
 
-class AsyncComprehensiveCounterOpBase(AsyncActionTestBase, ABC):
+class AsyncComprehensiveCounterOpBase(UpdateActionTestBase, AsyncActionTestBase, ABC):
     """Async ops on ``ComprehensiveTestModel.counter`` (RedisInt) with TTL coverage.
 
     Parallel to :class:`ComprehensiveCounterOpBase`; used by async mutations
@@ -407,7 +407,7 @@ class AsyncComprehensiveCounterOpBase(AsyncActionTestBase, ABC):
         return loaded.counter
 
 
-class AsyncFloatModelValueOpBase(AsyncActionTestBase, ABC):
+class AsyncFloatModelValueOpBase(UpdateActionTestBase, AsyncActionTestBase, ABC):
     """Async ops on ``FloatModel.value`` (RedisFloat) with TTL coverage."""
 
     ttl_model_cls = TTLFloatModel
@@ -418,7 +418,7 @@ class AsyncFloatModelValueOpBase(AsyncActionTestBase, ABC):
         return loaded.value
 
 
-class AllTypesAmountOpBase(ActionTestBase, ABC):
+class AllTypesAmountOpBase(UpdateActionTestBase, ABC):
     """RedisFloat binary ops on ``PipelineAllTypesTestModel.amount``. ``self.test_input`` is ``BinaryOpCase``."""
 
     def create_models(self):
@@ -435,7 +435,7 @@ class AllTypesAmountOpBase(ActionTestBase, ABC):
         return self.test_input.expected
 
 
-class AllTypesNameOpBase(ActionTestBase, ABC):
+class AllTypesNameOpBase(UpdateActionTestBase, ABC):
     """RedisStr ops on ``PipelineAllTypesTestModel.name``."""
 
     async def load_data(self):
@@ -443,7 +443,7 @@ class AllTypesNameOpBase(ActionTestBase, ABC):
         return loaded.name
 
 
-class ComprehensiveTagsOpBase(ActionTestBase, ABC):
+class ComprehensiveTagsOpBase(UpdateActionTestBase, ABC):
     """List ops on ``ComprehensiveTestModel.tags``. Sync / pipeline-only actions."""
 
     async def load_data(self):
@@ -451,7 +451,7 @@ class ComprehensiveTagsOpBase(ActionTestBase, ABC):
         return loaded.tags
 
 
-class AsyncComprehensiveTagsOpBase(AsyncActionTestBase, ABC):
+class AsyncComprehensiveTagsOpBase(UpdateActionTestBase, AsyncActionTestBase, ABC):
     ttl_model_cls = TTLComprehensiveTestModel
     no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
 
@@ -460,7 +460,7 @@ class AsyncComprehensiveTagsOpBase(AsyncActionTestBase, ABC):
         return loaded.tags
 
 
-class ComprehensiveMetadataOpBase(ActionTestBase, ABC):
+class ComprehensiveMetadataOpBase(UpdateActionTestBase, ABC):
     """Dict ops on ``ComprehensiveTestModel.metadata``. Sync / pipeline-only."""
 
     async def load_data(self):
@@ -468,7 +468,7 @@ class ComprehensiveMetadataOpBase(ActionTestBase, ABC):
         return loaded.metadata
 
 
-class AsyncComprehensiveMetadataOpBase(AsyncActionTestBase, ABC):
+class AsyncComprehensiveMetadataOpBase(UpdateActionTestBase, AsyncActionTestBase, ABC):
     ttl_model_cls = TTLComprehensiveTestModel
     no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
 
@@ -477,7 +477,7 @@ class AsyncComprehensiveMetadataOpBase(AsyncActionTestBase, ABC):
         return loaded.metadata
 
 
-class AllTypesModelIntFieldOpBase(ActionTestBase, ABC):
+class AllTypesModelIntFieldOpBase(UpdateActionTestBase, ABC):
     """RedisInt ops on ``AllTypesModel.int_field``."""
 
     async def load_data(self):
@@ -485,7 +485,7 @@ class AllTypesModelIntFieldOpBase(ActionTestBase, ABC):
         return loaded.int_field
 
 
-class AllTypesModelListFieldOpBase(ActionTestBase, ABC):
+class AllTypesModelListFieldOpBase(UpdateActionTestBase, ABC):
     """RedisList ops on ``AllTypesModel.list_field``."""
 
     def create_models(self):
@@ -499,7 +499,7 @@ class AllTypesModelListFieldOpBase(ActionTestBase, ABC):
         return []
 
 
-class AllTypesModelDictFieldOpBase(ActionTestBase, ABC):
+class AllTypesModelDictFieldOpBase(UpdateActionTestBase, ABC):
     """RedisDict ops on ``AllTypesModel.dict_field``."""
 
     def create_models(self):

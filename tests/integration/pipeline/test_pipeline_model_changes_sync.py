@@ -5,10 +5,10 @@ from rapyer.types.float import RedisFloat
 from rapyer.types.integer import RedisInt
 from rapyer.types.lst import RedisList
 from tests.integration.pipeline.pipeline_atomicity_base import (
-    ActionTestBase,
     AllTypesModelDictFieldOpBase,
     AllTypesModelListFieldOpBase,
     AsyncFloatModelValueOpBase,
+    UpdateActionTestBase,
 )
 from tests.models.complex_types import InnerMostModel, MiddleModel, OuterModel
 from tests.models.functionality_types import AllTypesModel
@@ -101,7 +101,7 @@ async def test_integer_assignment_changes_persisted_after_pipeline_sanity():
     assert final_model.int_field == 50
 
 
-class TestIntegerAddition(ActionTestBase):
+class TestIntegerAddition(UpdateActionTestBase):
     covered_method = RedisInt.__iadd__
 
     def create_models(self):

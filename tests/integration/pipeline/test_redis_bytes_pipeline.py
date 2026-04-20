@@ -1,9 +1,9 @@
 from rapyer.types.byte import RedisBytes
-from tests.integration.pipeline.pipeline_atomicity_base import ActionTestBase
+from tests.integration.pipeline.pipeline_atomicity_base import UpdateActionTestBase
 from tests.models.simple_types import BytesModel
 
 
-class TestRedisBytesIadd(ActionTestBase):
+class TestRedisBytesIadd(UpdateActionTestBase):
     covered_method = RedisBytes.__iadd__
 
     def create_models(self):
