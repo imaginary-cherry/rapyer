@@ -105,9 +105,9 @@ async def flush_action_targets(targets: list[ActionContextEntryType]):
                 existing[2] or initial,
             )
 
-    if not merged:
+    if not targets:
         return
-    atomic_model = merged.popitem()[1][0]
+    atomic_model = targets[0][0]
 
     async with ensure_pipeline(atomic_model.Meta):
         for model, action, initial in merged.values():
