@@ -1,4 +1,5 @@
 import inspect
+from dataclasses import dataclass, field
 from types import ModuleType
 from typing import Callable
 
@@ -128,10 +129,37 @@ def get_module_level_functions(module):
 
 # ── Pipeline atomicity coverage hook ──────────────────────────────────────────
 
-_covered_pipeline_atom_methods: set[tuple[str, str]] = set()
-_covered_ttl_refresh_methods: set[tuple[str, str]] = set()
-_covered_ttl_no_refresh_methods: set[tuple[str, str]] = set()
-_covered_no_clobber_methods: set[tuple[str, str]] = set()
+
+@dataclass(frozen=True)
+class CoverageCheck:
+    name: str
+    help_text: str
+    expected: Callable[[], set[tuple[str, str]]]
+    covered: set[tuple[str, str]] = field(default_factory=set)
+
+
+COVERAGE_CHECKS: list[CoverageCheck] = [
+    CoverageCheck(
+        name="cover_pipeline_atom",
+        help_text="pipeline atomicity",
+        expected=lambda: _collect_methods(ignore_groups=ActionGroup.READ),
+    ),
+    CoverageCheck(
+        name="cover_ttl_refresh",
+        help_text="TTL refresh",
+        expected=lambda: _collect_methods(only_async=True),
+    ),
+    CoverageCheck(
+        name="cover_ttl_no_refresh",
+        help_text="TTL no-refresh",
+        expected=lambda: _collect_methods(only_async=True),
+    ),
+    CoverageCheck(
+        name="cover_no_clobber",
+        help_text="no-clobber behavior",
+        expected=lambda: _collect_methods(),
+    ),
+]
 
 
 def pytest_addoption(parser):
@@ -144,26 +172,12 @@ def pytest_addoption(parser):
 
 
 def pytest_configure(config):
-    config.addinivalue_line(
-        "markers",
-        "cover_pipeline_atom(*methods): marks test as covering pipeline "
-        "atomicity for given (class_name, method_name) tuples",
-    )
-    config.addinivalue_line(
-        "markers",
-        "cover_ttl_refresh(*methods): marks test as covering TTL refresh "
-        "for given (class_name, method_name) tuples",
-    )
-    config.addinivalue_line(
-        "markers",
-        "cover_ttl_no_refresh(*methods): marks test as covering TTL "
-        "no-refresh for given (class_name, method_name) tuples",
-    )
-    config.addinivalue_line(
-        "markers",
-        "cover_no_clobber(*methods): marks test as covering no-clobber "
-        "behavior for given (class_name, method_name) tuples",
-    )
+    for check in COVERAGE_CHECKS:
+        config.addinivalue_line(
+            "markers",
+            f"{check.name}(*methods): marks test as covering "
+            f"{check.help_text} for given (class_name, method_name) tuples",
+        )
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -171,15 +185,10 @@ def pytest_runtest_makereport(item, call):
     outcome = yield
     report = outcome.get_result()
     if report.when == "call" and report.outcome != "skipped":
-        for mark_name, coverage_set in (
-            ("cover_pipeline_atom", _covered_pipeline_atom_methods),
-            ("cover_ttl_refresh", _covered_ttl_refresh_methods),
-            ("cover_ttl_no_refresh", _covered_ttl_no_refresh_methods),
-            ("cover_no_clobber", _covered_no_clobber_methods),
-        ):
-            marker = item.get_closest_marker(mark_name)
+        for check in COVERAGE_CHECKS:
+            marker = item.get_closest_marker(check.name)
             if marker:
-                coverage_set.update(marker.args)
+                check.covered.update(marker.args)
 
 
 def _all_subclasses(cls):
@@ -277,39 +286,10 @@ def pytest_sessionfinish(session, exitstatus):
         return
 
     has_failures = False
-
-    # Pipeline atomicity: all methods (sync + async), excluding READ-only ones
-    pipeline_atom_methods = _collect_methods(ignore_groups=ActionGroup.READ)
-    has_failures |= _emit_coverage_reports(
-        session,
-        "cover_pipeline_atom",
-        pipeline_atom_methods,
-        _covered_pipeline_atom_methods,
-    )
-
-    # TTL refresh / no-refresh: async methods only
-    async_methods = _collect_methods(only_async=True)
-    has_failures |= _emit_coverage_reports(
-        session,
-        "cover_ttl_refresh",
-        async_methods,
-        _covered_ttl_refresh_methods,
-    )
-    has_failures |= _emit_coverage_reports(
-        session,
-        "cover_ttl_no_refresh",
-        async_methods,
-        _covered_ttl_no_refresh_methods,
-    )
-
-    # No-clobber: all methods (sync + async)
-    all_methods = _collect_methods()
-    has_failures |= _emit_coverage_reports(
-        session,
-        "cover_no_clobber",
-        all_methods,
-        _covered_no_clobber_methods,
-    )
+    for check in COVERAGE_CHECKS:
+        has_failures |= _emit_coverage_reports(
+            session, check.name, check.expected(), check.covered
+        )
 
     if has_failures:
         session.exitstatus = pytest.ExitCode.TESTS_FAILED
