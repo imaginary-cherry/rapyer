@@ -164,12 +164,12 @@ COVERAGE_CHECKS: list[CoverageCheck] = [
         expected=lambda: _collect_methods(ignore_groups=ActionGroup.READ),
     ),
 ]
-SKIP_COVERAGE_FLAG = "action-coverage"
+COVERAGE_FLAG = "action-coverage"
 
 
 def pytest_addoption(parser):
     parser.addoption(
-        f"--{SKIP_COVERAGE_FLAG}",
+        f"--{COVERAGE_FLAG}",
         action="store_true",
         default=False,
         help="Run the action coverage check at session end.",
@@ -306,7 +306,7 @@ def _emit_coverage_reports(session, check_name, expected, covered):
 
 @pytest.hookimpl(trylast=True)
 def pytest_sessionfinish(session, exitstatus):
-    if session.config.getoption(f"--{SKIP_COVERAGE_FLAG}", default=False):
+    if not session.config.getoption(f"--{COVERAGE_FLAG}", default=False):
         return
 
     has_failures = False
