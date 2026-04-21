@@ -164,11 +164,12 @@ COVERAGE_CHECKS: list[CoverageCheck] = [
         expected=lambda: _collect_methods(ignore_groups=ActionGroup.READ),
     ),
 ]
+SKIP_COVERAGE_FLAG = "skip-pipeline-coverage"
 
 
 def pytest_addoption(parser):
     parser.addoption(
-        "--skip-pipeline-coverage",
+        f"--{SKIP_COVERAGE_FLAG}",
         action="store_true",
         default=False,
         help="Skip the pipeline atomicity coverage check at session end.",
@@ -305,7 +306,7 @@ def _emit_coverage_reports(session, check_name, expected, covered):
 
 @pytest.hookimpl(trylast=True)
 def pytest_sessionfinish(session, exitstatus):
-    if session.config.getoption("--skip-pipeline-coverage", default=False):
+    if session.config.getoption(f"--{SKIP_COVERAGE_FLAG}", default=False):
         return
 
     has_failures = False
