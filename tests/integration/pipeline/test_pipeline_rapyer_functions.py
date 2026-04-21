@@ -1,7 +1,10 @@
 import asyncio
 
 import rapyer
-from tests.integration.pipeline.pipeline_atomicity_base import ActionTestBase
+from tests.integration.pipeline.pipeline_atomicity_base import (
+    ActionTestBase,
+    TTLActionTestBase,
+)
 from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.simple_types import IntModel, StrModel
 
@@ -27,7 +30,7 @@ class TestRapyerFunctionAdeleteMany(ActionTestBase):
         return 0, 0
 
 
-class TestRapyerFunctionAinsert(ActionTestBase):
+class TestRapyerFunctionAinsert(TTLActionTestBase):
     covered_method = rapyer.ainsert
 
     def create_models(self):
@@ -55,7 +58,7 @@ class TestRapyerFunctionAinsert(ActionTestBase):
         return self.created_models
 
 
-class TestRapyerFunctionApipeline(ActionTestBase):
+class TestRapyerFunctionApipeline(TTLActionTestBase):
     covered_method = rapyer.apipeline
 
     def create_models(self):

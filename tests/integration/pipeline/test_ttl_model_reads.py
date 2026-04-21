@@ -1,6 +1,7 @@
 from rapyer.base import AtomicRedisModel
 from rapyer.types.base import RedisType
 from tests.integration.pipeline.pipeline_atomicity_base import (
+    ComprehensiveCounterOpBase,
     TTLActionTestBase,
 )
 from tests.models.collection_types import ComprehensiveTestModel
