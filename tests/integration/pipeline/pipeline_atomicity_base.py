@@ -107,36 +107,55 @@ class ActionTestBase(ABC):
         loaded_after = await self.load_data()
         self.assert_after_pipeline(loaded_after)
 
-    def __init_subclass__(cls, **kwargs: Any):
-        super().__init_subclass__(**kwargs)
-        if inspect.isabstract(cls):
-            return
-        params = cls.params or [None]
-        base_fn = cls.test_pipeline_atomicity
+    @classmethod
+    def _prepare_action_test(
+        cls,
+        *,
+        test_attr: str,
+        cover_marker: str,
+        skip_attr: str,
+        parametrize: bool,
+    ):
+        """Wrap, parametrize, cover-mark and skip-mark one test method on ``cls``.
+
+        Each concrete subclass gets its own fresh function object so pytest
+        markers applied here don't leak to sibling subclasses.
+        """
+        base_fn = getattr(cls, test_attr)
 
         @functools.wraps(base_fn)
-        async def test_pipeline_atomicity(self, test_input):
+        async def wrapped(self, test_input):
             return await base_fn(self, test_input)
 
-        mark = pytest.mark.parametrize(
-            "test_input", params, ids=[repr(p) for p in params]
-        )
-        cls.test_pipeline_atomicity = mark(test_pipeline_atomicity)
+        if parametrize:
+            params = cls.params or [None]
+            wrapped = pytest.mark.parametrize(
+                "test_input", params, ids=[repr(p) for p in params]
+            )(wrapped)
 
         methods = cls.covered_method
         if methods is not None:
             if not isinstance(methods, list):
                 methods = [methods]
-            normalized = []
-            for method in methods:
-                class_name, method_name = method.__qualname__.rsplit(".", 1)
-                normalized.append((class_name, method_name))
-            conver_marker = pytest.mark.cover_pipeline_atom(*normalized)
-            cls.test_pipeline_atomicity = conver_marker(cls.test_pipeline_atomicity)
+            normalized = [tuple(m.__qualname__.rsplit(".", 1)) for m in methods]
+            wrapped = getattr(pytest.mark, cover_marker)(*normalized)(wrapped)
 
-        if cls.skip_pipeline_atomicity:
-            skip_marker = pytest.mark.skip(reason=cls.skip_pipeline_atomicity)
-            cls.test_pipeline_atomicity = skip_marker(cls.test_pipeline_atomicity)
+        skip_reason = getattr(cls, skip_attr)
+        if skip_reason:
+            wrapped = pytest.mark.skip(reason=skip_reason)(wrapped)
+
+        setattr(cls, test_attr, wrapped)
+
+    def __init_subclass__(cls, **kwargs: Any):
+        super().__init_subclass__(**kwargs)
+        if inspect.isabstract(cls):
+            return
+        cls._prepare_action_test(
+            test_attr="test_pipeline_atomicity",
+            cover_marker="cover_pipeline_atom",
+            skip_attr="skip_pipeline_atomicity",
+            parametrize=True,
+        )
 
 
 # =============================================================================
@@ -183,35 +202,12 @@ class UpdateActionTestBase(ActionTestBase, ABC):
         super().__init_subclass__(**kwargs)
         if inspect.isabstract(cls):
             return
-
-        # Parametrize test_no_clobber (same params as test_pipeline_atomicity)
-        params = cls.params or [None]
-        base_fn = cls.test_no_clobber
-
-        @functools.wraps(base_fn)
-        async def test_no_clobber(self, test_input):
-            return await base_fn(self, test_input)
-
-        mark = pytest.mark.parametrize(
-            "test_input", params, ids=[repr(p) for p in params]
+        cls._prepare_action_test(
+            test_attr="test_no_clobber",
+            cover_marker="cover_no_clobber",
+            skip_attr="skip_pipeline_atomicity",
+            parametrize=True,
         )
-        cls.test_no_clobber = mark(test_no_clobber)
-
-        # Apply cover_no_clobber marker
-        methods = cls.covered_method
-        if methods is not None:
-            if not isinstance(methods, list):
-                methods = [methods]
-            normalized = []
-            for method in methods:
-                class_name, method_name = method.__qualname__.rsplit(".", 1)
-                normalized.append((class_name, method_name))
-            no_clobber_marker = pytest.mark.cover_no_clobber(*normalized)
-            cls.test_no_clobber = no_clobber_marker(cls.test_no_clobber)
-
-        if cls.skip_pipeline_atomicity:
-            skip_marker = pytest.mark.skip(reason=cls.skip_pipeline_atomicity)
-            cls.test_no_clobber = skip_marker(cls.test_no_clobber)
 
 
 # =============================================================================
@@ -317,46 +313,18 @@ class AsyncActionTestBase(ActionTestBase, ABC):
         super().__init_subclass__(**kwargs)
         if inspect.isabstract(cls):
             return
-
-        methods = cls.covered_method
-        if methods is not None:
-            if not isinstance(methods, list):
-                methods = [methods]
-            normalized = []
-            for method in methods:
-                class_name, method_name = method.__qualname__.rsplit(".", 1)
-                normalized.append((class_name, method_name))
-
-            base_refresh_fn = cls.test_ttl_refresh_on_action
-
-            @functools.wraps(base_refresh_fn)
-            async def test_ttl_refresh_on_action(self):
-                return await base_refresh_fn(self)
-
-            mark_ttl_test = pytest.mark.cover_ttl_refresh(*normalized)
-            cls.test_ttl_refresh_on_action = mark_ttl_test(test_ttl_refresh_on_action)
-            base_no_refresh_fn = cls.test_ttl_no_refresh_on_action
-
-            @functools.wraps(base_no_refresh_fn)
-            async def test_ttl_no_refresh_on_action(self):
-                return await base_no_refresh_fn(self)
-
-            mark_ttl_refresh = pytest.mark.cover_ttl_no_refresh(*normalized)
-            cls.test_ttl_no_refresh_on_action = mark_ttl_refresh(
-                test_ttl_no_refresh_on_action
-            )
-
-        if cls.skip_ttl_refresh:
-            skip_marker = pytest.mark.skip(reason=cls.skip_ttl_refresh)
-            cls.test_ttl_refresh_on_action = skip_marker(
-                cls.test_ttl_refresh_on_action
-            )
-
-        if cls.skip_ttl_no_refresh:
-            skip_marker = pytest.mark.skip(reason=cls.skip_ttl_no_refresh)
-            cls.test_ttl_no_refresh_on_action = skip_marker(
-                cls.test_ttl_no_refresh_on_action
-            )
+        cls._prepare_action_test(
+            test_attr="test_ttl_refresh_on_action",
+            cover_marker="cover_ttl_refresh",
+            skip_attr="skip_ttl_refresh",
+            parametrize=False,
+        )
+        cls._prepare_action_test(
+            test_attr="test_ttl_no_refresh_on_action",
+            cover_marker="cover_ttl_no_refresh",
+            skip_attr="skip_ttl_no_refresh",
+            parametrize=False,
+        )
 
 
 # =============================================================================
