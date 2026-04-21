@@ -6,8 +6,6 @@ from rapyer.types.base import RedisType
 from rapyer.types.dct import RedisDict
 from rapyer.types.lst import RedisList
 from tests.integration.pipeline.pipeline_atomicity_base import (
-    AsyncComprehensiveMetadataOpBase,
-    AsyncComprehensiveTagsOpBase,
     TTLActionTestBase,
     TwoModelDeleteBase,
     UpdateActionTestBase,
@@ -173,7 +171,7 @@ async def test_pipeline_context_manager__pipeline_context_cleanup__check_context
 # =============================================================================
 
 
-class TestListAappend(AsyncComprehensiveTagsOpBase):
+class TestListAappend(ComprehensiveTagsOpBase, TTLActionTestBase):
     covered_method = RedisList.aappend
 
     def create_models(self):
@@ -189,7 +187,7 @@ class TestListAappend(AsyncComprehensiveTagsOpBase):
         return ["initial", "new_tag"]
 
 
-class TestListAextend(AsyncComprehensiveTagsOpBase):
+class TestListAextend(ComprehensiveTagsOpBase, TTLActionTestBase):
     covered_method = RedisList.aextend
 
     def create_models(self):
@@ -205,7 +203,7 @@ class TestListAextend(AsyncComprehensiveTagsOpBase):
         return ["initial", "tag1", "tag2"]
 
 
-class TestListAinsert(AsyncComprehensiveTagsOpBase):
+class TestListAinsert(ComprehensiveTagsOpBase, TTLActionTestBase):
     covered_method = RedisList.ainsert
 
     def create_models(self):
@@ -221,7 +219,7 @@ class TestListAinsert(AsyncComprehensiveTagsOpBase):
         return ["first", "middle", "last"]
 
 
-class TestListAclear(AsyncComprehensiveTagsOpBase):
+class TestListAclear(ComprehensiveTagsOpBase, TTLActionTestBase):
     covered_method = RedisList.aclear
 
     def create_models(self):
@@ -237,7 +235,7 @@ class TestListAclear(AsyncComprehensiveTagsOpBase):
         return []
 
 
-class TestListApop(AsyncComprehensiveTagsOpBase):
+class TestListApop(ComprehensiveTagsOpBase, TTLActionTestBase):
     covered_method = RedisList.apop
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
@@ -259,7 +257,7 @@ class TestListApop(AsyncComprehensiveTagsOpBase):
 # =============================================================================
 
 
-class TestDictAsetItem(AsyncComprehensiveMetadataOpBase):
+class TestDictAsetItem(ComprehensiveMetadataOpBase, TTLActionTestBase):
     covered_method = RedisDict.aset_item
 
     def create_models(self):
@@ -275,7 +273,7 @@ class TestDictAsetItem(AsyncComprehensiveMetadataOpBase):
         return {"existing": "value", "new_key": "new_value"}
 
 
-class TestDictAdelItem(AsyncComprehensiveMetadataOpBase):
+class TestDictAdelItem(ComprehensiveMetadataOpBase, TTLActionTestBase):
     covered_method = RedisDict.adel_item
 
     def create_models(self):
@@ -291,7 +289,7 @@ class TestDictAdelItem(AsyncComprehensiveMetadataOpBase):
         return {"key2": "value2"}
 
 
-class TestDictAupdate(AsyncComprehensiveMetadataOpBase):
+class TestDictAupdate(ComprehensiveMetadataOpBase, TTLActionTestBase):
     covered_method = RedisDict.aupdate
 
     def create_models(self):
@@ -311,7 +309,7 @@ class TestDictAupdate(AsyncComprehensiveMetadataOpBase):
         }
 
 
-class TestDictAclear(AsyncComprehensiveMetadataOpBase):
+class TestDictAclear(ComprehensiveMetadataOpBase, TTLActionTestBase):
     covered_method = RedisDict.aclear
 
     def create_models(self):
@@ -327,7 +325,7 @@ class TestDictAclear(AsyncComprehensiveMetadataOpBase):
         return {}
 
 
-class TestDictApop(AsyncComprehensiveMetadataOpBase):
+class TestDictApop(ComprehensiveMetadataOpBase, TTLActionTestBase):
     covered_method = RedisDict.apop
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
@@ -344,7 +342,7 @@ class TestDictApop(AsyncComprehensiveMetadataOpBase):
         return {"key2": "value2"}
 
 
-class TestDictApopitem(AsyncComprehensiveMetadataOpBase):
+class TestDictApopitem(ComprehensiveMetadataOpBase, TTLActionTestBase):
     covered_method = RedisDict.apopitem
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 

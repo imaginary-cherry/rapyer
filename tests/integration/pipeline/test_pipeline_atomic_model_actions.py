@@ -9,7 +9,6 @@ from rapyer.types.integer import RedisInt
 from rapyer.types.lst import RedisList
 from tests.integration.pipeline.pipeline_atomicity_base import (
     ActionTestBase,
-    AsyncComprehensiveCounterOpBase,
     ComprehensiveMetadataOpBase,
     ComprehensiveTagsOpBase,
     TTLActionTestBase,
@@ -188,7 +187,7 @@ class TestRapyerAsetTtl(ActionTestBase):
         assert all(0 < ttl <= TTL_SECONDS for ttl in loaded), loaded
 
 
-class TestRedisIntAincrease(AsyncComprehensiveCounterOpBase):
+class TestRedisIntAincrease(ComprehensiveCounterOpBase, TTLActionTestBase):
     covered_method = RedisInt.aincrease
 
     def create_models(self):

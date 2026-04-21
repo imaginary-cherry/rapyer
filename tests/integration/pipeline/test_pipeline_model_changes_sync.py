@@ -7,7 +7,7 @@ from rapyer.types.lst import RedisList
 from tests.integration.pipeline.pipeline_atomicity_base import (
     AllTypesModelDictFieldOpBase,
     AllTypesModelListFieldOpBase,
-    AsyncFloatModelValueOpBase,
+    TTLActionTestBase,
     UpdateActionTestBase,
 )
 from tests.models.complex_types import InnerMostModel, MiddleModel, OuterModel
@@ -426,11 +426,15 @@ async def test_float_division_changes_preserved_during_pipeline_committed_after_
     assert final_model.value == 25.0
 
 
-class TestFloatAincrease(AsyncFloatModelValueOpBase):
+class TestFloatAincrease(UpdateActionTestBase, TTLActionTestBase):
     covered_method = RedisFloat.aincrease
 
     def create_models(self):
         return [FloatModel(value=50.0)]
+
+    async def load_data(self):
+        loaded = await FloatModel.aget(self.created_models[0].key)
+        return loaded.value
 
     async def perform_action(self, piped: FloatModel):
         await piped.value.aincrease(10.5)

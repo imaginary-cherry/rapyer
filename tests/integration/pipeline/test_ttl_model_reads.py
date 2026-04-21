@@ -1,7 +1,6 @@
 from rapyer.base import AtomicRedisModel
 from rapyer.types.base import RedisType
 from tests.integration.pipeline.pipeline_atomicity_base import (
-    AsyncComprehensiveCounterOpBase,
     TTLActionTestBase,
 )
 from tests.models.collection_types import ComprehensiveTestModel
@@ -52,7 +51,7 @@ class TestModelAfindOne(TTLActionTestBase):
         await type(self.created_models[0]).afind_one()
 
 
-class TestRedisTypeAload(AsyncComprehensiveCounterOpBase):
+class TestRedisTypeAload(ComprehensiveCounterOpBase, TTLActionTestBase):
     covered_method = RedisType.aload
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 

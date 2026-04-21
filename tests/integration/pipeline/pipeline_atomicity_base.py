@@ -16,7 +16,6 @@ from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.functionality_types import AllTypesModel
 from tests.models.pipeline_base import INIT_CLOBBER_SENTINEL, PipelineActionModel
 from tests.models.redis_types import PipelineAllTypesTestModel
-from tests.models.simple_types import FloatModel
 
 # =============================================================================
 # Shared case dataclasses
@@ -368,27 +367,6 @@ class ComprehensiveCounterOpBase(UpdateActionTestBase, ABC):
         return self.test_input.expected
 
 
-class AsyncComprehensiveCounterOpBase(UpdateActionTestBase, TTLActionTestBase, ABC):
-    """Async ops on ``ComprehensiveTestModel.counter`` (RedisInt) with TTL coverage.
-
-    Parallel to :class:`ComprehensiveCounterOpBase`; used by async mutations
-    like ``RedisInt.aincrease`` and field-level ``RedisType.aload`` /
-    ``RedisType.asave``.
-    """
-
-    async def load_data(self):
-        loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
-        return loaded.counter
-
-
-class AsyncFloatModelValueOpBase(UpdateActionTestBase, TTLActionTestBase, ABC):
-    """Async ops on ``FloatModel.value`` (RedisFloat) with TTL coverage."""
-
-    async def load_data(self):
-        loaded = await FloatModel.aget(self.created_models[0].key)
-        return loaded.value
-
-
 class AllTypesAmountOpBase(UpdateActionTestBase, ABC):
     """RedisFloat binary ops on ``PipelineAllTypesTestModel.amount``. ``self.test_input`` is ``BinaryOpCase``."""
 
@@ -422,21 +400,9 @@ class ComprehensiveTagsOpBase(UpdateActionTestBase, ABC):
         return loaded.tags
 
 
-class AsyncComprehensiveTagsOpBase(UpdateActionTestBase, TTLActionTestBase, ABC):
-    async def load_data(self):
-        loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
-        return loaded.tags
-
-
 class ComprehensiveMetadataOpBase(UpdateActionTestBase, ABC):
     """Dict ops on ``ComprehensiveTestModel.metadata``. Sync / pipeline-only."""
 
-    async def load_data(self):
-        loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
-        return loaded.metadata
-
-
-class AsyncComprehensiveMetadataOpBase(UpdateActionTestBase, TTLActionTestBase, ABC):
     async def load_data(self):
         loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
         return loaded.metadata
