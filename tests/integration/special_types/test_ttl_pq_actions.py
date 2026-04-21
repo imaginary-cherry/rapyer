@@ -17,13 +17,17 @@ from tests.models.special_types import (
 class PQActionBase(UpdateActionTestBase, AsyncActionTestBase, ABC):
     ttl_model_cls = PriorityQueueTTLModel
     no_refresh_ttl_model_cls = PriorityQueueTTLNoRefreshModel
-    skip_pipeline_atomicity = True
 
     def create_models(self):
         return [PriorityQueueModel(name="pq_test")]
 
     def ttl_keys(self, model: PriorityQueueModel):
         return [model.key, model.tasks.special_key]
+
+    async def load_data(self):
+        return await self.real_redis_client.zrange(
+            self.created_models[0].tasks.special_key, 0, -1, withscores=True
+        )
 
     async def _setup_ttl_data(self, model_cls: type[PriorityQueueModel]):
         originals = self.create_models()
@@ -46,23 +50,52 @@ class TestPQApush(PQActionBase):
     covered_method = RedisPriorityQueue.apush
 
     async def perform_action(self, piped: PriorityQueueModel):
-        await self.created_models[0].tasks.apush("new_item", 0.5)
+        await piped.tasks.apush("new_item", 0.5)
+
+    def expected_before(self):
+        return []
+
+    def expected_after(self):
+        return [('"new_item"', 0.5)]
 
 
 class TestPQApushMany(PQActionBase):
     covered_method = RedisPriorityQueue.apush_many
 
     async def perform_action(self, piped: PriorityQueueModel):
-        await self.created_models[0].tasks.apush_many(
+        await piped.tasks.apush_many(
             [
                 PriorityQueueItem(value="a", priority=0.1),
                 PriorityQueueItem(value="b", priority=0.2),
             ]
         )
 
+    def expected_before(self):
+        return []
+
+    def expected_after(self):
+        return [('"a"', 0.1), ('"b"', 0.2)]
+
+
+class TestPQAclear(PQActionBase):
+    covered_method = RedisPriorityQueue.aclear
+
+    def ttl_keys(self, model):
+        return [model.key]
+
+    async def perform_action(self, piped: PriorityQueueModel):
+        await piped.tasks.aclear()
+
+    def expected_before(self):
+        return []
+
+    def expected_after(self):
+        return []
+
 
 class TestPQApop(PQActionBase):
     covered_method = RedisPriorityQueue.apop
+    skip_pipeline_atomicity = True
 
     async def perform_action(self, piped: PriorityQueueModel):
         await self.created_models[0].tasks.apop()
@@ -75,13 +108,25 @@ class TestPQAremove(PQActionBase):
         await self.created_models[0].tasks.aremove("medium")
 
 
-class TestPQAclear(PQActionBase):
-    """``aclear`` deletes the special key, so only check ``model.key`` TTL."""
-
-    covered_method = RedisPriorityQueue.aclear
-
-    def ttl_keys(self, model):
-        return [model.key]
+class TestPQApeek(PQActionBase):
+    covered_method = RedisPriorityQueue.apeek
+    skip_pipeline_atomicity = True
 
     async def perform_action(self, piped: PriorityQueueModel):
-        await self.created_models[0].tasks.aclear()
+        await self.created_models[0].tasks.apeek()
+
+
+class TestPQAsize(PQActionBase):
+    covered_method = RedisPriorityQueue.asize
+    skip_pipeline_atomicity = True
+
+    async def perform_action(self, piped: PriorityQueueModel):
+        await self.created_models[0].tasks.asize()
+
+
+class TestPQAitems(PQActionBase):
+    covered_method = RedisPriorityQueue.aitems
+    skip_pipeline_atomicity = True
+
+    async def perform_action(self, piped: PriorityQueueModel):
+        await self.created_models[0].tasks.aitems()
