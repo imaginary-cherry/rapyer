@@ -1,3 +1,5 @@
+import pytest
+
 import rapyer
 from rapyer.base import AtomicRedisModel
 from rapyer.types.dct import RedisDict
@@ -89,6 +91,11 @@ class TestModelAinsert(AsyncActionTestBase):
 
     def expected_after(self):
         return 1, "inserted"
+
+    @pytest.mark.asyncio
+    async def test_ttl_no_refresh_on_action(self):
+        pytest.skip("Ainsert is initial so we always set ttl")
+
 
 
 # NOTE: mirrors TestModelAinsert but exercises the module-level
