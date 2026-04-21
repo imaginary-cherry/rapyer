@@ -9,6 +9,7 @@ from rapyer.types.integer import RedisInt
 from rapyer.types.lst import RedisList
 from tests.integration.pipeline.pipeline_atomicity_base import (
     ActionTestBase,
+    ComprehensiveCounterOpBase,
     ComprehensiveMetadataOpBase,
     ComprehensiveTagsOpBase,
     TTLActionTestBase,

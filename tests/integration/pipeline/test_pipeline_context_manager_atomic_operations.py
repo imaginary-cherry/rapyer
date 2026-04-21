@@ -6,6 +6,8 @@ from rapyer.types.base import RedisType
 from rapyer.types.dct import RedisDict
 from rapyer.types.lst import RedisList
 from tests.integration.pipeline.pipeline_atomicity_base import (
+    ComprehensiveMetadataOpBase,
+    ComprehensiveTagsOpBase,
     TTLActionTestBase,
     TwoModelDeleteBase,
     UpdateActionTestBase,
