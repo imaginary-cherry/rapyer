@@ -10,20 +10,11 @@ from rapyer.types.dct import RedisDict
 from rapyer.types.lst import RedisList
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.special import SpecialFieldType
-
-
-def _method_to_tuple(method: Callable) -> tuple[str, str]:
-    qualname = method.__qualname__
-    if "." in qualname:
-        class_name, method_name = qualname.rsplit(".", 1)
-        return class_name, method_name
-    # Module-level function — match the (rapyer, name) shape produced by
-    # conftest._iter_module_functions.
-    return rapyer.__name__, qualname
+from tests.integration.pipeline.pipeline_atomicity_base import _cover_tuple
 
 
 def _group(*methods: Callable) -> frozenset[tuple[str, str]]:
-    return frozenset(_method_to_tuple(m) for m in methods)
+    return frozenset(_cover_tuple(m) for m in methods)
 
 
 # ── Private helpers: single-underscore internals, not Redis operations ────
@@ -71,4 +62,6 @@ NON_ACTION_METHODS = _group(
     init_rapyer,
     teardown_rapyer,
     find_redis_models,
+    # Distributed lock context manager, not a pipeline-participating write.
+    rapyer.alock_from_key,
 )

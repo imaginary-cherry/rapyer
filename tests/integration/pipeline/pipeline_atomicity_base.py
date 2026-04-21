@@ -38,6 +38,14 @@ class BinaryOpCase:
 # =============================================================================
 
 
+def _cover_tuple(method: Any) -> tuple[str, str]:
+    qualname = method.__qualname__
+    if "." in qualname:
+        cls_name, method_name = qualname.rsplit(".", 1)
+        return cls_name, method_name
+    return rapyer.__name__, qualname
+
+
 class ActionTestBase(ABC):
     """
     Define tests for all the actions in this package, so each action will be tested for all the behaviors
@@ -149,7 +157,7 @@ class ActionTestBase(ABC):
         if methods is not None:
             if not isinstance(methods, list):
                 methods = [methods]
-            normalized = [tuple(m.__qualname__.rsplit(".", 1)) for m in methods]
+            normalized = [_cover_tuple(m) for m in methods]
             wrapped = getattr(pytest.mark, cover_marker)(*normalized)(wrapped)
 
         skip_reason = getattr(cls, skip_attr)
