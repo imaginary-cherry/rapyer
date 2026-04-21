@@ -4,6 +4,7 @@ import inspect
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, ClassVar, cast
+from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
@@ -11,19 +12,11 @@ import pytest_asyncio
 import rapyer
 from rapyer import AtomicRedisModel
 from tests.integration.conftest import REDUCED_TTL_SECONDS
-from tests.models.collection_types import (
-    ComprehensiveTestModel,
-    NoRefreshTTLComprehensiveTestModel,
-    TTLComprehensiveTestModel,
-)
+from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.functionality_types import AllTypesModel
 from tests.models.pipeline_base import INIT_CLOBBER_SENTINEL, PipelineActionModel
 from tests.models.redis_types import PipelineAllTypesTestModel
-from tests.models.simple_types import (
-    FloatModel,
-    NoRefreshTTLFloatModel,
-    TTLFloatModel,
-)
+from tests.models.simple_types import FloatModel
 
 # =============================================================================
 # Shared case dataclasses
@@ -234,12 +227,6 @@ class AsyncActionTestBase(ActionTestBase, ABC):
     behavior for async actions decorated with ``@mark_actions``.
     """
 
-    ttl_model_cls: ClassVar[type[AtomicRedisModel]]
-    """Model subclass with ``Meta.ttl`` set. Used in ``test_ttl_refresh_on_action``."""
-
-    no_refresh_ttl_model_cls: ClassVar[type[AtomicRedisModel]]
-    """Model subclass with ``Meta.ttl`` set and ``refresh_ttl=False``."""
-
     model_exists_before_action: bool = True
 
     def ttl_keys(self, model: AtomicRedisModel) -> list[str]:
@@ -250,24 +237,16 @@ class AsyncActionTestBase(ActionTestBase, ABC):
         """
         return [model.key]
 
-    async def _setup_ttl_data(
-        self, model_cls: type[AtomicRedisModel]
-    ) -> list[AtomicRedisModel]:
-        originals = await self.setup_data()
-        recreated = [model_cls(**m.model_dump()) for m in originals]
-
-        for inst in recreated:
+    async def _setup_ttl_data(self) -> list[AtomicRedisModel]:
+        models = await self.setup_data()
+        for inst in models:
             for key in self.ttl_keys(inst):
                 await self.real_redis_client.expire(key, REDUCED_TTL_SECONDS)
-
-        return recreated
+        return models
 
     @pytest.mark.asyncio
     async def test_ttl_refresh_on_action(self):
-        assert (
-            self.ttl_model_cls is not None
-        ), f"{type(self).__name__}.ttl_model_cls is not set"
-        self.created_models = await self._setup_ttl_data(self.ttl_model_cls)
+        self.created_models = await self._setup_ttl_data()
         model_for_keys = self.created_models[0]
 
         keys = []
@@ -279,9 +258,10 @@ class AsyncActionTestBase(ActionTestBase, ABC):
                 *[self.real_redis_client.ttl(k) for k in keys]
             )
 
-        await self.perform_action(model_for_keys)
+        with patch("rapyer.base.should_refresh_for_action", return_value=True):
+            await self.perform_action(model_for_keys)
 
-        ttl_configured = self.ttl_model_cls.Meta.ttl
+        ttl_configured = model_for_keys.Meta.ttl
         afters = await asyncio.gather(
             *[self.real_redis_client.ttl(key) for key in keys]
         )
@@ -298,10 +278,7 @@ class AsyncActionTestBase(ActionTestBase, ABC):
 
     @pytest.mark.asyncio
     async def test_ttl_no_refresh_on_action(self):
-        assert (
-            self.no_refresh_ttl_model_cls is not None
-        ), f"{type(self).__name__}.no_refresh_ttl_model_cls is not set"
-        self.created_models = await self._setup_ttl_data(self.no_refresh_ttl_model_cls)
+        self.created_models = await self._setup_ttl_data()
         model_for_keys = self.created_models[0]
 
         keys = []
@@ -312,7 +289,9 @@ class AsyncActionTestBase(ActionTestBase, ABC):
             ttls_before: list[int] = await asyncio.gather(
                 *[self.real_redis_client.ttl(k) for k in keys]
             )
-        await self.perform_action(model_for_keys)
+
+        with patch("rapyer.base.should_refresh_for_action", return_value=False):
+            await self.perform_action(model_for_keys)
 
         afters = await asyncio.gather(
             *[self.real_redis_client.ttl(key) for key in keys]
@@ -378,7 +357,6 @@ class AsyncRapyerActionBase(AsyncActionTestBase, ABC):
     """Atomicity via module-level ``rapyer.apipeline()`` context, with TTL coverage.
 
     Parallel to :class:`RapyerActionBase` for async actions.
-    Subclasses declare their own ``ttl_model_cls`` / ``no_refresh_ttl_model_cls``.
     """
 
     def pipeline_owner(self):
@@ -410,9 +388,6 @@ class AsyncComprehensiveCounterOpBase(UpdateActionTestBase, AsyncActionTestBase,
     ``RedisType.asave``.
     """
 
-    ttl_model_cls = TTLComprehensiveTestModel
-    no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
-
     async def load_data(self):
         loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
         return loaded.counter
@@ -420,9 +395,6 @@ class AsyncComprehensiveCounterOpBase(UpdateActionTestBase, AsyncActionTestBase,
 
 class AsyncFloatModelValueOpBase(UpdateActionTestBase, AsyncActionTestBase, ABC):
     """Async ops on ``FloatModel.value`` (RedisFloat) with TTL coverage."""
-
-    ttl_model_cls = TTLFloatModel
-    no_refresh_ttl_model_cls = NoRefreshTTLFloatModel
 
     async def load_data(self):
         loaded = await FloatModel.aget(self.created_models[0].key)
@@ -463,9 +435,6 @@ class ComprehensiveTagsOpBase(UpdateActionTestBase, ABC):
 
 
 class AsyncComprehensiveTagsOpBase(UpdateActionTestBase, AsyncActionTestBase, ABC):
-    ttl_model_cls = TTLComprehensiveTestModel
-    no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
-
     async def load_data(self):
         loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
         return loaded.tags
@@ -480,9 +449,6 @@ class ComprehensiveMetadataOpBase(UpdateActionTestBase, ABC):
 
 
 class AsyncComprehensiveMetadataOpBase(UpdateActionTestBase, AsyncActionTestBase, ABC):
-    ttl_model_cls = TTLComprehensiveTestModel
-    no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
-
     async def load_data(self):
         loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
         return loaded.metadata

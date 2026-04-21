@@ -4,17 +4,11 @@ from tests.integration.pipeline.pipeline_atomicity_base import (
     AsyncActionTestBase,
     AsyncComprehensiveCounterOpBase,
 )
-from tests.models.collection_types import (
-    ComprehensiveTestModel,
-    NoRefreshTTLComprehensiveTestModel,
-    TTLComprehensiveTestModel,
-)
+from tests.models.collection_types import ComprehensiveTestModel
 
 
 class TestModelAget(AsyncActionTestBase):
     covered_method = AtomicRedisModel.aget
-    ttl_model_cls = TTLComprehensiveTestModel
-    no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
     skip_pipeline_atomicity = True
 
     def create_models(self):
@@ -27,8 +21,6 @@ class TestModelAget(AsyncActionTestBase):
 
 class TestModelAload(AsyncActionTestBase):
     covered_method = AtomicRedisModel.aload
-    ttl_model_cls = TTLComprehensiveTestModel
-    no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
     skip_pipeline_atomicity = True
 
     def create_models(self):
@@ -40,8 +32,6 @@ class TestModelAload(AsyncActionTestBase):
 
 class TestModelAfind(AsyncActionTestBase):
     covered_method = AtomicRedisModel.afind
-    ttl_model_cls = TTLComprehensiveTestModel
-    no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
     skip_pipeline_atomicity = True
 
     def create_models(self):
@@ -53,8 +43,6 @@ class TestModelAfind(AsyncActionTestBase):
 
 class TestModelAfindOne(AsyncActionTestBase):
     covered_method = AtomicRedisModel.afind_one
-    ttl_model_cls = TTLComprehensiveTestModel
-    no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
     skip_pipeline_atomicity = True
 
     def create_models(self):

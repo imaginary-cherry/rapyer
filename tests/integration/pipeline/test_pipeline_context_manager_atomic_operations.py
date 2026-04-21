@@ -14,9 +14,7 @@ from tests.integration.pipeline.pipeline_atomicity_base import (
 )
 from tests.models.collection_types import (
     ComprehensiveTestModel,
-    NoRefreshTTLComprehensiveTestModel,
     PipelineTestModel,
-    TTLComprehensiveTestModel,
 )
 
 
@@ -371,8 +369,6 @@ class TestDictApopitem(AsyncComprehensiveMetadataOpBase):
 
 class TestStringSet(UpdateActionTestBase, AsyncActionTestBase):
     covered_method = RedisType.asave
-    ttl_model_cls = TTLComprehensiveTestModel
-    no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
 
     def create_models(self):
         return [ComprehensiveTestModel(name="original")]

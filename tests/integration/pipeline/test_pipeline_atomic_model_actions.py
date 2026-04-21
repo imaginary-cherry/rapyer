@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 
 import rapyer
@@ -16,11 +18,7 @@ from tests.integration.pipeline.pipeline_atomicity_base import (
     TwoModelDeleteBase,
     UpdateActionTestBase,
 )
-from tests.models.collection_types import (
-    ComprehensiveTestModel,
-    NoRefreshTTLComprehensiveTestModel,
-    TTLComprehensiveTestModel,
-)
+from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.simple_types import (
     TTL_TEST_SECONDS,
     TTLRefreshTestModel,
@@ -32,8 +30,6 @@ TTL_SECONDS = 300
 
 class TestModelAsave(UpdateActionTestBase, AsyncActionTestBase):
     covered_method = AtomicRedisModel.asave
-    ttl_model_cls = TTLComprehensiveTestModel
-    no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
 
     def create_models(self):
         return [ComprehensiveTestModel(name="original", counter=10)]
@@ -64,8 +60,6 @@ class TestModelAinsert(AsyncActionTestBase):
     """
 
     covered_method = AtomicRedisModel.ainsert
-    ttl_model_cls = TTLComprehensiveTestModel
-    no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
     model_exists_before_action = False
 
     def create_models(self):
@@ -388,8 +382,6 @@ class TestRapyerAupdate(UpdateActionTestBase, AsyncRapyerActionBase):
     pipeline like every other mutation."""
 
     covered_method = AtomicRedisModel.aupdate
-    ttl_model_cls = TTLComprehensiveTestModel
-    no_refresh_ttl_model_cls = NoRefreshTTLComprehensiveTestModel
 
     def create_models(self):
         return [ComprehensiveTestModel(name="original", counter=10)]

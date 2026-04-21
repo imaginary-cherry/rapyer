@@ -132,19 +132,7 @@ class ComprehensiveTestModel(PipelineActionModel):
     name: str = ""
     counter: int = 0
 
-
-class TTLComprehensiveTestModel(ComprehensiveTestModel):
-    """Variant of :class:`ComprehensiveTestModel` with TTL refresh enabled."""
-
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=TTL_REFRESH_TEST_SECONDS)
-
-
-class NoRefreshTTLComprehensiveTestModel(ComprehensiveTestModel):
-    """Variant of :class:`ComprehensiveTestModel` with TTL set but refresh disabled."""
-
-    Meta: ClassVar[RedisConfig] = RedisConfig(
-        ttl=TTL_REFRESH_TEST_SECONDS, refresh_ttl=False
-    )
 
 
 class PipelineTestModel(AtomicRedisModel):

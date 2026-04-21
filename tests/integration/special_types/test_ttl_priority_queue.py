@@ -10,9 +10,8 @@ from tests.conftest import (
 from tests.integration.conftest import REDUCED_TTL_SECONDS, SavedModelWithReducedTTL
 from tests.models.simple_types import TTL_TEST_SECONDS
 from tests.models.special_types import (
+    PriorityQueueModel,
     PriorityQueueModelBase,
-    PriorityQueueTTLModel,
-    PriorityQueueTTLNoRefreshModel,
 )
 
 
@@ -33,14 +32,7 @@ async def create_pq_model(real_redis_client, model: PriorityQueueModelBase):
 
 @pytest_asyncio.fixture
 async def saved_pq_ttl_model_with_reduced_ttl(real_redis_client):
-    model = PriorityQueueTTLModel(name="pq_ttl_test")
-    async for result in create_pq_model(real_redis_client, model):
-        yield result
-
-
-@pytest_asyncio.fixture
-async def saved_pq_no_refresh_model_with_reduced_ttl(real_redis_client):
-    model = PriorityQueueTTLNoRefreshModel(name="pq_no_refresh_test")
+    model = PriorityQueueModel(name="pq_ttl_test")
     async for result in create_pq_model(real_redis_client, model):
         yield result
 
@@ -128,7 +120,7 @@ async def test_ttl_refresh_pq_key_on_aget(
     initial_ttl = saved_pq_ttl_model_with_reduced_ttl.initial_ttl
 
     # Act
-    await PriorityQueueTTLModel.aget(model.key)
+    await PriorityQueueModel.aget(model.key)
 
     # Assert
     await assert_ttl_refreshed(
@@ -146,7 +138,7 @@ async def test_ttl_refresh_pq_key_on_afind(
     initial_ttl = saved_pq_ttl_model_with_reduced_ttl.initial_ttl
 
     # Act
-    await PriorityQueueTTLModel.afind()
+    await PriorityQueueModel.afind()
 
     # Assert
     await assert_ttl_refreshed(
@@ -158,10 +150,10 @@ async def test_ttl_refresh_pq_key_on_afind(
 @pytest.mark.asyncio
 async def test_ttl_pq_key_on_ainsert(real_redis_client):
     # Arrange
-    model = PriorityQueueTTLModel(name="insert_ttl_test")
+    model = PriorityQueueModel(name="insert_ttl_test")
 
     # Act
-    await PriorityQueueTTLModel.ainsert(model)
+    await PriorityQueueModel.ainsert(model)
 
     # Assert
     await assert_ttl_refreshed(real_redis_client, REDUCED_TTL_SECONDS, model.key)
@@ -177,7 +169,7 @@ async def test_ttl_refresh_pq_key_on_afind_one(
     initial_ttl = saved_pq_ttl_model_with_reduced_ttl.initial_ttl
 
     # Act
-    await PriorityQueueTTLModel.afind_one(model.key)
+    await PriorityQueueModel.afind_one(model.key)
 
     # Assert
     await assert_ttl_refreshed(
@@ -189,7 +181,7 @@ async def test_ttl_refresh_pq_key_on_afind_one(
 @pytest.mark.asyncio
 async def test_refresh_ttl_if_needed_refreshes_pq_key_ttl(real_redis_client):
     # Arrange
-    model = PriorityQueueTTLModel(name="refresh_test")
+    model = PriorityQueueModel(name="refresh_test")
     await model.asave()
     await model.tasks.apush("item", 1.0)
 

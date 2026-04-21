@@ -432,8 +432,6 @@ async def test_aset_ttl_sets_ttl_on_both_model_and_pq_key(
     model = saved_pq_model
     model_key = model.key
     pq_key = model.tasks.special_key
-    assert await real_redis_client.ttl(model_key) == -1
-    assert await real_redis_client.ttl(pq_key) == -1
 
     # Act
     await model.aset_ttl(60)

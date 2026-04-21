@@ -17,6 +17,8 @@ class PriorityQueueModelBase(PipelineActionModel, Generic[T]):
 class PriorityQueueModel(PriorityQueueModelBase[str]):
     name: str = "default"
 
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=TTL_TEST_SECONDS)
+
 
 class PriorityQueueIntModel(PriorityQueueModelBase[int]):
     label: str = "test"
@@ -46,13 +48,3 @@ class PQContainerModel(AtomicRedisModel):
     outer_name: str = "container"
 
 
-class PriorityQueueTTLModel(PriorityQueueModelBase[str]):
-    name: str = "default"
-
-    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=TTL_TEST_SECONDS)
-
-
-class PriorityQueueTTLNoRefreshModel(PriorityQueueModelBase[str]):
-    name: str = "default"
-
-    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=TTL_TEST_SECONDS, refresh_ttl=False)

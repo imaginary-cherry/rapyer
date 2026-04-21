@@ -6,11 +6,7 @@ from tests.integration.pipeline.pipeline_atomicity_base import (
     AsyncActionTestBase,
     UpdateActionTestBase,
 )
-from tests.models.special_types import (
-    PriorityQueueModel,
-    PriorityQueueTTLModel,
-    PriorityQueueTTLNoRefreshModel,
-)
+from tests.models.special_types import PriorityQueueModel
 
 # Initial items every PQ test class starts with. Kept in class-level constants
 # so test classes can assemble their ``expected_before`` / ``expected_after``
@@ -29,9 +25,6 @@ INITIAL_CONTENTS: list[tuple[str, float]] = [
 
 
 class PQActionBase(UpdateActionTestBase, AsyncActionTestBase, ABC):
-    ttl_model_cls = PriorityQueueTTLModel
-    no_refresh_ttl_model_cls = PriorityQueueTTLNoRefreshModel
-
     initial_items: ClassVar[list[tuple[str, float]]] = INITIAL_ITEMS
 
     def create_models(self):

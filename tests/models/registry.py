@@ -17,12 +17,10 @@ from tests.models.collection_types import (
     ListModel,
     MixedTypesModel,
     NestedDictModel,
-    NoRefreshTTLComprehensiveTestModel,
     PipelineTestModel,
     ProductListModel,
     StrDictModel,
     StrListModel,
-    TTLComprehensiveTestModel,
     UserListModel,
 )
 from tests.models.common import EventWithDatetimeKeyModel, UserWithKeyModel
@@ -73,10 +71,8 @@ from tests.models.simple_types import (
     FloatModel,
     IntModel,
     NoneTestModel,
-    NoRefreshTTLFloatModel,
     StrModel,
     TaskModel,
-    TTLFloatModel,
     TTLRefreshDisabledModel,
     TTLRefreshTestModel,
     UserModelWithoutTTL,
@@ -89,8 +85,6 @@ from tests.models.special_types import (
     PQContainerModel,
     PriorityQueueIntModel,
     PriorityQueueModel,
-    PriorityQueueTTLModel,
-    PriorityQueueTTLNoRefreshModel,
     SubSubPriorityQueueModel,
 )
 from tests.models.specialized import UserModel
@@ -128,13 +122,9 @@ TESTED_REDIS_MODELS = [
     MixedTypesModel,
     PipelineTestModel,
     ComprehensiveTestModel,
-    TTLComprehensiveTestModel,
-    NoRefreshTTLComprehensiveTestModel,
     # Simple types
     IntModel,
     FloatModel,
-    TTLFloatModel,
-    NoRefreshTTLFloatModel,
     BoolModel,
     StrModel,
     BytesModel,
@@ -196,8 +186,6 @@ TESTED_REDIS_MODELS = [
     MixedSpecialModel,
     GenericPriorityQueueModel,
     OptionalPriorityQueueModel,
-    PriorityQueueTTLModel,
-    PriorityQueueTTLNoRefreshModel,
     SubSubPriorityQueueModel,
     PQContainerModel,
 ]
