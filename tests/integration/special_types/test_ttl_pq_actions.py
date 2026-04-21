@@ -47,15 +47,15 @@ class PQActionBase(UpdateActionTestBase, AsyncActionTestBase, ABC):
             self.created_models[0].tasks.special_key, 0, -1, withscores=True
         )
 
+    def expected_before(self):
+        return INITIAL_CONTENTS
+
 
 class TestPQApush(PQActionBase):
     covered_method = RedisPriorityQueue.apush
 
     async def perform_action(self, piped: PriorityQueueModel):
         await piped.tasks.apush("new_item", 0.5)
-
-    def expected_before(self):
-        return INITIAL_CONTENTS
 
     def expected_after(self):
         # priority 0.5 < 1.0, so the new item sorts in front of the initial trio.
@@ -109,6 +109,9 @@ class TestPQAremove(PQActionBase):
 
     async def perform_action(self, piped: PriorityQueueModel):
         await self.created_models[0].tasks.aremove("medium")
+
+    def expected_after(self):
+        return [('"high"', 1.0), ('"low"', 3.0)]
 
 
 class TestPQApeek(PQActionBase):
