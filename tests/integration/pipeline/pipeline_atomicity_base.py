@@ -98,12 +98,18 @@ class ActionTestBase(ABC):
 
     @pytest.mark.asyncio
     async def test_pipeline_atomicity(self, test_input):
+        # Arrange
         self.test_input = test_input
         self.created_models = await self.setup_data()
+
+        # Act
         async with rapyer.apipeline():
             await self.perform_action(self.created_models[0])
+            # Assert (during pipeline)
             loaded_during = await self.load_data()
             self.assert_during_pipeline(loaded_during)
+
+        # Assert (after pipeline)
         loaded_after = await self.load_data()
         self.assert_after_pipeline(loaded_after)
 
@@ -180,19 +186,18 @@ class UpdateActionTestBase(ActionTestBase, ABC):
 
     @pytest.mark.asyncio
     async def test_no_clobber(self, test_input):
+        # Arrange
         self.test_input = test_input
         self.created_models = await self.setup_data()
         sentinel_models = self.created_models
-
-        # Inject sentinel directly into Redis for every existing model
         for model in sentinel_models:
             model.pipeline_no_clobber_sentinel = self.NO_CLOBBER_SENTINEL_VALUE
 
-        # Perform the action — use pipeline unless the action can't be deferred
+        # Act
         async with rapyer.apipeline():
             await self.perform_action(self.created_models[0])
 
-        # Verify sentinel was NOT overwritten on surviving models
+        # Assert
         keys = [model.key for model in sentinel_models]
         loaded_data = await rapyer.afind(*keys)
         loaded_data = cast(list[PipelineActionModel], loaded_data)
@@ -254,9 +259,9 @@ class AsyncActionTestBase(ActionTestBase, ABC):
 
     @pytest.mark.asyncio
     async def test_ttl_refresh_on_action(self):
+        # Arrange
         self.created_models = await self._setup_ttl_data()
         model_for_keys = self.created_models[0]
-
         keys = []
         for model in self.created_models:
             keys.extend(self.ttl_keys(model))
@@ -266,9 +271,11 @@ class AsyncActionTestBase(ActionTestBase, ABC):
                 *[self.real_redis_client.ttl(k) for k in keys]
             )
 
+        # Act
         with patch("rapyer.base.should_refresh_for_action", return_value=True):
             await self.perform_action(model_for_keys)
 
+        # Assert
         ttl_configured = model_for_keys.Meta.ttl
         afters = await asyncio.gather(
             *[self.real_redis_client.ttl(key) for key in keys]
@@ -286,9 +293,9 @@ class AsyncActionTestBase(ActionTestBase, ABC):
 
     @pytest.mark.asyncio
     async def test_ttl_no_refresh_on_action(self):
+        # Arrange
         self.created_models = await self._setup_ttl_data()
         model_for_keys = self.created_models[0]
-
         keys = []
         for model in self.created_models:
             keys.extend(self.ttl_keys(model))
@@ -298,9 +305,11 @@ class AsyncActionTestBase(ActionTestBase, ABC):
                 *[self.real_redis_client.ttl(k) for k in keys]
             )
 
+        # Act
         with patch("rapyer.base.should_refresh_for_action", return_value=False):
             await self.perform_action(model_for_keys)
 
+        # Assert
         afters = await asyncio.gather(
             *[self.real_redis_client.ttl(key) for key in keys]
         )
