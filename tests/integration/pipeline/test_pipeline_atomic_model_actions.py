@@ -1,7 +1,3 @@
-from unittest.mock import patch
-
-import pytest
-
 import rapyer
 from rapyer.base import AtomicRedisModel
 from rapyer.types.dct import RedisDict
@@ -64,20 +60,20 @@ class TestModelAinsert(AsyncActionTestBase):
 
     def create_models(self):
         # Only the existing model is inserted; the new model is the test subject.
-        return [ComprehensiveTestModel(name="existing")]
+        return [
+            ComprehensiveTestModel(name="existing"),
+            ComprehensiveTestModel(name="existing2"),
+        ]
 
     async def setup_data(self):
-        existing_models = await super().setup_data()
-        new_model = ComprehensiveTestModel(name="inserted")
-        return [*existing_models, new_model]
+        return self.create_models()
 
     def pipeline_owner(self):
         existing, _new = self.created_models
         return existing
 
-    async def perform_action(self, piped: ComprehensiveTestModel) -> None:
-        _existing, new_model = self.created_models
-        await ComprehensiveTestModel.ainsert(new_model)
+    async def perform_action(self, piped: ComprehensiveTestModel):
+        await ComprehensiveTestModel.ainsert(*self.created_models)
 
     async def load_data(self):
         """Return ``(exists_flag, name_or_None)`` for the new model."""
@@ -115,7 +111,9 @@ class TestRapyerAinsert(RapyerActionBase):
         await ComprehensiveTestModel.ainsert(*self.created_models)
 
     async def load_data(self):
-        return tuple([await self.real_redis_client.exists(m.key) for m in self.created_models])
+        return tuple(
+            [await self.real_redis_client.exists(m.key) for m in self.created_models]
+        )
 
     def expected_before(self):
         return 0, 0
