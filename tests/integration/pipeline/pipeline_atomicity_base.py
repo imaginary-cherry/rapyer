@@ -342,13 +342,25 @@ class AsyncActionTestBase(ActionTestBase, ABC):
             for method in methods:
                 class_name, method_name = method.__qualname__.rsplit(".", 1)
                 normalized.append((class_name, method_name))
-            cover_ttl_mark = pytest.mark.cover_ttl_refresh(*normalized)
-            cls.test_ttl_refresh_on_action = cover_ttl_mark(
-                cls.test_ttl_refresh_on_action
+
+            base_refresh_fn = cls.test_ttl_refresh_on_action
+
+            @functools.wraps(base_refresh_fn)
+            async def test_ttl_refresh_on_action(self):
+                return await base_refresh_fn(self)
+
+            mark_ttl_test = pytest.mark.cover_ttl_refresh(*normalized)
+            cls.test_ttl_refresh_on_action = mark_ttl_test(test_ttl_refresh_on_action)
+            base_no_refresh_fn = cls.test_ttl_no_refresh_on_action
+
+            @functools.wraps(base_no_refresh_fn)
+            async def test_ttl_no_refresh_on_action(self):
+                return await base_no_refresh_fn(self)
+
+            mark_ttl_refresh = pytest.mark.cover_ttl_no_refresh(*normalized)
+            cls.test_ttl_no_refresh_on_action = mark_ttl_refresh(
+                test_ttl_no_refresh_on_action
             )
-            cls.test_ttl_no_refresh_on_action = pytest.mark.cover_ttl_no_refresh(
-                *normalized
-            )(cls.test_ttl_no_refresh_on_action)
 
 
 # =============================================================================
