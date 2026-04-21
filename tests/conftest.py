@@ -161,7 +161,7 @@ COVERAGE_CHECKS: list[CoverageCheck] = [
     CoverageCheck(
         name="cover_no_clobber",
         help_text="no-clobber behavior",
-        expected=lambda: _collect_methods(),
+        expected=lambda: _collect_methods(ignore_groups=ActionGroup.READ),
     ),
 ]
 
