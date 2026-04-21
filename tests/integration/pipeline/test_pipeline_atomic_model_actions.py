@@ -48,7 +48,7 @@ class TestModelAsave(UpdateActionTestBase, AsyncActionTestBase):
         return "updated", 99
 
     @pytest.mark.asyncio
-    async def test_no_clobber(self, test_input):
+    async def test_no_clobber_effect_when_outside_of_pipeline(self, test_input):
         pytest.skip(
             "Asave saves the entire model, there is no point in checking the clobber"
         )

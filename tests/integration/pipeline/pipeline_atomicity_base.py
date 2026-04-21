@@ -176,16 +176,12 @@ class ActionTestBase(ABC):
 
 
 class UpdateActionTestBase(ActionTestBase, ABC):
-    """Base for actions that modify data in Redis.
-
-    Adds :meth:`test_no_clobber`: verifies that performing the action does
-    NOT overwrite fields that were changed externally (outside the pipeline).
-    """
+    """Base for actions that modify data in Redis."""
 
     NO_CLOBBER_SENTINEL_VALUE: ClassVar[str] = "NO_CLOBBER_SENTINEL_42"
 
     @pytest.mark.asyncio
-    async def test_no_clobber(self, test_input):
+    async def test_no_clobber_effect_when_outside_of_pipeline(self, test_input):
         # Arrange
         self.test_input = test_input
         self.created_models = await self.setup_data()
@@ -214,7 +210,7 @@ class UpdateActionTestBase(ActionTestBase, ABC):
         if inspect.isabstract(cls):
             return
         cls._prepare_action_test(
-            test_attr="test_no_clobber",
+            test_attr="test_no_clobber_effect_when_outside_of_pipeline",
             cover_marker="cover_no_clobber",
             skip_attr="skip_pipeline_atomicity",
             parametrize=True,
