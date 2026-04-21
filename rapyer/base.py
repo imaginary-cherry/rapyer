@@ -953,16 +953,14 @@ def find_redis_models() -> list[type[AtomicRedisModel]]:
 
 @mark_actions(ActionGroup.UPDATE, target=TargetSource.MANUAL, initial=True)
 async def ainsert(*models: Unpack[AtomicRedisModel]) -> list[AtomicRedisModel]:
-    async with AtomicRedisModel.Meta.redis.pipeline() as pipe:
-        with with_pipe_context(pipe):
-            for model in models:
-                register_action_target(model, ActionGroup.UPDATE, initial=True)
-                pipe.json().set(model.key, model.json_path, model.redis_dump())
-                for fname in model.__class__._special_field_names:
-                    field = getattr(model, fname)
-                    if isinstance(field, SpecialFieldType):
-                        await field.asave_special()
-            await pipe.execute()
+    async with ensure_pipeline(AtomicRedisModel.Meta) as pipe:
+        for model in models:
+            register_action_target(model, ActionGroup.UPDATE, initial=True)
+            pipe.json().set(model.key, model.json_path, model.redis_dump())
+            for fname in model.__class__._special_field_names:
+                field = getattr(model, fname)
+                if isinstance(field, SpecialFieldType):
+                    await field.asave_special()
     return models
 
 
