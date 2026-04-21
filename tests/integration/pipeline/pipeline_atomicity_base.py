@@ -97,8 +97,6 @@ class ActionTestBase(ABC):
 
     @pytest.mark.asyncio
     async def test_pipeline_atomicity(self, test_input):
-        if self.skip_pipeline_atomicity:
-            pytest.skip(f"{type(self).__name__} has skip_pipeline_atomicity=True")
         self.test_input = test_input
         self.created_models = await self.setup_data()
         async with rapyer.apipeline():
@@ -135,6 +133,12 @@ class ActionTestBase(ABC):
             conver_marker = pytest.mark.cover_pipeline_atom(*normalized)
             cls.test_pipeline_atomicity = conver_marker(cls.test_pipeline_atomicity)
 
+        if cls.skip_pipeline_atomicity:
+            skip_marker = pytest.mark.skip(
+                reason=f"{cls.__name__} has skip_pipeline_atomicity=True"
+            )
+            cls.test_pipeline_atomicity = skip_marker(cls.test_pipeline_atomicity)
+
 
 # =============================================================================
 # Update action base — pipeline atomicity + no-clobber
@@ -152,9 +156,6 @@ class UpdateActionTestBase(ActionTestBase, ABC):
 
     @pytest.mark.asyncio
     async def test_no_clobber(self, test_input):
-        if self.skip_pipeline_atomicity:
-            pytest.skip(f"{type(self).__name__} has skip_pipeline_atomicity=True")
-
         self.test_input = test_input
         self.created_models = await self.setup_data()
         sentinel_models = self.created_models
@@ -208,6 +209,12 @@ class UpdateActionTestBase(ActionTestBase, ABC):
                 normalized.append((class_name, method_name))
             no_clobber_marker = pytest.mark.cover_no_clobber(*normalized)
             cls.test_no_clobber = no_clobber_marker(cls.test_no_clobber)
+
+        if cls.skip_pipeline_atomicity:
+            skip_marker = pytest.mark.skip(
+                reason=f"{cls.__name__} has skip_pipeline_atomicity=True"
+            )
+            cls.test_no_clobber = skip_marker(cls.test_no_clobber)
 
 
 # =============================================================================
