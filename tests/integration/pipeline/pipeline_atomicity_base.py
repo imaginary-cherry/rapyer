@@ -123,15 +123,21 @@ class ActionTestBase(ABC):
         """
         base_fn = getattr(cls, test_attr)
 
-        @functools.wraps(base_fn)
-        async def wrapped(self, test_input):
-            return await base_fn(self, test_input)
-
         if parametrize:
+
+            @functools.wraps(base_fn)
+            async def wrapped(self, test_input):
+                return await base_fn(self, test_input)
+
             params = cls.params or [None]
             wrapped = pytest.mark.parametrize(
                 "test_input", params, ids=[repr(p) for p in params]
             )(wrapped)
+        else:
+
+            @functools.wraps(base_fn)
+            async def wrapped(self):
+                return await base_fn(self)
 
         methods = cls.covered_method
         if methods is not None:
