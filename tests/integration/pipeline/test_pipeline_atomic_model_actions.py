@@ -1,3 +1,6 @@
+import asyncio
+
+import rapyer
 from rapyer.base import AtomicRedisModel
 from rapyer.types.dct import RedisDict
 from rapyer.types.integer import RedisInt
@@ -62,8 +65,10 @@ class TestModelAinsert(AsyncActionTestBase):
         await ComprehensiveTestModel.ainsert(*self.created_models)
 
     async def load_data(self):
-        keys = [model.key for model in self.created_models]
-        return await ComprehensiveTestModel.afind(*keys)
+        existing_data = await asyncio.gather(
+            *[rapyer.afind_one(model.key) for model in self.created_models]
+        )
+        return [data for data in existing_data if data is not None]
 
     def expected_before(self):
         return []
