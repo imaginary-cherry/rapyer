@@ -1,5 +1,7 @@
 import asyncio
 
+import pytest
+
 import rapyer
 from rapyer.base import AtomicRedisModel
 from rapyer.types.dct import RedisDict
@@ -44,6 +46,12 @@ class TestModelAsave(UpdateActionTestBase, AsyncActionTestBase):
 
     def expected_after(self):
         return "updated", 99
+
+    @pytest.mark.asyncio
+    async def test_no_clobber(self, test_input):
+        pytest.skip(
+            "Asave saves the entire model, there is no point in checking the clobber"
+        )
 
 
 class TestModelAinsert(AsyncActionTestBase):
