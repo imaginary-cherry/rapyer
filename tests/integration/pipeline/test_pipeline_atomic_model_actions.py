@@ -1,4 +1,3 @@
-
 from rapyer.base import AtomicRedisModel
 from rapyer.types.dct import RedisDict
 from rapyer.types.integer import RedisInt
@@ -63,19 +62,14 @@ class TestModelAinsert(AsyncActionTestBase):
         await ComprehensiveTestModel.ainsert(*self.created_models)
 
     async def load_data(self):
-        """Return ``(exists_flag, name_or_None)`` for the new model."""
-        _existing, new_model = self.created_models
-        exists = await self.real_redis_client.exists(new_model.key)
-        if not exists:
-            return 0, None
-        loaded = await ComprehensiveTestModel.aget(new_model.key)
-        return 1, loaded.name
+        keys = [model.key for model in self.created_models]
+        return await ComprehensiveTestModel.afind(*keys)
 
     def expected_before(self):
-        return 0, None
+        return []
 
     def expected_after(self):
-        return 1, "inserted"
+        return self.created_models
 
 
 class TestRapyerAinsert(ActionTestBase):
