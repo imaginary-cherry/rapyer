@@ -1,14 +1,3 @@
-"""Class-based TTL coverage for ``RedisPriorityQueue`` actions.
-
-PQ is a :class:`SpecialFieldType` — its items live under a separate Redis
-key ``{model.key}:tasks`` (the ``special_key``). The TTL tests therefore
-override :meth:`ttl_keys` to check both the main key and the special key.
-
-Pipeline atomicity tests are skipped for now — PQ actions have no existing
-pipeline-atomicity coverage in the codebase; adding it is orthogonal to
-TTL migration.
-"""
-
 from abc import ABC
 
 import rapyer
