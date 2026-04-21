@@ -442,14 +442,6 @@ class AsyncComprehensiveMetadataOpBase(UpdateActionTestBase, AsyncActionTestBase
         return loaded.metadata
 
 
-class AllTypesModelIntFieldOpBase(UpdateActionTestBase, ABC):
-    """RedisInt ops on ``AllTypesModel.int_field``."""
-
-    async def load_data(self):
-        loaded = await AllTypesModel.aget(self.created_models[0].key)
-        return loaded.int_field
-
-
 class AllTypesModelListFieldOpBase(UpdateActionTestBase, ABC):
     """RedisList ops on ``AllTypesModel.list_field``."""
 
@@ -478,7 +470,7 @@ class AllTypesModelDictFieldOpBase(UpdateActionTestBase, ABC):
         return {}
 
 
-class TwoModelDeleteBase(ActionTestBase, ABC):
+class TwoModelDeleteBase(AsyncActionTestBase, ABC):
     """Two-model delete atomicity: model1 deleted, model2 preserved."""
 
     def create_models(self):
