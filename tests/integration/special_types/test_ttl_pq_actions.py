@@ -3,7 +3,7 @@ from typing import ClassVar
 
 from rapyer.types.priority_queue import PriorityQueueItem, RedisPriorityQueue
 from tests.integration.pipeline.pipeline_atomicity_base import (
-    AsyncActionTestBase,
+    TTLActionTestBase,
     UpdateActionTestBase,
 )
 from tests.models.special_types import PriorityQueueModel
@@ -24,7 +24,7 @@ INITIAL_CONTENTS: list[tuple[str, float]] = [
 ]
 
 
-class PQActionBase(UpdateActionTestBase, AsyncActionTestBase, ABC):
+class PQActionBase(UpdateActionTestBase, TTLActionTestBase, ABC):
     initial_items: ClassVar[list[tuple[str, float]]] = INITIAL_ITEMS
 
     def create_models(self):

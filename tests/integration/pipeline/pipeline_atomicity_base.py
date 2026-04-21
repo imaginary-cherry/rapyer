@@ -230,7 +230,7 @@ class UpdateActionTestBase(ActionTestBase, ABC):
 # =============================================================================
 
 
-class AsyncActionTestBase(ActionTestBase, ABC):
+class TTLActionTestBase(ActionTestBase, ABC):
     """
     Extension of :class:`ActionTestBase` that also exercises TTL refresh
     behavior for async actions decorated with ``@mark_actions``.
@@ -368,7 +368,7 @@ class ComprehensiveCounterOpBase(UpdateActionTestBase, ABC):
         return self.test_input.expected
 
 
-class AsyncComprehensiveCounterOpBase(UpdateActionTestBase, AsyncActionTestBase, ABC):
+class AsyncComprehensiveCounterOpBase(UpdateActionTestBase, TTLActionTestBase, ABC):
     """Async ops on ``ComprehensiveTestModel.counter`` (RedisInt) with TTL coverage.
 
     Parallel to :class:`ComprehensiveCounterOpBase`; used by async mutations
@@ -381,7 +381,7 @@ class AsyncComprehensiveCounterOpBase(UpdateActionTestBase, AsyncActionTestBase,
         return loaded.counter
 
 
-class AsyncFloatModelValueOpBase(UpdateActionTestBase, AsyncActionTestBase, ABC):
+class AsyncFloatModelValueOpBase(UpdateActionTestBase, TTLActionTestBase, ABC):
     """Async ops on ``FloatModel.value`` (RedisFloat) with TTL coverage."""
 
     async def load_data(self):
@@ -422,7 +422,7 @@ class ComprehensiveTagsOpBase(UpdateActionTestBase, ABC):
         return loaded.tags
 
 
-class AsyncComprehensiveTagsOpBase(UpdateActionTestBase, AsyncActionTestBase, ABC):
+class AsyncComprehensiveTagsOpBase(UpdateActionTestBase, TTLActionTestBase, ABC):
     async def load_data(self):
         loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
         return loaded.tags
@@ -436,7 +436,7 @@ class ComprehensiveMetadataOpBase(UpdateActionTestBase, ABC):
         return loaded.metadata
 
 
-class AsyncComprehensiveMetadataOpBase(UpdateActionTestBase, AsyncActionTestBase, ABC):
+class AsyncComprehensiveMetadataOpBase(UpdateActionTestBase, TTLActionTestBase, ABC):
     async def load_data(self):
         loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
         return loaded.metadata
@@ -470,7 +470,7 @@ class AllTypesModelDictFieldOpBase(UpdateActionTestBase, ABC):
         return {}
 
 
-class TwoModelDeleteBase(AsyncActionTestBase, ABC):
+class TwoModelDeleteBase(TTLActionTestBase, ABC):
     """Two-model delete atomicity: model1 deleted, model2 preserved."""
 
     def create_models(self):

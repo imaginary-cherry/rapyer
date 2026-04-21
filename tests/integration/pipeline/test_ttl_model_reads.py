@@ -1,13 +1,13 @@
 from rapyer.base import AtomicRedisModel
 from rapyer.types.base import RedisType
 from tests.integration.pipeline.pipeline_atomicity_base import (
-    AsyncActionTestBase,
     AsyncComprehensiveCounterOpBase,
+    TTLActionTestBase,
 )
 from tests.models.collection_types import ComprehensiveTestModel
 
 
-class TestModelAget(AsyncActionTestBase):
+class TestModelAget(TTLActionTestBase):
     covered_method = AtomicRedisModel.aget
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
@@ -19,7 +19,7 @@ class TestModelAget(AsyncActionTestBase):
         await type(model).aget(model.key)
 
 
-class TestModelAload(AsyncActionTestBase):
+class TestModelAload(TTLActionTestBase):
     covered_method = AtomicRedisModel.aload
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
@@ -30,7 +30,7 @@ class TestModelAload(AsyncActionTestBase):
         await self.created_models[0].aload()
 
 
-class TestModelAfind(AsyncActionTestBase):
+class TestModelAfind(TTLActionTestBase):
     covered_method = AtomicRedisModel.afind
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
@@ -41,7 +41,7 @@ class TestModelAfind(AsyncActionTestBase):
         await type(self.created_models[0]).afind()
 
 
-class TestModelAfindOne(AsyncActionTestBase):
+class TestModelAfindOne(TTLActionTestBase):
     covered_method = AtomicRedisModel.afind_one
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 

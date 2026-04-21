@@ -9,10 +9,10 @@ from rapyer.types.integer import RedisInt
 from rapyer.types.lst import RedisList
 from tests.integration.pipeline.pipeline_atomicity_base import (
     ActionTestBase,
-    AsyncActionTestBase,
     AsyncComprehensiveCounterOpBase,
     ComprehensiveMetadataOpBase,
     ComprehensiveTagsOpBase,
+    TTLActionTestBase,
     TwoModelDeleteBase,
     UpdateActionTestBase,
 )
@@ -26,7 +26,7 @@ from tests.models.simple_types import (
 TTL_SECONDS = 300
 
 
-class TestModelAsave(UpdateActionTestBase, AsyncActionTestBase):
+class TestModelAsave(UpdateActionTestBase, TTLActionTestBase):
     covered_method = AtomicRedisModel.asave
 
     def create_models(self):
@@ -54,7 +54,7 @@ class TestModelAsave(UpdateActionTestBase, AsyncActionTestBase):
         )
 
 
-class TestModelAinsert(AsyncActionTestBase):
+class TestModelAinsert(TTLActionTestBase):
     covered_method = AtomicRedisModel.ainsert
     model_exists_before_action = False
     skip_ttl_no_refresh = "Ainsert is initial so we always set ttl"
@@ -331,7 +331,7 @@ class TestRapyerAduplicateMany(ActionTestBase):
         assert len(set(all_pks)) == 4
 
 
-class TestRapyerAupdate(UpdateActionTestBase, AsyncActionTestBase):
+class TestRapyerAupdate(UpdateActionTestBase, TTLActionTestBase):
     """After aupdate was switched to ``ensure_pipeline``, it defers to an outer
     pipeline like every other mutation."""
 

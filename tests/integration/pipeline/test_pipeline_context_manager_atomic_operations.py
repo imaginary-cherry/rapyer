@@ -6,9 +6,9 @@ from rapyer.types.base import RedisType
 from rapyer.types.dct import RedisDict
 from rapyer.types.lst import RedisList
 from tests.integration.pipeline.pipeline_atomicity_base import (
-    AsyncActionTestBase,
     AsyncComprehensiveMetadataOpBase,
     AsyncComprehensiveTagsOpBase,
+    TTLActionTestBase,
     TwoModelDeleteBase,
     UpdateActionTestBase,
 )
@@ -367,7 +367,7 @@ class TestDictApopitem(AsyncComprehensiveMetadataOpBase):
 # =============================================================================
 
 
-class TestStringSet(UpdateActionTestBase, AsyncActionTestBase):
+class TestStringSet(UpdateActionTestBase, TTLActionTestBase):
     covered_method = RedisType.asave
 
     def create_models(self):
