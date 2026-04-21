@@ -1,4 +1,3 @@
-import pytest
 
 from rapyer.base import AtomicRedisModel
 from rapyer.types.dct import RedisDict
@@ -46,16 +45,9 @@ class TestModelAsave(UpdateActionTestBase, AsyncActionTestBase):
 
 
 class TestModelAinsert(AsyncActionTestBase):
-    """Verify ``ainsert`` inside a model pipeline defers the new model's creation.
-
-    ``ainsert`` is the only async action whose subject is a fresh (unsaved)
-    model, so the standard ``_setup_ttl_data`` flow (pre-insert + reduce TTL)
-    doesn't apply. The TTL tests are overridden to assert that the initial
-    TTL set by ``asave`` matches the configured value.
-    """
-
     covered_method = AtomicRedisModel.ainsert
     model_exists_before_action = False
+    skip_ttl_no_refresh = "Ainsert is initial so we always set ttl"
 
     def create_models(self):
         # Only the existing model is inserted; the new model is the test subject.
@@ -84,11 +76,6 @@ class TestModelAinsert(AsyncActionTestBase):
 
     def expected_after(self):
         return 1, "inserted"
-
-    @pytest.mark.asyncio
-    async def test_ttl_no_refresh_on_action(self):
-        pytest.skip("Ainsert is initial so we always set ttl")
-
 
 
 class TestRapyerAinsert(ActionTestBase):

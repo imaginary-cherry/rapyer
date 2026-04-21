@@ -98,7 +98,7 @@ class TestPQAclear(PQActionBase):
 
 class TestPQApop(PQActionBase):
     covered_method = RedisPriorityQueue.apop
-    skip_pipeline_atomicity = True
+    skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
     async def perform_action(self, piped: PriorityQueueModel):
         await self.created_models[0].tasks.apop()
@@ -113,7 +113,7 @@ class TestPQAremove(PQActionBase):
 
 class TestPQApeek(PQActionBase):
     covered_method = RedisPriorityQueue.apeek
-    skip_pipeline_atomicity = True
+    skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
     async def perform_action(self, piped: PriorityQueueModel):
         await self.created_models[0].tasks.apeek()
@@ -121,7 +121,7 @@ class TestPQApeek(PQActionBase):
 
 class TestPQAsize(PQActionBase):
     covered_method = RedisPriorityQueue.asize
-    skip_pipeline_atomicity = True
+    skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
     async def perform_action(self, piped: PriorityQueueModel):
         await self.created_models[0].tasks.asize()
@@ -129,7 +129,7 @@ class TestPQAsize(PQActionBase):
 
 class TestPQAitems(PQActionBase):
     covered_method = RedisPriorityQueue.aitems
-    skip_pipeline_atomicity = True
+    skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
     async def perform_action(self, piped: PriorityQueueModel):
         await self.created_models[0].tasks.aitems()

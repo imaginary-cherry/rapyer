@@ -9,7 +9,7 @@ from tests.models.collection_types import ComprehensiveTestModel
 
 class TestModelAget(AsyncActionTestBase):
     covered_method = AtomicRedisModel.aget
-    skip_pipeline_atomicity = True
+    skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
     def create_models(self):
         return [ComprehensiveTestModel(name="test", counter=1)]
@@ -21,7 +21,7 @@ class TestModelAget(AsyncActionTestBase):
 
 class TestModelAload(AsyncActionTestBase):
     covered_method = AtomicRedisModel.aload
-    skip_pipeline_atomicity = True
+    skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
     def create_models(self):
         return [ComprehensiveTestModel(name="test", counter=1)]
@@ -32,7 +32,7 @@ class TestModelAload(AsyncActionTestBase):
 
 class TestModelAfind(AsyncActionTestBase):
     covered_method = AtomicRedisModel.afind
-    skip_pipeline_atomicity = True
+    skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
     def create_models(self):
         return [ComprehensiveTestModel(name="test", counter=1)]
@@ -43,7 +43,7 @@ class TestModelAfind(AsyncActionTestBase):
 
 class TestModelAfindOne(AsyncActionTestBase):
     covered_method = AtomicRedisModel.afind_one
-    skip_pipeline_atomicity = True
+    skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
     def create_models(self):
         return [ComprehensiveTestModel(name="test", counter=1)]
@@ -54,7 +54,7 @@ class TestModelAfindOne(AsyncActionTestBase):
 
 class TestRedisTypeAload(AsyncComprehensiveCounterOpBase):
     covered_method = RedisType.aload
-    skip_pipeline_atomicity = True
+    skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
     def create_models(self):
         return [ComprehensiveTestModel(counter=42)]

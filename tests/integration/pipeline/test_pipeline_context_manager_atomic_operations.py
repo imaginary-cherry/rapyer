@@ -239,7 +239,7 @@ class TestListAclear(AsyncComprehensiveTagsOpBase):
 
 class TestListApop(AsyncComprehensiveTagsOpBase):
     covered_method = RedisList.apop
-    skip_pipeline_atomicity = True
+    skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
     def create_models(self):
         return [ComprehensiveTestModel(tags=["tag1", "tag2"])]
@@ -329,7 +329,7 @@ class TestDictAclear(AsyncComprehensiveMetadataOpBase):
 
 class TestDictApop(AsyncComprehensiveMetadataOpBase):
     covered_method = RedisDict.apop
-    skip_pipeline_atomicity = True
+    skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
     def create_models(self):
         return [ComprehensiveTestModel(metadata={"key1": "value1", "key2": "value2"})]
@@ -346,7 +346,7 @@ class TestDictApop(AsyncComprehensiveMetadataOpBase):
 
 class TestDictApopitem(AsyncComprehensiveMetadataOpBase):
     covered_method = RedisDict.apopitem
-    skip_pipeline_atomicity = True
+    skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
     def create_models(self):
         # Single-entry dict so the popped item is deterministic.

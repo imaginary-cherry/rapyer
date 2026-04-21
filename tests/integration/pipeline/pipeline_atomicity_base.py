@@ -49,10 +49,11 @@ class ActionTestBase(ABC):
     covered_method: ClassVar[Any] = None
     """Method (or list of methods) passed to ``@model_pipeline_test_for``."""
 
-    skip_pipeline_atomicity: ClassVar[bool] = False
-    """If True, :meth:`test_pipeline_atomicity` is skipped. Use for actions that
-    return a value (and so can't be deferred in a pipeline) or that otherwise
-    don't have pipeline atomicity coverage."""
+    skip_pipeline_atomicity: ClassVar[str | None] = None
+    """If set to a reason string, :meth:`test_pipeline_atomicity` and (when
+    applicable) :meth:`test_no_clobber` are skipped with that reason. Use for
+    actions that return a value (and so can't be deferred in a pipeline) or
+    that otherwise don't have pipeline atomicity coverage."""
 
     created_models: Any = None
     test_input: Any = None
@@ -134,9 +135,7 @@ class ActionTestBase(ABC):
             cls.test_pipeline_atomicity = conver_marker(cls.test_pipeline_atomicity)
 
         if cls.skip_pipeline_atomicity:
-            skip_marker = pytest.mark.skip(
-                reason=f"{cls.__name__} has skip_pipeline_atomicity=True"
-            )
+            skip_marker = pytest.mark.skip(reason=cls.skip_pipeline_atomicity)
             cls.test_pipeline_atomicity = skip_marker(cls.test_pipeline_atomicity)
 
 
@@ -211,9 +210,7 @@ class UpdateActionTestBase(ActionTestBase, ABC):
             cls.test_no_clobber = no_clobber_marker(cls.test_no_clobber)
 
         if cls.skip_pipeline_atomicity:
-            skip_marker = pytest.mark.skip(
-                reason=f"{cls.__name__} has skip_pipeline_atomicity=True"
-            )
+            skip_marker = pytest.mark.skip(reason=cls.skip_pipeline_atomicity)
             cls.test_no_clobber = skip_marker(cls.test_no_clobber)
 
 
@@ -229,6 +226,14 @@ class AsyncActionTestBase(ActionTestBase, ABC):
     """
 
     model_exists_before_action: bool = True
+
+    skip_ttl_refresh: ClassVar[str | None] = None
+    """If set to a reason string, :meth:`test_ttl_refresh_on_action` is skipped
+    with that reason."""
+
+    skip_ttl_no_refresh: ClassVar[str | None] = None
+    """If set to a reason string, :meth:`test_ttl_no_refresh_on_action` is
+    skipped with that reason."""
 
     def ttl_keys(self, model: AtomicRedisModel) -> list[str]:
         """Redis keys whose TTL should be asserted. Default: ``[model.key]``.
@@ -339,6 +344,18 @@ class AsyncActionTestBase(ActionTestBase, ABC):
             mark_ttl_refresh = pytest.mark.cover_ttl_no_refresh(*normalized)
             cls.test_ttl_no_refresh_on_action = mark_ttl_refresh(
                 test_ttl_no_refresh_on_action
+            )
+
+        if cls.skip_ttl_refresh:
+            skip_marker = pytest.mark.skip(reason=cls.skip_ttl_refresh)
+            cls.test_ttl_refresh_on_action = skip_marker(
+                cls.test_ttl_refresh_on_action
+            )
+
+        if cls.skip_ttl_no_refresh:
+            skip_marker = pytest.mark.skip(reason=cls.skip_ttl_no_refresh)
+            cls.test_ttl_no_refresh_on_action = skip_marker(
+                cls.test_ttl_no_refresh_on_action
             )
 
 
