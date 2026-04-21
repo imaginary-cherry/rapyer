@@ -1,6 +1,6 @@
 import json
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar, get_args
+from typing import Any, Generic, Optional, TypeVar, get_args
 
 from pydantic import GetCoreSchemaHandler, TypeAdapter
 from pydantic_core import core_schema
@@ -95,10 +95,12 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         ]
 
     @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
-    async def aremove(self, value) -> bool:
-        """Remove a specific value from the queue. Returns True if removed."""
+    async def aremove(self, value) -> Optional[bool]:
+        """Remove a specific value from the queue. Returns True if removed. In pipeline it returns None"""
         serialized = self._serialize_value(value)
         removed = await self.client.zrem(self.special_key, serialized)
+        if self.pipeline:
+            return None
         return removed > 0
 
     # --- SpecialFieldType interface ---
