@@ -1,14 +1,11 @@
 import pytest
 
 from rapyer.base import AtomicRedisModel
-from tests.integration.pipeline.pipeline_atomicity_base import RapyerActionBase
+from tests.integration.pipeline.pipeline_atomicity_base import ActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
 
 
-# NOTE: complementary to TestModelAsave (which covers a single-model
-# field update). This one exercises batching of multiple fresh-model asaves
-# under the module-level ``rapyer.apipeline()`` context.
-class TestRapyerAsaveBatching(RapyerActionBase):
+class TestRapyerAsaveBatching(ActionTestBase):
     covered_method = AtomicRedisModel.asave
 
     def create_models(self):

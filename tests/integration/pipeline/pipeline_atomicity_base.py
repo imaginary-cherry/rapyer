@@ -85,10 +85,6 @@ class ActionTestBase(ABC):
         """Value ``load_data`` should return after the pipeline exits."""
         return None
 
-    def pipeline_owner(self) -> AtomicRedisModel | type[AtomicRedisModel]:
-        """Return the object to call ``.apipeline()`` on. Default: ``self.handle``."""
-        return self.created_models[0]
-
     def assert_during_pipeline(self, loaded: Any):
         assert loaded == self.expected_before()
 
@@ -105,9 +101,8 @@ class ActionTestBase(ABC):
             pytest.skip(f"{type(self).__name__} has skip_pipeline_atomicity=True")
         self.test_input = test_input
         self.created_models = await self.setup_data()
-        owner = self.pipeline_owner()
-        async with owner.apipeline() as piped:
-            await self.perform_action(piped)
+        async with rapyer.apipeline():
+            await self.perform_action(self.created_models[0])
             loaded_during = await self.load_data()
             self.assert_during_pipeline(loaded_during)
         loaded_after = await self.load_data()
@@ -169,9 +164,8 @@ class UpdateActionTestBase(ActionTestBase, ABC):
             model.pipeline_no_clobber_sentinel = self.NO_CLOBBER_SENTINEL_VALUE
 
         # Perform the action — use pipeline unless the action can't be deferred
-        owner = self.pipeline_owner()
-        async with owner.apipeline() as piped:
-            await self.perform_action(piped)
+        async with rapyer.apipeline():
+            await self.perform_action(self.created_models[0])
 
         # Verify sentinel was NOT overwritten on surviving models
         keys = [model.key for model in sentinel_models]
@@ -346,23 +340,6 @@ class AsyncActionTestBase(ActionTestBase, ABC):
 # =============================================================================
 
 
-class RapyerActionBase(ActionTestBase, ABC):
-    """Atomicity via the module-level ``rapyer.apipeline()`` context. Sync / pipeline-only."""
-
-    def pipeline_owner(self):
-        return rapyer
-
-
-class AsyncRapyerActionBase(AsyncActionTestBase, ABC):
-    """Atomicity via module-level ``rapyer.apipeline()`` context, with TTL coverage.
-
-    Parallel to :class:`RapyerActionBase` for async actions.
-    """
-
-    def pipeline_owner(self):
-        return rapyer
-
-
 class ComprehensiveCounterOpBase(UpdateActionTestBase, ABC):
     """RedisInt binary ops on ``ComprehensiveTestModel.counter``. ``self.test_input`` is ``BinaryOpCase``. Sync / pipeline-only."""
 
@@ -498,9 +475,6 @@ class TwoModelDeleteBase(ActionTestBase, ABC):
             ComprehensiveTestModel(tags=["tag1"], name="model1"),
             ComprehensiveTestModel(tags=["tag2"], name="model2"),
         ]
-
-    def pipeline_owner(self):
-        return self.created_models[0]
 
     async def load_data(self):
         model1, model2 = self.created_models

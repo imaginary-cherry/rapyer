@@ -23,9 +23,6 @@ class TestAsetTtl(ActionTestBase):
         assert all(ttl == -1 for ttl in ttls_before)
         return models
 
-    def pipeline_owner(self):
-        return self.created_models[0]
-
     async def perform_action(self, piped):
         for model in self.created_models:
             await model.aset_ttl(TTL_SECONDS)

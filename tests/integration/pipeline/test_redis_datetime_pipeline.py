@@ -26,10 +26,6 @@ class DatetimeBothModelsOpBase(UpdateActionTestBase, ABC):
         str_date_model = DatetimeModel(created_at=initial, updated_at=initial)
         return [ts_model, str_date_model]
 
-    def pipeline_owner(self):
-        ts_model, _str_date_model = self.created_models
-        return ts_model
-
     async def load_data(self):
         ts_model, str_date_model = self.created_models
         loaded_ts = await DatetimeTimestampModel.aget(ts_model.key)

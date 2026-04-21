@@ -4,7 +4,7 @@ import pytest_asyncio
 import rapyer
 from rapyer import DeleteResult, RapyerDeleteResult
 from rapyer.base import AtomicRedisModel
-from tests.integration.pipeline.pipeline_atomicity_base import RapyerActionBase
+from tests.integration.pipeline.pipeline_atomicity_base import ActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.index_types import IndexTestModel
 from tests.models.simple_types import IntModel, StrModel
@@ -34,9 +34,7 @@ async def create_index(real_redis_client):
     await IndexTestModel.adelete_index()
 
 
-# NOTE: mirrors TestModelAdeleteMany but exercises the module-level
-# ``rapyer.apipeline()`` context instead of the instance pipeline.
-class TestRapyerAdeleteMany(RapyerActionBase):
+class TestRapyerAdeleteMany(ActionTestBase):
     covered_method = AtomicRedisModel.adelete_many
 
     result: DeleteResult | None = None
