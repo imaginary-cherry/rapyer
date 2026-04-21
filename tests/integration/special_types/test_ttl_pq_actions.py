@@ -1,8 +1,7 @@
 from abc import ABC
+from typing import ClassVar
 
-import rapyer
 from rapyer.types.priority_queue import PriorityQueueItem, RedisPriorityQueue
-from tests.integration.conftest import REDUCED_TTL_SECONDS
 from tests.integration.pipeline.pipeline_atomicity_base import (
     AsyncActionTestBase,
     UpdateActionTestBase,
@@ -13,10 +12,27 @@ from tests.models.special_types import (
     PriorityQueueTTLNoRefreshModel,
 )
 
+# Initial items every PQ test class starts with. Kept in class-level constants
+# so test classes can assemble their ``expected_before`` / ``expected_after``
+# from them without re-declaring the serialized form inline.
+INITIAL_ITEMS: list[tuple[str, float]] = [
+    ("high", 1.0),
+    ("medium", 2.0),
+    ("low", 3.0),
+]
+# Serialized form returned by ZRANGE (JSON-encoded member + float score).
+INITIAL_CONTENTS: list[tuple[str, float]] = [
+    ('"high"', 1.0),
+    ('"medium"', 2.0),
+    ('"low"', 3.0),
+]
+
 
 class PQActionBase(UpdateActionTestBase, AsyncActionTestBase, ABC):
     ttl_model_cls = PriorityQueueTTLModel
     no_refresh_ttl_model_cls = PriorityQueueTTLNoRefreshModel
+
+    initial_items: ClassVar[list[tuple[str, float]]] = INITIAL_ITEMS
 
     def create_models(self):
         return [PriorityQueueModel(name="pq_test")]
@@ -24,26 +40,19 @@ class PQActionBase(UpdateActionTestBase, AsyncActionTestBase, ABC):
     def ttl_keys(self, model: PriorityQueueModel):
         return [model.key, model.tasks.special_key]
 
+    async def setup_data(self):
+        """Insert the model AND populate the PQ special field with
+        ``initial_items`` so actions run against a non-empty queue."""
+        models = await super().setup_data()
+        for inst in models:
+            for value, priority in self.initial_items:
+                await inst.tasks.apush(value, priority)
+        return models
+
     async def load_data(self):
         return await self.real_redis_client.zrange(
             self.created_models[0].tasks.special_key, 0, -1, withscores=True
         )
-
-    async def _setup_ttl_data(self, model_cls: type[PriorityQueueModel]):
-        originals = self.create_models()
-        recreated = [model_cls(**m.model_dump()) for m in originals]
-        await rapyer.ainsert(*recreated)
-
-        for inst in recreated:
-            await inst.tasks.apush("high", 1.0)
-            await inst.tasks.apush("medium", 2.0)
-            await inst.tasks.apush("low", 3.0)
-
-        for inst in recreated:
-            for key in self.ttl_keys(inst):
-                await self.real_redis_client.expire(key, REDUCED_TTL_SECONDS)
-
-        return recreated
 
 
 class TestPQApush(PQActionBase):
@@ -53,10 +62,11 @@ class TestPQApush(PQActionBase):
         await piped.tasks.apush("new_item", 0.5)
 
     def expected_before(self):
-        return []
+        return INITIAL_CONTENTS
 
     def expected_after(self):
-        return [('"new_item"', 0.5)]
+        # priority 0.5 < 1.0, so the new item sorts in front of the initial trio.
+        return [('"new_item"', 0.5), *INITIAL_CONTENTS]
 
 
 class TestPQApushMany(PQActionBase):
@@ -71,10 +81,10 @@ class TestPQApushMany(PQActionBase):
         )
 
     def expected_before(self):
-        return []
+        return INITIAL_CONTENTS
 
     def expected_after(self):
-        return [('"a"', 0.1), ('"b"', 0.2)]
+        return [('"a"', 0.1), ('"b"', 0.2), *INITIAL_CONTENTS]
 
 
 class TestPQAclear(PQActionBase):
@@ -87,7 +97,7 @@ class TestPQAclear(PQActionBase):
         await piped.tasks.aclear()
 
     def expected_before(self):
-        return []
+        return INITIAL_CONTENTS
 
     def expected_after(self):
         return []

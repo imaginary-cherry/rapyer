@@ -253,9 +253,8 @@ class AsyncActionTestBase(ActionTestBase, ABC):
     async def _setup_ttl_data(
         self, model_cls: type[AtomicRedisModel]
     ) -> list[AtomicRedisModel]:
-        originals = self.create_models()
+        originals = await self.setup_data()
         recreated = [model_cls(**m.model_dump()) for m in originals]
-        await rapyer.ainsert(*recreated)
 
         for inst in recreated:
             for key in self.ttl_keys(inst):
