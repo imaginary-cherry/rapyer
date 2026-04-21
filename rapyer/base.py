@@ -35,7 +35,6 @@ from rapyer.config import RedisConfig
 from rapyer.context import (
     _context_pipe,
     ensure_pipeline,
-    pipe_ctx_from_redix,
     pipeline_with_execution,
     with_pipe_context,
 )
@@ -207,9 +206,7 @@ class AtomicRedisModel(BaseModel):
             return
         # initial=True with refresh_ttl=False → set TTL only if none exists (NX)
         nx = initial and not should_refresh
-        pipe_context = (
-            ensure_pipeline if can_use_pipeline else pipeline_with_execution
-        )
+        pipe_context = ensure_pipeline if can_use_pipeline else pipeline_with_execution
         async with pipe_context(self.Meta) as pipe:
             pipe.expire(self.key, self.Meta.ttl, nx=nx)
             for fname in self._special_field_names:
@@ -614,7 +611,7 @@ class AtomicRedisModel(BaseModel):
         return [RapyerKey(k) for k in keys]
 
     @classmethod
-    @mark_actions(ActionGroup.UPDATE, target=TargetSource.MANUAL, initial=True)
+    @mark_actions(ActionGroup.UPDATE, target=TargetSource.RESULT, initial=True)
     async def ainsert(cls, *models: Unpack[Self]):
         async with ensure_pipeline(cls.Meta) as pipe:
             for model in models:
@@ -624,6 +621,7 @@ class AtomicRedisModel(BaseModel):
                     field = getattr(model, fname)
                     if isinstance(field, SpecialFieldType):
                         await field.asave_special()
+            return models
 
     @classmethod
     @mark_actions(ActionGroup.DELETE, ignore_refresh=True)
