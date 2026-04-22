@@ -64,4 +64,12 @@ NON_ACTION_METHODS = _group(
     find_redis_models,
     # Distributed lock context manager, not a pipeline-participating write.
     rapyer.alock_from_key,
+    # TTL primitives: they ARE the TTL mechanism, not actions subject to it.
+    AtomicRedisModel.aset_ttl,
+    AtomicRedisModel.refresh_ttl_if_needed,
+    # afind_keys / aexists are lightweight queries (keys / existence only) that
+    # never load model data, so TTL refresh doesn't apply.
+    AtomicRedisModel.afind_keys,
+    AtomicRedisModel.aexists,
+    rapyer.aexists,
 )
