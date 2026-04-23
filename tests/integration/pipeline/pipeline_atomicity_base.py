@@ -246,6 +246,12 @@ class TTLActionTestBase(ActionTestBase, ABC):
     """If set to a reason string, :meth:`test_ttl_no_refresh_on_action` is
     skipped with that reason."""
 
+    def all_keys_to_check(self):
+        keys = []
+        for model in self.created_models:
+            keys.extend(self.ttl_keys(model))
+        return keys
+
     def ttl_keys(self, model: AtomicRedisModel) -> list[str]:
         """Redis keys whose TTL should be asserted. Default: ``[model.key]``.
 
@@ -266,11 +272,9 @@ class TTLActionTestBase(ActionTestBase, ABC):
         # Arrange
         self.created_models = await self._setup_ttl_data()
         model_for_keys = self.created_models[0]
-        keys = []
-        for model in self.created_models:
-            keys.extend(self.ttl_keys(model))
         ttls_before = None
         if self.model_exists_before_action:
+            keys = self.all_keys_to_check()
             ttls_before: list[int] = await asyncio.gather(
                 *[self.real_redis_client.ttl(k) for k in keys]
             )
@@ -284,6 +288,7 @@ class TTLActionTestBase(ActionTestBase, ABC):
             await self.perform_action(model_for_keys)
 
         # Assert
+        keys = self.all_keys_to_check()
         ttl_configured = model_for_keys.Meta.ttl
         afters = await asyncio.gather(
             *[self.real_redis_client.ttl(key) for key in keys]

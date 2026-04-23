@@ -272,10 +272,16 @@ class TestRedisDictClear(ComprehensiveMetadataOpBase):
         return {}
 
 
-class TestRapyerAduplicate(ActionTestBase):
+class TestRapyerAduplicate(UpdateActionTestBase, TTLActionTestBase):
     covered_method = AtomicRedisModel.aduplicate
+    model_exists_before_action = False
 
     duplicate: ComprehensiveTestModel | None = None
+
+    def all_keys_to_check(self):
+        if self.duplicate is None:
+            return []
+        return [self.duplicate.key]
 
     def create_models(self):
         return [ComprehensiveTestModel(name="original", counter=42, tags=["t1"])]
@@ -301,10 +307,16 @@ class TestRapyerAduplicate(ActionTestBase):
         assert self.duplicate.pk != self.created_models[0].pk
 
 
-class TestRapyerAduplicateMany(ActionTestBase):
+class TestRapyerAduplicateMany(UpdateActionTestBase, TTLActionTestBase):
     covered_method = AtomicRedisModel.aduplicate_many
+    model_exists_before_action = False
 
     duplicates: list[ComprehensiveTestModel] | None = None
+
+    def all_keys_to_check(self):
+        if self.duplicates is None:
+            return []
+        return [model.key for model in self.duplicates]
 
     def create_models(self):
         return [ComprehensiveTestModel(name="original", counter=42, tags=["t1"])]
