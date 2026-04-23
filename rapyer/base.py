@@ -785,9 +785,6 @@ class AtomicRedisModel(BaseModel):
                     raise
             yield redis_model
 
-            if self.should_refresh():
-                pipe.expire(self.key, self.Meta.ttl)
-
     def __setattr__(self, name: str, value: Any) -> None:
         skip_redis_set = False
         if isinstance(value, BaseRedisType):
