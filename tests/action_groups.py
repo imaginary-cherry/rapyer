@@ -41,6 +41,18 @@ PRIVATE_METHODS = _group(
     AtomicRedisModel.is_inner_model,
     AtomicRedisModel.assign_fields_links,
     AtomicRedisModel.validate_sub_model,
+    AtomicRedisModel._all_keys_for_key,
+    AtomicRedisModel._iter_expanded_filter_batches,
+    AtomicRedisModel._resolve_key,
+    AtomicRedisModel.class_key_initials,
+    AtomicRedisModel.index_name,
+    AtomicRedisModel.create_expressions,
+    AtomicRedisModel.create_redis_model,
+    AtomicRedisModel.init_class,
+    AtomicRedisModel.iter_filter_batches,
+    AtomicRedisModel.redis_schema,
+    AtomicRedisModel.should_refresh,
+    AtomicRedisModel.should_refresh_for_action,
 )
 
 # PRIVATE_INHERITED_METHODS — MRO-aware. Any subclass that inherits OR
@@ -52,6 +64,8 @@ PRIVATE_INHERITED_METHODS = _group(
     RedisType.serialize_unknown,
     RedisType.deserialize_unknown,
     GenericRedisType.iterate_items,
+    GenericRedisType.full_serializer,
+    GenericRedisType.full_deserializer,
     RedisDict.validate_dict,
     RedisList.create_new_value,
     RedisList.create_new_values,
