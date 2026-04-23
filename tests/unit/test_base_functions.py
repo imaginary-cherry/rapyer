@@ -5,6 +5,7 @@ import pytest
 
 from rapyer import AtomicRedisModel
 from rapyer.base import REDIS_MODELS, find_redis_models
+from rapyer.errors import DuplicateModelNameError
 
 
 @pytest.fixture
@@ -60,3 +61,17 @@ def test_find_redis_models_returns_all_loaded_models_sanity(reset_redis_model_ls
 
     # Assert
     assert set(models) == expected
+
+
+def test_registering_two_models_with_same_class_name_raises(reset_redis_model_lst):
+    # Arrange
+    class DuplicateNameModel(AtomicRedisModel):
+        field1: str = ""
+
+    # Act & Assert
+    with pytest.raises(DuplicateModelNameError) as exc_info:
+
+        class DuplicateNameModel(AtomicRedisModel):  # noqa: F811
+            field2: int = 0
+
+    assert exc_info.value.model_name == "DuplicateNameModel"

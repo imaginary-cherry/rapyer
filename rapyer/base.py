@@ -40,6 +40,7 @@ from rapyer.context import (
 )
 from rapyer.errors import (
     CantSerializeRedisValueError,
+    DuplicateModelNameError,
     KeyNotFound,
     MissingParameterError,
     PersistentNoScriptError,
@@ -354,6 +355,16 @@ class AtomicRedisModel(BaseModel):
         # Update the redis model list for initialization
         # Skip dynamically created classes from type conversion
         if cls.__doc__ != DYNAMIC_CLASS_DOC and cls.Meta.init_with_rapyer:
+            existing = next(
+                (m for m in REDIS_MODELS if m.__name__ == cls.__name__), None
+            )
+            if existing is not None:
+                raise DuplicateModelNameError(
+                    cls.__name__,
+                    f"A rapyer model named {cls.__name__!r} is already registered "
+                    f"(existing: {existing.__module__}, new: {cls.__module__}). "
+                    "Model classes are resolved from Redis keys by __name__ and must be unique.",
+                )
             REDIS_MODELS.append(cls)
 
     @classmethod

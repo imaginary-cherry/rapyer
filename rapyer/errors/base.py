@@ -32,3 +32,11 @@ class UpdateAtomicModelError(RapyerError):
 
 class InvalidRefreshTtlError(RapyerError):
     """Raised when refresh_ttl contains ActionGroup.DELETE, which is never refreshable."""
+
+
+class DuplicateModelNameError(RapyerError):
+    """Raised when two registered models share the same class name."""
+
+    def __init__(self, model_name: str, *args):
+        super().__init__(*args)
+        self.model_name = model_name
