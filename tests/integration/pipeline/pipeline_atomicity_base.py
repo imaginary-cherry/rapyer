@@ -350,7 +350,7 @@ class TTLActionTestBase(ActionTestBase, ABC):
         self.created_models = await self._setup_ttl_data()
         model_for_keys = self.created_models[0]
 
-        flush_spy = AsyncMock(wraps=actions_module.flush_action_targets)
+        flush_spy = AsyncMock()
         redis_expire_spy = AsyncMock()
         pipeline_expire_spy = MagicMock()
 
