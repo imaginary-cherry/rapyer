@@ -474,6 +474,7 @@ async def test_pipeline_exception_rollback__check_no_changes_applied_edge_case()
 
 class TestDelete(TwoModelDeleteBase):
     covered_method = AtomicRedisModel.adelete
+    skip_ttl_refresh = "Nothing to refresh when model is deleted"
     skip_ttl_no_refresh = "Nothing to refresh when model is deleted"
 
     async def perform_action(self, piped):
@@ -482,6 +483,7 @@ class TestDelete(TwoModelDeleteBase):
 
 class TestTryDelete(TwoModelDeleteBase):
     covered_method = AtomicRedisModel.adelete_by_key
+    skip_ttl_refresh = "Nothing to refresh when model is deleted"
     skip_ttl_no_refresh = "Nothing to refresh when model is deleted"
 
     async def perform_action(self, piped):

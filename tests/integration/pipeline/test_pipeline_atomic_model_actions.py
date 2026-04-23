@@ -116,6 +116,7 @@ class TestRapyerAinsert(ActionTestBase):
 
 class TestRapyerDelete(TwoModelDeleteBase):
     covered_method = AtomicRedisModel.adelete
+    skip_ttl_refresh = "Nothing to refresh when model is deleted"
     skip_ttl_no_refresh = "Nothing to refresh when model is deleted"
 
     async def perform_action(self, piped):
@@ -125,6 +126,7 @@ class TestRapyerDelete(TwoModelDeleteBase):
 
 class TestRapyerDeleteByKey(TwoModelDeleteBase):
     covered_method = AtomicRedisModel.adelete_by_key
+    skip_ttl_refresh = "Nothing to refresh when model is deleted"
     skip_ttl_no_refresh = "Nothing to refresh when model is deleted"
 
     async def perform_action(self, piped):
