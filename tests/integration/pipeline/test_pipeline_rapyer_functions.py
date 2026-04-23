@@ -4,6 +4,7 @@ import rapyer
 from tests.integration.pipeline.pipeline_atomicity_base import (
     ActionTestBase,
     TTLActionTestBase,
+    UpdateActionTestBase,
 )
 from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.simple_types import IntModel, StrModel
@@ -60,7 +61,7 @@ class TestRapyerFunctionAinsert(TTLActionTestBase):
         return self.created_models
 
 
-class TestRapyerFunctionApipeline(TTLActionTestBase):
+class TestRapyerFunctionApipeline(TTLActionTestBase, UpdateActionTestBase):
     covered_method = rapyer.apipeline
 
     def create_models(self):
@@ -82,7 +83,7 @@ class TestRapyerFunctionApipeline(TTLActionTestBase):
         return "updated"
 
 
-class TestRapyerFunctionAget(TTLActionTestBase):
+class TestRapyerFunctionAget(TTLActionTestBase, UpdateActionTestBase):
     covered_method = rapyer.aget
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
@@ -93,7 +94,7 @@ class TestRapyerFunctionAget(TTLActionTestBase):
         assert await rapyer.aget(self.created_models[0].key) is not None
 
 
-class TestRapyerFunctionAfindOne(TTLActionTestBase):
+class TestRapyerFunctionAfindOne(TTLActionTestBase, UpdateActionTestBase):
     covered_method = rapyer.afind_one
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
@@ -104,7 +105,7 @@ class TestRapyerFunctionAfindOne(TTLActionTestBase):
         assert await rapyer.afind_one(self.created_models[0].key) is not None
 
 
-class TestRapyerFunctionAfind(TTLActionTestBase):
+class TestRapyerFunctionAfind(TTLActionTestBase, UpdateActionTestBase):
     covered_method = rapyer.afind
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
