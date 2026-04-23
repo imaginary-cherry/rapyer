@@ -370,6 +370,27 @@ class TestRapyerAupdate(UpdateActionTestBase, TTLActionTestBase):
         return "updated", 99
 
 
+class TestModelApipeline(TTLActionTestBase, UpdateActionTestBase):
+    covered_method = AtomicRedisModel.apipeline
+
+    def create_models(self):
+        return [ComprehensiveTestModel(name="original")]
+
+    async def perform_action(self, piped: ComprehensiveTestModel) -> None:
+        async with piped.apipeline(use_existing_pipe=True) as model:
+            model.name = "updated"
+
+    async def load_data(self):
+        loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
+        return loaded.name
+
+    def expected_before(self):
+        return "original"
+
+    def expected_after(self):
+        return "updated"
+
+
 class TestRapyerRefreshTtl(ActionTestBase):
     covered_method = AtomicRedisModel.refresh_ttl_if_needed
     reduced_ttl: int = 10
