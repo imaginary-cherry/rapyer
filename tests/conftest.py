@@ -165,7 +165,10 @@ COVERAGE_CHECKS: list[CoverageCheck] = [
     CoverageCheck(
         name="cover_no_clobber",
         help_text="no-clobber behavior",
-        expected=lambda: _collect_methods(ignore_groups=ActionGroup.READ),
+        expected=lambda: _collect_methods(
+            # Delete and create effect the entire model
+            ignore_groups=(ActionGroup.DELETE | ActionGroup.CREATE)
+        ),
     ),
 ]
 COVERAGE_FLAG = "action-coverage"
