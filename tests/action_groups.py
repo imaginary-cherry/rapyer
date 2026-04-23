@@ -100,4 +100,5 @@ NON_ACTION_METHODS = _group(
     AtomicRedisModel.afind_keys,
     AtomicRedisModel.aexists,
     rapyer.aexists,
+    rapyer.apipeline,  # TODO - this should change once we add update on each action in the ttl
 )
