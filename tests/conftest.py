@@ -213,7 +213,7 @@ def _all_subclasses(cls):
 
 def _iter_class_methods(cls, async_only: bool):
     members = (
-        inspect.getmembers(cls, predicate=inspect.iscoroutinefunction)
+        inspect.getmembers(cls, predicate=_is_async_callable)
         if async_only
         else vars(cls).items()
     )
