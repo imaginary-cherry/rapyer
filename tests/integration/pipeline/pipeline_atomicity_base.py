@@ -356,9 +356,7 @@ class TTLActionTestBase(ActionTestBase, ABC):
 
         # Act
         with (
-            patch.object(
-                type(model_for_keys).Meta, "refresh_ttl", ActionGroup(0)
-            ),
+            patch.object(type(model_for_keys).Meta, "refresh_ttl", ActionGroup(0)),
             patch.object(actions_module, "flush_action_targets", flush_spy),
             patch.object(Redis, "expire", redis_expire_spy),
             patch.object(Pipeline, "expire", pipeline_expire_spy),
@@ -390,7 +388,7 @@ class TTLActionTestBase(ActionTestBase, ABC):
             parametrize=False,
         )
         cls._prepare_action_test(
-            test_attr="test_no_expire_calls_when_ttl_refresh_disabled",
+            test_attr="test_ttl_update_only_once",
             cover_marker="cover_ttl_update_once",
             skip_attr="skip_ttl_refresh",
             parametrize=False,
