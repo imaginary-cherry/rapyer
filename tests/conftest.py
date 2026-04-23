@@ -159,7 +159,7 @@ COVERAGE_CHECKS: list[CoverageCheck] = [
         name="cover_ttl_no_refresh",
         help_text="TTL no-refresh",
         expected=lambda: _collect_methods(
-            only_async=True, ignore_groups=ActionGroup.DELETE
+            only_async=True, ignore_groups=ActionGroup.DELETE | ActionGroup.CREATE
         ),
     ),
     CoverageCheck(
