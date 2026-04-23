@@ -196,15 +196,10 @@ def mark_actions(
 
 
 def marks_redis_updated(method):
-    """Decorator for sync pipeline methods. Marks _redis_updated on the result.
-
-    Pipeline TTL refresh is handled at pipeline exit via should_refresh(),
-    not per-operation. This decorator only signals that Redis was modified.
-
-    Usage:
-        @marks_redis_updated
-        def __iadd__(self, other):
-            ...
+    """
+    We mark when the field was already updated to prevent duplicated updates.
+    This is usually helps in self assign field like model.int_field += 1
+    where both __iadd__ of int and __setitem__ of atmoic model
     """
 
     @functools.wraps(method)
