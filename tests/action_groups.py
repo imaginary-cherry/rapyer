@@ -90,6 +90,8 @@ NON_ACTION_METHODS = _group(
     find_redis_models,
     # Distributed lock context manager, not a pipeline-participating write.
     rapyer.alock_from_key,
+    AtomicRedisModel.alock_from_key,
+    AtomicRedisModel.alock,
     # TTL primitives: they ARE the TTL mechanism, not actions subject to it.
     AtomicRedisModel.aset_ttl,
     AtomicRedisModel.refresh_ttl_if_needed,
