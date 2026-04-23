@@ -11,6 +11,7 @@ import pytest_asyncio
 
 import rapyer
 from rapyer import AtomicRedisModel
+from rapyer.actions import ActionGroup
 from tests.integration.conftest import REDUCED_TTL_SECONDS
 from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.functionality_types import AllTypesModel
@@ -275,7 +276,11 @@ class TTLActionTestBase(ActionTestBase, ABC):
             )
 
         # Act
-        with patch("rapyer.base.should_refresh_for_action", return_value=True):
+        with patch.object(
+            type(model_for_keys).Meta,
+            "refresh_ttl",
+            ActionGroup.all(for_ttl=True),
+        ):
             await self.perform_action(model_for_keys)
 
         # Assert
@@ -309,7 +314,11 @@ class TTLActionTestBase(ActionTestBase, ABC):
             )
 
         # Act
-        with patch("rapyer.base.should_refresh_for_action", return_value=False):
+        with patch.object(
+            type(model_for_keys).Meta,
+            "refresh_ttl",
+            ActionGroup(0),
+        ):
             await self.perform_action(model_for_keys)
 
         # Assert
