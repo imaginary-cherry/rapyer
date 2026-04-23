@@ -31,6 +31,7 @@ class ActionGroup(enum.Flag):
 
     READ = enum.auto()
     FETCH = enum.auto()
+    CREATE = enum.auto()
     UPDATE = enum.auto()
     APPEND = enum.auto()
     DELETE = enum.auto()

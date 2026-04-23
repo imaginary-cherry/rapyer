@@ -378,7 +378,7 @@ class AtomicRedisModel(BaseModel):
     def is_inner_model(self) -> bool:
         return bool(self.field_name)
 
-    @mark_actions(ActionGroup.UPDATE, initial=True)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.CREATE, initial=True)
     async def asave(self) -> Self:
         model_dump = self.redis_dump()
         async with ensure_pipeline(self.Meta) as pipe:
@@ -612,7 +612,7 @@ class AtomicRedisModel(BaseModel):
         return [RapyerKey(k) for k in keys]
 
     @classmethod
-    @mark_actions(ActionGroup.UPDATE, target=TargetSource.RESULT, initial=True)
+    @mark_actions(ActionGroup.CREATE, target=TargetSource.RESULT, initial=True)
     async def ainsert(cls, *models: Unpack[Self]):
         async with ensure_pipeline(cls.Meta) as pipe:
             for model in models:
@@ -951,7 +951,7 @@ def find_redis_models() -> list[type[AtomicRedisModel]]:
     return REDIS_MODELS
 
 
-@mark_actions(ActionGroup.UPDATE, target=TargetSource.MANUAL, initial=True)
+@mark_actions(ActionGroup.CREATE, target=TargetSource.MANUAL, initial=True)
 async def ainsert(*models: Unpack[AtomicRedisModel]) -> list[AtomicRedisModel]:
     async with ensure_pipeline(AtomicRedisModel.Meta) as pipe:
         for model in models:
