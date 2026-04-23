@@ -60,7 +60,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
 
     @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ)
     async def apop(self):
-        result = await self.client.zpopmin(self.special_key, count=1)
+        result = await self.redis.zpopmin(self.special_key, count=1)
         if not result:
             return None
         member, score = result[0]
@@ -69,7 +69,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
     @mark_actions(ActionGroup.READ)
     async def apeek(self):
         """Return the item with the lowest priority score without removing it."""
-        result = await self.client.zrange(self.special_key, 0, 0, withscores=True)
+        result = await self.redis.zrange(self.special_key, 0, 0, withscores=True)
         if not result:
             return None
         member, score = result[0]
@@ -88,7 +88,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
     @mark_actions(ActionGroup.READ)
     async def aitems(self) -> list[PriorityQueueItem]:
         """Return all items sorted by priority (ascending)."""
-        result = await self.client.zrange(self.special_key, 0, -1, withscores=True)
+        result = await self.redis.zrange(self.special_key, 0, -1, withscores=True)
         return [
             PriorityQueueItem(value=self._deserialize_value(m), priority=s)
             for m, s in result

@@ -10,12 +10,11 @@ from pydantic_core import core_schema
 from pydantic_core.core_schema import CoreSchema, SerializationInfo, ValidationInfo
 from redis.commands.search.field import TextField
 
+# Imported here to avoid circular import issues; actions imports context, not types.base
+from rapyer.actions import ActionGroup, mark_actions
 from rapyer.context import _context_pipe
 from rapyer.errors import CantSerializeRedisValueError
 from rapyer.typing_support import Self
-
-# Imported here to avoid circular import issues; actions imports context, not types.base
-from rapyer.actions import ActionGroup, mark_actions
 
 logger = logging.getLogger("rapyer")
 
@@ -98,7 +97,7 @@ class RedisType(BaseRedisType):
 
     @mark_actions(ActionGroup.READ)
     async def aload(self):
-        redis_value = await self.client.json().get(self.key, self.field_path)  # type: ignore[misc]
+        redis_value = await self.redis.json().get(self.key, self.field_path)  # type: ignore[misc]
         if redis_value is None:
             return None
         result = self._adapter.validate_python(
