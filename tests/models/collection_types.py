@@ -96,7 +96,7 @@ class ListDictModel(BaseDictMetadataModel):
     metadata: dict[str, list[str]] = Field(default_factory=dict)
 
 
-class NestedDictModel(BaseDictMetadataModel):
+class NestedMetadataDictModel(BaseDictMetadataModel):
     metadata: dict[str, dict[str, str]] = Field(default_factory=dict)
 
 

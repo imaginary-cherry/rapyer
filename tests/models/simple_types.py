@@ -59,7 +59,7 @@ class DatetimeListModel(AtomicRedisModel):
     dates: list[datetime] = Field(default_factory=list)
 
 
-class DatetimeDictModel(AtomicRedisModel):
+class DatetimeEventsModel(AtomicRedisModel):
     event_dates: dict[str, datetime] = Field(default_factory=dict)
 
 

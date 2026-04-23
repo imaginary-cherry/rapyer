@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import pytest
 
 from tests.models.simple_types import (
-    DatetimeDictModel,
+    DatetimeEventsModel,
     DatetimeListModel,
     DatetimeModel,
 )
@@ -158,11 +158,11 @@ async def test_redis_datetime_list_functionality_sanity(test_dates):
 @pytest.mark.asyncio
 async def test_redis_datetime_dict_functionality_sanity(test_date_dict):
     # Arrange
-    model = DatetimeDictModel(event_dates=test_date_dict)
+    model = DatetimeEventsModel(event_dates=test_date_dict)
     await model.asave()
 
     # Act
-    fresh_model = DatetimeDictModel()
+    fresh_model = DatetimeEventsModel()
     fresh_model.pk = model.pk
     loaded_model = await fresh_model.aload()
 

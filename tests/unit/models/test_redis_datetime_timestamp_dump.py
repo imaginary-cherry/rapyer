@@ -4,7 +4,7 @@ import pytest
 from pydantic import TypeAdapter
 
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME
-from tests.models.unit_types import DatetimeTimestampModel
+from tests.models.simple_types import DatetimeTimestampModel
 
 
 @pytest.mark.parametrize(
