@@ -32,6 +32,8 @@ class TestRapyerFunctionAdeleteMany(ActionTestBase):
 
 class TestRapyerFunctionAinsert(TTLActionTestBase):
     covered_method = rapyer.ainsert
+    model_exists_before_action = False
+    skip_ttl_no_refresh = "Ainsert is initial so we always set ttl"
 
     def create_models(self):
         return [
