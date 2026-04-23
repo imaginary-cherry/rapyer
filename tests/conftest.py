@@ -218,6 +218,8 @@ def _iter_class_methods(cls, async_only: bool):
         else vars(cls).items()
     )
     for name, method in members:
+        if isinstance(method, (classmethod, staticmethod)):
+            method = method.__func__
         if name.startswith("__") or not callable(method):
             continue
         if getattr(method, "__qualname__", "").split(".")[0] != cls.__name__:
