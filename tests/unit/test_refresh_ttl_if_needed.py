@@ -29,9 +29,6 @@ from tests.models.simple_types import TTLRefreshTestModel
             ActionGroup.APPEND, ActionGroup.APPEND, True, id="single-append-append"
         ),
         pytest.param(
-            ActionGroup.DELETE, ActionGroup.DELETE, True, id="single-delete-delete"
-        ),
-        pytest.param(
             ActionGroup.ERASE, ActionGroup.ERASE, True, id="single-erase-erase"
         ),
         pytest.param(
@@ -68,30 +65,6 @@ from tests.models.simple_types import TTLRefreshTestModel
             id="two-ru-vs-append",
         ),
         pytest.param(
-            ActionGroup.READ | ActionGroup.UPDATE | ActionGroup.DELETE,
-            ActionGroup.READ,
-            True,
-            id="three-rud-read",
-        ),
-        pytest.param(
-            ActionGroup.READ | ActionGroup.UPDATE | ActionGroup.DELETE,
-            ActionGroup.DELETE,
-            True,
-            id="three-rud-delete",
-        ),
-        pytest.param(
-            ActionGroup.READ | ActionGroup.UPDATE | ActionGroup.DELETE,
-            ActionGroup.APPEND,
-            False,
-            id="three-rud-vs-append",
-        ),
-        pytest.param(
-            ActionGroup.READ | ActionGroup.UPDATE | ActionGroup.DELETE,
-            ActionGroup.ERASE,
-            False,
-            id="three-rud-vs-erase",
-        ),
-        pytest.param(
             ActionGroup.READ,
             ActionGroup.UPDATE | ActionGroup.APPEND,
             False,
@@ -109,9 +82,9 @@ from tests.models.simple_types import TTLRefreshTestModel
             True,
             id="multi-action-overlap-append",
         ),
-        pytest.param(ActionGroup.all(), ActionGroup.READ, True, id="all-read"),
+        pytest.param(ActionGroup.all(for_ttl=True), ActionGroup.READ, True, id="all-read"),
         pytest.param(
-            ActionGroup.all(), ActionGroup.ARITHMETIC, True, id="all-arithmetic"
+            ActionGroup.all(for_ttl=True), ActionGroup.ARITHMETIC, True, id="all-arithmetic"
         ),
     ],
 )

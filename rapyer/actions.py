@@ -38,9 +38,11 @@ class ActionGroup(enum.Flag):
     ARITHMETIC = enum.auto()
 
     @classmethod
-    def all(cls) -> "ActionGroup":
+    def all(cls, *, for_ttl: bool = False) -> "ActionGroup":
         result = cls(0)
         for member in cls:
+            if for_ttl and member is cls.DELETE:
+                continue
             result |= member
         return result
 

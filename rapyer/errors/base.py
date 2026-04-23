@@ -28,3 +28,7 @@ class UnsupportedArgumentValueError(RapyerError):
 
 class UpdateAtomicModelError(RapyerError):
     pass
+
+
+class InvalidRefreshTtlError(RapyerError):
+    """Raised when refresh_ttl contains ActionGroup.DELETE, which is never refreshable."""
