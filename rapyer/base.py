@@ -404,18 +404,8 @@ class AtomicRedisModel(BaseModel):
 
     @mark_actions(ActionGroup.UPDATE, target=TargetSource.RESULT, initial=True)
     async def aduplicate(self) -> Self:
-        if self.is_inner_model():
-            raise RuntimeError("Can only duplicate from top level model")
-
-        duplicated = self.__class__(**self.model_dump())
-        async with ensure_pipeline(self.Meta):
-            await duplicated.asave()
-            for fname in self._special_field_names:
-                source_field = getattr(self, fname)
-                target_field = getattr(duplicated, fname)
-                if isinstance(source_field, SpecialFieldType):
-                    await source_field.aduplicate_special(target_field.special_key)
-        return duplicated
+        duplicates = await self.aduplicate_many(1)
+        return duplicates[0]
 
     @mark_actions(ActionGroup.UPDATE, target=TargetSource.RESULT, initial=True)
     async def aduplicate_many(self, num: int) -> list[Self]:
