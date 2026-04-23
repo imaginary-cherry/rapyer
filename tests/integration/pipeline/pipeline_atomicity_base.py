@@ -4,12 +4,14 @@ import inspect
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, ClassVar, cast
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
+from redis.asyncio.client import Pipeline, Redis
 
 import rapyer
+import rapyer.actions as actions_module
 from rapyer import AtomicRedisModel
 from rapyer.actions import ActionGroup
 from tests.integration.conftest import REDUCED_TTL_SECONDS
@@ -342,6 +344,35 @@ class TTLActionTestBase(ActionTestBase, ABC):
                 0 < after <= REDUCED_TTL_SECONDS
             ), f"TTL for {key}={after}; expected in (0, {REDUCED_TTL_SECONDS}]"
 
+    @pytest.mark.asyncio
+    async def test_ttl_update_only_once(self):
+        # Arrange
+        self.created_models = await self._setup_ttl_data()
+        model_for_keys = self.created_models[0]
+
+        flush_spy = AsyncMock(wraps=actions_module.flush_action_targets)
+        redis_expire_spy = AsyncMock()
+        pipeline_expire_spy = MagicMock()
+
+        # Act
+        with (
+            patch.object(
+                type(model_for_keys).Meta, "refresh_ttl", ActionGroup(0)
+            ),
+            patch.object(actions_module, "flush_action_targets", flush_spy),
+            patch.object(Redis, "expire", redis_expire_spy),
+            patch.object(Pipeline, "expire", pipeline_expire_spy),
+        ):
+            await self.perform_action(model_for_keys)
+
+        # Assert
+        assert flush_spy.await_count == 1, (
+            f"flush_action_targets awaited {flush_spy.await_count} times "
+            f"(expected exactly 1) for {type(self).__name__}.perform_action"
+        )
+        redis_expire_spy.assert_not_awaited()
+        pipeline_expire_spy.assert_not_called()
+
     def __init_subclass__(cls, **kwargs: Any):
         super().__init_subclass__(**kwargs)
         if inspect.isabstract(cls):
@@ -356,6 +387,12 @@ class TTLActionTestBase(ActionTestBase, ABC):
             test_attr="test_ttl_no_refresh_on_action",
             cover_marker="cover_ttl_no_refresh",
             skip_attr="skip_ttl_no_refresh",
+            parametrize=False,
+        )
+        cls._prepare_action_test(
+            test_attr="test_no_expire_calls_when_ttl_refresh_disabled",
+            cover_marker="cover_ttl_update_once",
+            skip_attr="skip_ttl_refresh",
             parametrize=False,
         )
 
