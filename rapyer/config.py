@@ -23,11 +23,15 @@ class RedisConfig(BaseModel):
 
     # SkipValidation lets tests inject MagicMock/FakeRedis without a type error
     # while keeping the annotation for static analysis.
-    redis: Annotated[Redis, SkipValidation] = Field(
-        default_factory=lambda: redis.asyncio.from_url(
-            DEFAULT_CONNECTION, decode_responses=True
-        )
-    )
+    redis: Annotated[
+        Redis,
+        SkipValidation,
+        Field(
+            default_factory=lambda: redis.asyncio.from_url(
+                DEFAULT_CONNECTION, decode_responses=True
+            )
+        ),
+    ]
     redis_type: dict[type, type] = Field(default_factory=create_all_types)
     ttl: int | None = None
     init_with_rapyer: bool = True
