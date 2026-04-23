@@ -50,7 +50,6 @@ PRIVATE_METHODS = _group(
     AtomicRedisModel.create_redis_model,
     AtomicRedisModel.init_class,
     AtomicRedisModel.iter_filter_batches,
-    AtomicRedisModel.redis_schema,
     AtomicRedisModel.should_refresh,
     AtomicRedisModel.should_refresh_for_action,
 )
@@ -60,12 +59,17 @@ PRIVATE_METHODS = _group(
 # helpers whose contract is shared across the type hierarchy
 PRIVATE_INHERITED_METHODS = _group(
     BaseRedisType.sub_field_path,
+    RedisType.redis_schema,
     RedisType.clone,
     RedisType.serialize_unknown,
     RedisType.deserialize_unknown,
     GenericRedisType.iterate_items,
     GenericRedisType.full_serializer,
     GenericRedisType.full_deserializer,
+    GenericRedisType.build_typed_original,
+    GenericRedisType.find_inner_type,
+    GenericRedisType.schema_for_unknown,
+    GenericRedisType.try_deserialize_item,
     RedisDict.validate_dict,
     RedisList.create_new_value,
     RedisList.create_new_values,
@@ -73,7 +77,9 @@ PRIVATE_INHERITED_METHODS = _group(
     SpecialFieldType.asave_special,
     SpecialFieldType.adelete_special,
     SpecialFieldType.aduplicate_special,
+    RedisPriorityQueue.find_inner_type,
     RedisPriorityQueue.aremove,
+    AtomicRedisModel.redis_schema,
 )
 
 # NON_ACTION_METHODS — module-level helpers that aren't Redis actions and
