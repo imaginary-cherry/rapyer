@@ -70,7 +70,6 @@ class TestRapyerFunctionApipeline(TTLActionTestBase, UpdateActionTestBase):
     async def perform_action(self, piped):
         async with rapyer.apipeline(use_existing_pipe=True):
             piped.name = "updated"
-            await piped.asave()
 
     async def load_data(self):
         loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
