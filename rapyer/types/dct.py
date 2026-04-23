@@ -121,7 +121,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
     @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ)
     async def apop(self, key, default=None):
         result = await arun_sha(
-            self.client,
+            self.redis,
             self.Meta,
             DICT_POP_SCRIPT_NAME,
             1,
@@ -141,7 +141,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
     @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ)
     async def apopitem(self):
         result = await arun_sha(
-            self.client,
+            self.redis,
             self.Meta,
             DICT_POPITEM_SCRIPT_NAME,
             1,
