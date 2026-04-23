@@ -1,8 +1,13 @@
 import pytest
 
+from rapyer import AtomicRedisModel
 from rapyer.actions import ACTION_GROUPS_ATTR, ActionGroup, should_refresh_for_action
 from rapyer.config import RedisConfig
 from rapyer.errors import InvalidRefreshTtlError
+from rapyer.types.dct import RedisDict
+from rapyer.types.integer import RedisInt
+from rapyer.types.lst import RedisList
+from rapyer.types.priority_queue import RedisPriorityQueue
 
 # --- should_refresh_for_action tests ---
 
@@ -25,13 +30,25 @@ from rapyer.errors import InvalidRefreshTtlError
     ],
 )
 def test_should_refresh_for_action(refresh_ttl, action, expected):
+    # Arrange
     config = RedisConfig(ttl=60, refresh_ttl=refresh_ttl)
-    assert should_refresh_for_action(config, action) == expected
+
+    # Act
+    result = should_refresh_for_action(config, action)
+
+    # Assert
+    assert result == expected
 
 
 def test_should_refresh_returns_false_when_no_ttl():
+    # Arrange
     config = RedisConfig(ttl=None, refresh_ttl=True)
-    assert should_refresh_for_action(config, ActionGroup.READ) is False
+
+    # Act
+    result = should_refresh_for_action(config, ActionGroup.READ)
+
+    # Assert
+    assert result is False
 
 
 # --- RedisConfig.refresh_ttl DELETE guard tests ---
@@ -46,12 +63,14 @@ def test_should_refresh_returns_false_when_no_ttl():
     ],
 )
 def test_redis_config_rejects_delete_in_class_declaration(refresh_ttl):
-    from rapyer import AtomicRedisModel
+    # Arrange
+    bad_refresh_ttl = refresh_ttl
 
+    # Act / Assert
     with pytest.raises(InvalidRefreshTtlError):
 
         class _BadModel(AtomicRedisModel):
-            Meta = RedisConfig(ttl=60, refresh_ttl=refresh_ttl)
+            Meta = RedisConfig(ttl=60, refresh_ttl=bad_refresh_ttl)
 
 
 @pytest.mark.parametrize(
@@ -65,59 +84,105 @@ def test_redis_config_rejects_delete_in_class_declaration(refresh_ttl):
     ],
 )
 def test_redis_config_accepts_non_delete_refresh_ttl(refresh_ttl):
-    RedisConfig(ttl=60, refresh_ttl=refresh_ttl)
+    # Arrange
+    ttl = 60
+
+    # Act
+    config = RedisConfig(ttl=ttl, refresh_ttl=refresh_ttl)
+
+    # Assert
+    assert config.refresh_ttl == refresh_ttl
 
 
 # --- ActionGroup.all() tests ---
 
 
 def test_action_group_all_includes_every_member():
+    # Arrange
+    members = list(ActionGroup)
+
+    # Act
     all_groups = ActionGroup.all()
-    for member in ActionGroup:
+
+    # Assert
+    for member in members:
         assert member in all_groups
 
 
 def test_action_group_all_for_ttl_excludes_delete():
+    # Arrange
+    members = list(ActionGroup)
+
+    # Act
     ttl_groups = ActionGroup.all(for_ttl=True)
+
+    # Assert
     assert ActionGroup.DELETE not in ttl_groups
-    for member in ActionGroup:
+    for member in members:
         if member is not ActionGroup.DELETE:
             assert member in ttl_groups
 
 
 def test_action_group_all_for_ttl_accepted_by_redis_config():
+    # Arrange
+    refresh_ttl = ActionGroup.all(for_ttl=True)
+
+    # Act
+    config = RedisConfig(ttl=60, refresh_ttl=refresh_ttl)
+
+    # Assert
     # ActionGroup.all(for_ttl=True) excludes DELETE → must not raise
-    RedisConfig(ttl=60, refresh_ttl=ActionGroup.all(for_ttl=True))
+    assert config.refresh_ttl == refresh_ttl
 
 
 # --- Decorator _action_groups attribute tests ---
 
 
 def test_mark_actions_sets_action_groups_on_method():
-    from rapyer.types.integer import RedisInt
+    # Arrange
+    method = RedisInt.aincrease
 
-    assert hasattr(RedisInt.aincrease, ACTION_GROUPS_ATTR)
-    assert ActionGroup.UPDATE in RedisInt.aincrease._action_groups
-    assert ActionGroup.ARITHMETIC in RedisInt.aincrease._action_groups
+    # Act
+    action_groups = getattr(method, ACTION_GROUPS_ATTR)
+
+    # Assert
+    assert hasattr(method, ACTION_GROUPS_ATTR)
+    assert ActionGroup.UPDATE in action_groups
+    assert ActionGroup.ARITHMETIC in action_groups
 
 
 def test_list_aappend_has_update_and_append_groups():
-    from rapyer.types.lst import RedisList
+    # Arrange
+    method = RedisList.aappend
 
-    assert ActionGroup.UPDATE in RedisList.aappend._action_groups
-    assert ActionGroup.APPEND in RedisList.aappend._action_groups
+    # Act
+    action_groups = method._action_groups
+
+    # Assert
+    assert ActionGroup.UPDATE in action_groups
+    assert ActionGroup.APPEND in action_groups
 
 
 def test_dict_adel_item_has_update_and_erase_groups():
-    from rapyer.types.dct import RedisDict
+    # Arrange
+    method = RedisDict.adel_item
 
+    # Act
+    action_groups = method._action_groups
+
+    # Assert
     # adel_item removes an item from the collection but keeps the model key → ERASE, not DELETE
-    assert ActionGroup.UPDATE in RedisDict.adel_item._action_groups
-    assert ActionGroup.ERASE in RedisDict.adel_item._action_groups
+    assert ActionGroup.UPDATE in action_groups
+    assert ActionGroup.ERASE in action_groups
 
 
 def test_priority_queue_apush_has_update_and_append_groups():
-    from rapyer.types.priority_queue import RedisPriorityQueue
+    # Arrange
+    method = RedisPriorityQueue.apush
 
-    assert ActionGroup.UPDATE in RedisPriorityQueue.apush._action_groups
-    assert ActionGroup.APPEND in RedisPriorityQueue.apush._action_groups
+    # Act
+    action_groups = method._action_groups
+
+    # Assert
+    assert ActionGroup.UPDATE in action_groups
+    assert ActionGroup.APPEND in action_groups
