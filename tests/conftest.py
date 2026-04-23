@@ -263,7 +263,7 @@ def _collect_methods(
     candidates = []
     for cls in _all_subclasses(BaseRedisType):
         candidates.extend(_iter_class_methods(cls, async_only=only_async))
-    candidates.extend(_iter_class_methods(AtomicRedisModel, async_only=True))
+    candidates.extend(_iter_class_methods(AtomicRedisModel, async_only=only_async))
     candidates.extend(_iter_module_functions(rapyer))
 
     result = set()
