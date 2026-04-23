@@ -35,6 +35,12 @@ PRIVATE_METHODS = _group(
     AtomicRedisModel._search_keys_by_query,
     AtomicRedisModel.acreate_index,
     AtomicRedisModel.adelete_index,
+    AtomicRedisModel.update,
+    AtomicRedisModel.redis_dump_json,
+    AtomicRedisModel.redis_dump,
+    AtomicRedisModel.is_inner_model,
+    AtomicRedisModel.assign_fields_links,
+    AtomicRedisModel.validate_sub_model,
 )
 
 # PRIVATE_INHERITED_METHODS — MRO-aware. Any subclass that inherits OR
