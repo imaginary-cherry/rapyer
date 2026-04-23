@@ -187,6 +187,7 @@ class UpdateActionTestBase(ActionTestBase, ABC):
     """Base for actions that modify data in Redis."""
 
     NO_CLOBBER_SENTINEL_VALUE: ClassVar[str] = "NO_CLOBBER_SENTINEL_42"
+    skip_clobber_check: ClassVar[bool] = False
 
     @pytest.mark.asyncio
     async def test_no_clobber_effect_when_outside_of_pipeline(self, test_input):
@@ -220,7 +221,7 @@ class UpdateActionTestBase(ActionTestBase, ABC):
         cls._prepare_action_test(
             test_attr="test_no_clobber_effect_when_outside_of_pipeline",
             cover_marker="cover_no_clobber",
-            skip_attr="skip_pipeline_atomicity",
+            skip_attr="skip_clobber_check",
             parametrize=True,
         )
 
