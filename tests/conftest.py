@@ -163,11 +163,11 @@ COVERAGE_CHECKS: list[CoverageCheck] = [
         ),
     ),
     CoverageCheck(
-        name="cover_ttl_udpate_once",
+        name="cover_ttl_update_once",
         help_text="TTL Update once",
         expected=lambda: _collect_methods(
             only_async=True, ignore_groups=ActionGroup.DELETE | ActionGroup.CREATE
-        )
+        ),
     ),
     CoverageCheck(
         name="cover_no_clobber",
