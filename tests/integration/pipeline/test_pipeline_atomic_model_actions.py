@@ -12,6 +12,7 @@ from tests.integration.pipeline.pipeline_atomicity_base import (
     ComprehensiveCounterOpBase,
     ComprehensiveMetadataOpBase,
     ComprehensiveTagsOpBase,
+    CreateActionTestBase,
     TTLActionTestBase,
     TwoModelDeleteBase,
     UpdateActionTestBase,
@@ -26,7 +27,7 @@ from tests.models.simple_types import (
 TTL_SECONDS = 300
 
 
-class TestModelAsave(UpdateActionTestBase, TTLActionTestBase):
+class TestModelAsave(UpdateActionTestBase, CreateActionTestBase):
     covered_method = AtomicRedisModel.asave
 
     def create_models(self):
@@ -54,7 +55,7 @@ class TestModelAsave(UpdateActionTestBase, TTLActionTestBase):
         )
 
 
-class TestModelAinsert(TTLActionTestBase):
+class TestModelAinsert(CreateActionTestBase):
     covered_method = AtomicRedisModel.ainsert
     model_exists_before_action = False
     skip_ttl_no_refresh = "Ainsert is initial so we always set ttl"
@@ -272,7 +273,7 @@ class TestRedisDictClear(ComprehensiveMetadataOpBase):
         return {}
 
 
-class TestRapyerAduplicate(UpdateActionTestBase, TTLActionTestBase):
+class TestRapyerAduplicate(UpdateActionTestBase, CreateActionTestBase):
     covered_method = AtomicRedisModel.aduplicate
     model_exists_before_action = False
 
@@ -307,7 +308,7 @@ class TestRapyerAduplicate(UpdateActionTestBase, TTLActionTestBase):
         assert self.duplicate.pk != self.created_models[0].pk
 
 
-class TestRapyerAduplicateMany(UpdateActionTestBase, TTLActionTestBase):
+class TestRapyerAduplicateMany(UpdateActionTestBase, CreateActionTestBase):
     covered_method = AtomicRedisModel.aduplicate_many
     model_exists_before_action = False
 

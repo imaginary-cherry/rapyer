@@ -3,6 +3,7 @@ import asyncio
 import rapyer
 from tests.integration.pipeline.pipeline_atomicity_base import (
     ActionTestBase,
+    CreateActionTestBase,
     TTLActionTestBase,
     UpdateActionTestBase,
 )
@@ -31,7 +32,7 @@ class TestRapyerFunctionAdeleteMany(ActionTestBase):
         return 0, 0
 
 
-class TestRapyerFunctionAinsert(TTLActionTestBase):
+class TestRapyerFunctionAinsert(CreateActionTestBase):
     covered_method = rapyer.ainsert
     model_exists_before_action = False
     skip_ttl_no_refresh = "Ainsert is initial so we always set ttl"

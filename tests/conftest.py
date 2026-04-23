@@ -177,6 +177,13 @@ COVERAGE_CHECKS: list[CoverageCheck] = [
             ignore_groups=(ActionGroup.DELETE | ActionGroup.CREATE)
         ),
     ),
+    CoverageCheck(
+        name="cover_no_ttl_when_not_configured",
+        help_text="No TTL set when ttl is not configured",
+        expected=lambda: _collect_methods(
+            only_async=True, require_groups=ActionGroup.CREATE
+        ),
+    ),
 ]
 COVERAGE_FLAG = "action-coverage"
 
@@ -261,6 +268,7 @@ def _is_non_action(holder, method_name: str) -> bool:
 
 def _collect_methods(
     ignore_groups: ActionGroup | None = None,
+    require_groups: ActionGroup | None = None,
     ignore_private: bool = True,
     only_async: bool = False,
 ):
@@ -268,6 +276,8 @@ def _collect_methods(
 
     When only_async=True, BaseRedisType subclasses are also restricted to async.
     AtomicRedisModel is always async-only since non-async members aren't Redis ops.
+    When require_groups is set, only methods tagged with at least one of those
+    action groups are included.
     """
     candidates = []
     for cls in _all_subclasses(BaseRedisType):
@@ -279,6 +289,10 @@ def _collect_methods(
     for holder, name, method in candidates:
         if should_ignore_group(method, ignore_groups):
             continue
+        if require_groups is not None:
+            groups = getattr(method, ACTION_GROUPS_ATTR, None)
+            if groups is None or not (groups & require_groups):
+                continue
         if _is_non_action(holder, name):
             continue
         if ignore_private and _is_private_method(holder, name):

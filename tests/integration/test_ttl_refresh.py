@@ -1,10 +1,7 @@
 import pytest
 
 from tests.integration.conftest import REDUCED_TTL_SECONDS
-from tests.models.simple_types import (
-    TTL_TEST_SECONDS,
-    UserModelWithoutTTL as ModelWithoutTTL,
-)
+from tests.models.simple_types import TTL_TEST_SECONDS
 
 
 @pytest.mark.asyncio
@@ -23,21 +20,6 @@ async def test_ttl_refresh_on_pipeline_execute__sanity(
     final_ttl = await real_redis_client.ttl(model.key)
     assert final_ttl > initial_ttl
     assert TTL_TEST_SECONDS - 2 < final_ttl <= TTL_TEST_SECONDS
-
-
-@pytest.mark.asyncio
-async def test_no_ttl_refresh_when_ttl_not_configured__sanity(real_redis_client):
-    # Arrange
-    model = ModelWithoutTTL(name="leo", age=55)
-    await model.asave()
-
-    # Act
-    loaded_model = await ModelWithoutTTL.aget(model.key)
-
-    # Assert
-    ttl = await real_redis_client.ttl(model.key)
-    assert ttl == -1  # No TTL set
-    assert loaded_model.name == "leo"
 
 
 @pytest.mark.asyncio
