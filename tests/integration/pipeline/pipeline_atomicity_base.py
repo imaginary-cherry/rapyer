@@ -1,4 +1,5 @@
 import asyncio
+import enum
 import functools
 import inspect
 from abc import ABC, abstractmethod
@@ -15,10 +16,26 @@ import rapyer.actions as actions_module
 from rapyer import AtomicRedisModel
 from rapyer.actions import ActionGroup
 from tests.integration.conftest import REDUCED_TTL_SECONDS
+from tests.integration.special_types.adapters import PriorityQueueAdapter
 from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.functionality_types import AllTypesModel
 from tests.models.pipeline_base import INIT_CLOBBER_SENTINEL, PipelineActionModel
 from tests.models.redis_types import PipelineAllTypesTestModel
+
+
+class SpecialFieldActionType(enum.Enum):
+    """Categorises a model action by its effect on a populated special field.
+
+    Drives the generic special-field tests in :class:`ActionTestBase`: the
+    test method orchestrates setup and assertions per category.
+    """
+
+    SAVE = enum.auto()
+    CREATE = enum.auto()
+    UPDATE = enum.auto()
+    DELETE = enum.auto()
+    DUPLICATE = enum.auto()
+
 
 # =============================================================================
 # Shared case dataclasses
@@ -65,6 +82,16 @@ class ActionTestBase(ABC):
     actions that return a value (and so can't be deferred in a pipeline) or
     that otherwise don't have pipeline atomicity coverage."""
 
+    special_field_action_type: ClassVar["SpecialFieldActionType | None"] = None
+    """When set, :meth:`test_special_field_lifecycle` and
+    :meth:`test_special_field_ttl_refresh` are registered on the subclass.
+    The value drives setup and assertions: e.g., DELETE → assert field key
+    absent; SAVE/UPDATE/CREATE → assert field data present; DUPLICATE →
+    assert field data present on the produced duplicate(s)."""
+
+    skip_special_field_lifecycle: ClassVar[str | None] = None
+    skip_special_field_ttl: ClassVar[str | None] = None
+
     created_models: Any = None
     test_input: Any = None
 
@@ -105,6 +132,38 @@ class ActionTestBase(ABC):
     @pytest_asyncio.fixture(autouse=True)
     async def _capture_real_redis(self, real_redis_client):
         self.real_redis_client = real_redis_client
+
+    @pytest.mark.asyncio
+    async def _impl_special_field_lifecycle(self):
+        adapter = PriorityQueueAdapter()
+        originals = self.create_models()
+        wrapped = [_wrap_with_sp_field(m, adapter.sp_field_class) for m in originals]
+        self.created_models = wrapped
+
+        if self.special_field_action_type is not SpecialFieldActionType.CREATE:
+            for m in wrapped:
+                await m.asave()
+        for m in wrapped:
+            await adapter.populate(m)
+
+        await self.perform_action(wrapped[0])
+
+        if self.special_field_action_type is SpecialFieldActionType.DELETE:
+            for m in wrapped:
+                sp_key = adapter.special_key(m)
+                if await self.real_redis_client.exists(m.key):
+                    await adapter.assert_data_present_by_key(
+                        sp_key, self.real_redis_client
+                    )
+                else:
+                    await adapter.assert_data_absent_by_key(
+                        sp_key, self.real_redis_client
+                    )
+        else:
+            keys = self._special_field_keys_to_check()
+            for k in keys:
+                sp_key = adapter.special_key_from_model_key(k)
+                await adapter.assert_data_present_by_key(sp_key, self.real_redis_client)
 
     @pytest.mark.asyncio
     async def test_pipeline_atomicity(self, test_input):
@@ -269,6 +328,47 @@ class TTLActionTestBase(ActionTestBase, ABC):
             for key in self.ttl_keys(inst):
                 await self.real_redis_client.expire(key, REDUCED_TTL_SECONDS)
         return models
+
+    @pytest.mark.asyncio
+    async def _impl_special_field_ttl_refresh(self):
+        adapter = PriorityQueueAdapter()
+        originals = self.create_models()
+        wrapped = [_wrap_with_sp_field(m, adapter.sp_field_class) for m in originals]
+        self.created_models = wrapped
+
+        if self.model_exists_before_action:
+            for m in wrapped:
+                await m.asave()
+        for m in wrapped:
+            await adapter.populate(m)
+        if self.model_exists_before_action:
+            for m in wrapped:
+                await self.real_redis_client.expire(m.key, REDUCED_TTL_SECONDS)
+                await self.real_redis_client.expire(
+                    adapter.special_key(m), REDUCED_TTL_SECONDS
+                )
+
+        with patch.object(
+            type(wrapped[0]).Meta, "refresh_ttl", ActionGroup.all(for_ttl=True)
+        ):
+            await self.perform_action(wrapped[0])
+
+        # Some subclasses' ``all_keys_to_check`` mixes model keys with special
+        # keys (PQActionBase). Map each: if it already ends with the field-name
+        # suffix it IS a special key; otherwise derive one. Dedupe.
+        suffix = f":{adapter.field_name}"
+        sp_keys: set[str] = set()
+        for k in self.all_keys_to_check():
+            if k.endswith(suffix):
+                sp_keys.add(k)
+            else:
+                sp_keys.add(adapter.special_key_from_model_key(k))
+        ttl_configured = type(wrapped[0]).Meta.ttl
+        for sp_key in sp_keys:
+            ttl = await self.real_redis_client.ttl(sp_key)
+            assert (
+                ttl_configured - 2 < ttl <= ttl_configured
+            ), f"TTL for {sp_key}={ttl}; expected near {ttl_configured}"
 
     @pytest.mark.asyncio
     async def test_ttl_refresh_on_action(self):
