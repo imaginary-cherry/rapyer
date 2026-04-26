@@ -1,5 +1,4 @@
 import asyncio
-import enum
 import functools
 import inspect
 from abc import ABC, abstractmethod
@@ -8,34 +7,21 @@ from typing import Any, ClassVar, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-import pytest_asyncio
 from redis.asyncio.client import Pipeline, Redis
 
 import rapyer
 import rapyer.actions as actions_module
 from rapyer import AtomicRedisModel
-from rapyer.actions import ActionGroup
+from rapyer.actions import ACTION_GROUPS_ATTR, ActionGroup
 from tests.integration.conftest import REDUCED_TTL_SECONDS
-from tests.integration.special_types.adapters import PriorityQueueAdapter
+from tests.integration.special_types.adapters import (
+    PriorityQueueAdapter,
+    SpecialFieldAdapter,
+)
 from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.functionality_types import AllTypesModel
 from tests.models.pipeline_base import INIT_CLOBBER_SENTINEL, PipelineActionModel
 from tests.models.redis_types import PipelineAllTypesTestModel
-
-
-class SpecialFieldActionType(enum.Enum):
-    """Categorises a model action by its effect on a populated special field.
-
-    Drives the generic special-field tests in :class:`ActionTestBase`: the
-    test method orchestrates setup and assertions per category.
-    """
-
-    SAVE = enum.auto()
-    CREATE = enum.auto()
-    UPDATE = enum.auto()
-    DELETE = enum.auto()
-    DUPLICATE = enum.auto()
-
 
 # =============================================================================
 # Shared case dataclasses
@@ -81,13 +67,6 @@ class ActionTestBase(ABC):
     applicable) :meth:`test_no_clobber` are skipped with that reason. Use for
     actions that return a value (and so can't be deferred in a pipeline) or
     that otherwise don't have pipeline atomicity coverage."""
-
-    special_field_action_type: ClassVar["SpecialFieldActionType | None"] = None
-    """When set, :meth:`test_special_field_lifecycle` and
-    :meth:`test_special_field_ttl_refresh` are registered on the subclass.
-    The value drives setup and assertions: e.g., DELETE → assert field key
-    absent; SAVE/UPDATE/CREATE → assert field data present; DUPLICATE →
-    assert field data present on the produced duplicate(s)."""
 
     skip_special_field_lifecycle: ClassVar[str | None] = None
     skip_special_field_ttl: ClassVar[str | None] = None
