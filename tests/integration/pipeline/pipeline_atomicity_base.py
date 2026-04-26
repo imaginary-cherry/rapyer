@@ -126,9 +126,10 @@ class ActionTestBase(ABC):
         return wrapped
 
     @pytest.mark.asyncio
-    async def _setup_test_special_field_lifecycle_create(self):
+    async def _setup_test_special_field_lifecycle_create(
+        self, adapter: SpecialFieldAdapter
+    ):
         # Arrange
-        adapter = PriorityQueueAdapter()
         originals = self.create_models()
         wrapped = [adapter.sp_field_class(**m.model_dump()) for m in originals]
         self.created_models = wrapped
@@ -141,9 +142,10 @@ class ActionTestBase(ABC):
         await adapter.assert_data_present_by_key(wrapped[0])
 
     @pytest.mark.asyncio
-    async def _setup_test_special_field_lifecycle_delete(self):
+    async def _setup_test_special_field_lifecycle_delete(
+        self, adapter: SpecialFieldAdapter
+    ):
         # Arrange
-        adapter = PriorityQueueAdapter()
         wrapped = await self.create_sp_models(adapter)
 
         # Act
@@ -181,6 +183,7 @@ class ActionTestBase(ABC):
         cover_marker: str,
         skip_attr: str,
         parametrize: bool,
+        **test_params,
     ):
         """Wrap, parametrize, cover-mark and skip-mark one test method on ``cls``.
 
@@ -193,7 +196,7 @@ class ActionTestBase(ABC):
 
             @functools.wraps(base_fn)
             async def wrapped(self, test_input):
-                return await base_fn(self, test_input)
+                return await base_fn(self, test_input, **test_params)
 
             params = cls.params or [None]
             wrapped = pytest.mark.parametrize(
@@ -203,7 +206,7 @@ class ActionTestBase(ABC):
 
             @functools.wraps(base_fn)
             async def wrapped(self):
-                return await base_fn(self)
+                return await base_fn(self, **test_params)
 
         methods = cls.covered_method
         if methods is not None:
@@ -241,11 +244,13 @@ class ActionTestBase(ABC):
             cls.test_special_field_lifecycle = None
 
         if cls.test_special_field_lifecycle is not None:
+            adapter = PriorityQueueAdapter()
             cls._prepare_action_test(
                 test_attr="test_special_field_lifecycle",
-                cover_marker="cover_sf_lifecycle",
+                cover_marker=f"cover_{adapter.sf_name}_lifecycle",
                 skip_attr="skip_special_field_lifecycle",
                 parametrize=False,
+                adapter=adapter,
             )
 
 
@@ -343,9 +348,8 @@ class TTLActionTestBase(ActionTestBase, ABC):
                 await self.real_redis_client.expire(key, REDUCED_TTL_SECONDS)
 
     @pytest.mark.asyncio
-    async def _impl_special_field_ttl_refresh(self):
+    async def test_special_field_ttl_refresh(self, adapter: SpecialFieldAdapter):
         # Arrange
-        adapter = PriorityQueueAdapter()
         wrapped = await self.create_sp_models(adapter)
 
         await self.set_ttl(wrapped)
@@ -499,12 +503,13 @@ class TTLActionTestBase(ActionTestBase, ABC):
             skip_attr="skip_ttl_refresh",
             parametrize=False,
         )
-        cls.test_special_field_ttl_refresh = cls._impl_special_field_ttl_refresh
+        adapter = PriorityQueueAdapter()
         cls._prepare_action_test(
             test_attr="test_special_field_ttl_refresh",
-            cover_marker=None,
+            cover_marker=f"cover_{adapter.sf_name}_ttl_refresh",
             skip_attr="skip_special_field_ttl",
             parametrize=False,
+            adapter=adapter,
         )
 
 
