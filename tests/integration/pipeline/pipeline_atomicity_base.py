@@ -74,6 +74,10 @@ class ActionTestBase(ABC):
     created_models: Any = None
     test_input: Any = None
 
+    @property
+    def real_redis_client(self):
+        return AtomicRedisModel.Meta.redis
+
     @abstractmethod
     def create_models(self) -> list[PipelineActionModel]:
         """
@@ -108,41 +112,49 @@ class ActionTestBase(ABC):
     def assert_after_pipeline(self, loaded: Any):
         assert loaded == self.expected_after()
 
-    @pytest_asyncio.fixture(autouse=True)
-    async def _capture_real_redis(self, real_redis_client):
-        self.real_redis_client = real_redis_client
-
-    @pytest.mark.asyncio
-    async def _impl_special_field_lifecycle(self):
-        adapter = PriorityQueueAdapter()
+    async def create_sp_models(
+        self, adapter: SpecialFieldAdapter
+    ) -> list[AtomicRedisModel]:
         originals = self.create_models()
-        wrapped = [_wrap_with_sp_field(m, adapter.sp_field_class) for m in originals]
+        wrapped = [adapter.sp_field_class(**m.model_dump()) for m in originals]
         self.created_models = wrapped
 
-        if self.special_field_action_type is not SpecialFieldActionType.CREATE:
+        async with rapyer.apipeline():
+            await rapyer.ainsert(*wrapped)
             for m in wrapped:
-                await m.asave()
-        for m in wrapped:
-            await adapter.populate(m)
+                await adapter.populate(m)
+        return wrapped
 
+    @pytest.mark.asyncio
+    async def _setup_test_special_field_lifecycle_create(self):
+        # Arrange
+        adapter = PriorityQueueAdapter()
+        originals = self.create_models()
+        wrapped = [adapter.sp_field_class(**m.model_dump()) for m in originals]
+        self.created_models = wrapped
+
+        # Act
+        await self.perform_action(wrapped[0])
+        await adapter.populate(wrapped[0])
+
+        # Assert
+        await adapter.assert_data_present_by_key(wrapped[0])
+
+    @pytest.mark.asyncio
+    async def _setup_test_special_field_lifecycle_delete(self):
+        # Arrange
+        adapter = PriorityQueueAdapter()
+        wrapped = await self.create_sp_models(adapter)
+
+        # Act
         await self.perform_action(wrapped[0])
 
-        if self.special_field_action_type is SpecialFieldActionType.DELETE:
-            for m in wrapped:
-                sp_key = adapter.special_key(m)
-                if await self.real_redis_client.exists(m.key):
-                    await adapter.assert_data_present_by_key(
-                        sp_key, self.real_redis_client
-                    )
-                else:
-                    await adapter.assert_data_absent_by_key(
-                        sp_key, self.real_redis_client
-                    )
-        else:
-            keys = self._special_field_keys_to_check()
-            for k in keys:
-                sp_key = adapter.special_key_from_model_key(k)
-                await adapter.assert_data_present_by_key(sp_key, self.real_redis_client)
+        # Assert
+        for m in wrapped:
+            model_exists = await self.real_redis_client.exists(m.key)
+            if model_exists:
+                continue
+            await adapter.assert_data_absent_by_key(m)
 
     @pytest.mark.asyncio
     async def test_pipeline_atomicity(self, test_input):
@@ -216,6 +228,25 @@ class ActionTestBase(ABC):
             skip_attr="skip_pipeline_atomicity",
             parametrize=True,
         )
+        action_groups = getattr(cls.covered_method, ACTION_GROUPS_ATTR, [])
+        if ActionGroup.CREATE in action_groups:
+            cls.test_special_field_lifecycle = (
+                cls._setup_test_special_field_lifecycle_create
+            )
+        elif ActionGroup.DELETE in action_groups:
+            cls.test_special_field_lifecycle = (
+                cls._setup_test_special_field_lifecycle_delete
+            )
+        else:
+            cls.test_special_field_lifecycle = None
+
+        if cls.test_special_field_lifecycle is not None:
+            cls._prepare_action_test(
+                test_attr="test_special_field_lifecycle",
+                cover_marker="cover_sf_lifecycle",
+                skip_attr="skip_special_field_lifecycle",
+                parametrize=False,
+            )
 
 
 # =============================================================================
@@ -303,51 +334,47 @@ class TTLActionTestBase(ActionTestBase, ABC):
 
     async def _setup_ttl_data(self) -> list[AtomicRedisModel]:
         models = await self.setup_data()
+        await self.set_ttl(models)
+        return models
+
+    async def set_ttl(self, models: list[AtomicRedisModel]):
         for inst in models:
             for key in self.ttl_keys(inst):
                 await self.real_redis_client.expire(key, REDUCED_TTL_SECONDS)
-        return models
 
     @pytest.mark.asyncio
     async def _impl_special_field_ttl_refresh(self):
+        # Arrange
         adapter = PriorityQueueAdapter()
-        originals = self.create_models()
-        wrapped = [_wrap_with_sp_field(m, adapter.sp_field_class) for m in originals]
-        self.created_models = wrapped
+        wrapped = await self.create_sp_models(adapter)
 
-        if self.model_exists_before_action:
-            for m in wrapped:
-                await m.asave()
-        for m in wrapped:
-            await adapter.populate(m)
-        if self.model_exists_before_action:
-            for m in wrapped:
-                await self.real_redis_client.expire(m.key, REDUCED_TTL_SECONDS)
-                await self.real_redis_client.expire(
-                    adapter.special_key(m), REDUCED_TTL_SECONDS
-                )
+        await self.set_ttl(wrapped)
+        await adapter.set_ttl(wrapped[0], REDUCED_TTL_SECONDS)
 
+        ttls_before = None
+        if self.model_exists_before_action:
+            ttls_before: list[int] = await adapter.get_additional_ttl(wrapped[0])
+
+        # Act
         with patch.object(
             type(wrapped[0]).Meta, "refresh_ttl", ActionGroup.all(for_ttl=True)
         ):
             await self.perform_action(wrapped[0])
 
-        # Some subclasses' ``all_keys_to_check`` mixes model keys with special
-        # keys (PQActionBase). Map each: if it already ends with the field-name
-        # suffix it IS a special key; otherwise derive one. Dedupe.
-        suffix = f":{adapter.field_name}"
-        sp_keys: set[str] = set()
-        for k in self.all_keys_to_check():
-            if k.endswith(suffix):
-                sp_keys.add(k)
-            else:
-                sp_keys.add(adapter.special_key_from_model_key(k))
+        # Assert
         ttl_configured = type(wrapped[0]).Meta.ttl
-        for sp_key in sp_keys:
-            ttl = await self.real_redis_client.ttl(sp_key)
+        afters = await adapter.get_additional_ttl(wrapped[0])
+        keys = adapter.additional_ttl_keys(wrapped[0])
+        if self.model_exists_before_action and ttls_before is not None:
+            for key, after, before in zip(keys, afters, ttls_before):
+                assert (
+                    after > before
+                ), f"TTL not refreshed for {key}: before={before} after={after}"
+
+        for key, after in zip(keys, afters):
             assert (
-                ttl_configured - 2 < ttl <= ttl_configured
-            ), f"TTL for {sp_key}={ttl}; expected near {ttl_configured}"
+                ttl_configured - 2 < after <= ttl_configured
+            ), f"TTL for {key}={after}; expected close to {ttl_configured}"
 
     @pytest.mark.asyncio
     async def test_ttl_refresh_on_action(self):
@@ -470,6 +497,13 @@ class TTLActionTestBase(ActionTestBase, ABC):
             test_attr="test_ttl_update_only_once",
             cover_marker="cover_ttl_update_once",
             skip_attr="skip_ttl_refresh",
+            parametrize=False,
+        )
+        cls.test_special_field_ttl_refresh = cls._impl_special_field_ttl_refresh
+        cls._prepare_action_test(
+            test_attr="test_special_field_ttl_refresh",
+            cover_marker=None,
+            skip_attr="skip_special_field_ttl",
             parametrize=False,
         )
 
