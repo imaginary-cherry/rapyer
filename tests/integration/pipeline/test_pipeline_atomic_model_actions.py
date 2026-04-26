@@ -71,7 +71,7 @@ class TestModelAinsert(CreateActionTestBase):
         return self.create_models()
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        await ComprehensiveTestModel.ainsert(*self.created_models)
+        await type(self.created_models[0]).ainsert(*self.created_models)
 
     async def load_data(self):
         existing_data = await asyncio.gather(
@@ -101,7 +101,7 @@ class TestRapyerAinsert(ActionTestBase):
         return self.create_models()
 
     async def perform_action(self, piped):
-        await ComprehensiveTestModel.ainsert(*self.created_models)
+        await type(self.created_models[0]).ainsert(*self.created_models)
 
     async def load_data(self):
         return tuple(
@@ -132,7 +132,7 @@ class TestRapyerDeleteByKey(TwoModelDeleteBase):
 
     async def perform_action(self, piped):
         model1, _ = self.created_models
-        await ComprehensiveTestModel.adelete_by_key(model1.key)
+        await type(model1).adelete_by_key(model1.key)
 
 
 class TestModelAdeleteMany(ActionTestBase):
@@ -147,7 +147,7 @@ class TestModelAdeleteMany(ActionTestBase):
 
     async def perform_action(self, piped):
         _model1, model2, model3 = self.created_models
-        await ComprehensiveTestModel.adelete_many(model2, model3)
+        await type(model2).adelete_many(model2, model3)
 
     async def load_data(self):
         _model1, model2, model3 = self.created_models

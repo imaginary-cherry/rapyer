@@ -488,7 +488,7 @@ class TestTryDelete(TwoModelDeleteBase):
 
     async def perform_action(self, piped):
         model1, _model2 = self.created_models
-        await ComprehensiveTestModel.adelete_by_key(model1.key)
+        await type(model1).adelete_by_key(model1.key)
 
 
 @pytest.mark.asyncio
