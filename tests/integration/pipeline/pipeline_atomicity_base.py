@@ -28,7 +28,7 @@ from tests.coverage_helpers import (
 )
 from tests.integration.conftest import REDUCED_TTL_SECONDS
 from tests.integration.special_types.adapters import (
-    PriorityQueueAdapter,
+    SPECIAL_FIELD_ADAPTERS,
     SpecialFieldAdapter,
 )
 from tests.models.collection_types import ComprehensiveTestModel
@@ -251,7 +251,7 @@ class ActionTestBase(ABC):
             lifecycle_base_fn = None
 
         if lifecycle_base_fn is not None:
-            for adapter in [PriorityQueueAdapter()]:
+            for adapter in SPECIAL_FIELD_ADAPTERS:
                 test_name = f"test_special_field_lifecycle__{adapter.sf_name}"
                 setattr(cls, test_name, lifecycle_base_fn)
                 cls._prepare_action_test(
@@ -516,7 +516,7 @@ class TTLActionTestBase(ActionTestBase, ABC):
         )
         if is_action_for_refresh_sf(cls.covered_method):
             ttl_refresh_base_fn = cls._setup_test_special_field_ttl_refresh
-            for adapter in [PriorityQueueAdapter()]:
+            for adapter in SPECIAL_FIELD_ADAPTERS:
                 test_name = f"test_special_field_ttl_refresh__{adapter.sf_name}"
                 setattr(cls, test_name, ttl_refresh_base_fn)
                 cls._prepare_action_test(

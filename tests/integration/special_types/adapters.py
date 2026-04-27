@@ -68,3 +68,6 @@ class PriorityQueueAdapter(SpecialFieldAdapter):
         sp_key = model.tasks.special_key
         exists = await self.redis_client.exists(sp_key)
         assert not exists, f"PQ key {sp_key} unexpectedly still exists"
+
+
+SPECIAL_FIELD_ADAPTERS = [PriorityQueueAdapter()]
