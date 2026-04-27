@@ -10,11 +10,11 @@ from rapyer.types.dct import RedisDict
 from rapyer.types.lst import RedisList
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.special import SpecialFieldType
-from tests.integration.pipeline.pipeline_atomicity_base import _cover_tuple
+from tests.coverage_helpers import cover_tuple
 
 
 def _group(*methods: Callable) -> frozenset[tuple[str, str]]:
-    return frozenset(_cover_tuple(m) for m in methods)
+    return frozenset(cover_tuple(m) for m in methods)
 
 
 # ── Private helpers: single-underscore internals, not Redis operations ────
