@@ -26,11 +26,12 @@
 - **`apop` / `apopitem` Cannot Run Inside a Pipeline**: `RedisDict.apop()` and `RedisDict.apopitem()` now always execute against the direct Redis client because their callers need the popped value back at call time. Calling them inside `apipeline()` will execute immediately rather than being batched.
 
 
-### 🔄 Changed
+### 💥 Breaking Changes
 
-- **BREAKING - `apipeline()` No Longer Refreshes TTL on Its Own**: Entering and exiting an `apipeline()` context no longer triggers a TTL refresh by itself. TTL is now refreshed only by the actions executed inside the pipeline, according to `refresh_ttl` configuration. A future release will support per-model TTL changes for every model touched in a pipeline.
-- **BREAKING - Duplicate Model Class Names Are Rejected**: Registering two `AtomicRedisModel` subclasses with the same `__name__` now raises `DuplicateModelNameError` at class-definition time. Rapyer resolves model classes from Redis keys by `__name__`, so duplicates were already unsafe.
-- **`refresh_ttl=ActionGroup.DELETE` Rejected**: `RedisConfig.refresh_ttl` validates against `ActionGroup.DELETE` and raises `InvalidRefreshTtlError` (the key is gone after delete, so refresh is meaningless).
+- **`apipeline()` No Longer Refreshes TTL on Its Own**: Entering and exiting an `apipeline()` context no longer triggers a TTL refresh by itself. TTL is now refreshed only by the actions executed inside the pipeline, according to `refresh_ttl` configuration. A future release will support per-model TTL changes for every model touched in a pipeline.
+- **Duplicate Model Class Names Are Rejected**: Registering two `AtomicRedisModel` subclasses with the same `__name__` now raises `DuplicateModelNameError` at class-definition time. Rapyer resolves model classes from Redis keys by `__name__`, so duplicates were already unsafe.
+- **`afind()` rejects mixing keys and expressions**: Calling `afind()` with both keys (str) and `Expression` arguments now raises `UnsupportedArgumentValueError` instead of silently ignoring the expressions. Previously this combination logged a warning and dropped the expressions; callers must now choose one mode (keys or filter expressions) per call.
+
 
 
 ## [1.2.6]
