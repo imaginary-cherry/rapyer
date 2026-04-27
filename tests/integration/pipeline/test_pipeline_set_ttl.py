@@ -1,6 +1,6 @@
 from rapyer.base import AtomicRedisModel
 from tests.integration.pipeline.pipeline_atomicity_base import ActionTestBase
-from tests.models.simple_types import UserModelWithoutTTL
+from tests.models.collection_types import ComprehensiveTestModelNoTTL
 
 TTL_SECONDS = 300
 
@@ -12,9 +12,9 @@ class TestAsetTtl(ActionTestBase):
 
     def create_models(self):
         return [
-            UserModelWithoutTTL(name="user1", age=25),
-            UserModelWithoutTTL(name="user2", age=30),
-            UserModelWithoutTTL(name="user3", age=35),
+            ComprehensiveTestModelNoTTL(name="user1", counter=25),
+            ComprehensiveTestModelNoTTL(name="user2", counter=30),
+            ComprehensiveTestModelNoTTL(name="user3", counter=35),
         ]
 
     async def setup_data(self):

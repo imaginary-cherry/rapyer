@@ -19,9 +19,7 @@ from tests.integration.special_types.adapters import (
     SpecialFieldAdapter,
 )
 from tests.models.collection_types import ComprehensiveTestModel
-from tests.models.functionality_types import AllTypesModel
 from tests.models.pipeline_base import INIT_CLOBBER_SENTINEL, PipelineActionModel
-from tests.models.redis_types import PipelineAllTypesTestModel
 
 # =============================================================================
 # Shared case dataclasses
@@ -573,14 +571,14 @@ class ComprehensiveCounterOpBase(UpdateActionTestBase, ABC):
         return self.test_input.expected
 
 
-class AllTypesAmountOpBase(UpdateActionTestBase, ABC):
-    """RedisFloat binary ops on ``PipelineAllTypesTestModel.amount``. ``self.test_input`` is ``BinaryOpCase``."""
+class ComprehensiveAmountOpBase(UpdateActionTestBase, ABC):
+    """RedisFloat binary ops on ``ComprehensiveTestModel.amount``. ``self.test_input`` is ``BinaryOpCase``."""
 
     def create_models(self):
-        return [PipelineAllTypesTestModel(amount=self.test_input.initial)]
+        return [ComprehensiveTestModel(amount=self.test_input.initial)]
 
     async def load_data(self):
-        loaded = await PipelineAllTypesTestModel.aget(self.created_models[0].key)
+        loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
         return loaded.amount
 
     def expected_before(self):
@@ -590,11 +588,11 @@ class AllTypesAmountOpBase(UpdateActionTestBase, ABC):
         return self.test_input.expected
 
 
-class AllTypesNameOpBase(UpdateActionTestBase, ABC):
-    """RedisStr ops on ``PipelineAllTypesTestModel.name``."""
+class ComprehensiveNameOpBase(UpdateActionTestBase, ABC):
+    """RedisStr ops on ``ComprehensiveTestModel.name``."""
 
     async def load_data(self):
-        loaded = await PipelineAllTypesTestModel.aget(self.created_models[0].key)
+        loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
         return loaded.name
 
 
@@ -614,32 +612,36 @@ class ComprehensiveMetadataOpBase(UpdateActionTestBase, ABC):
         return loaded.metadata
 
 
-class AllTypesModelListFieldOpBase(UpdateActionTestBase, ABC):
-    """RedisList ops on ``AllTypesModel.list_field``."""
-
-    def create_models(self):
-        return [AllTypesModel()]
+class ComprehensiveDataOpBase(UpdateActionTestBase, ABC):
+    """RedisBytes ops on ``ComprehensiveTestModel.data``."""
 
     async def load_data(self):
-        loaded = await AllTypesModel.aget(self.created_models[0].key)
-        return loaded.list_field
-
-    def expected_before(self):
-        return []
+        loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
+        return loaded.data
 
 
-class AllTypesModelDictFieldOpBase(UpdateActionTestBase, ABC):
-    """RedisDict ops on ``AllTypesModel.dict_field``."""
-
-    def create_models(self):
-        return [AllTypesModel()]
+class ComprehensiveEventTimeOpBase(UpdateActionTestBase, ABC):
+    """RedisDatetime ops on ``ComprehensiveTestModel.event_time``."""
 
     async def load_data(self):
-        loaded = await AllTypesModel.aget(self.created_models[0].key)
-        return loaded.dict_field
+        loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
+        return loaded.event_time
 
-    def expected_before(self):
-        return {}
+
+class ComprehensiveEventTimestampOpBase(UpdateActionTestBase, ABC):
+    """RedisDatetimeTimestamp ops on ``ComprehensiveTestModel.event_timestamp``."""
+
+    async def load_data(self):
+        loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
+        return loaded.event_timestamp
+
+
+class ComprehensiveTasksOpBase(UpdateActionTestBase, ABC):
+    """RedisPriorityQueue ops on ``ComprehensiveTestModel.tasks``."""
+
+    async def load_data(self):
+        loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
+        return loaded.tasks
 
 
 class TwoModelDeleteBase(TTLActionTestBase, ABC):

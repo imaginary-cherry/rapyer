@@ -2,17 +2,17 @@ import pytest
 
 from rapyer.types.float import RedisFloat
 from tests.integration.pipeline.pipeline_atomicity_base import (
-    AllTypesAmountOpBase,
+    ComprehensiveAmountOpBase,
     BinaryOpCase,
     UpdateActionTestBase,
 )
-from tests.models.redis_types import PipelineAllTypesTestModel
+from tests.models.collection_types import ComprehensiveTestModel
 
 
 @pytest.mark.asyncio
 async def test_redis_float_operations__changes_outside_pipeline_ignored_sanity():
     # Arrange
-    model = PipelineAllTypesTestModel(amount=100.0)
+    model = ComprehensiveTestModel(amount=100.0)
     await model.asave()
 
     # Act - outside pipeline (should be ignored)
@@ -25,7 +25,7 @@ async def test_redis_float_operations__changes_outside_pipeline_ignored_sanity()
         m.amount *= 2.0
 
     # Assert - only pipeline ops applied
-    final = await PipelineAllTypesTestModel.aget(model.key)
+    final = await ComprehensiveTestModel.aget(model.key)
     assert final.amount == 220.0
 
 
@@ -37,7 +37,7 @@ class TestRedisFloatAllOperationsCombined(UpdateActionTestBase):
     ]
 
     def create_models(self):
-        return [PipelineAllTypesTestModel(amount=100.0)]
+        return [ComprehensiveTestModel(amount=100.0)]
 
     async def perform_action(self, piped):
         piped.amount += 50.0
@@ -49,7 +49,7 @@ class TestRedisFloatAllOperationsCombined(UpdateActionTestBase):
         piped.amount **= 2.0
 
     async def load_data(self):
-        loaded = await PipelineAllTypesTestModel.aget(self.created_models[0].key)
+        loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
         return loaded.amount
 
     def expected_before(self):
@@ -59,7 +59,7 @@ class TestRedisFloatAllOperationsCombined(UpdateActionTestBase):
         return 36.0
 
 
-class TestRedisFloatItruediv(AllTypesAmountOpBase):
+class TestRedisFloatItruediv(ComprehensiveAmountOpBase):
     covered_method = RedisFloat.__itruediv__
     params = [
         BinaryOpCase(100.0, 4.0, 25.0),
@@ -71,7 +71,7 @@ class TestRedisFloatItruediv(AllTypesAmountOpBase):
         piped.amount /= self.test_input.operand
 
 
-class TestRedisFloatIfloordiv(AllTypesAmountOpBase):
+class TestRedisFloatIfloordiv(ComprehensiveAmountOpBase):
     covered_method = RedisFloat.__ifloordiv__
     params = [
         BinaryOpCase(17.0, 5.0, 3.0),
@@ -83,7 +83,7 @@ class TestRedisFloatIfloordiv(AllTypesAmountOpBase):
         piped.amount //= self.test_input.operand
 
 
-class TestRedisFloatImod(AllTypesAmountOpBase):
+class TestRedisFloatImod(ComprehensiveAmountOpBase):
     covered_method = RedisFloat.__imod__
     params = [
         BinaryOpCase(17.5, 5.0, 2.5),
@@ -95,7 +95,7 @@ class TestRedisFloatImod(AllTypesAmountOpBase):
         piped.amount %= self.test_input.operand
 
 
-class TestRedisFloatIpow(AllTypesAmountOpBase):
+class TestRedisFloatIpow(ComprehensiveAmountOpBase):
     covered_method = RedisFloat.__ipow__
     params = [
         BinaryOpCase(2.0, 3.0, 8.0),

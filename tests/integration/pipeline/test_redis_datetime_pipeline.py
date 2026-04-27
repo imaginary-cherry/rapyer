@@ -8,29 +8,28 @@ from tests.integration.pipeline.pipeline_atomicity_base import (
     BinaryOpCase,
     UpdateActionTestBase,
 )
+from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.simple_types import DatetimeModel, DatetimeTimestampModel
 
 
 class DatetimeBothModelsOpBase(UpdateActionTestBase, ABC):
     """Datetime iadd/isub tests that mutate both storage flavors at once.
 
-    Setup creates a :class:`DatetimeTimestampModel` and a :class:`DatetimeModel`
-    sharing the same initial ``created_at``. The pipeline is opened on the
-    timestamp model; the other model's mutation goes through the same pipeline
-    via the context var set by ``apipeline()``.
+    Setup creates a single :class:`ComprehensiveTestModel` whose ``event_time``
+    is a regular datetime (RedisDatetime — ISO storage) and ``event_timestamp``
+    is a :class:`RedisDatetimeTimestamp` (numeric storage). Both fields share
+    the same initial value.
     """
 
     def create_models(self):
         initial = self.test_input.initial
-        ts_model = DatetimeTimestampModel(created_at=initial, updated_at=initial)
-        str_date_model = DatetimeModel(created_at=initial, updated_at=initial)
-        return [ts_model, str_date_model]
+        return [
+            ComprehensiveTestModel(event_time=initial, event_timestamp=initial)
+        ]
 
     async def load_data(self):
-        ts_model, str_date_model = self.created_models
-        loaded_ts = await DatetimeTimestampModel.aget(ts_model.key)
-        loaded_str = await DatetimeModel.aget(str_date_model.key)
-        return loaded_ts.created_at, loaded_str.created_at
+        loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
+        return loaded.event_time, loaded.event_timestamp
 
     def expected_before(self):
         return self.test_input.initial, self.test_input.initial
@@ -60,9 +59,8 @@ class TestRedisDatetimeIadd(DatetimeBothModelsOpBase):
     ]
 
     async def perform_action(self, piped):
-        _, str_date_model = self.created_models
-        piped.created_at += self.test_input.operand
-        str_date_model.created_at += self.test_input.operand
+        piped.event_time += self.test_input.operand
+        piped.event_timestamp += self.test_input.operand
 
 
 class TestRedisDatetimeIsub(DatetimeBothModelsOpBase):
@@ -86,9 +84,8 @@ class TestRedisDatetimeIsub(DatetimeBothModelsOpBase):
     ]
 
     async def perform_action(self, piped):
-        _, str_date_model = self.created_models
-        piped.created_at -= self.test_input.operand
-        str_date_model.created_at -= self.test_input.operand
+        piped.event_time -= self.test_input.operand
+        piped.event_timestamp -= self.test_input.operand
 
 
 @pytest.mark.asyncio

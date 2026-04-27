@@ -17,11 +17,10 @@ from tests.integration.pipeline.pipeline_atomicity_base import (
     TwoModelDeleteBase,
     UpdateActionTestBase,
 )
-from tests.models.collection_types import ComprehensiveTestModel
-from tests.models.simple_types import (
-    TTL_TEST_SECONDS,
-    TTLRefreshTestModel,
-    UserModelWithoutTTL,
+from tests.models.collection_types import (
+    ComprehensiveTestModel,
+    ComprehensiveTestModelNoTTL,
+    TTL_REFRESH_TEST_SECONDS,
 )
 
 TTL_SECONDS = 300
@@ -168,9 +167,9 @@ class TestRapyerAsetTtl(ActionTestBase):
 
     def create_models(self):
         return [
-            UserModelWithoutTTL(name="user1", age=25),
-            UserModelWithoutTTL(name="user2", age=30),
-            UserModelWithoutTTL(name="user3", age=35),
+            ComprehensiveTestModelNoTTL(name="user1", counter=25),
+            ComprehensiveTestModelNoTTL(name="user2", counter=30),
+            ComprehensiveTestModelNoTTL(name="user3", counter=35),
         ]
 
     async def setup_data(self):
@@ -397,7 +396,7 @@ class TestRapyerRefreshTtl(ActionTestBase):
     reduced_ttl: int = 10
 
     def create_models(self):
-        return [TTLRefreshTestModel(name="ttl_test", age=25)]
+        return [ComprehensiveTestModel(name="ttl_test", counter=25)]
 
     async def setup_data(self):
         models = await super().setup_data()
@@ -418,4 +417,4 @@ class TestRapyerRefreshTtl(ActionTestBase):
         assert loaded <= self.reduced_ttl
 
     def assert_after_pipeline(self, loaded):
-        assert self.reduced_ttl < loaded <= TTL_TEST_SECONDS
+        assert self.reduced_ttl < loaded <= TTL_REFRESH_TEST_SECONDS

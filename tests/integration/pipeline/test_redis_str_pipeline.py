@@ -3,16 +3,16 @@ import pytest
 from rapyer.types.string import RedisStr
 from tests.integration.pipeline.pipeline_atomicity_base import (
     BinaryOpCase,
-    AllTypesNameOpBase,
+    ComprehensiveNameOpBase,
 )
-from tests.models.redis_types import PipelineAllTypesTestModel
+from tests.models.collection_types import ComprehensiveTestModel
 
 
-class TestRedisStrAllOperationsCombined(AllTypesNameOpBase):
+class TestRedisStrAllOperationsCombined(ComprehensiveNameOpBase):
     covered_method = RedisStr.__iadd__
 
     def create_models(self):
-        return [PipelineAllTypesTestModel(name="hello")]
+        return [ComprehensiveTestModel(name="hello")]
 
     async def perform_action(self, piped):
         piped.name += "_world"
@@ -28,7 +28,7 @@ class TestRedisStrAllOperationsCombined(AllTypesNameOpBase):
 @pytest.mark.asyncio
 async def test_redis_str_operations__changes_outside_pipeline_ignored_sanity():
     # Arrange
-    model = PipelineAllTypesTestModel(name="hello")
+    model = ComprehensiveTestModel(name="hello")
     await model.asave()
 
     # Act - outside pipeline (should be ignored)
@@ -40,16 +40,16 @@ async def test_redis_str_operations__changes_outside_pipeline_ignored_sanity():
         m.name += "_inside"
 
     # Assert - only pipeline ops applied
-    final = await PipelineAllTypesTestModel.aget(model.key)
+    final = await ComprehensiveTestModel.aget(model.key)
     assert final.name == "hello_inside"
 
 
-class TestRedisStrImul(AllTypesNameOpBase):
+class TestRedisStrImul(ComprehensiveNameOpBase):
     covered_method = RedisStr.__imul__
     params = [BinaryOpCase("test", 0, "")]
 
     def create_models(self):
-        return [PipelineAllTypesTestModel(name=self.test_input.initial)]
+        return [ComprehensiveTestModel(name=self.test_input.initial)]
 
     async def perform_action(self, piped):
         piped.name *= self.test_input.operand
@@ -64,7 +64,7 @@ class TestRedisStrImul(AllTypesNameOpBase):
 @pytest.mark.asyncio
 async def test_redis_str_combined_iadd_and_imul_with_pipeline_sanity():
     # Arrange
-    model = PipelineAllTypesTestModel(name="ab")
+    model = ComprehensiveTestModel(name="ab")
     await model.asave()
 
     # Act
@@ -73,9 +73,9 @@ async def test_redis_str_combined_iadd_and_imul_with_pipeline_sanity():
         m.name += "_end"  # "abab_end"
 
         # Assert - changes not visible during pipeline
-        loaded = await PipelineAllTypesTestModel.aget(model.key)
+        loaded = await ComprehensiveTestModel.aget(model.key)
         assert loaded.name == "ab"
 
     # Assert - all changes applied after pipeline
-    final = await PipelineAllTypesTestModel.aget(model.key)
+    final = await ComprehensiveTestModel.aget(model.key)
     assert final.name == "abab_end"

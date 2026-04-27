@@ -5,11 +5,12 @@ from rapyer.types.float import RedisFloat
 from rapyer.types.integer import RedisInt
 from rapyer.types.lst import RedisList
 from tests.integration.pipeline.pipeline_atomicity_base import (
-    AllTypesModelDictFieldOpBase,
-    AllTypesModelListFieldOpBase,
+    ComprehensiveMetadataOpBase,
+    ComprehensiveTagsOpBase,
     TTLActionTestBase,
     UpdateActionTestBase,
 )
+from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.complex_types import InnerMostModel, MiddleModel, OuterModel
 from tests.models.functionality_types import AllTypesModel
 from tests.models.simple_types import FloatModel
@@ -105,14 +106,14 @@ class TestIntegerAddition(UpdateActionTestBase):
     covered_method = RedisInt.__iadd__
 
     def create_models(self):
-        return [AllTypesModel(int_field=100)]
+        return [ComprehensiveTestModel(counter=100)]
 
     async def perform_action(self, piped):
-        piped.int_field += 25
+        piped.counter += 25
 
     async def load_data(self):
-        loaded = await AllTypesModel.aget(self.created_models[0].key)
-        return loaded.int_field
+        loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
+        return loaded.counter
 
     def expected_before(self):
         return 100
@@ -146,11 +147,17 @@ async def test_integer_multiple_operations_changes_preserved_during_pipeline_com
 # =============================================================================
 
 
-class TestListAppend(AllTypesModelListFieldOpBase):
+class TestListAppend(ComprehensiveTagsOpBase):
     covered_method = RedisList.append
 
+    def create_models(self):
+        return [ComprehensiveTestModel()]
+
     async def perform_action(self, piped):
-        piped.list_field.append("item1")
+        piped.tags.append("item1")
+
+    def expected_before(self):
+        return []
 
     def expected_after(self):
         return ["item1"]
@@ -175,11 +182,17 @@ async def test_list_aappend_changes_preserved_during_pipeline_committed_after_sa
     assert final_model.list_field == ["async_item"]
 
 
-class TestListExtend(AllTypesModelListFieldOpBase):
+class TestListExtend(ComprehensiveTagsOpBase):
     covered_method = RedisList.extend
 
+    def create_models(self):
+        return [ComprehensiveTestModel()]
+
     async def perform_action(self, piped):
-        piped.list_field.extend(["item1", "item2"])
+        piped.tags.extend(["item1", "item2"])
+
+    def expected_before(self):
+        return []
 
     def expected_after(self):
         return ["item1", "item2"]
@@ -233,11 +246,17 @@ async def test_list_mixed_operations_changes_preserved_during_pipeline_committed
 # =============================================================================
 
 
-class TestDictUpdate(AllTypesModelDictFieldOpBase):
+class TestDictUpdate(ComprehensiveMetadataOpBase):
     covered_method = RedisDict.update
 
+    def create_models(self):
+        return [ComprehensiveTestModel()]
+
     async def perform_action(self, piped):
-        piped.dict_field.update({"key1": "value1", "key2": "value2"})
+        piped.metadata.update({"key1": "value1", "key2": "value2"})
+
+    def expected_before(self):
+        return {}
 
     def expected_after(self):
         return {"key1": "value1", "key2": "value2"}
@@ -267,11 +286,17 @@ async def test_dict_aupdate_changes_preserved_during_pipeline_committed_after_sa
     }
 
 
-class TestDictSetitem(AllTypesModelDictFieldOpBase):
+class TestDictSetitem(ComprehensiveMetadataOpBase):
     covered_method = RedisDict.__setitem__
 
+    def create_models(self):
+        return [ComprehensiveTestModel()]
+
     async def perform_action(self, piped):
-        piped.dict_field["direct_key"] = "direct_value"
+        piped.metadata["direct_key"] = "direct_value"
+
+    def expected_before(self):
+        return {}
 
     def expected_after(self):
         return {"direct_key": "direct_value"}
@@ -430,14 +455,14 @@ class TestFloatAincrease(UpdateActionTestBase, TTLActionTestBase):
     covered_method = RedisFloat.aincrease
 
     def create_models(self):
-        return [FloatModel(value=50.0)]
+        return [ComprehensiveTestModel(amount=50.0)]
 
     async def load_data(self):
-        loaded = await FloatModel.aget(self.created_models[0].key)
-        return loaded.value
+        loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
+        return loaded.amount
 
-    async def perform_action(self, piped: FloatModel):
-        await piped.value.aincrease(10.5)
+    async def perform_action(self, piped: ComprehensiveTestModel):
+        await piped.amount.aincrease(10.5)
 
     def expected_before(self):
         return 50.0

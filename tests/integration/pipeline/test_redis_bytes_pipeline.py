@@ -1,19 +1,19 @@
 from rapyer.types.byte import RedisBytes
 from tests.integration.pipeline.pipeline_atomicity_base import UpdateActionTestBase
-from tests.models.simple_types import BytesModel
+from tests.models.collection_types import ComprehensiveTestModel
 
 
 class TestRedisBytesIadd(UpdateActionTestBase):
     covered_method = RedisBytes.__iadd__
 
     def create_models(self):
-        return [BytesModel(data=b"hello")]
+        return [ComprehensiveTestModel(data=b"hello")]
 
     async def perform_action(self, piped):
         piped.data += b" world"
 
     async def load_data(self):
-        loaded = await BytesModel.aget(self.created_models[0].key)
+        loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
         return loaded.data
 
     def expected_before(self):

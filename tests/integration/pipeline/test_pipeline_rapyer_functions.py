@@ -8,14 +8,16 @@ from tests.integration.pipeline.pipeline_atomicity_base import (
     UpdateActionTestBase,
 )
 from tests.models.collection_types import ComprehensiveTestModel
-from tests.models.simple_types import IntModel, StrModel
 
 
 class TestRapyerFunctionAdeleteMany(ActionTestBase):
     covered_method = rapyer.adelete_many
 
     def create_models(self):
-        return [StrModel(name="s1"), IntModel(count=1)]
+        return [
+            ComprehensiveTestModel(name="s1"),
+            ComprehensiveTestModel(counter=1),
+        ]
 
     async def perform_action(self, piped):
         await rapyer.adelete_many(*self.created_models)

@@ -5,6 +5,7 @@ from pydantic import Field
 
 from rapyer.base import AtomicRedisModel
 from rapyer.config import RedisConfig
+from rapyer.types import RedisDatetimeTimestamp, RedisPriorityQueue
 from tests.models.pipeline_base import PipelineActionModel
 from tests.models.common import (
     Address,
@@ -131,8 +132,23 @@ class ComprehensiveTestModel(PipelineActionModel):
     metadata: dict[str, str] = Field(default_factory=dict)
     name: str = ""
     counter: int = 0
+    amount: float = 0.0
+    data: bytes = b""
+    event_time: datetime = Field(default_factory=datetime.now)
+    event_timestamp: RedisDatetimeTimestamp = Field(default_factory=datetime.now)
+    tasks: RedisPriorityQueue[str] = Field(default_factory=RedisPriorityQueue[str])
 
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=TTL_REFRESH_TEST_SECONDS)
+
+
+class ComprehensiveTestModelNoTTL(ComprehensiveTestModel):
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=None)
+
+
+class ComprehensiveTestModelNoRefreshTTL(ComprehensiveTestModel):
+    Meta: ClassVar[RedisConfig] = RedisConfig(
+        ttl=TTL_REFRESH_TEST_SECONDS, refresh_ttl=False
+    )
 
 
 class PipelineTestModel(AtomicRedisModel):
