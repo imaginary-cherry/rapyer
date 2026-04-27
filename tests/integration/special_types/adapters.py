@@ -4,6 +4,8 @@ from typing import ClassVar
 from redis import Redis
 
 from rapyer.base import AtomicRedisModel
+from rapyer.types.priority_queue import RedisPriorityQueue
+from rapyer.types.special import SpecialFieldType
 from tests.models.collection_types import ComprehensiveTestModel
 
 
@@ -12,7 +14,7 @@ class SpecialFieldAdapter(ABC):
     An adapter for speical field to help us tests them for each action we need
     """
 
-    sf_name: ClassVar[str]
+    sf_class: ClassVar[type[SpecialFieldType]]
     sp_field_class: ClassVar[type[AtomicRedisModel]]
 
     @property
@@ -45,7 +47,7 @@ class SpecialFieldAdapter(ABC):
 
 
 class PriorityQueueAdapter(SpecialFieldAdapter):
-    sf_name = "PrioirtyQueue"
+    sf_class = RedisPriorityQueue
     sp_field_class = ComprehensiveTestModel
     EXPECTED_SIZE = 3
 

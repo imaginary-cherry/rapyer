@@ -2,6 +2,7 @@ from typing import Callable
 
 from rapyer.actions import ACTION_GROUPS_ATTR, ActionGroup
 from rapyer.types.base import BaseRedisType
+from rapyer.types.special import SpecialFieldType
 
 
 def cover_marker(*parts: str) -> str:
@@ -19,8 +20,8 @@ SPECIAL_FIELD_LIFECYCLE = "lifecycle"
 SPECIAL_FIELD_TTL_REFRESH = "ttl_refresh"
 
 
-def special_field_cover_marker(sf_name: str, coverage: str) -> str:
-    return cover_marker(sf_name, coverage)
+def special_field_cover_marker(sf_class: type[SpecialFieldType], coverage: str) -> str:
+    return cover_marker(sf_class.__name__, coverage)
 
 
 def cover_tuple(method: Callable) -> tuple[str, str]:

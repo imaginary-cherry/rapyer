@@ -11,6 +11,7 @@ import rapyer.types  # noqa: F401  # ensure all BaseRedisType subclasses are reg
 from rapyer.actions import ACTION_GROUPS_ATTR, ActionGroup
 from rapyer.base import AtomicRedisModel
 from rapyer.types.base import BaseRedisType
+from rapyer.types.special import SpecialFieldType
 from tests.action_groups import (
     NON_ACTION_METHODS,
     PRIVATE_INHERITED_METHODS,
@@ -30,7 +31,6 @@ from tests.coverage_helpers import (
     should_ignore_group,
     special_field_cover_marker,
 )
-from tests.integration.special_types.adapters import SPECIAL_FIELD_ADAPTERS
 
 TTL_TESTED_METHODS: set[tuple[str, str]] = set()
 TTL_NO_REFRESH_TESTED_METHODS: set[tuple[str, str]] = set()
@@ -184,24 +184,21 @@ COVERAGE_CHECKS: list[CoverageCheck] = [
     ),
 ]
 
-for adapter in SPECIAL_FIELD_ADAPTERS:
+for sf_class in all_subclasses(SpecialFieldType):
+    sf_class: type[SpecialFieldType]
     COVERAGE_CHECKS.extend(
         [
             CoverageCheck(
-                name=special_field_cover_marker(
-                    adapter.sf_name, SPECIAL_FIELD_LIFECYCLE
-                ),
-                help_text=f"{adapter.sf_name} special field lifecycle",
+                name=special_field_cover_marker(sf_class, SPECIAL_FIELD_LIFECYCLE),
+                help_text=f"{sf_class.__name__} special field lifecycle",
                 expected=lambda: _collect_methods(
                     only_async=True,
                     require_groups=ActionGroup.CREATE | ActionGroup.DELETE,
                 ),
             ),
             CoverageCheck(
-                name=special_field_cover_marker(
-                    adapter.sf_name, SPECIAL_FIELD_TTL_REFRESH
-                ),
-                help_text=f"{adapter.sf_name} special field TTL refresh",
+                name=special_field_cover_marker(sf_class, SPECIAL_FIELD_TTL_REFRESH),
+                help_text=f"{sf_class.__name__} special field TTL refresh",
                 expected=lambda: _collect_methods(
                     # Delete and create effect the entire model
                     ignore_groups=(ActionGroup.DELETE | ActionGroup.CREATE)

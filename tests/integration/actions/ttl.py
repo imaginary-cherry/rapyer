@@ -225,12 +225,12 @@ class TTLActionTestBase(ActionTestBase, ABC):
         if is_action_for_refresh_sf(cls.covered_method):
             ttl_refresh_base_fn = cls._setup_test_special_field_ttl_refresh
             for adapter in SPECIAL_FIELD_ADAPTERS:
-                test_name = f"test_special_field_ttl_refresh__{adapter.sf_name}"
+                test_name = f"test_special_field_ttl_refresh__{adapter.sf_class.__name__}"
                 setattr(cls, test_name, ttl_refresh_base_fn)
                 cls._prepare_action_test(
                     test_attr=test_name,
                     cover_marker=special_field_cover_marker(
-                        adapter.sf_name, SPECIAL_FIELD_TTL_REFRESH
+                        adapter.sf_class, SPECIAL_FIELD_TTL_REFRESH
                     ),
                     skip_attr="skip_special_field_ttl",
                     parametrize=False,

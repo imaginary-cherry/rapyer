@@ -230,12 +230,12 @@ class ActionTestBase(ABC):
 
         if lifecycle_base_fn is not None:
             for adapter in SPECIAL_FIELD_ADAPTERS:
-                test_name = f"test_special_field_lifecycle__{adapter.sf_name}"
+                test_name = f"test_special_field_lifecycle__{adapter.sf_class.__name__}"
                 setattr(cls, test_name, lifecycle_base_fn)
                 cls._prepare_action_test(
                     test_attr=test_name,
                     cover_marker=special_field_cover_marker(
-                        adapter.sf_name, SPECIAL_FIELD_LIFECYCLE
+                        adapter.sf_class, SPECIAL_FIELD_LIFECYCLE
                     ),
                     skip_attr="skip_special_field_lifecycle",
                     parametrize=False,
