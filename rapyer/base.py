@@ -64,7 +64,7 @@ from rapyer.types.base import (
     RedisType,
 )
 from rapyer.types.convert import RedisConverter
-from rapyer.types.special import SpecialFieldType
+from rapyer.types.special import SpecialFieldType, special_field_key
 from rapyer.typing_support import Self, Unpack
 from rapyer.utils.annotation import (
     DYNAMIC_CLASS_DOC,
@@ -484,7 +484,7 @@ class AtomicRedisModel(BaseModel):
     def _all_keys_for_key(cls, key: str) -> list[str]:
         keys = [key]
         for fname in cls._special_field_names:
-            keys.append(f"{key}:{fname}")
+            keys.append(special_field_key(key, fname))
         return keys
 
     @classmethod

@@ -4,7 +4,7 @@ from rapyer.base import AtomicRedisModel
 from rapyer.errors import UpdateAtomicModelError
 from rapyer.types.base import BaseRedisType
 from rapyer.types.priority_queue import RedisPriorityQueue
-from rapyer.types.special import SpecialFieldType
+from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX, SpecialFieldType
 from tests.conftest import special_field_test_for
 from tests.models.special_types import (
     MixedSpecialModel,
@@ -20,7 +20,7 @@ def test_priority_queue_model_creation_sanity():
     assert isinstance(model.tasks, BaseRedisType)
     assert model.tasks.key == model.key
     assert model.tasks.field_path == ".tasks"
-    assert model.tasks.special_key == f"{model.key}:tasks"
+    assert model.tasks.special_key == f"{SPECIAL_FIELD_KEY_PREFIX}:{model.key}:tasks"
     assert model.name == "test"
 
 
@@ -29,14 +29,14 @@ def test_priority_queue_int_model_creation_sanity():
 
     assert isinstance(model.tasks, SpecialFieldType)
     assert model.tasks.field_path == ".tasks"
-    assert model.tasks.special_key == f"{model.key}:tasks"
+    assert model.tasks.special_key == f"{SPECIAL_FIELD_KEY_PREFIX}:{model.key}:tasks"
 
 
 def test_mixed_special_model_creation_sanity():
     model = MixedSpecialModel(name="mixed", count=42)
 
     assert isinstance(model.tasks, SpecialFieldType)
-    assert model.tasks.special_key == f"{model.key}:tasks"
+    assert model.tasks.special_key == f"{SPECIAL_FIELD_KEY_PREFIX}:{model.key}:tasks"
     assert model.name == "mixed"
     assert model.count == 42
 
@@ -76,7 +76,9 @@ def test_priority_queue_base_model_link():
 
 def test_priority_queue_special_key_format():
     model = PriorityQueueModel(name="test")
-    expected_key = f"PriorityQueueModel:{model.pk}:tasks"
+    expected_key = (
+        f"{SPECIAL_FIELD_KEY_PREFIX}:PriorityQueueModel:{model.pk}:tasks"
+    )
 
     assert model.tasks.special_key == expected_key
 

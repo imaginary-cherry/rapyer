@@ -8,7 +8,7 @@ from pydantic import Field
 from rapyer.base import AtomicRedisModel
 from rapyer.config import RedisConfig
 from rapyer.types.priority_queue import PriorityQueueItem, RedisPriorityQueue
-from rapyer.types.special import SpecialFieldType
+from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX, SpecialFieldType
 
 
 class FakePriorityQueueModel(AtomicRedisModel):
@@ -49,7 +49,7 @@ async def test_save_and_load_model_with_pq(fake_redis):
     loaded = await FakePriorityQueueModel.aget(model.key)
     assert loaded.name == "test_save"
     assert isinstance(loaded.tasks, SpecialFieldType)
-    assert loaded.tasks.special_key == f"{model.key}:tasks"
+    assert loaded.tasks.special_key == f"{SPECIAL_FIELD_KEY_PREFIX}:{model.key}:tasks"
 
 
 @pytest.mark.asyncio

@@ -4,6 +4,7 @@ import pytest_asyncio
 from rapyer.base import AtomicRedisModel
 from rapyer.errors import UpdateAtomicModelError
 from rapyer.types.priority_queue import RedisPriorityQueue
+from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX
 from tests.conftest import special_field_test_for
 from tests.models.special_types import (
     MixedSpecialModel,
@@ -72,6 +73,27 @@ async def test_ainsert_mixed_models_regular_fields_and_pq_accessible(real_redis_
         assert loaded.count == model.count
         await loaded.tasks.apush("test_item", 1.0)
         assert await loaded.tasks.apop() == "test_item"
+
+
+@pytest.mark.asyncio
+async def test_priority_queue_special_key_not_matched_by_model_key_scan(
+    real_redis_client,
+):
+    # Arrange
+    model = PriorityQueueModel(name="scan_test")
+    await model.asave()
+    await model.tasks.apush("job", 1.0)
+
+    # Act
+    model_pattern_keys = await real_redis_client.keys(
+        f"{PriorityQueueModel.class_key_initials()}:*"
+    )
+    found_keys = await PriorityQueueModel.afind_keys(max_results=1)
+
+    # Assert
+    assert model.key in model_pattern_keys
+    assert model.tasks.special_key not in model_pattern_keys
+    assert found_keys == [model.key]
 
 
 # --- aget ---
@@ -301,7 +323,9 @@ async def test_sub_sub_class_pq_has_correct_key_and_actions_work():
     await model.asave()
 
     # Assert - key format
-    expected_key = f"SubSubPriorityQueueModel:{model.pk}:tasks"
+    expected_key = (
+        f"{SPECIAL_FIELD_KEY_PREFIX}:SubSubPriorityQueueModel:{model.pk}:tasks"
+    )
     assert model.tasks.special_key == expected_key
 
     # Act - push items with varying priorities
@@ -332,7 +356,7 @@ async def test_contained_model_pq_has_correct_key_and_actions_work():
     await model.asave()
 
     # Assert - key format uses outer model's key
-    expected_key = f"PQContainerModel:{model.pk}:tasks"
+    expected_key = f"{SPECIAL_FIELD_KEY_PREFIX}:PQContainerModel:{model.pk}:tasks"
     assert model.inner_pq.tasks.special_key == expected_key
 
     # Act - push items via the contained model's PQ

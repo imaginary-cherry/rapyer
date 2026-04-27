@@ -112,7 +112,7 @@ await worker.tasks.apush("job_1", priority=1.0)
 `RedisPriorityQueue` is a **special field type** — it stores data in a separate Redis key derived from the parent model's key:
 
 ```
-{ModelName}:{pk}:tasks
+__rapyer_special__:{ModelName}:{pk}:tasks
 ```
 
 This means:
