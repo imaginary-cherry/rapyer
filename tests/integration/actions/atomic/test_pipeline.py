@@ -29,6 +29,7 @@ class TestModelApipeline(TTLActionTestBase, UpdateActionTestBase):
 class TestRapyerFunctionApipeline(TTLActionTestBase, UpdateActionTestBase):
     covered_method = rapyer.apipeline
     skip_ttl_refresh = "Apipeline doesn't refresh ttl on its own as an action"
+    skip_special_field_ttl = "Apipeline doesn't refresh ttl on its own as an action"
 
     def create_models(self):
         return [ComprehensiveTestModel(name="original")]
