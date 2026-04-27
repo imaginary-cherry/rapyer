@@ -88,9 +88,10 @@ class TTLActionTestBase(ActionTestBase, ABC):
             await self.perform_action(wrapped[0])
 
         # Assert
-        ttl_configured = type(wrapped[0]).Meta.ttl
-        afters = await adapter.get_additional_ttl(wrapped[0])
-        keys = adapter.additional_ttl_keys(wrapped[0])
+        models_for_ttl = self.models_to_check_ttl()
+        ttl_configured = type(models_for_ttl[0]).Meta.ttl
+        keys = adapter.additional_ttl_keys(models_for_ttl[0])
+        afters = await adapter.get_additional_ttl(models_for_ttl[0])
         if self.model_exists_before_action and ttls_before is not None:
             for key, after, before in zip(keys, afters, ttls_before):
                 assert (
