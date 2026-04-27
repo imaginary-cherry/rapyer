@@ -597,7 +597,7 @@ class AtomicRedisModel(BaseModel):
 
     # TODO - in version 1.3.0 we need to return None when key not found
     @classmethod
-    @mark_actions(ActionGroup.READ, ActionGroup.FETCH, ignore_refresh=True)
+    @mark_actions(ActionGroup.READ, ActionGroup.FETCH)
     async def afind_one(cls, *args) -> Optional[Self]:
         results = await cls.afind(*args, max_results=1)
         return results[0] if results else None
@@ -882,7 +882,7 @@ def _resolve_model_class(redis_key: str) -> type[AtomicRedisModel] | None:
     return redis_model_mapping.get(class_name)
 
 
-@mark_actions(ActionGroup.READ, ActionGroup.FETCH, ignore_refresh=True)
+@mark_actions(ActionGroup.READ, ActionGroup.FETCH)
 async def aget(redis_key: str) -> AtomicRedisModel:
     klass = _resolve_model_class(redis_key)
     if klass is None:
@@ -890,7 +890,7 @@ async def aget(redis_key: str) -> AtomicRedisModel:
     return await klass.aget(redis_key)
 
 
-@mark_actions(ActionGroup.READ, ActionGroup.FETCH, ignore_refresh=True)
+@mark_actions(ActionGroup.READ, ActionGroup.FETCH)
 async def afind_one(redis_key: str) -> Optional[AtomicRedisModel]:
     try:
         return await aget(redis_key)
