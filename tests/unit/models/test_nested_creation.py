@@ -67,12 +67,12 @@ def test_hybrid_model_custom_values_preserve_redis_types_sanity():
 
 def test_hybrid_model_inherits_from_person_redis_types_and_json_path_sanity():
     # Arrange
-    class PersonRedisModel(AtomicRedisModel, Person):
+    class PersonRedisModel2(AtomicRedisModel, Person):
         redis_status: str = "active"
         priority: int = 1
 
     # Act
-    model = PersonRedisModel(name="John", age=30, email="john@test.com")
+    model = PersonRedisModel2(name="John", age=30, email="john@test.com")
 
     # Assert
     # Check values are correct
