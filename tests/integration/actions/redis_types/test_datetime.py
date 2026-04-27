@@ -18,9 +18,7 @@ class DatetimeBothModelsOpBase(UpdateActionTestBase, ABC):
 
     def create_models(self):
         initial = self.test_input.initial
-        return [
-            ComprehensiveTestModel(event_time=initial, event_timestamp=initial)
-        ]
+        return [ComprehensiveTestModel(event_time=initial, event_timestamp=initial)]
 
     async def load_data(self):
         loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)

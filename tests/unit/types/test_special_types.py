@@ -76,9 +76,7 @@ def test_priority_queue_base_model_link():
 
 def test_priority_queue_special_key_format():
     model = PriorityQueueModel(name="test")
-    expected_key = (
-        f"{SPECIAL_FIELD_KEY_PREFIX}:PriorityQueueModel:{model.pk}:tasks"
-    )
+    expected_key = f"{SPECIAL_FIELD_KEY_PREFIX}:PriorityQueueModel:{model.pk}:tasks"
 
     assert model.tasks.special_key == expected_key
 

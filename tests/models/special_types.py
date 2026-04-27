@@ -45,5 +45,3 @@ class SubSubPriorityQueueModel(PriorityQueueModel):
 class PQContainerModel(AtomicRedisModel):
     inner_pq: PriorityQueueModel = Field(default_factory=PriorityQueueModel)
     outer_name: str = "container"
-
-

@@ -6,7 +6,6 @@ from pydantic_core import core_schema
 
 from rapyer.types.base import BaseRedisType
 
-
 SPECIAL_FIELD_KEY_PREFIX = "__rapyer_special__"
 
 

@@ -82,9 +82,14 @@ from tests.models.simple_types import TTLRefreshTestModel
             True,
             id="multi-action-overlap-append",
         ),
-        pytest.param(ActionGroup.all(for_ttl=True), ActionGroup.READ, True, id="all-read"),
         pytest.param(
-            ActionGroup.all(for_ttl=True), ActionGroup.ARITHMETIC, True, id="all-arithmetic"
+            ActionGroup.all(for_ttl=True), ActionGroup.READ, True, id="all-read"
+        ),
+        pytest.param(
+            ActionGroup.all(for_ttl=True),
+            ActionGroup.ARITHMETIC,
+            True,
+            id="all-arithmetic",
         ),
     ],
 )

@@ -6,7 +6,6 @@ from pydantic import Field
 from rapyer.base import AtomicRedisModel
 from rapyer.config import RedisConfig
 from rapyer.types import RedisDatetimeTimestamp, RedisPriorityQueue
-from tests.models.pipeline_base import PipelineActionModel
 from tests.models.common import (
     Address,
     Company,
@@ -18,6 +17,7 @@ from tests.models.common import (
     User,
     UserProfile,
 )
+from tests.models.pipeline_base import PipelineActionModel
 
 TTL_REFRESH_TEST_SECONDS = 24
 

@@ -58,7 +58,9 @@ class TestAsetTtl(ActionTestBase):
             await model.aset_ttl(TTL_SECONDS)
 
     async def load_data(self):
-        return [await self.real_redis_client.ttl(model.key) for model in self.created_models]
+        return [
+            await self.real_redis_client.ttl(model.key) for model in self.created_models
+        ]
 
     def expected_before(self):
         # All TTLs are still -1 (unset) while the pipeline is open.

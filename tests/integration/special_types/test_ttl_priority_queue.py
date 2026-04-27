@@ -2,7 +2,7 @@ import pytest
 import pytest_asyncio
 
 from rapyer.base import AtomicRedisModel
-from rapyer.types.priority_queue import PriorityQueueItem, RedisPriorityQueue
+from rapyer.types.priority_queue import RedisPriorityQueue
 from tests.conftest import (
     special_field_test_for,
     special_field_ttl_test_for,
@@ -49,7 +49,6 @@ async def assert_ttl_not_refreshed(real_redis_client, initial_ttl, *keys):
         ttl = await real_redis_client.ttl(key)
         assert ttl <= initial_ttl
         assert 0 < ttl <= REDUCED_TTL_SECONDS
-
 
 
 # --- Base model action PQ key TTL tests ---

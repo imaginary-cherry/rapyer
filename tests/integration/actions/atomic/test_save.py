@@ -54,7 +54,9 @@ class TestRapyerAsaveBatching(ActionTestBase):
             await model.asave()
 
     async def load_data(self):
-        return tuple([await self.real_redis_client.exists(m.key) for m in self.created_models])
+        return tuple(
+            [await self.real_redis_client.exists(m.key) for m in self.created_models]
+        )
 
     def expected_before(self):
         return 0, 0, 0

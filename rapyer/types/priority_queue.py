@@ -118,7 +118,6 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
             mapping = {member: score for member, score in items}
             await self.client.zadd(target_special_key, mapping)
 
-
     def __eq__(self, other):
         if not isinstance(other, RedisPriorityQueue):
             return False

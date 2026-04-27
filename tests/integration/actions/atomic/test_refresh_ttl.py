@@ -1,8 +1,8 @@
 from rapyer.base import AtomicRedisModel
 from tests.integration.actions.base import ActionTestBase
 from tests.models.collection_types import (
-    ComprehensiveTestModel,
     TTL_REFRESH_TEST_SECONDS,
+    ComprehensiveTestModel,
 )
 
 
