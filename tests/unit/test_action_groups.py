@@ -62,7 +62,9 @@ def test_should_refresh_returns_false_when_no_ttl():
         ActionGroup.all(),  # all() includes DELETE → rejected
     ],
 )
-def test_redis_config_rejects_delete_in_class_declaration(refresh_ttl):
+def test_redis_config_rejects_delete_in_class_declaration(
+    refresh_ttl, restore_redis_models
+):
     # Arrange
     bad_refresh_ttl = refresh_ttl
 
