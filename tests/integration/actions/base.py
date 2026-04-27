@@ -8,10 +8,11 @@ import pytest
 
 import rapyer
 from rapyer import AtomicRedisModel
-from rapyer.actions import ACTION_GROUPS_ATTR, ActionGroup
+from rapyer.actions import ActionGroup
 from tests.coverage_helpers import (
     COVER_PIPELINE_ATOM,
     SPECIAL_FIELD_LIFECYCLE,
+    action_groups_for,
     cover_tuple,
     special_field_cover_marker,
 )
@@ -218,7 +219,7 @@ class ActionTestBase(ABC):
             skip_attr="skip_pipeline_atomicity",
             parametrize=True,
         )
-        action_groups = getattr(cls.covered_method, ACTION_GROUPS_ATTR, [])
+        action_groups = action_groups_for(cls.covered_method)
         if ActionGroup.CREATE in action_groups:
             lifecycle_base_fn = cls._setup_test_special_field_lifecycle_create
         elif ActionGroup.DELETE in action_groups:

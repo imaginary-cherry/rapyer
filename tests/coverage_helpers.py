@@ -61,6 +61,15 @@ def covered_methods_as_list(covered_method) -> list:
     return [covered_method]
 
 
+def action_groups_for(covered_method) -> set[ActionGroup]:
+    groups: set[ActionGroup] = set()
+    for method in covered_methods_as_list(covered_method):
+        method_groups = getattr(method, ACTION_GROUPS_ATTR, None)
+        if method_groups:
+            groups.update(method_groups)
+    return groups
+
+
 def is_base_redis_type_method(method: Callable) -> bool:
     redis_type_names = {
         BaseRedisType.__name__,
