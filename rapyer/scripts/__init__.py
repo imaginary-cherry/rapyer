@@ -13,6 +13,7 @@ from rapyer.scripts.constants import (
     STR_MUL_SCRIPT_NAME,
 )
 from rapyer.scripts.registry import (
+    _REGISTERED_SCRIPT_SHAS,
     arun_sha,
     get_scripts,
     get_scripts_fakeredis,
@@ -25,6 +26,7 @@ SCRIPTS = get_scripts()
 SCRIPTS_FAKEREDIS = get_scripts_fakeredis()
 
 __all__ = [
+    "_REGISTERED_SCRIPT_SHAS",
     "DATETIME_ADD_SCRIPT_NAME",
     "DICT_POP_SCRIPT_NAME",
     "DICT_POPITEM_SCRIPT_NAME",
