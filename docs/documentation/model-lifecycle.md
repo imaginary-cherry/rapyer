@@ -20,31 +20,37 @@ When a TTL is set, the model will automatically be deleted from Redis after the 
 
 ## TTL Refresh
 
-By default, Rapyer automatically refreshes the TTL of a model whenever it is accessed or modified. This prevents models from expiring while they are still in active use.
+By default, Rapyer refreshes a model's TTL whenever it is accessed or modified. This keeps models alive while they are in active use.
 
 ### How It Works
 
-When `refresh_ttl` is enabled (the default), the following operations will reset the TTL timer:
+When `refresh_ttl` is enabled (the default), the following operations reset the TTL timer:
 
 - Reading a model with `afind` or `aget`
 - Saving changes with `asave`
-- Any atomic field operations (e.g., `aappend`, `aupdate`, `aincrease`)
+- Any atomic field operation (e.g., `aappend`, `aupdate`, `aincrease`)
 
-This means a model with a 1-hour TTL will only expire if it remains untouched for a full hour.
+A model with a 1-hour TTL will only expire if it remains untouched for a full hour.
 
 ### Configuration
 
-TTL refresh can be configured globally or per-model:
+`refresh_ttl` accepts three forms:
+
+| Value | Behavior |
+|---|---|
+| `True` (default) | Refresh TTL on every read/write operation |
+| `False` | Never refresh TTL |
+| `ActionGroup` flag | Refresh only on the specified categories of operations |
 
 #### Global Configuration
 
 ```python
 from rapyer import init_rapyer
 
-# Enable TTL refresh (default behavior)
+# Refresh on every operation (default)
 await init_rapyer(redis="redis://localhost:6379/0", ttl=3600, refresh_ttl=True)
 
-# Disable TTL refresh globally
+# Never refresh
 await init_rapyer(redis="redis://localhost:6379/0", ttl=3600, refresh_ttl=False)
 ```
 
@@ -55,13 +61,48 @@ class Session(AtomicRedisModel):
     user_id: str
     data: dict = {}
 
-# Enable TTL refresh for this model
 Session.Meta.ttl = 1800
-Session.Meta.refresh_ttl = True  # Default
-
-# Disable TTL refresh for this model
-Session.Meta.refresh_ttl = False
+Session.Meta.refresh_ttl = False  # Disable for this model only
 ```
+
+### Fine-Grained Strategies with `ActionGroup`
+
+Pass an `ActionGroup` flag to refresh TTL only on specific categories of operations. Flags can be combined with `|`.
+
+```python
+from rapyer.actions import ActionGroup
+
+# Refresh only on writes — reads do not extend lifetime
+Session.Meta.refresh_ttl = ActionGroup.UPDATE | ActionGroup.APPEND | ActionGroup.CREATE
+
+# Refresh only when the model is fetched or read
+Cache.Meta.refresh_ttl = ActionGroup.READ | ActionGroup.FETCH
+
+# Refresh on every category except DELETE (equivalent to True)
+Session.Meta.refresh_ttl = ActionGroup.all(for_ttl=True)
+```
+
+Available groups:
+
+| Group | Triggers |
+|---|---|
+| `READ` | Reading a value (field-level reads, contains-checks) |
+| `FETCH` | Loading a full model (`aget`, `afind`, `afind_one`) |
+| `CREATE` | Creating a model (`asave`, `ainsert`) |
+| `UPDATE` | Modifying existing data |
+| `APPEND` | Adding items to a collection |
+| `ERASE` | Removing items from a collection (`apop`, `aclear`, `aremove`) |
+| `ARITHMETIC` | In-place numeric operations (`aincrease`) |
+| `DELETE` | Removing the entire key — **cannot** be used with `refresh_ttl` |
+
+!!! warning "DELETE is not refreshable"
+    `refresh_ttl` cannot include `ActionGroup.DELETE`. The key is removed from Redis on delete, so refreshing its TTL is meaningless. Passing it raises `InvalidRefreshTtlError`.
+
+See the [`ActionGroup` API reference](../api/action-group.md) for the full list of methods that map to each group.
+
+### Initial TTL is Always Set
+
+Even with `refresh_ttl=False`, the TTL is established the first time a model is created (`asave`, `ainsert`). Disabling refresh only prevents *subsequent* operations from resetting the timer — it does not prevent the initial expiration from being applied.
 
 ### Use Cases
 
