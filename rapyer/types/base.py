@@ -87,7 +87,7 @@ class BaseRedisType(ABC):
 
 class RedisType(BaseRedisType):
 
-    @mark_actions(ActionGroup.UPDATE, initial=True)
+    @mark_actions(ActionGroup.UPDATE)
     async def asave(self) -> Self:
         model_dump = self._adapter.dump_python(
             self, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
