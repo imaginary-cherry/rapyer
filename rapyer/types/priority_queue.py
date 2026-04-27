@@ -20,9 +20,6 @@ class PriorityQueueItem(Generic[T]):
 class RedisPriorityQueue(SpecialFieldType, Generic[T]):
     """
     Priority queue backed by a Redis Sorted Set. Pure Redis proxy — no local state.
-
-    All operations go directly to Redis via ``self.client`` (pipeline-aware).
-    Lower priority score = higher precedence.
     """
 
     original_type: type = type(None)
@@ -68,7 +65,6 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
 
     @mark_actions(ActionGroup.READ)
     async def apeek(self):
-        """Return the item with the lowest priority score without removing it."""
         result = await self.redis.zrange(self.special_key, 0, 0, withscores=True)
         if not result:
             return None
@@ -77,17 +73,14 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
 
     @mark_actions(ActionGroup.READ)
     async def asize(self) -> int:
-        """Return the number of items in the queue."""
         return await self.client.zcard(self.special_key)
 
     @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     async def aclear(self):
-        """Remove all items from the queue."""
         await self.client.delete(self.special_key)
 
     @mark_actions(ActionGroup.READ)
     async def aitems(self) -> list[PriorityQueueItem]:
-        """Return all items sorted by priority (ascending)."""
         result = await self.redis.zrange(self.special_key, 0, -1, withscores=True)
         return [
             PriorityQueueItem(value=self._deserialize_value(m), priority=s)
@@ -96,7 +89,6 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
 
     @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     async def aremove(self, value) -> Optional[bool]:
-        """Remove a specific value from the queue. Returns True if removed. In pipeline it returns None"""
         serialized = self._serialize_value(value)
         removed = await self.client.zrem(self.special_key, serialized)
         if self.pipeline:
