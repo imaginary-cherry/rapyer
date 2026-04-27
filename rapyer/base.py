@@ -413,12 +413,12 @@ class AtomicRedisModel(BaseModel):
             exclude=self._special_field_names or None,
         )
 
-    @mark_actions(ActionGroup.UPDATE, target=TargetSource.RESULT, initial=True)
+    @mark_actions(ActionGroup.CREATE, target=TargetSource.RESULT, initial=True)
     async def aduplicate(self) -> Self:
         duplicates = await self.aduplicate_many(1)
         return duplicates[0]
 
-    @mark_actions(ActionGroup.UPDATE, target=TargetSource.RESULT, initial=True)
+    @mark_actions(ActionGroup.CREATE, target=TargetSource.RESULT, initial=True)
     async def aduplicate_many(self, num: int) -> list[Self]:
         if self.is_inner_model():
             raise RuntimeError("Can only duplicate from top level model")
