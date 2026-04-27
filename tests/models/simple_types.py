@@ -12,23 +12,22 @@ from rapyer.types import (
     RedisList,
 )
 from tests.models.common import Priority, TaskStatus
-from tests.models.pipeline_base import PipelineActionModel
 
 TTL_TEST_SECONDS = 24
 USER_TTL = 300
 
 
-class StrModel(PipelineActionModel):
+class StrModel(AtomicRedisModel):
     name: str = ""
     description: str = "default"
 
 
-class IntModel(PipelineActionModel):
+class IntModel(AtomicRedisModel):
     count: int = 0
     score: int = 100
 
 
-class FloatModel(PipelineActionModel):
+class FloatModel(AtomicRedisModel):
     value: RedisFloat = 0.0
     temperature: float = 20.5
 
@@ -40,17 +39,17 @@ class BoolModel(AtomicRedisModel):
     is_deleted: bool = True
 
 
-class BytesModel(PipelineActionModel):
+class BytesModel(AtomicRedisModel):
     data: bytes = b""
     binary_content: bytes = b"default"
 
 
-class DatetimeModel(PipelineActionModel):
+class DatetimeModel(AtomicRedisModel):
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
 
-class DatetimeTimestampModel(PipelineActionModel):
+class DatetimeTimestampModel(AtomicRedisModel):
     created_at: RedisDatetimeTimestamp = Field(default_factory=datetime.now)
     updated_at: RedisDatetimeTimestamp = Field(default_factory=datetime.now)
 
@@ -69,7 +68,7 @@ class TaskModel(AtomicRedisModel):
     priority: Priority = Priority.MEDIUM
 
 
-class UserModelWithTTL(PipelineActionModel):
+class UserModelWithTTL(AtomicRedisModel):
     name: str = "test"
     age: int = 25
     active: bool = True
@@ -79,7 +78,7 @@ class UserModelWithTTL(PipelineActionModel):
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=USER_TTL)
 
 
-class UserModelWithoutTTL(PipelineActionModel):
+class UserModelWithoutTTL(AtomicRedisModel):
     name: str = "test"
     age: int = 25
 
@@ -93,7 +92,7 @@ class NoneTestModel(AtomicRedisModel):
     optional_dict: dict[str, str] | None = None
 
 
-class TTLRefreshTestModel(PipelineActionModel):
+class TTLRefreshTestModel(AtomicRedisModel):
     name: str = "test"
     age: RedisInt = 25
     score: RedisFloat = 0.0
@@ -103,7 +102,7 @@ class TTLRefreshTestModel(PipelineActionModel):
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=TTL_TEST_SECONDS)
 
 
-class TTLRefreshDisabledModel(PipelineActionModel):
+class TTLRefreshDisabledModel(AtomicRedisModel):
     name: str = "test"
     age: RedisInt = 25
     score: RedisFloat = 0.0

@@ -4,7 +4,6 @@ from pydantic import BaseModel, Field
 
 from rapyer.base import AtomicRedisModel
 from rapyer.fields.safe_load import SafeLoad
-from tests.models.pipeline_base import PipelineActionModel
 
 
 class NestedListModel(AtomicRedisModel):
@@ -46,7 +45,7 @@ class MiddleModel(BaseModel):
     metadata: dict[str, str] = Field(default_factory=dict)
 
 
-class OuterModel(PipelineActionModel):
+class OuterModel(AtomicRedisModel):
     middle_model: MiddleModel = Field(default_factory=MiddleModel)
     user_data: dict[str, int] = Field(default_factory=dict)
     items: list[int] = Field(default_factory=list)

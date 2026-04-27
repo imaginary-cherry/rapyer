@@ -5,7 +5,6 @@ from typing import List
 from pydantic import Field
 
 from rapyer.base import AtomicRedisModel
-from tests.models.pipeline_base import PipelineActionModel
 
 
 class RichModel(AtomicRedisModel):
@@ -34,7 +33,7 @@ class MyTestEnum(Enum):
     OPTION_B = "option_b"
 
 
-class AllTypesModel(PipelineActionModel):
+class AllTypesModel(AtomicRedisModel):
     str_field: str = "default"
     int_field: int = 0
     bool_field: bool = False

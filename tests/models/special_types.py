@@ -4,13 +4,12 @@ from pydantic import Field
 
 from rapyer.base import AtomicRedisModel, RedisConfig
 from rapyer.types.priority_queue import RedisPriorityQueue
-from tests.models.pipeline_base import PipelineActionModel
 from tests.models.simple_types import TTL_TEST_SECONDS
 
 T = TypeVar("T")
 
 
-class PriorityQueueModelBase(PipelineActionModel, Generic[T]):
+class PriorityQueueModelBase(AtomicRedisModel, Generic[T]):
     tasks: RedisPriorityQueue[T] = Field(default_factory=RedisPriorityQueue)
 
 

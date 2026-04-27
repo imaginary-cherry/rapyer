@@ -9,7 +9,6 @@ from rapyer.types.dct import RedisDict
 from rapyer.types.integer import RedisInt
 from rapyer.types.lst import RedisList
 from rapyer.types.string import RedisStr
-from tests.models.pipeline_base import PipelineActionModel
 
 
 # Models with direct Redis type annotations
@@ -77,7 +76,7 @@ class DictOfListsRapyerKeyModel(AtomicRedisModel):
     items: dict[str, list[RapyerKey]] = Field(default_factory=dict)
 
 
-class PipelineAllTypesTestModel(PipelineActionModel):
+class PipelineAllTypesTestModel(AtomicRedisModel):
     counter: int = 0
     amount: float = 0.0
     name: str = ""
