@@ -66,7 +66,7 @@ def action_groups_for(covered_method) -> set[ActionGroup]:
     for method in covered_methods_as_list(covered_method):
         method_groups = getattr(method, ACTION_GROUPS_ATTR, None)
         if method_groups:
-            groups.update(method_groups)
+            groups |= set(method_groups)
     return groups
 
 
