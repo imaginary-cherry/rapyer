@@ -30,7 +30,7 @@ from tests.coverage_helpers import (
     should_ignore_group,
     special_field_cover_marker,
 )
-from tests.integration.special_types.adapters import PriorityQueueAdapter
+from tests.integration.special_types.adapters import SPECIAL_FIELD_ADAPTERS
 
 TTL_TESTED_METHODS: set[tuple[str, str]] = set()
 TTL_NO_REFRESH_TESTED_METHODS: set[tuple[str, str]] = set()
@@ -183,6 +183,32 @@ COVERAGE_CHECKS: list[CoverageCheck] = [
         ),
     ),
 ]
+
+for adapter in SPECIAL_FIELD_ADAPTERS:
+    COVERAGE_CHECKS.extend(
+        [
+            CoverageCheck(
+                name=special_field_cover_marker(
+                    adapter.sf_name, SPECIAL_FIELD_LIFECYCLE
+                ),
+                help_text=f"{adapter.sf_name} special field lifecycle",
+                expected=lambda: _collect_methods(
+                    only_async=True,
+                    require_groups=ActionGroup.CREATE | ActionGroup.DELETE,
+                ),
+            ),
+            CoverageCheck(
+                name=special_field_cover_marker(
+                    adapter.sf_name, SPECIAL_FIELD_TTL_REFRESH
+                ),
+                help_text=f"{adapter.sf_name} special field TTL refresh",
+                expected=lambda: _collect_methods(
+                    # Delete and create effect the entire model
+                    ignore_groups=(ActionGroup.DELETE | ActionGroup.CREATE)
+                ),
+            ),
+        ]
+    )
 COVERAGE_FLAG = "action-coverage"
 
 
@@ -202,17 +228,6 @@ def pytest_configure(config):
             f"{check.name}(*methods): marks test as covering "
             f"{check.help_text} for given (class_name, method_name) tuples",
         )
-    for adapter in [PriorityQueueAdapter()]:
-        for coverage, help_text in [
-            (SPECIAL_FIELD_LIFECYCLE, "special field lifecycle"),
-            (SPECIAL_FIELD_TTL_REFRESH, "special field TTL refresh"),
-        ]:
-            marker_name = special_field_cover_marker(adapter.sf_name, coverage)
-            config.addinivalue_line(
-                "markers",
-                f"{marker_name}(*methods): marks test as covering "
-                f"{help_text} for given (class_name, method_name) tuples",
-            )
 
 
 @pytest.hookimpl(hookwrapper=True)
