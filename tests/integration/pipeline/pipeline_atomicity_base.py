@@ -14,8 +14,17 @@ import rapyer.actions as actions_module
 from rapyer import AtomicRedisModel
 from rapyer.actions import ACTION_GROUPS_ATTR, ActionGroup
 from tests.coverage_helpers import (
+    COVER_NO_CLOBBER,
+    COVER_NO_TTL_WHEN_NOT_CONFIGURED,
+    COVER_PIPELINE_ATOM,
+    COVER_TTL_NO_REFRESH,
+    COVER_TTL_REFRESH,
+    COVER_TTL_UPDATE_ONCE,
+    SPECIAL_FIELD_LIFECYCLE,
+    SPECIAL_FIELD_TTL_REFRESH,
     cover_tuple,
     is_action_for_refresh_sf,
+    special_field_cover_marker,
 )
 from tests.integration.conftest import REDUCED_TTL_SECONDS
 from tests.integration.special_types.adapters import (
@@ -104,7 +113,8 @@ class ActionTestBase(ABC):
         assert loaded == self.expected_before()
 
     def assert_after_pipeline(self, loaded: Any):
-        assert loaded == self.expected_after()
+        expected_after = self.expected_after()
+        assert loaded == expected_after, f"Expected {expected_after!r}, got {loaded!r}"
 
     async def create_sp_models(
         self, adapter: SpecialFieldAdapter
@@ -228,7 +238,7 @@ class ActionTestBase(ABC):
             return
         cls._prepare_action_test(
             test_attr="test_pipeline_atomicity",
-            cover_marker="cover_pipeline_atom",
+            cover_marker=COVER_PIPELINE_ATOM,
             skip_attr="skip_pipeline_atomicity",
             parametrize=True,
         )
@@ -246,7 +256,9 @@ class ActionTestBase(ABC):
                 setattr(cls, test_name, lifecycle_base_fn)
                 cls._prepare_action_test(
                     test_attr=test_name,
-                    cover_marker=f"cover_{adapter.sf_name}_lifecycle",
+                    cover_marker=special_field_cover_marker(
+                        adapter.sf_name, SPECIAL_FIELD_LIFECYCLE
+                    ),
                     skip_attr="skip_special_field_lifecycle",
                     parametrize=False,
                     adapter=adapter,
@@ -295,7 +307,7 @@ class UpdateActionTestBase(ActionTestBase, ABC):
             return
         cls._prepare_action_test(
             test_attr="test_no_clobber_effect_when_outside_of_pipeline",
-            cover_marker="cover_no_clobber",
+            cover_marker=COVER_NO_CLOBBER,
             skip_attr="skip_clobber_check",
             parametrize=True,
         )
@@ -486,19 +498,19 @@ class TTLActionTestBase(ActionTestBase, ABC):
             return
         cls._prepare_action_test(
             test_attr="test_ttl_refresh_on_action",
-            cover_marker="cover_ttl_refresh",
+            cover_marker=COVER_TTL_REFRESH,
             skip_attr="skip_ttl_refresh",
             parametrize=False,
         )
         cls._prepare_action_test(
             test_attr="test_ttl_no_refresh_on_action",
-            cover_marker="cover_ttl_no_refresh",
+            cover_marker=COVER_TTL_NO_REFRESH,
             skip_attr="skip_ttl_no_refresh",
             parametrize=False,
         )
         cls._prepare_action_test(
             test_attr="test_ttl_update_only_once",
-            cover_marker="cover_ttl_update_once",
+            cover_marker=COVER_TTL_UPDATE_ONCE,
             skip_attr="skip_ttl_refresh",
             parametrize=False,
         )
@@ -509,7 +521,9 @@ class TTLActionTestBase(ActionTestBase, ABC):
                 setattr(cls, test_name, ttl_refresh_base_fn)
                 cls._prepare_action_test(
                     test_attr=test_name,
-                    cover_marker=f"cover_{adapter.sf_name}_ttl_refresh",
+                    cover_marker=special_field_cover_marker(
+                        adapter.sf_name, SPECIAL_FIELD_TTL_REFRESH
+                    ),
                     skip_attr="skip_special_field_ttl",
                     parametrize=False,
                     adapter=adapter,
@@ -548,7 +562,7 @@ class CreateActionTestBase(TTLActionTestBase, ABC):
             return
         cls._prepare_action_test(
             test_attr="test_no_ttl_set_when_ttl_not_configured",
-            cover_marker="cover_no_ttl_when_not_configured",
+            cover_marker=COVER_NO_TTL_WHEN_NOT_CONFIGURED,
             skip_attr="skip_no_ttl_when_not_configured",
             parametrize=False,
         )

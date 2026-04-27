@@ -4,6 +4,25 @@ from rapyer.actions import ACTION_GROUPS_ATTR, ActionGroup
 from rapyer.types.base import BaseRedisType
 
 
+def cover_marker(*parts: str) -> str:
+    return "cover_" + "_".join(parts)
+
+
+COVER_PIPELINE_ATOM = cover_marker("pipeline_atom")
+COVER_TTL_REFRESH = cover_marker("ttl_refresh")
+COVER_TTL_NO_REFRESH = cover_marker("ttl_no_refresh")
+COVER_TTL_UPDATE_ONCE = cover_marker("ttl_update_once")
+COVER_NO_CLOBBER = cover_marker("no_clobber")
+COVER_NO_TTL_WHEN_NOT_CONFIGURED = cover_marker("no_ttl_when_not_configured")
+
+SPECIAL_FIELD_LIFECYCLE = "lifecycle"
+SPECIAL_FIELD_TTL_REFRESH = "ttl_refresh"
+
+
+def special_field_cover_marker(sf_name: str, coverage: str) -> str:
+    return cover_marker(sf_name, coverage)
+
+
 def cover_tuple(method: Callable) -> tuple[str, str]:
     qualname = getattr(method, "__qualname__", getattr(method, "__name__", ""))
     if "." in qualname:

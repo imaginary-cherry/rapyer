@@ -17,10 +17,20 @@ from tests.action_groups import (
     PRIVATE_METHODS,
 )
 from tests.coverage_helpers import (
+    COVER_NO_CLOBBER,
+    COVER_NO_TTL_WHEN_NOT_CONFIGURED,
+    COVER_PIPELINE_ATOM,
+    COVER_TTL_NO_REFRESH,
+    COVER_TTL_REFRESH,
+    COVER_TTL_UPDATE_ONCE,
+    SPECIAL_FIELD_LIFECYCLE,
+    SPECIAL_FIELD_TTL_REFRESH,
     all_subclasses,
     cover_tuple,
     should_ignore_group,
+    special_field_cover_marker,
 )
+from tests.integration.special_types.adapters import PriorityQueueAdapter
 
 TTL_TESTED_METHODS: set[tuple[str, str]] = set()
 TTL_NO_REFRESH_TESTED_METHODS: set[tuple[str, str]] = set()
@@ -132,33 +142,33 @@ class CoverageCheck:
 
 COVERAGE_CHECKS: list[CoverageCheck] = [
     CoverageCheck(
-        name="cover_pipeline_atom",
+        name=COVER_PIPELINE_ATOM,
         help_text="pipeline atomicity",
         expected=lambda: _collect_methods(ignore_groups=ActionGroup.READ),
     ),
     CoverageCheck(
-        name="cover_ttl_refresh",
+        name=COVER_TTL_REFRESH,
         help_text="TTL refresh",
         expected=lambda: _collect_methods(
             only_async=True, ignore_groups=ActionGroup.DELETE
         ),
     ),
     CoverageCheck(
-        name="cover_ttl_no_refresh",
+        name=COVER_TTL_NO_REFRESH,
         help_text="TTL no-refresh",
         expected=lambda: _collect_methods(
             only_async=True, ignore_groups=ActionGroup.DELETE | ActionGroup.CREATE
         ),
     ),
     CoverageCheck(
-        name="cover_ttl_update_once",
+        name=COVER_TTL_UPDATE_ONCE,
         help_text="TTL Update once",
         expected=lambda: _collect_methods(
             only_async=True, ignore_groups=ActionGroup.DELETE | ActionGroup.CREATE
         ),
     ),
     CoverageCheck(
-        name="cover_no_clobber",
+        name=COVER_NO_CLOBBER,
         help_text="no-clobber behavior",
         expected=lambda: _collect_methods(
             # Delete and create effect the entire model
@@ -166,7 +176,7 @@ COVERAGE_CHECKS: list[CoverageCheck] = [
         ),
     ),
     CoverageCheck(
-        name="cover_no_ttl_when_not_configured",
+        name=COVER_NO_TTL_WHEN_NOT_CONFIGURED,
         help_text="No TTL set when ttl is not configured",
         expected=lambda: _collect_methods(
             only_async=True, require_groups=ActionGroup.CREATE
@@ -192,6 +202,17 @@ def pytest_configure(config):
             f"{check.name}(*methods): marks test as covering "
             f"{check.help_text} for given (class_name, method_name) tuples",
         )
+    for adapter in [PriorityQueueAdapter()]:
+        for coverage, help_text in [
+            (SPECIAL_FIELD_LIFECYCLE, "special field lifecycle"),
+            (SPECIAL_FIELD_TTL_REFRESH, "special field TTL refresh"),
+        ]:
+            marker_name = special_field_cover_marker(adapter.sf_name, coverage)
+            config.addinivalue_line(
+                "markers",
+                f"{marker_name}(*methods): marks test as covering "
+                f"{help_text} for given (class_name, method_name) tuples",
+            )
 
 
 @pytest.hookimpl(hookwrapper=True)
