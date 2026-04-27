@@ -69,6 +69,41 @@ class TTLActionTestBase(ActionTestBase, ABC):
             for key in self.ttl_keys(inst):
                 await self.real_redis_client.expire(key, REDUCED_TTL_SECONDS)
 
+    def assert_ttls_refreshed(
+        self,
+        keys: list[str],
+        afters: list[int],
+        ttl_configured: int,
+        ttls_before: list[int] | None = None,
+    ) -> None:
+        if ttls_before is not None:
+            for key, after, before in zip(keys, afters, ttls_before):
+                assert (
+                    after > before
+                ), f"TTL not refreshed for {key}: before={before} after={after}"
+        for key, after in zip(keys, afters):
+            assert (
+                ttl_configured - 2 < after <= ttl_configured
+            ), f"TTL for {key}={after}; expected close to {ttl_configured}"
+
+    def assert_ttls_not_refreshed(
+        self,
+        keys: list[str],
+        afters: list[int],
+        max_ttl: int = REDUCED_TTL_SECONDS,
+        ttls_before: list[int] | None = None,
+    ) -> None:
+        if ttls_before is not None:
+            for key, after, before in zip(keys, afters, ttls_before):
+                assert after <= before, (
+                    f"TTL unexpectedly refreshed for {key}: before={before} "
+                    f"after={after}"
+                )
+        for key, after in zip(keys, afters):
+            assert (
+                0 < after <= max_ttl
+            ), f"TTL for {key}={after}; expected in (0, {max_ttl}]"
+
     @pytest.mark.asyncio
     async def _setup_test_special_field_ttl_refresh(self, adapter: SpecialFieldAdapter):
         # Arrange
@@ -92,16 +127,7 @@ class TTLActionTestBase(ActionTestBase, ABC):
         ttl_configured = type(models_for_ttl[0]).Meta.ttl
         keys = adapter.additional_ttl_keys(models_for_ttl[0])
         afters = await adapter.get_additional_ttl(models_for_ttl[0])
-        if self.model_exists_before_action and ttls_before is not None:
-            for key, after, before in zip(keys, afters, ttls_before):
-                assert (
-                    after > before
-                ), f"TTL not refreshed for {key}: before={before} after={after}"
-
-        for key, after in zip(keys, afters):
-            assert (
-                ttl_configured - 2 < after <= ttl_configured
-            ), f"TTL for {key}={after}; expected close to {ttl_configured}"
+        self.assert_ttls_refreshed(keys, afters, ttl_configured, ttls_before)
 
     @pytest.mark.asyncio
     async def test_ttl_refresh_on_action(self):
@@ -129,16 +155,7 @@ class TTLActionTestBase(ActionTestBase, ABC):
         afters = await asyncio.gather(
             *[self.real_redis_client.ttl(key) for key in keys]
         )
-        if self.model_exists_before_action and ttls_before is not None:
-            for key, after, before in zip(keys, afters, ttls_before):
-                assert (
-                    after > before
-                ), f"TTL not refreshed for {key}: before={before} after={after}"
-
-        for key, after in zip(keys, afters):
-            assert (
-                ttl_configured - 2 < after <= ttl_configured
-            ), f"TTL for {key}={after}; expected close to {ttl_configured}"
+        self.assert_ttls_refreshed(keys, afters, ttl_configured, ttls_before)
 
     @pytest.mark.asyncio
     async def test_ttl_no_refresh_on_action(self):
@@ -166,16 +183,7 @@ class TTLActionTestBase(ActionTestBase, ABC):
         afters = await asyncio.gather(
             *[self.real_redis_client.ttl(key) for key in keys]
         )
-        if self.model_exists_before_action and ttls_before is not None:
-            for key, after, before in zip(keys, afters, ttls_before):
-                assert after <= before, (
-                    f"TTL unexpectedly refreshed for {key}: before={before} "
-                    f"after={after}"
-                )
-        for key, after in zip(keys, afters):
-            assert (
-                0 < after <= REDUCED_TTL_SECONDS
-            ), f"TTL for {key}={after}; expected in (0, {REDUCED_TTL_SECONDS}]"
+        self.assert_ttls_not_refreshed(keys, afters, ttls_before=ttls_before)
 
     @pytest.mark.asyncio
     async def test_ttl_update_only_once(self):
