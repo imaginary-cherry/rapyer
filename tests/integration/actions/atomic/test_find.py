@@ -14,7 +14,7 @@ class TestModelAget(TTLActionTestBase, UpdateActionTestBase):
     def create_models(self):
         return [ComprehensiveTestModel(name="test", counter=1)]
 
-    async def perform_action(self, piped: ComprehensiveTestModel) -> None:
+    async def perform_action(self, piped: ComprehensiveTestModel):
         model = self.created_models[0]
         await type(model).aget(model.key)
 
@@ -26,7 +26,7 @@ class TestModelAload(TTLActionTestBase, UpdateActionTestBase):
     def create_models(self):
         return [ComprehensiveTestModel(name="test", counter=1)]
 
-    async def perform_action(self, piped: ComprehensiveTestModel) -> None:
+    async def perform_action(self, piped: ComprehensiveTestModel):
         await self.created_models[0].aload()
 
 
@@ -37,7 +37,7 @@ class TestModelAfind(TTLActionTestBase, UpdateActionTestBase):
     def create_models(self):
         return [ComprehensiveTestModel(name="test", counter=1)]
 
-    async def perform_action(self, piped: ComprehensiveTestModel) -> None:
+    async def perform_action(self, piped: ComprehensiveTestModel):
         await type(self.created_models[0]).afind()
 
 
@@ -48,7 +48,7 @@ class TestModelAfindOne(TTLActionTestBase, UpdateActionTestBase):
     def create_models(self):
         return [ComprehensiveTestModel(name="test", counter=1)]
 
-    async def perform_action(self, piped: ComprehensiveTestModel) -> None:
+    async def perform_action(self, piped: ComprehensiveTestModel):
         await type(self.created_models[0]).afind_one()
 
 
@@ -59,7 +59,7 @@ class TestRedisTypeAload(ComprehensiveCounterOpBase, TTLActionTestBase):
     def create_models(self):
         return [ComprehensiveTestModel(counter=42)]
 
-    async def perform_action(self, piped: ComprehensiveTestModel) -> None:
+    async def perform_action(self, piped: ComprehensiveTestModel):
         await self.created_models[0].counter.aload()
 
     def expected_before(self):
