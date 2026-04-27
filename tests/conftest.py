@@ -16,6 +16,11 @@ from tests.action_groups import (
     PRIVATE_INHERITED_METHODS,
     PRIVATE_METHODS,
 )
+from tests.coverage_helpers import (
+    all_subclasses,
+    cover_tuple,
+    should_ignore_group,
+)
 
 TTL_TESTED_METHODS: set[tuple[str, str]] = set()
 TTL_NO_REFRESH_TESTED_METHODS: set[tuple[str, str]] = set()
@@ -28,8 +33,7 @@ STANDALONE_PIPELINE_TESTED_METHODS: set[tuple[str, str]] = set()
 
 def _make_coverage_decorator(coverage_set: set[tuple[str, str]]):
     def coverage_test_for(method: Callable):
-        qualname = method.__qualname__
-        class_name, method_name = qualname.rsplit(".", 1)
+        class_name, method_name = cover_tuple(method)
 
         def decorator(func):
             coverage_set.add((class_name, method_name))
@@ -46,8 +50,7 @@ ttl_no_refresh_test_for = _make_coverage_decorator(TTL_NO_REFRESH_TESTED_METHODS
 
 def _make_special_field_coverage_decorator(coverage_set: set[tuple[str, str, str]]):
     def coverage_test_for(method: Callable, field_type: type):
-        qualname = method.__qualname__
-        class_name, method_name = qualname.rsplit(".", 1)
+        class_name, method_name = cover_tuple(method)
 
         def decorator(func):
             coverage_set.add((class_name, method_name, field_type.__name__))
@@ -78,27 +81,12 @@ def _is_async_callable(obj) -> bool:
     return inspect.isasyncgenfunction(wrapped)
 
 
-def should_ignore_group(
-    method: Callable, ignore_groups: ActionGroup | None = None
-) -> bool:
-    if ignore_groups is None:
-        return False
-
-    groups = getattr(method, ACTION_GROUPS_ATTR, None)
-    if groups is None:
-        return False
-    if groups & ignore_groups:
-        return True
-
-    return False
-
-
 def get_async_methods(cls, ignore_groups: ActionGroup | None = None):
     methods = []
     for name, method in inspect.getmembers(cls, predicate=inspect.iscoroutinefunction):
         if name.startswith("__"):
             continue
-        if method.__qualname__.split(".")[0] != cls.__name__:
+        if cover_tuple(method)[0] != cls.__name__:
             continue
         if should_ignore_group(method, ignore_groups):
             continue
@@ -112,7 +100,7 @@ def get_all_type_methods(cls, ignore_groups: ActionGroup | None = None):
     for name, method in vars(cls).items():
         if not callable(method):
             continue
-        if getattr(method, "__qualname__", "").split(".")[0] != cls.__name__:
+        if cover_tuple(method)[0] != cls.__name__:
             continue
         if should_ignore_group(method, ignore_groups):
             continue
@@ -217,14 +205,6 @@ def pytest_runtest_makereport(item, call):
                 check.covered.update(marker.args)
 
 
-def _all_subclasses(cls):
-    result = set()
-    for sub in cls.__subclasses__():
-        result.add(sub)
-        result.update(_all_subclasses(sub))
-    return result
-
-
 def _iter_class_methods(cls, async_only: bool):
     members = (
         inspect.getmembers(cls, predicate=_is_async_callable)
@@ -236,7 +216,7 @@ def _iter_class_methods(cls, async_only: bool):
             method = method.__func__
         if name.startswith("__") or not callable(method):
             continue
-        if getattr(method, "__qualname__", "").split(".")[0] != cls.__name__:
+        if cover_tuple(method)[0] != cls.__name__:
             continue
         yield cls, name, method
 
@@ -280,7 +260,7 @@ def _collect_methods(
     action groups are included.
     """
     candidates = []
-    for cls in _all_subclasses(BaseRedisType):
+    for cls in all_subclasses(BaseRedisType):
         candidates.extend(_iter_class_methods(cls, async_only=only_async))
     candidates.extend(_iter_class_methods(AtomicRedisModel, async_only=only_async))
     candidates.extend(_iter_module_functions(rapyer))

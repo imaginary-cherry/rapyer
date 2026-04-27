@@ -13,6 +13,10 @@ import rapyer
 import rapyer.actions as actions_module
 from rapyer import AtomicRedisModel
 from rapyer.actions import ACTION_GROUPS_ATTR, ActionGroup
+from tests.coverage_helpers import (
+    cover_tuple,
+    is_action_for_refresh_sf,
+)
 from tests.integration.conftest import REDUCED_TTL_SECONDS
 from tests.integration.special_types.adapters import (
     PriorityQueueAdapter,
@@ -39,14 +43,6 @@ class BinaryOpCase:
 # =============================================================================
 # Base
 # =============================================================================
-
-
-def _cover_tuple(method: Any) -> tuple[str, str]:
-    qualname = method.__qualname__
-    if "." in qualname:
-        cls_name, method_name = qualname.rsplit(".", 1)
-        return cls_name, method_name
-    return rapyer.__name__, qualname
 
 
 class ActionTestBase(ABC):
@@ -217,7 +213,7 @@ class ActionTestBase(ABC):
         if methods is not None:
             if not isinstance(methods, list):
                 methods = [methods]
-            normalized = [_cover_tuple(m) for m in methods]
+            normalized = [cover_tuple(m) for m in methods]
             wrapped = getattr(pytest.mark, cover_marker)(*normalized)(wrapped)
 
         skip_reason = getattr(cls, skip_attr)
@@ -351,9 +347,7 @@ class TTLActionTestBase(ActionTestBase, ABC):
                 await self.real_redis_client.expire(key, REDUCED_TTL_SECONDS)
 
     @pytest.mark.asyncio
-    async def _setup_test_special_field_ttl_refresh(
-        self, adapter: SpecialFieldAdapter
-    ):
+    async def _setup_test_special_field_ttl_refresh(self, adapter: SpecialFieldAdapter):
         # Arrange
         wrapped = await self.create_sp_models(adapter)
 
@@ -508,17 +502,18 @@ class TTLActionTestBase(ActionTestBase, ABC):
             skip_attr="skip_ttl_refresh",
             parametrize=False,
         )
-        ttl_refresh_base_fn = cls._setup_test_special_field_ttl_refresh
-        for adapter in [PriorityQueueAdapter()]:
-            test_name = f"test_special_field_ttl_refresh__{adapter.sf_name}"
-            setattr(cls, test_name, ttl_refresh_base_fn)
-            cls._prepare_action_test(
-                test_attr=test_name,
-                cover_marker=f"cover_{adapter.sf_name}_ttl_refresh",
-                skip_attr="skip_special_field_ttl",
-                parametrize=False,
-                adapter=adapter,
-            )
+        if is_action_for_refresh_sf(cls.covered_method):
+            ttl_refresh_base_fn = cls._setup_test_special_field_ttl_refresh
+            for adapter in [PriorityQueueAdapter()]:
+                test_name = f"test_special_field_ttl_refresh__{adapter.sf_name}"
+                setattr(cls, test_name, ttl_refresh_base_fn)
+                cls._prepare_action_test(
+                    test_attr=test_name,
+                    cover_marker=f"cover_{adapter.sf_name}_ttl_refresh",
+                    skip_attr="skip_special_field_ttl",
+                    parametrize=False,
+                    adapter=adapter,
+                )
 
 
 # =============================================================================
