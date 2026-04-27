@@ -2,6 +2,7 @@ import inspect
 from dataclasses import dataclass, field
 from types import ModuleType
 from typing import Callable
+from unittest.mock import AsyncMock
 
 import pytest
 from _pytest.reports import TestReport
@@ -39,6 +40,13 @@ SPECIAL_FIELD_TTL_TESTED_METHODS: set[tuple[str, str, str]] = set()
 BASE_MODEL_TTL_TESTED_METHODS: set[tuple[str, str]] = set()
 MODEL_PIPELINE_TESTED_METHODS: set[tuple[str, str]] = set()
 STANDALONE_PIPELINE_TESTED_METHODS: set[tuple[str, str]] = set()
+
+
+@pytest.fixture
+def force_no_ttl_updates(monkeypatch):
+    flush_mock = AsyncMock()
+    monkeypatch.setattr(rapyer.actions, "flush_action_targets", flush_mock)
+    return flush_mock
 
 
 def _make_coverage_decorator(coverage_set: set[tuple[str, str]]):
