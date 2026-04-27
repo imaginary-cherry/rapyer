@@ -15,7 +15,6 @@ class SpecialFieldAdapter(ABC):
     """
 
     sf_class: ClassVar[type[SpecialFieldType]]
-    sp_field_class: ClassVar[type[AtomicRedisModel]]
 
     @property
     def redis_client(self) -> Redis:
@@ -48,7 +47,6 @@ class SpecialFieldAdapter(ABC):
 
 class PriorityQueueAdapter(SpecialFieldAdapter):
     sf_class = RedisPriorityQueue
-    sp_field_class = ComprehensiveTestModel
     EXPECTED_SIZE = 3
 
     def additional_ttl_keys(self, model: ComprehensiveTestModel) -> list[str]:

@@ -97,8 +97,7 @@ class ActionTestBase(ABC):
     async def create_sp_models(
         self, adapter: SpecialFieldAdapter
     ) -> list[AtomicRedisModel]:
-        originals = self.create_models()
-        wrapped = [adapter.sp_field_class(**m.model_dump()) for m in originals]
+        wrapped = self.create_models()
         self.created_models = wrapped
 
         async with rapyer.apipeline():
@@ -112,8 +111,7 @@ class ActionTestBase(ABC):
         self, adapter: SpecialFieldAdapter
     ):
         # Arrange
-        originals = self.create_models()
-        wrapped = [adapter.sp_field_class(**m.model_dump()) for m in originals]
+        wrapped = self.create_models()
         self.created_models = wrapped
 
         # Act
