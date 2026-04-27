@@ -42,7 +42,7 @@ Creating a model. The initial TTL is always set when a model is first created, e
 
 | Source | Methods |
 |---|---|
-| `AtomicRedisModel` | `asave`, `ainsert` |
+| `AtomicRedisModel` | `asave`, `ainsert`, `aduplicate`, `aduplicate_many` |
 | Module-level | `rapyer.ainsert` |
 
 #### `UPDATE`
@@ -51,7 +51,7 @@ Modifying existing data. Triggered by virtually every mutating method, since upd
 
 | Source | Methods |
 |---|---|
-| `AtomicRedisModel` | `asave`, `aupdate`, `aduplicate`, `aduplicate_many`, `aset_ttl` |
+| `AtomicRedisModel` | `asave`, `aupdate`, `aset_ttl` |
 | `BaseRedisType` | `asave` |
 | `RedisDict` | `update`, `clear`, `__setitem__`, `aset_item`, `adel_item`, `aupdate`, `apop`, `apopitem`, `aclear` |
 | `RedisList` | `__setitem__`, `__iadd__`, `append`, `extend`, `insert`, `clear`, `remove_range`, `aappend`, `aextend`, `apop`, `ainsert`, `aclear` |
