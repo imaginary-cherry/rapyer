@@ -206,6 +206,13 @@ class ActionTestBase(ABC):
             async def wrapped(self):
                 return await base_fn(self, **test_params)
 
+        base_sig = inspect.signature(base_fn)
+        wrapped.__signature__ = base_sig.replace(
+            parameters=[
+                p for n, p in base_sig.parameters.items() if n not in test_params
+            ]
+        )
+
         methods = cls.covered_method
         if methods is not None:
             if not isinstance(methods, list):
@@ -231,25 +238,23 @@ class ActionTestBase(ABC):
         )
         action_groups = getattr(cls.covered_method, ACTION_GROUPS_ATTR, [])
         if ActionGroup.CREATE in action_groups:
-            cls.test_special_field_lifecycle = (
-                cls._setup_test_special_field_lifecycle_create
-            )
+            lifecycle_base_fn = cls._setup_test_special_field_lifecycle_create
         elif ActionGroup.DELETE in action_groups:
-            cls.test_special_field_lifecycle = (
-                cls._setup_test_special_field_lifecycle_delete
-            )
+            lifecycle_base_fn = cls._setup_test_special_field_lifecycle_delete
         else:
-            cls.test_special_field_lifecycle = None
+            lifecycle_base_fn = None
 
-        if cls.test_special_field_lifecycle is not None:
-            adapter = PriorityQueueAdapter()
-            cls._prepare_action_test(
-                test_attr="test_special_field_lifecycle",
-                cover_marker=f"cover_{adapter.sf_name}_lifecycle",
-                skip_attr="skip_special_field_lifecycle",
-                parametrize=False,
-                adapter=adapter,
-            )
+        if lifecycle_base_fn is not None:
+            for adapter in [PriorityQueueAdapter()]:
+                test_name = f"test_special_field_lifecycle__{adapter.sf_name}"
+                setattr(cls, test_name, lifecycle_base_fn)
+                cls._prepare_action_test(
+                    test_attr=test_name,
+                    cover_marker=f"cover_{adapter.sf_name}_lifecycle",
+                    skip_attr="skip_special_field_lifecycle",
+                    parametrize=False,
+                    adapter=adapter,
+                )
 
 
 # =============================================================================
@@ -346,7 +351,9 @@ class TTLActionTestBase(ActionTestBase, ABC):
                 await self.real_redis_client.expire(key, REDUCED_TTL_SECONDS)
 
     @pytest.mark.asyncio
-    async def test_special_field_ttl_refresh(self, adapter: SpecialFieldAdapter):
+    async def _setup_test_special_field_ttl_refresh(
+        self, adapter: SpecialFieldAdapter
+    ):
         # Arrange
         wrapped = await self.create_sp_models(adapter)
 
@@ -501,14 +508,17 @@ class TTLActionTestBase(ActionTestBase, ABC):
             skip_attr="skip_ttl_refresh",
             parametrize=False,
         )
-        adapter = PriorityQueueAdapter()
-        cls._prepare_action_test(
-            test_attr="test_special_field_ttl_refresh",
-            cover_marker=f"cover_{adapter.sf_name}_ttl_refresh",
-            skip_attr="skip_special_field_ttl",
-            parametrize=False,
-            adapter=adapter,
-        )
+        ttl_refresh_base_fn = cls._setup_test_special_field_ttl_refresh
+        for adapter in [PriorityQueueAdapter()]:
+            test_name = f"test_special_field_ttl_refresh__{adapter.sf_name}"
+            setattr(cls, test_name, ttl_refresh_base_fn)
+            cls._prepare_action_test(
+                test_attr=test_name,
+                cover_marker=f"cover_{adapter.sf_name}_ttl_refresh",
+                skip_attr="skip_special_field_ttl",
+                parametrize=False,
+                adapter=adapter,
+            )
 
 
 # =============================================================================
