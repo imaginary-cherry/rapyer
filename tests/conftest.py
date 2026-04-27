@@ -201,7 +201,8 @@ for sf_class in all_subclasses(SpecialFieldType):
                 help_text=f"{sf_class.__name__} special field TTL refresh",
                 expected=lambda: _collect_methods(
                     # Delete and create effect the entire model
-                    ignore_groups=(ActionGroup.DELETE | ActionGroup.CREATE)
+                    ignore_groups=(ActionGroup.DELETE | ActionGroup.CREATE),
+                    include_redis_types=False,
                 ),
             ),
         ]
@@ -284,6 +285,7 @@ def _collect_methods(
     require_groups: ActionGroup | None = None,
     ignore_private: bool = True,
     only_async: bool = False,
+    include_redis_types: bool = True,
 ):
     """Callable methods on BaseRedisType subclasses + async methods on AtomicRedisModel.
 
@@ -293,8 +295,9 @@ def _collect_methods(
     action groups are included.
     """
     candidates = []
-    for cls in all_subclasses(BaseRedisType):
-        candidates.extend(_iter_class_methods(cls, async_only=only_async))
+    if include_redis_types:
+        for cls in all_subclasses(BaseRedisType):
+            candidates.extend(_iter_class_methods(cls, async_only=only_async))
     candidates.extend(_iter_class_methods(AtomicRedisModel, async_only=only_async))
     candidates.extend(_iter_module_functions(rapyer))
 
