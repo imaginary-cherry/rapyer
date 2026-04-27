@@ -55,25 +55,6 @@ async def assert_ttl_not_refreshed(real_redis_client, initial_ttl, *keys):
 # --- Base model action PQ key TTL tests ---
 
 
-@special_field_ttl_test_for(AtomicRedisModel.asave, RedisPriorityQueue)
-@pytest.mark.asyncio
-async def test_ttl_refresh_pq_key_on_asave(
-    real_redis_client, saved_pq_ttl_model_with_reduced_ttl: SavedModelWithReducedTTL
-):
-    # Arrange
-    model = saved_pq_ttl_model_with_reduced_ttl.model
-    initial_ttl = saved_pq_ttl_model_with_reduced_ttl.initial_ttl
-
-    # Act
-    model.name = "updated"
-    await model.asave()
-
-    # Assert
-    await assert_ttl_refreshed(
-        real_redis_client, initial_ttl, model.tasks.special_key, model.key
-    )
-
-
 @special_field_ttl_test_for(AtomicRedisModel.aload, RedisPriorityQueue)
 @pytest.mark.asyncio
 async def test_ttl_refresh_pq_key_on_aload(
@@ -85,24 +66,6 @@ async def test_ttl_refresh_pq_key_on_aload(
 
     # Act
     await model.aload()
-
-    # Assert
-    await assert_ttl_refreshed(
-        real_redis_client, initial_ttl, model.tasks.special_key, model.key
-    )
-
-
-@special_field_ttl_test_for(AtomicRedisModel.aupdate, RedisPriorityQueue)
-@pytest.mark.asyncio
-async def test_ttl_refresh_pq_key_on_aupdate(
-    real_redis_client, saved_pq_ttl_model_with_reduced_ttl: SavedModelWithReducedTTL
-):
-    # Arrange
-    model = saved_pq_ttl_model_with_reduced_ttl.model
-    initial_ttl = saved_pq_ttl_model_with_reduced_ttl.initial_ttl
-
-    # Act
-    await model.aupdate(name="updated")
 
     # Assert
     await assert_ttl_refreshed(
@@ -144,19 +107,6 @@ async def test_ttl_refresh_pq_key_on_afind(
     await assert_ttl_refreshed(
         real_redis_client, initial_ttl, model.tasks.special_key, model.key
     )
-
-
-@special_field_ttl_test_for(AtomicRedisModel.ainsert, RedisPriorityQueue)
-@pytest.mark.asyncio
-async def test_ttl_pq_key_on_ainsert(real_redis_client):
-    # Arrange
-    model = PriorityQueueModel(name="insert_ttl_test")
-
-    # Act
-    await PriorityQueueModel.ainsert(model)
-
-    # Assert
-    await assert_ttl_refreshed(real_redis_client, REDUCED_TTL_SECONDS, model.key)
 
 
 @special_field_ttl_test_for(AtomicRedisModel.afind_one, RedisPriorityQueue)

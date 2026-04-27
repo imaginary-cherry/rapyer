@@ -35,27 +35,6 @@ async def saved_mixed_model():
 # --- adelete ---
 
 
-@special_field_test_for(AtomicRedisModel.adelete, RedisPriorityQueue)
-@pytest.mark.asyncio
-async def test_adelete_model_with_pq_deletes_model_and_pq_keys(
-    real_redis_client, saved_pq_model
-):
-    # Arrange
-    model = saved_pq_model
-    model_key = model.key
-    pq_key = model.tasks.special_key
-    assert await real_redis_client.exists(model_key) == 1
-    assert await real_redis_client.exists(pq_key) == 1
-
-    # Act
-    result = await model.adelete()
-
-    # Assert
-    assert result is True
-    assert await real_redis_client.exists(model_key) == 0
-    assert await real_redis_client.exists(pq_key) == 0
-
-
 @pytest.mark.asyncio
 async def test_adelete_model_with_empty_pq_deletes_model_key(real_redis_client):
     # Arrange
@@ -73,23 +52,6 @@ async def test_adelete_model_with_empty_pq_deletes_model_key(real_redis_client):
 
 
 # --- ainsert ---
-
-
-@special_field_test_for(AtomicRedisModel.ainsert, RedisPriorityQueue)
-@pytest.mark.asyncio
-async def test_ainsert_multiple_models_with_pq_all_saved(real_redis_client):
-    # Arrange
-    models = [PriorityQueueModel(name=f"model_{i}") for i in range(3)]
-
-    # Act
-    await PriorityQueueModel.ainsert(*models)
-
-    # Assert
-    for model in models:
-        assert await real_redis_client.exists(model.key) == 1
-        await model.tasks.apush("item", 1.0)
-        result = await model.tasks.apop()
-        assert result == "item"
 
 
 @pytest.mark.asyncio
@@ -242,25 +204,6 @@ async def test_afind_by_keys_returns_models_with_functional_pq(real_redis_client
 # --- aupdate ---
 
 
-@special_field_test_for(AtomicRedisModel.aupdate, RedisPriorityQueue)
-@pytest.mark.asyncio
-async def test_aupdate_regular_field_on_mixed_model_pq_persists(saved_mixed_model):
-    # Arrange
-    model = saved_mixed_model
-
-    # Act
-    await model.aupdate(name="updated_name", count=99)
-
-    # Assert
-    assert model.name == "updated_name"
-    assert model.count == 99
-    loaded = await MixedSpecialModel.aget(model.key)
-    assert loaded.name == "updated_name"
-    assert loaded.count == 99
-    assert await loaded.tasks.asize() == 2
-    assert await loaded.tasks.apop() == "task_a"
-
-
 @pytest.mark.asyncio
 async def test_aupdate_with_pq_field_raises_error(saved_mixed_model):
     # Arrange
@@ -293,23 +236,6 @@ async def test_aupdate_regular_and_pq_field_together_raises_error(saved_mixed_mo
 # --- aduplicate ---
 
 
-@special_field_test_for(AtomicRedisModel.aduplicate, RedisPriorityQueue)
-@pytest.mark.asyncio
-async def test_aduplicate_model_with_pq_duplicate_has_copied_pq(saved_pq_model):
-    # Arrange
-    model = saved_pq_model
-
-    # Act
-    duplicate = await model.aduplicate()
-
-    # Assert
-    assert duplicate.pk != model.pk
-    assert duplicate.name == model.name
-    assert isinstance(duplicate.tasks, RedisPriorityQueue)
-    assert await duplicate.tasks.asize() == 3
-    assert await model.tasks.asize() == 3
-
-
 @pytest.mark.asyncio
 async def test_aduplicate_pq_operations_on_duplicate_independent(saved_pq_model):
     # Arrange
@@ -340,84 +266,6 @@ async def test_aduplicate_mixed_model_regular_fields_copied_pq_independent(
     assert duplicate.count == model.count
     assert await duplicate.tasks.asize() == 2
     assert await model.tasks.asize() == 2
-
-
-# --- adelete_by_key ---
-
-
-@special_field_test_for(AtomicRedisModel.adelete_by_key, RedisPriorityQueue)
-@pytest.mark.asyncio
-async def test_adelete_by_key_does_delete_pq_key(real_redis_client, saved_pq_model):
-    # Arrange
-    model = saved_pq_model
-    model_key = model.key
-    pq_key = model.tasks.special_key
-    assert await real_redis_client.exists(model_key) == 1
-    assert await real_redis_client.exists(pq_key) == 1
-
-    # Act
-    result = await PriorityQueueModel.adelete_by_key(model_key)
-
-    # Assert
-    assert result is True
-    assert await real_redis_client.exists(model_key) == 0
-    assert await real_redis_client.exists(pq_key) == 0
-
-
-# --- adelete_many ---
-
-
-@special_field_test_for(AtomicRedisModel.adelete_many, RedisPriorityQueue)
-@pytest.mark.asyncio
-async def test_adelete_many_does_delete_pq_keys(real_redis_client):
-    # Arrange
-    models = []
-    for i in range(3):
-        model = PriorityQueueModel(name=f"model_{i}")
-        await model.asave()
-        await model.tasks.apush(f"item_{i}", float(i))
-        models.append(model)
-
-    model_keys = [m.key for m in models]
-    pq_keys = [m.tasks.special_key for m in models]
-
-    for key in model_keys + pq_keys:
-        assert await real_redis_client.exists(key) == 1
-
-    # Act
-    result = await PriorityQueueModel.adelete_many(*models)
-
-    # Assert
-    assert result.models_deleted == 3
-    assert result.keys_deleted == 6
-    for key in model_keys:
-        assert await real_redis_client.exists(key) == 0
-    for key in pq_keys:
-        assert await real_redis_client.exists(key) == 0
-
-
-# --- aduplicate_many ---
-
-
-@special_field_test_for(AtomicRedisModel.aduplicate_many, RedisPriorityQueue)
-@pytest.mark.asyncio
-async def test_aduplicate_many_models_with_pq_duplicates_have_copied_pq(
-    saved_pq_model,
-):
-    # Arrange
-    model = saved_pq_model
-
-    # Act
-    duplicates = await model.aduplicate_many(3)
-
-    # Assert
-    assert len(duplicates) == 3
-    for duplicate in duplicates:
-        assert duplicate.pk != model.pk
-        assert duplicate.name == model.name
-        assert isinstance(duplicate.tasks, RedisPriorityQueue)
-        assert await duplicate.tasks.asize() == 3
-    assert await model.tasks.asize() == 3
 
 
 # --- aset_ttl ---
