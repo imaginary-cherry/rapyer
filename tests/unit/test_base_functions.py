@@ -4,23 +4,13 @@ from typing import Any, Generic, TypeVar
 import pytest
 
 from rapyer import AtomicRedisModel
-from rapyer.base import REDIS_MODELS, find_redis_models
+from rapyer.base import find_redis_models
 from rapyer.errors import DuplicateModelNameError
-
-
-@pytest.fixture
-def reset_redis_model_lst():
-    original = REDIS_MODELS.copy()
-    REDIS_MODELS.clear()
-    yield
-    REDIS_MODELS.clear()
-    REDIS_MODELS.extend(original)
-
 
 T = TypeVar("T")
 
 
-def test_find_redis_models_returns_all_loaded_models_sanity(reset_redis_model_lst):
+def test_find_redis_models_returns_all_loaded_models_sanity(clean_redis_models):
     # Arrange
     class Model(AtomicRedisModel):
         field1: list[str]
@@ -63,7 +53,7 @@ def test_find_redis_models_returns_all_loaded_models_sanity(reset_redis_model_ls
     assert set(models) == expected
 
 
-def test_registering_two_models_with_same_class_name_raises(reset_redis_model_lst):
+def test_registering_two_models_with_same_class_name_raises(clean_redis_models):
     # Arrange
     class DuplicateNameModel(AtomicRedisModel):
         field1: str = ""
