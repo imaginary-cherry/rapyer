@@ -26,7 +26,7 @@ class CreateActionTestBase(TTLActionTestBase, ABC):
             await self.perform_action(model_for_keys)
 
         # Assert
-        keys = self.all_keys_to_check()
+        keys = self.models_to_check_ttl()
         ttls = await asyncio.gather(*[self.real_redis_client.ttl(k) for k in keys])
         for key, ttl in zip(keys, ttls):
             assert ttl == -1, f"TTL unexpectedly set for {key}: expected -1, got {ttl}"

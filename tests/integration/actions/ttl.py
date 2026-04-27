@@ -42,9 +42,12 @@ class TTLActionTestBase(ActionTestBase, ABC):
     """If set to a reason string, :meth:`test_ttl_no_refresh_on_action` is
     skipped with that reason."""
 
+    def models_to_check_ttl(self):
+        return self.created_models
+
     def all_keys_to_check(self):
         keys = []
-        for model in self.created_models:
+        for model in self.models_to_check_ttl():
             keys.extend(self.ttl_keys(model))
         return keys
 

@@ -10,10 +10,10 @@ class TestRapyerAduplicate(UpdateActionTestBase, CreateActionTestBase):
 
     duplicate: ComprehensiveTestModel | None = None
 
-    def all_keys_to_check(self):
+    def models_to_check_ttl(self):
         if self.duplicate is None:
             return []
-        return [self.duplicate.key]
+        return [self.duplicate]
 
     def create_models(self):
         return [ComprehensiveTestModel(name="original", counter=42, tags=["t1"])]
@@ -36,7 +36,7 @@ class TestRapyerAduplicate(UpdateActionTestBase, CreateActionTestBase):
 
     def assert_after_pipeline(self, loaded):
         super().assert_after_pipeline(loaded)
-        assert self.duplicate.pk != self.created_models[0].pk
+        assert self.duplicate.key != self.created_models[0].key
 
 
 class TestRapyerAduplicateMany(UpdateActionTestBase, CreateActionTestBase):
@@ -45,10 +45,11 @@ class TestRapyerAduplicateMany(UpdateActionTestBase, CreateActionTestBase):
 
     duplicates: list[ComprehensiveTestModel] | None = None
 
-    def all_keys_to_check(self):
-        if self.duplicates is None:
-            return []
-        return [model.key for model in self.duplicates]
+    def duplicates_lst(self):
+        return self.duplicates or []
+
+    def models_to_check_ttl(self):
+        return self.duplicates_lst()
 
     def create_models(self):
         return [ComprehensiveTestModel(name="original", counter=42, tags=["t1"])]
@@ -58,7 +59,7 @@ class TestRapyerAduplicateMany(UpdateActionTestBase, CreateActionTestBase):
 
     async def load_data(self):
         results = []
-        for dup in self.duplicates:
+        for dup in self.duplicates_lst():
             exists = await self.real_redis_client.exists(dup.key)
             if not exists:
                 results.append((0, None, None, None))
@@ -75,5 +76,5 @@ class TestRapyerAduplicateMany(UpdateActionTestBase, CreateActionTestBase):
 
     def assert_after_pipeline(self, loaded):
         super().assert_after_pipeline(loaded)
-        all_pks = [self.created_models[0].pk] + [d.pk for d in self.duplicates]
+        all_pks = [self.created_models[0].pk] + [d.pk for d in self.duplicates_lst()]
         assert len(set(all_pks)) == 4
