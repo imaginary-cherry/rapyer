@@ -1,8 +1,45 @@
 from rapyer.types.integer import RedisInt
-from tests.integration.pipeline.pipeline_atomicity_base import (
-    BinaryOpCase,
-    ComprehensiveCounterOpBase,
-)
+from tests.integration.actions.base import BinaryOpCase
+from tests.integration.actions.comprehensive_counter import ComprehensiveCounterOpBase
+from tests.integration.actions.ttl import TTLActionTestBase
+from tests.integration.actions.update import UpdateActionTestBase
+from tests.models.collection_types import ComprehensiveTestModel
+
+
+class TestIntegerAddition(UpdateActionTestBase):
+    covered_method = RedisInt.__iadd__
+
+    def create_models(self):
+        return [ComprehensiveTestModel(counter=100)]
+
+    async def perform_action(self, piped):
+        piped.counter += 25
+
+    async def load_data(self):
+        loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
+        return loaded.counter
+
+    def expected_before(self):
+        return 100
+
+    def expected_after(self):
+        return 125
+
+
+class TestRedisIntAincrease(ComprehensiveCounterOpBase, TTLActionTestBase):
+    covered_method = RedisInt.aincrease
+
+    def create_models(self):
+        return [ComprehensiveTestModel(counter=10)]
+
+    async def perform_action(self, piped: ComprehensiveTestModel) -> None:
+        await piped.counter.aincrease(5)
+
+    def expected_before(self):
+        return 10
+
+    def expected_after(self):
+        return 15
 
 
 class TestRedisIntIsub(ComprehensiveCounterOpBase):

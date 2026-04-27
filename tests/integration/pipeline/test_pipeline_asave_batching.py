@@ -1,36 +1,6 @@
 import pytest
 
-from rapyer.base import AtomicRedisModel
-from tests.integration.pipeline.pipeline_atomicity_base import ActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
-
-
-class TestRapyerAsaveBatching(ActionTestBase):
-    covered_method = AtomicRedisModel.asave
-
-    def create_models(self):
-        return [
-            ComprehensiveTestModel(name="model1", counter=1, tags=["tag1"]),
-            ComprehensiveTestModel(name="model2", counter=2, tags=["tag2"]),
-            ComprehensiveTestModel(name="model3", counter=3, tags=["tag3"]),
-        ]
-
-    async def setup_data(self):
-        # Don't pre-insert — the asave calls inside the pipeline are the subject.
-        return self.create_models()
-
-    async def perform_action(self, piped):
-        for model in self.created_models:
-            await model.asave()
-
-    async def load_data(self):
-        return tuple([await self.real_redis_client.exists(m.key) for m in self.created_models])
-
-    def expected_before(self):
-        return 0, 0, 0
-
-    def expected_after(self):
-        return 1, 1, 1
 
 
 @pytest.mark.asyncio

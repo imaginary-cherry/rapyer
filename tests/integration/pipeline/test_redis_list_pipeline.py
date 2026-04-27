@@ -1,26 +1,6 @@
 import pytest
 
-from rapyer.types.lst import RedisList
-from tests.integration.pipeline.pipeline_atomicity_base import (
-    ComprehensiveTagsOpBase,
-)
 from tests.models.collection_types import ComprehensiveTestModel
-
-
-class TestRedisListSetitem(ComprehensiveTagsOpBase):
-    covered_method = RedisList.__setitem__
-
-    def create_models(self):
-        return [ComprehensiveTestModel(tags=["first", "second", "third"])]
-
-    async def perform_action(self, piped):
-        piped.tags[1] = "modified"
-
-    def expected_before(self):
-        return ["first", "second", "third"]
-
-    def expected_after(self):
-        return ["first", "modified", "third"]
 
 
 @pytest.mark.asyncio
@@ -59,22 +39,6 @@ async def test_redis_list_setitem_at_end_with_pipeline_sanity():
     # Assert - Change should be applied after pipeline
     final_model = await ComprehensiveTestModel.aget(model.key)
     assert final_model.tags == ["first", "middle", "new_last"]
-
-
-class TestRedisListIadd(ComprehensiveTagsOpBase):
-    covered_method = RedisList.__iadd__
-
-    def create_models(self):
-        return [ComprehensiveTestModel(tags=["initial"])]
-
-    async def perform_action(self, piped):
-        piped.tags += ["added1", "added2"]
-
-    def expected_before(self):
-        return ["initial"]
-
-    def expected_after(self):
-        return ["initial", "added1", "added2"]
 
 
 @pytest.mark.asyncio

@@ -3,8 +3,6 @@ import pytest_asyncio
 
 import rapyer
 from rapyer import DeleteResult, RapyerDeleteResult
-from rapyer.base import AtomicRedisModel
-from tests.integration.pipeline.pipeline_atomicity_base import ActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.index_types import IndexTestModel
 from tests.models.simple_types import IntModel, StrModel
@@ -32,40 +30,6 @@ async def create_index(real_redis_client):
     await IndexTestModel.acreate_index()
     yield
     await IndexTestModel.adelete_index()
-
-
-class TestRapyerAdeleteMany(ActionTestBase):
-    covered_method = AtomicRedisModel.adelete_many
-
-    result: DeleteResult | None = None
-
-    def create_models(self):
-        return [
-            ComprehensiveTestModel(name="model1", tags=["a"]),
-            ComprehensiveTestModel(name="model2", tags=["b"]),
-        ]
-
-    async def perform_action(self, piped):
-        model1, model2 = self.created_models
-        self.result = await ComprehensiveTestModel.adelete_many(model1, model2)
-
-    async def load_data(self):
-        model1, model2 = self.created_models
-        return (
-            await self.real_redis_client.exists(model1.key),
-            await self.real_redis_client.exists(model2.key),
-        )
-
-    def expected_before(self):
-        return 1, 1
-
-    def expected_after(self):
-        return 0, 0
-
-    def assert_after_pipeline(self, loaded):
-        super().assert_after_pipeline(loaded)
-        assert isinstance(self.result, DeleteResult)
-        assert self.result.models_deleted == 2
 
 
 @pytest.mark.asyncio

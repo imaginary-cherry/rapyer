@@ -2,10 +2,8 @@ from abc import ABC
 from typing import ClassVar
 
 from rapyer.types.priority_queue import PriorityQueueItem, RedisPriorityQueue
-from tests.integration.pipeline.pipeline_atomicity_base import (
-    TTLActionTestBase,
-    UpdateActionTestBase,
-)
+from tests.integration.actions.ttl import TTLActionTestBase
+from tests.integration.actions.update import UpdateActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
 
 # Initial items every PQ test class starts with. Kept in class-level constants

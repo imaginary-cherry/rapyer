@@ -1,5 +1,5 @@
 from rapyer.types.byte import RedisBytes
-from tests.integration.pipeline.pipeline_atomicity_base import UpdateActionTestBase
+from tests.integration.actions.update import UpdateActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
 
 
