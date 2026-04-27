@@ -17,7 +17,7 @@ class JobQueue(AtomicRedisModel):
 
 #### `special_key`
 **Type:** `str`  
-**Description:** The Redis key for this field's sorted set. Format: `{model_key}:{field_name}`.
+**Description:** The Redis key for this field's sorted set. Format: `__rapyer_special__:{model_key}:{field_name}`.
 
 ## Methods
 

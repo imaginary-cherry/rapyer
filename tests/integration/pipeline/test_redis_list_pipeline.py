@@ -1,28 +1,6 @@
 import pytest
 
-from rapyer.types.lst import RedisList
-from tests.conftest import model_pipeline_test_for
 from tests.models.collection_types import ComprehensiveTestModel
-
-
-@model_pipeline_test_for(RedisList.__setitem__)
-@pytest.mark.asyncio
-async def test_redis_list_setitem_with_pipeline_sanity():
-    # Arrange
-    model = ComprehensiveTestModel(tags=["first", "second", "third"])
-    await model.asave()
-
-    # Act
-    async with model.apipeline() as redis_model:
-        redis_model.tags[1] = "modified"
-
-        # Assert - Change should not be applied yet
-        loaded_model = await ComprehensiveTestModel.aget(model.key)
-        assert loaded_model.tags == ["first", "second", "third"]
-
-    # Assert - Change should be applied after pipeline
-    final_model = await ComprehensiveTestModel.aget(model.key)
-    assert final_model.tags == ["first", "modified", "third"]
 
 
 @pytest.mark.asyncio
@@ -61,26 +39,6 @@ async def test_redis_list_setitem_at_end_with_pipeline_sanity():
     # Assert - Change should be applied after pipeline
     final_model = await ComprehensiveTestModel.aget(model.key)
     assert final_model.tags == ["first", "middle", "new_last"]
-
-
-@model_pipeline_test_for(RedisList.__iadd__)
-@pytest.mark.asyncio
-async def test_redis_list_iadd_with_pipeline_sanity():
-    # Arrange
-    model = ComprehensiveTestModel(tags=["initial"])
-    await model.asave()
-
-    # Act
-    async with model.apipeline() as redis_model:
-        redis_model.tags += ["added1", "added2"]
-
-        # Assert - Change should not be applied yet
-        loaded_model = await ComprehensiveTestModel.aget(model.key)
-        assert loaded_model.tags == ["initial"]
-
-    # Assert - Change should be applied after pipeline
-    final_model = await ComprehensiveTestModel.aget(model.key)
-    assert final_model.tags == ["initial", "added1", "added2"]
 
 
 @pytest.mark.asyncio

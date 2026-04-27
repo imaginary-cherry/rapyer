@@ -1,10 +1,11 @@
 import json
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar, get_args
+from typing import Any, Generic, Optional, TypeVar, get_args
 
 from pydantic import GetCoreSchemaHandler, TypeAdapter
 from pydantic_core import core_schema
 
+from rapyer.actions import ActionGroup, mark_actions
 from rapyer.types.special import SpecialFieldType
 
 T = TypeVar("T")
@@ -19,9 +20,6 @@ class PriorityQueueItem(Generic[T]):
 class RedisPriorityQueue(SpecialFieldType, Generic[T]):
     """
     Priority queue backed by a Redis Sorted Set. Pure Redis proxy — no local state.
-
-    All operations go directly to Redis via ``self.client`` (pipeline-aware).
-    Lower priority score = higher precedence.
     """
 
     original_type: type = type(None)
@@ -47,70 +45,75 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
 
     # --- Queue operations ---
 
-    async def apush(self, value: T, priority: float) -> None:
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND)
+    async def apush(self, value: T, priority: float):
         serialized = self._serialize_value(value)
         await self.client.zadd(self.special_key, {serialized: priority})
-        await self.refresh_ttl_if_needed()
 
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND)
     async def apush_many(self, items: list[PriorityQueueItem[T]]):
         mapping = {self._serialize_value(item.value): item.priority for item in items}
         await self.client.zadd(self.special_key, mapping)
-        await self.refresh_ttl_if_needed()
 
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ)
     async def apop(self):
-        result = await self.client.zpopmin(self.special_key, count=1)
+        result = await self.redis.zpopmin(self.special_key, count=1)
         if not result:
             return None
         member, score = result[0]
-        await self.refresh_ttl_if_needed()
         return self._deserialize_value(member)
 
+    @mark_actions(ActionGroup.READ)
     async def apeek(self):
-        """Return the item with the lowest priority score without removing it."""
-        result = await self.client.zrange(self.special_key, 0, 0, withscores=True)
+        result = await self.redis.zrange(self.special_key, 0, 0, withscores=True)
         if not result:
             return None
         member, score = result[0]
         return self._deserialize_value(member)
 
+    @mark_actions(ActionGroup.READ)
     async def asize(self) -> int:
-        """Return the number of items in the queue."""
         return await self.client.zcard(self.special_key)
 
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     async def aclear(self):
-        """Remove all items from the queue."""
         await self.client.delete(self.special_key)
-        await self.refresh_ttl_if_needed()
 
+    @mark_actions(ActionGroup.READ)
     async def aitems(self) -> list[PriorityQueueItem]:
-        """Return all items sorted by priority (ascending)."""
-        result = await self.client.zrange(self.special_key, 0, -1, withscores=True)
+        result = await self.redis.zrange(self.special_key, 0, -1, withscores=True)
         return [
             PriorityQueueItem(value=self._deserialize_value(m), priority=s)
             for m, s in result
         ]
 
-    async def aremove(self, value) -> bool:
-        """Remove a specific value from the queue. Returns True if removed."""
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
+    async def aremove(self, value) -> Optional[bool]:
         serialized = self._serialize_value(value)
         removed = await self.client.zrem(self.special_key, serialized)
-        await self.refresh_ttl_if_needed()
+        if self.pipeline:
+            return None
         return removed > 0
 
     # --- SpecialFieldType interface ---
 
-    async def asave_special(self) -> None:
+    async def asave_special(self):
         # NOTE - nothing to save
         pass
 
-    async def adelete_special(self) -> None:
+    async def adelete_special(self):
         await self.client.delete(self.special_key)
 
-    async def aduplicate_special(self, target_special_key: str) -> None:
+    async def aduplicate_special(self, target_special_key: str):
         items = await self.redis.zrange(self.special_key, 0, -1, withscores=True)
         if items:
             mapping = {member: score for member, score in items}
             await self.client.zadd(target_special_key, mapping)
+
+    def __eq__(self, other):
+        if not isinstance(other, RedisPriorityQueue):
+            return False
+        return self.special_key == other.special_key
 
     # --- Pydantic schema ---
 

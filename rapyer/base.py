@@ -24,16 +24,23 @@ from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 from redis.exceptions import NoScriptError, ResponseError
 
+from rapyer.actions import (
+    ActionGroup,
+    TargetSource,
+    mark_actions,
+    register_action_target,
+    should_refresh_for_action,
+)
 from rapyer.config import RedisConfig
 from rapyer.context import (
     _context_pipe,
     ensure_pipeline,
-    pipe_ctx_from_redix,
     pipeline_with_execution,
     with_pipe_context,
 )
 from rapyer.errors import (
     CantSerializeRedisValueError,
+    DuplicateModelNameError,
     KeyNotFound,
     MissingParameterError,
     PersistentNoScriptError,
@@ -57,7 +64,7 @@ from rapyer.types.base import (
     RedisType,
 )
 from rapyer.types.convert import RedisConverter
-from rapyer.types.special import SpecialFieldType
+from rapyer.types.special import SpecialFieldType, special_field_key
 from rapyer.typing_support import Self, Unpack
 from rapyer.utils.annotation import (
     DYNAMIC_CLASS_DOC,
@@ -178,20 +185,35 @@ class AtomicRedisModel(BaseModel):
         return _context_pipe.get() or self.Meta.redis
 
     @classmethod
-    def should_refresh(cls):
-        return cls.Meta.refresh_ttl and cls.Meta.ttl is not None
+    def should_refresh_for_action(cls, action=None):
+        if action is None:
+            action = ActionGroup.all()
+        return should_refresh_for_action(cls.Meta, action)
 
-    async def refresh_ttl_if_needed(self, can_use_pipeline: bool = False):
-        if self.should_refresh():
-            pipe_context = (
-                ensure_pipeline if can_use_pipeline else pipeline_with_execution
-            )
-            async with pipe_context(self.Meta) as pipe:
-                pipe.expire(self.key, self.Meta.ttl)
-                for fname in self._special_field_names:
-                    field = getattr(self, fname)
-                    if isinstance(field, SpecialFieldType):
-                        pipe.expire(field.special_key, self.Meta.ttl)
+    @classmethod
+    def should_refresh(cls):
+        return cls.should_refresh_for_action()
+
+    async def refresh_ttl_if_needed(
+        self,
+        can_use_pipeline: bool = False,
+        action=None,
+        initial: bool = False,
+    ):
+        if self.Meta.ttl is None:
+            return
+        should_refresh = self.should_refresh_for_action(action)
+        if not should_refresh and not initial:
+            return
+        # initial=True with refresh_ttl=False → set TTL only if none exists (NX)
+        nx = initial and not should_refresh
+        pipe_context = ensure_pipeline if can_use_pipeline else pipeline_with_execution
+        async with pipe_context(self.Meta) as pipe:
+            pipe.expire(self.key, self.Meta.ttl, nx=nx)
+            for fname in self._special_field_names:
+                field = getattr(self, fname)
+                if isinstance(field, SpecialFieldType):
+                    pipe.expire(field.special_key, self.Meta.ttl, nx=nx)
 
     @classmethod
     def redis_schema(cls, redis_name: str = ""):
@@ -333,6 +355,16 @@ class AtomicRedisModel(BaseModel):
         # Update the redis model list for initialization
         # Skip dynamically created classes from type conversion
         if cls.__doc__ != DYNAMIC_CLASS_DOC and cls.Meta.init_with_rapyer:
+            existing = next(
+                (m for m in REDIS_MODELS if m.__name__ == cls.__name__), None
+            )
+            if existing is not None:
+                raise DuplicateModelNameError(
+                    cls.__name__,
+                    f"A rapyer model named {cls.__name__!r} is already registered "
+                    f"(existing: {existing.__module__}, new: {cls.__module__}). "
+                    "Model classes are resolved from Redis keys by __name__ and must be unique.",
+                )
             REDIS_MODELS.append(cls)
 
     @classmethod
@@ -357,19 +389,15 @@ class AtomicRedisModel(BaseModel):
     def is_inner_model(self) -> bool:
         return bool(self.field_name)
 
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.CREATE, initial=True)
     async def asave(self) -> Self:
         model_dump = self.redis_dump()
         async with ensure_pipeline(self.Meta) as pipe:
             pipe.json().set(self.key, self.json_path, model_dump)
-            if self.Meta.ttl is not None:
-                nx = not self.Meta.refresh_ttl
-                pipe.expire(self.key, self.Meta.ttl, nx=nx)
             for fname in self._special_field_names:
                 field = getattr(self, fname)
                 if isinstance(field, SpecialFieldType):
                     await field.asave_special()
-                    if self.Meta.ttl is not None:
-                        pipe.expire(field.special_key, self.Meta.ttl, nx=nx)
         return self
 
     def redis_dump(self):
@@ -385,20 +413,12 @@ class AtomicRedisModel(BaseModel):
             exclude=self._special_field_names or None,
         )
 
+    @mark_actions(ActionGroup.CREATE, target=TargetSource.RESULT, initial=True)
     async def aduplicate(self) -> Self:
-        if self.is_inner_model():
-            raise RuntimeError("Can only duplicate from top level model")
+        duplicates = await self.aduplicate_many(1)
+        return duplicates[0]
 
-        duplicated = self.__class__(**self.model_dump())
-        async with ensure_pipeline(self.Meta):
-            await duplicated.asave()
-            for fname in self._special_field_names:
-                source_field = getattr(self, fname)
-                target_field = getattr(duplicated, fname)
-                if isinstance(source_field, SpecialFieldType):
-                    await source_field.aduplicate_special(target_field.special_key)
-        return duplicated
-
+    @mark_actions(ActionGroup.CREATE, target=TargetSource.RESULT, initial=True)
     async def aduplicate_many(self, num: int) -> list[Self]:
         if self.is_inner_model():
             raise RuntimeError("Can only duplicate from top level model")
@@ -418,6 +438,7 @@ class AtomicRedisModel(BaseModel):
         for field_name, value in kwargs.items():
             setattr(self, field_name, value)
 
+    @mark_actions(ActionGroup.UPDATE)
     async def aupdate(self, **kwargs):
         # Special fields (e.g. RedisPriorityQueue) manage their own separate
         # Redis storage and cannot be serialized as JSON path updates.
@@ -441,11 +462,10 @@ class AtomicRedisModel(BaseModel):
             for field_name in kwargs.keys()
         }
 
-        async with self.Meta.redis.pipeline(transaction=True) as pipe:
+        async with ensure_pipeline(self.Meta) as pipe:
             update_keys_in_pipeline(pipe, self.key, **json_path_kwargs)
-            await pipe.execute()
-        await self.refresh_ttl_if_needed()
 
+    @mark_actions(ActionGroup.UPDATE, ignore_refresh=True)
     async def aset_ttl(self, ttl: int) -> None:
         if self.is_inner_model():
             raise RuntimeError("Can only set TTL from top level model")
@@ -464,7 +484,7 @@ class AtomicRedisModel(BaseModel):
     def _all_keys_for_key(cls, key: str) -> list[str]:
         keys = [key]
         for fname in cls._special_field_names:
-            keys.append(f"{key}:{fname}")
+            keys.append(special_field_key(key, fname))
         return keys
 
     @classmethod
@@ -476,6 +496,7 @@ class AtomicRedisModel(BaseModel):
         return key
 
     @classmethod
+    @mark_actions(ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT)
     async def aget(cls, key: str) -> Self:
         key = cls._resolve_key(key)
         model_dump = await cls.Meta.redis.json().get(key, "$")  # type: ignore[misc]
@@ -487,10 +508,9 @@ class AtomicRedisModel(BaseModel):
         instance = cls.model_validate(model_dump, context=context)
         instance.key = key
         instance._failed_fields = context.get(FAILED_FIELDS_KEY, set())
-        if cls.should_refresh():
-            await instance.refresh_ttl_if_needed()
         return instance
 
+    @mark_actions(ActionGroup.READ)
     async def aload(self) -> Self:
         model_dump = await self.Meta.redis.json().get(self.key, self.json_path)  # type: ignore[misc]
         if not model_dump:
@@ -501,7 +521,6 @@ class AtomicRedisModel(BaseModel):
         instance._pk = self._pk
         instance._base_model_link = self._base_model_link
         instance._failed_fields = context.get(FAILED_FIELDS_KEY, set())
-        await self.refresh_ttl_if_needed()
         return instance
 
     @classmethod
@@ -522,6 +541,7 @@ class AtomicRedisModel(BaseModel):
         return model
 
     @classmethod
+    @mark_actions(ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT)
     async def afind(cls, *args, max_results: Optional[int] = None) -> list[Self]:
         if max_results is not None and max_results < 0:
             raise UnsupportedArgumentValueError(
@@ -573,20 +593,17 @@ class AtomicRedisModel(BaseModel):
                 continue
             instances.append(model)
 
-        if cls.should_refresh():
-            async with pipe_ctx_from_redix(cls.Meta.redis) as pipe:
-                for model in instances:
-                    await model.refresh_ttl_if_needed(can_use_pipeline=True)
-                await pipe.execute()
-
         return instances
 
+    # TODO - in version 1.3.0 we need to return None when key not found
     @classmethod
+    @mark_actions(ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT)
     async def afind_one(cls, *args) -> Optional[Self]:
         results = await cls.afind(*args, max_results=1)
         return results[0] if results else None
 
     @classmethod
+    @mark_actions(ActionGroup.READ, ignore_refresh=True)
     async def afind_keys(cls, max_results: Optional[int] = None) -> list[RapyerKey]:
         pattern = f"{cls.class_key_initials()}:*"
         if max_results is None:
@@ -596,20 +613,20 @@ class AtomicRedisModel(BaseModel):
         return [RapyerKey(k) for k in keys]
 
     @classmethod
+    @mark_actions(ActionGroup.CREATE, target=TargetSource.RESULT, initial=True)
     async def ainsert(cls, *models: Unpack[Self]):
         async with ensure_pipeline(cls.Meta) as pipe:
             for model in models:
+                register_action_target(model, ActionGroup.UPDATE, initial=True)
                 pipe.json().set(model.key, model.json_path, model.redis_dump())
-                if cls.Meta.ttl is not None:
-                    pipe.expire(model.key, cls.Meta.ttl)
                 for fname in cls._special_field_names:
                     field = getattr(model, fname)
                     if isinstance(field, SpecialFieldType):
                         await field.asave_special()
-                        if cls.Meta.ttl is not None:
-                            pipe.expire(field.special_key, cls.Meta.ttl)
+            return models
 
     @classmethod
+    @mark_actions(ActionGroup.DELETE, ignore_refresh=True)
     async def adelete_by_key(cls, key: str) -> bool:
         key = cls._resolve_key(key)
         keys_to_delete = cls._all_keys_for_key(key)
@@ -622,12 +639,14 @@ class AtomicRedisModel(BaseModel):
             results = await pipe.execute()
         return sum(results) > 0
 
+    @mark_actions(ActionGroup.DELETE, ignore_refresh=True)
     async def adelete(self):
         if self.is_inner_model():
             raise RuntimeError("Can only delete from inner model")
         return await self.adelete_by_key(self.key)
 
     @classmethod
+    @mark_actions(ActionGroup.READ, ignore_refresh=True)
     async def aexists(cls, key: str | Self) -> bool:
         key = cls._resolve_key(key)
         client = _context_pipe.get() or cls.Meta.redis
@@ -672,6 +691,7 @@ class AtomicRedisModel(BaseModel):
             yield [k for key in batch for k in cls._all_keys_for_key(key)]
 
     @classmethod
+    @mark_actions(ActionGroup.DELETE, ignore_refresh=True)
     async def adelete_many(
         cls, *args: Self | RapyerKey | str | Expression
     ) -> DeleteResult:
@@ -776,9 +796,6 @@ class AtomicRedisModel(BaseModel):
                     raise
             yield redis_model
 
-            if self.should_refresh():
-                pipe.expire(self.key, self.Meta.ttl)
-
     def __setattr__(self, name: str, value: Any) -> None:
         skip_redis_set = False
         if isinstance(value, BaseRedisType):
@@ -865,6 +882,7 @@ def _resolve_model_class(redis_key: str) -> type[AtomicRedisModel] | None:
     return redis_model_mapping.get(class_name)
 
 
+@mark_actions(ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT)
 async def aget(redis_key: str) -> AtomicRedisModel:
     klass = _resolve_model_class(redis_key)
     if klass is None:
@@ -872,6 +890,7 @@ async def aget(redis_key: str) -> AtomicRedisModel:
     return await klass.aget(redis_key)
 
 
+@mark_actions(ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT)
 async def afind_one(redis_key: str) -> Optional[AtomicRedisModel]:
     try:
         return await aget(redis_key)
@@ -879,6 +898,7 @@ async def afind_one(redis_key: str) -> Optional[AtomicRedisModel]:
         return None
 
 
+@mark_actions(ActionGroup.READ, ignore_refresh=True)
 async def aexists(redis_key: str | AtomicRedisModel) -> bool:
     if isinstance(redis_key, AtomicRedisModel):
         redis_key = redis_key.key
@@ -888,6 +908,7 @@ async def aexists(redis_key: str | AtomicRedisModel) -> bool:
     return await klass.aexists(redis_key)
 
 
+@mark_actions(ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT)
 async def afind(*redis_keys: str, skip_missing: bool = False) -> list[AtomicRedisModel]:
     if not redis_keys:
         return []
@@ -907,7 +928,6 @@ async def afind(*redis_keys: str, skip_missing: bool = False) -> list[AtomicRedi
     )
 
     instances = []
-    instances_by_class: dict[type[AtomicRedisModel], list[AtomicRedisModel]] = {}
 
     for data, key in zip(models_data, redis_keys):
         if data is None:
@@ -921,14 +941,6 @@ async def afind(*redis_keys: str, skip_missing: bool = False) -> list[AtomicRedi
         if model is None:
             continue
         instances.append(model)
-        instances_by_class.setdefault(klass, []).append(model)
-
-    async with AtomicRedisModel.Meta.redis.pipeline() as pipe:
-        for klass, class_instances in instances_by_class.items():
-            if klass.should_refresh():
-                for model in class_instances:
-                    pipe.expire(model.key, klass.Meta.ttl)
-        await pipe.execute()
 
     return instances
 
@@ -937,23 +949,20 @@ def find_redis_models() -> list[type[AtomicRedisModel]]:
     return REDIS_MODELS
 
 
+@mark_actions(ActionGroup.CREATE, target=TargetSource.MANUAL, initial=True)
 async def ainsert(*models: Unpack[AtomicRedisModel]) -> list[AtomicRedisModel]:
-    async with AtomicRedisModel.Meta.redis.pipeline() as pipe:
-        with with_pipe_context(pipe):
-            for model in models:
-                pipe.json().set(model.key, model.json_path, model.redis_dump())
-                if model.Meta.ttl is not None:
-                    pipe.expire(model.key, model.Meta.ttl)
-                for fname in model.__class__._special_field_names:
-                    field = getattr(model, fname)
-                    if isinstance(field, SpecialFieldType):
-                        await field.asave_special()
-                        if model.Meta.ttl is not None:
-                            pipe.expire(field.special_key, model.Meta.ttl)
-            await pipe.execute()
+    async with ensure_pipeline(AtomicRedisModel.Meta) as pipe:
+        for model in models:
+            register_action_target(model, ActionGroup.UPDATE, initial=True)
+            pipe.json().set(model.key, model.json_path, model.redis_dump())
+            for fname in model.__class__._special_field_names:
+                field = getattr(model, fname)
+                if isinstance(field, SpecialFieldType):
+                    await field.asave_special()
     return models
 
 
+@mark_actions(ActionGroup.DELETE, ignore_refresh=True)
 async def adelete_many(*args: RapyerKey | str | AtomicRedisModel) -> RapyerDeleteResult:
     if not args:
         raise MissingParameterError("adelete_many requires at least one argument")

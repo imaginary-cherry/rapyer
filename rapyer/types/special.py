@@ -6,6 +6,13 @@ from pydantic_core import core_schema
 
 from rapyer.types.base import BaseRedisType
 
+SPECIAL_FIELD_KEY_PREFIX = "__rapyer_special__"
+
+
+def special_field_key(model_key: str, field_name: str) -> str:
+    clean_name = field_name.lstrip(".")
+    return f"{SPECIAL_FIELD_KEY_PREFIX}:{model_key}:{clean_name}"
+
 
 class SpecialFieldType(BaseRedisType, abc.ABC):
     """Base for field types stored separately from the model's JSON dump.
@@ -22,28 +29,27 @@ class SpecialFieldType(BaseRedisType, abc.ABC):
     def special_key(self) -> str:
         """Redis key for this field's separate data structure.
 
-        Format: ``{model_key}:{field_name_without_dot}``
-        e.g., ``MyModel:abc123:tasks``
+        Format: ``__rapyer_special__:{model_key}:{field_name_without_dot}``
+        e.g., ``__rapyer_special__:MyModel:abc123:tasks``
         """
-        clean_name = self.field_name.lstrip(".")
-        return f"{self.key}:{clean_name}"
+        return special_field_key(self.key, self.field_name)
 
     @abc.abstractmethod
-    async def asave_special(self) -> None:
+    async def asave_special(self):
         """Save this field's data to its separate Redis structure.
 
         Uses ``self.client`` which is pipeline-aware.
         """
 
     @abc.abstractmethod
-    async def adelete_special(self) -> None:
+    async def adelete_special(self):
         """Delete this field's separate Redis data.
 
         Uses ``self.client`` which is pipeline-aware.
         """
 
     @abc.abstractmethod
-    async def aduplicate_special(self, target_special_key: str) -> None:
+    async def aduplicate_special(self, target_special_key: str):
         """Copy this field's data to a new key for a duplicated model.
 
         The *read* must use ``self.redis`` (direct client) so the data is

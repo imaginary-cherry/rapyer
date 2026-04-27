@@ -31,6 +31,8 @@ class FloatModel(AtomicRedisModel):
     value: RedisFloat = 0.0
     temperature: float = 20.5
 
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=TTL_TEST_SECONDS)
+
 
 class BoolModel(AtomicRedisModel):
     is_active: bool = False
@@ -56,7 +58,7 @@ class DatetimeListModel(AtomicRedisModel):
     dates: list[datetime] = Field(default_factory=list)
 
 
-class DatetimeDictModel(AtomicRedisModel):
+class DatetimeEventsModel(AtomicRedisModel):
     event_dates: dict[str, datetime] = Field(default_factory=dict)
 
 

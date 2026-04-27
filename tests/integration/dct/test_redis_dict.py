@@ -17,7 +17,7 @@ from tests.models.collection_types import (
     EnumDictModel,
     IntDictModel,
     ListDictModel,
-    NestedDictModel,
+    NestedMetadataDictModel,
     StrDictModel,
 )
 from tests.models.common import Person, Status
@@ -47,7 +47,7 @@ from tests.models.common import Person, Status
         [BoolDictModel, {"key1": True}, "key2", False],
         [ListDictModel, {"key1": ["item1", "item2"]}, "key2", ["item3", "item4"]],
         [
-            NestedDictModel,
+            NestedMetadataDictModel,
             {"key1": {"nested1": "value1"}},
             "key2",
             {"nested2": "value2"},

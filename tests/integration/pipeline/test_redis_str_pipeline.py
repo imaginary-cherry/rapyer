@@ -1,35 +1,12 @@
 import pytest
 
-from rapyer.types.string import RedisStr
-from tests.conftest import model_pipeline_test_for
-from tests.models.redis_types import PipelineAllTypesTestModel
-
-
-@model_pipeline_test_for(RedisStr.__iadd__)
-@pytest.mark.asyncio
-async def test_redis_str_operations__all_operations_combined__check_atomicity_sanity():
-    # Arrange
-    model = PipelineAllTypesTestModel(name="hello")
-    await model.asave()
-
-    # Act
-    async with model.apipeline() as m:
-        m.name += "_world"
-        m.name += "_test"
-
-        # Assert - changes not visible during pipeline
-        loaded = await PipelineAllTypesTestModel.aget(model.key)
-        assert loaded.name == "hello"
-
-    # Assert - all changes applied after pipeline
-    final = await PipelineAllTypesTestModel.aget(model.key)
-    assert final.name == "hello_world_test"
+from tests.models.collection_types import ComprehensiveTestModel
 
 
 @pytest.mark.asyncio
 async def test_redis_str_operations__changes_outside_pipeline_ignored_sanity():
     # Arrange
-    model = PipelineAllTypesTestModel(name="hello")
+    model = ComprehensiveTestModel(name="hello")
     await model.asave()
 
     # Act - outside pipeline (should be ignored)
@@ -41,38 +18,14 @@ async def test_redis_str_operations__changes_outside_pipeline_ignored_sanity():
         m.name += "_inside"
 
     # Assert - only pipeline ops applied
-    final = await PipelineAllTypesTestModel.aget(model.key)
+    final = await ComprehensiveTestModel.aget(model.key)
     assert final.name == "hello_inside"
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ["initial_value", "multiplier", "expected"],
-    [["test", 0, ""]],
-)
-@model_pipeline_test_for(RedisStr.__imul__)
-async def test_redis_str_imul_with_pipeline_sanity(initial_value, multiplier, expected):
-    # Arrange
-    model = PipelineAllTypesTestModel(name=initial_value)
-    await model.asave()
-
-    # Act
-    async with model.apipeline() as redis_model:
-        redis_model.name *= multiplier
-
-        # Assert - Change should not be applied yet
-        loaded_model = await PipelineAllTypesTestModel.aget(model.key)
-        assert loaded_model.name == initial_value
-
-    # Assert - Change should be applied after pipeline
-    final_model = await PipelineAllTypesTestModel.aget(model.key)
-    assert final_model.name == expected
 
 
 @pytest.mark.asyncio
 async def test_redis_str_combined_iadd_and_imul_with_pipeline_sanity():
     # Arrange
-    model = PipelineAllTypesTestModel(name="ab")
+    model = ComprehensiveTestModel(name="ab")
     await model.asave()
 
     # Act
@@ -81,9 +34,9 @@ async def test_redis_str_combined_iadd_and_imul_with_pipeline_sanity():
         m.name += "_end"  # "abab_end"
 
         # Assert - changes not visible during pipeline
-        loaded = await PipelineAllTypesTestModel.aget(model.key)
+        loaded = await ComprehensiveTestModel.aget(model.key)
         assert loaded.name == "ab"
 
     # Assert - all changes applied after pipeline
-    final = await PipelineAllTypesTestModel.aget(model.key)
+    final = await ComprehensiveTestModel.aget(model.key)
     assert final.name == "abab_end"

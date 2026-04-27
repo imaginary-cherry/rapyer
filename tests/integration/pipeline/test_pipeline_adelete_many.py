@@ -3,8 +3,6 @@ import pytest_asyncio
 
 import rapyer
 from rapyer import DeleteResult, RapyerDeleteResult
-from rapyer.base import AtomicRedisModel
-from tests.conftest import standalone_pipeline_test_for
 from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.index_types import IndexTestModel
 from tests.models.simple_types import IntModel, StrModel
@@ -28,36 +26,10 @@ async def inserted_test_models(test_models):
 
 @pytest_asyncio.fixture
 async def create_index(real_redis_client):
+    IndexTestModel.init_class()
     await IndexTestModel.acreate_index()
     yield
     await IndexTestModel.adelete_index()
-
-
-@standalone_pipeline_test_for(AtomicRedisModel.adelete_many)
-@pytest.mark.asyncio
-async def test_pipeline_class_adelete_many__keys_deferred_until_execute(
-    real_redis_client,
-):
-    # Arrange
-    model1 = ComprehensiveTestModel(name="model1", tags=["a"])
-    model2 = ComprehensiveTestModel(name="model2", tags=["b"])
-    await model1.asave()
-    await model2.asave()
-
-    # Act
-    async with rapyer.apipeline():
-        result = await ComprehensiveTestModel.adelete_many(model1, model2)
-
-        key1_exists = await real_redis_client.exists(model1.key)
-        key2_exists = await real_redis_client.exists(model2.key)
-        assert key1_exists == 1
-        assert key2_exists == 1
-
-    # Assert
-    assert isinstance(result, DeleteResult)
-    assert result.models_deleted == 2
-    assert await real_redis_client.exists(model1.key) == 0
-    assert await real_redis_client.exists(model2.key) == 0
 
 
 @pytest.mark.asyncio

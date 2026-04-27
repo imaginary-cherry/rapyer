@@ -65,7 +65,9 @@ def test_hybrid_model_custom_values_preserve_redis_types_sanity():
     assert "count" in model_dict
 
 
-def test_hybrid_model_inherits_from_person_redis_types_and_json_path_sanity():
+def test_hybrid_model_inherits_from_person_redis_types_and_json_path_sanity(
+    restore_redis_models,
+):
     # Arrange
     class PersonRedisModel(AtomicRedisModel, Person):
         redis_status: str = "active"
@@ -111,7 +113,7 @@ def test_hybrid_model_inherits_from_person_redis_types_and_json_path_sanity():
     ],
 )
 def test_hybrid_model_with_various_values_types_and_json_path_sanity(
-    test_name, test_age, test_email
+    test_name, test_age, test_email, restore_redis_models
 ):
     # Arrange
     class PersonRedisModel(AtomicRedisModel, Person):

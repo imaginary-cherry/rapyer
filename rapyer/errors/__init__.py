@@ -1,6 +1,8 @@
 import warnings
 
 from rapyer.errors.base import (
+    DuplicateModelNameError,
+    InvalidRefreshTtlError,
     KeyNotFound,
     MissingParameterError,
     RapyerError,
@@ -31,6 +33,8 @@ def __getattr__(name):
 
 
 __all__ = [
+    "DuplicateModelNameError",
+    "InvalidRefreshTtlError",
     "UpdateAtomicModelError",
     "BadFilterError",
     "FindError",

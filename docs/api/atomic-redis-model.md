@@ -387,7 +387,7 @@ class User(AtomicRedisModel):
 
 - `redis` - Redis client instance
 - `ttl` - Time-to-live in seconds
-- `refresh_ttl` - Refresh TTL on read/write (default: `True`)
+- `refresh_ttl` - Controls TTL refresh behavior. Accepts `True` (refresh on every operation, default), `False` (never refresh), or an [`ActionGroup`](action-group.md) flag for fine-grained per-category control.
 - `safe_load_all` - Treat all non-Redis fields as SafeLoad (default: `False`)
 - `prefer_normal_json_dump` - Use JSON serialization for compatible fields instead of pickle (default: `False`)
 - `max_delete_per_transaction` - Maximum keys deleted per pipeline transaction in `adelete_many()` (default: `1000`, set to `None` to disable batching)

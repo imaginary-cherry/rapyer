@@ -1,9 +1,6 @@
-from datetime import datetime
-
 from pydantic import Field
 
 from rapyer.base import AtomicRedisModel
-from rapyer.types import RedisDatetimeTimestamp
 
 
 # Unit test models for simple types
@@ -61,9 +58,3 @@ class TestOperationsModel(AtomicRedisModel):
     count: int = 0
     items: list[str] = Field(default_factory=list)
     metadata: dict[str, str] = Field(default_factory=dict)
-
-
-# Model with RedisDatetimeTimestamp for testing serialization
-class DatetimeTimestampModel(AtomicRedisModel):
-    created_at: RedisDatetimeTimestamp = Field(default_factory=datetime.now)
-    updated_at: RedisDatetimeTimestamp = Field(default_factory=datetime.now)

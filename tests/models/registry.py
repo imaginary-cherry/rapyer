@@ -16,7 +16,7 @@ from tests.models.collection_types import (
     ListDictModel,
     ListModel,
     MixedTypesModel,
-    NestedDictModel,
+    NestedMetadataDictModel,
     PipelineTestModel,
     ProductListModel,
     StrDictModel,
@@ -65,7 +65,7 @@ from tests.models.safe_load_types import (
 from tests.models.simple_types import (
     BoolModel,
     BytesModel,
-    DatetimeDictModel,
+    DatetimeEventsModel,
     DatetimeListModel,
     DatetimeModel,
     FloatModel,
@@ -85,8 +85,6 @@ from tests.models.special_types import (
     PQContainerModel,
     PriorityQueueIntModel,
     PriorityQueueModel,
-    PriorityQueueTTLModel,
-    PriorityQueueTTLNoRefreshModel,
     SubSubPriorityQueueModel,
 )
 from tests.models.specialized import UserModel
@@ -118,7 +116,7 @@ TESTED_REDIS_MODELS = [
     BaseModelDictModel,
     BoolDictModel,
     ListDictModel,
-    NestedDictModel,
+    NestedMetadataDictModel,
     DictModel,
     # Collection types - Mixed and pipeline models
     MixedTypesModel,
@@ -132,7 +130,7 @@ TESTED_REDIS_MODELS = [
     BytesModel,
     DatetimeModel,
     DatetimeListModel,
-    DatetimeDictModel,
+    DatetimeEventsModel,
     UserModelWithTTL,
     UserModelWithoutTTL,
     TaskModel,
@@ -188,8 +186,6 @@ TESTED_REDIS_MODELS = [
     MixedSpecialModel,
     GenericPriorityQueueModel,
     OptionalPriorityQueueModel,
-    PriorityQueueTTLModel,
-    PriorityQueueTTLNoRefreshModel,
     SubSubPriorityQueueModel,
     PQContainerModel,
 ]

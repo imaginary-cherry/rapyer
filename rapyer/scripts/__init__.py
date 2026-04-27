@@ -26,6 +26,7 @@ SCRIPTS = get_scripts()
 SCRIPTS_FAKEREDIS = get_scripts_fakeredis()
 
 __all__ = [
+    "_REGISTERED_SCRIPT_SHAS",
     "DATETIME_ADD_SCRIPT_NAME",
     "DICT_POP_SCRIPT_NAME",
     "DICT_POPITEM_SCRIPT_NAME",

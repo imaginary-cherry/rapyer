@@ -1,9 +1,11 @@
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, ClassVar, Dict, List
 
 from pydantic import Field
 
 from rapyer.base import AtomicRedisModel
+from rapyer.config import RedisConfig
+from rapyer.types import RedisDatetimeTimestamp, RedisPriorityQueue
 from tests.models.common import (
     Address,
     Company,
@@ -15,6 +17,9 @@ from tests.models.common import (
     User,
     UserProfile,
 )
+from tests.models.pipeline_base import PipelineActionModel
+
+TTL_REFRESH_TEST_SECONDS = 24
 
 
 class SimpleListModel(AtomicRedisModel):
@@ -92,7 +97,7 @@ class ListDictModel(BaseDictMetadataModel):
     metadata: dict[str, list[str]] = Field(default_factory=dict)
 
 
-class NestedDictModel(BaseDictMetadataModel):
+class NestedMetadataDictModel(BaseDictMetadataModel):
     metadata: dict[str, dict[str, str]] = Field(default_factory=dict)
 
 
@@ -122,11 +127,28 @@ class ProductListModel(AtomicRedisModel):
     products: list[Product] = Field(default_factory=list)
 
 
-class ComprehensiveTestModel(AtomicRedisModel):
+class ComprehensiveTestModel(PipelineActionModel):
     tags: list[str] = Field(default_factory=list)
     metadata: dict[str, str] = Field(default_factory=dict)
     name: str = ""
     counter: int = 0
+    amount: float = 0.0
+    data: bytes = b""
+    event_time: datetime = Field(default_factory=datetime.now)
+    event_timestamp: RedisDatetimeTimestamp = Field(default_factory=datetime.now)
+    tasks: RedisPriorityQueue[str] = Field(default_factory=RedisPriorityQueue[str])
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=TTL_REFRESH_TEST_SECONDS)
+
+
+class ComprehensiveTestModelNoTTL(ComprehensiveTestModel):
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=None)
+
+
+class ComprehensiveTestModelNoRefreshTTL(ComprehensiveTestModel):
+    Meta: ClassVar[RedisConfig] = RedisConfig(
+        ttl=TTL_REFRESH_TEST_SECONDS, refresh_ttl=False
+    )
 
 
 class PipelineTestModel(AtomicRedisModel):

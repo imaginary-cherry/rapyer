@@ -1,6 +1,5 @@
 import abc
 import base64
-import functools
 import logging
 import pickle
 from abc import ABC
@@ -11,6 +10,8 @@ from pydantic_core import core_schema
 from pydantic_core.core_schema import CoreSchema, SerializationInfo, ValidationInfo
 from redis.commands.search.field import TextField
 
+# Imported here to avoid circular import issues; actions imports context, not types.base
+from rapyer.actions import ActionGroup, mark_actions
 from rapyer.context import _context_pipe
 from rapyer.errors import CantSerializeRedisValueError
 from rapyer.typing_support import Self
@@ -20,17 +21,6 @@ logger = logging.getLogger("rapyer")
 REDIS_DUMP_FLAG_NAME = "__rapyer_dumped__"
 FAILED_FIELDS_KEY = "__rapyer_failed_fields__"
 SKIP_SENTINEL = object()
-
-
-def marks_redis_updated(method):
-    @functools.wraps(method)
-    def wrapper(self, *args, **kwargs):
-        result = method(self, *args, **kwargs)
-        if result is not NotImplemented and _context_pipe.get() is not None:
-            result._redis_updated = True
-        return result
-
-    return wrapper
 
 
 class BaseRedisType(ABC):
@@ -52,9 +42,14 @@ class BaseRedisType(ABC):
     def Meta(self):
         return self._base_model_link.Meta
 
-    async def refresh_ttl_if_needed(self, can_use_pipeline: bool = False):
+    async def refresh_ttl_if_needed(
+        self,
+        can_use_pipeline: bool = False,
+        action=None,
+        initial: bool = False,
+    ):
         return await self._base_model_link.refresh_ttl_if_needed(
-            can_use_pipeline=can_use_pipeline
+            can_use_pipeline=can_use_pipeline, action=action, initial=initial
         )
 
     @property
@@ -92,25 +87,22 @@ class BaseRedisType(ABC):
 
 class RedisType(BaseRedisType):
 
+    @mark_actions(ActionGroup.UPDATE)
     async def asave(self) -> Self:
         model_dump = self._adapter.dump_python(
             self, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
         )
         await self.client.json().set(self.key, self.json_path, model_dump)  # type: ignore[misc]
-        if self.Meta.ttl is not None:
-            nx = not self.Meta.refresh_ttl
-            await self.client.expire(self.key, self.Meta.ttl, nx=nx)
         return self
 
+    @mark_actions(ActionGroup.READ)
     async def aload(self):
-        redis_value = await self.client.json().get(self.key, self.field_path)  # type: ignore[misc]
+        redis_value = await self.redis.json().get(self.key, self.field_path)  # type: ignore[misc]
         if redis_value is None:
             return None
         result = self._adapter.validate_python(
             redis_value, context={REDIS_DUMP_FLAG_NAME: True}
         )
-
-        await self.refresh_ttl_if_needed()
         return result
 
     @abc.abstractmethod
