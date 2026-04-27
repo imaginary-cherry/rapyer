@@ -2,7 +2,7 @@ import pytest
 
 from rapyer.types.float import RedisFloat
 from tests.integration.actions.base import BinaryOpCase
-from tests.integration.actions.comprehensive_amount import ComprehensiveAmountOpBase
+from tests.integration.actions.comprehensive import ComprehensiveAmountOpBase
 from tests.integration.actions.ttl import TTLActionTestBase
 from tests.integration.actions.update import UpdateActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel

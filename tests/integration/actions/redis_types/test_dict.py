@@ -1,5 +1,5 @@
 from rapyer.types.dct import RedisDict
-from tests.integration.actions.comprehensive_metadata import ComprehensiveMetadataOpBase
+from tests.integration.actions.comprehensive import ComprehensiveMetadataOpBase
 from tests.integration.actions.ttl import TTLActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
 

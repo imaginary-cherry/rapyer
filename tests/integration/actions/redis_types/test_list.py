@@ -1,5 +1,5 @@
 from rapyer.types.lst import RedisList
-from tests.integration.actions.comprehensive_tags import ComprehensiveTagsOpBase
+from tests.integration.actions.comprehensive import ComprehensiveTagsOpBase
 from tests.integration.actions.ttl import TTLActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
 

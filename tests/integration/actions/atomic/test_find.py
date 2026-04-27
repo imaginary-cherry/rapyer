@@ -1,7 +1,7 @@
 import rapyer
 from rapyer.base import AtomicRedisModel
 from rapyer.types.base import RedisType
-from tests.integration.actions.comprehensive_counter import ComprehensiveCounterOpBase
+from tests.integration.actions.comprehensive import ComprehensiveCounterOpBase
 from tests.integration.actions.ttl import TTLActionTestBase
 from tests.integration.actions.update import UpdateActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel

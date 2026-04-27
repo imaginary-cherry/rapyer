@@ -1,6 +1,6 @@
 from rapyer.types.integer import RedisInt
 from tests.integration.actions.base import BinaryOpCase
-from tests.integration.actions.comprehensive_counter import ComprehensiveCounterOpBase
+from tests.integration.actions.comprehensive import ComprehensiveCounterOpBase
 from tests.integration.actions.ttl import TTLActionTestBase
 from tests.integration.actions.update import UpdateActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
