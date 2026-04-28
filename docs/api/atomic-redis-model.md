@@ -63,7 +63,9 @@ await user.aload()  # Refreshes user with latest Redis data
 #### `adelete()`
 **Type:** `async` method  
 **Returns:** `bool`  
-**Description:** Deletes this model instance from Redis. Can only be called on top-level models (not nested ones).
+**Description:** Deletes this model instance from Redis. Can only be called on top-level models (not nested ones). Returns `True` only if at least one Redis key was actually removed; returns `False` if the model did not exist.
+
+> **Warning:** When called inside an active pipeline context (e.g. inside `apipeline()`), the deletion is queued on the outer caller's pipeline and executed later. In that case the actual Redis result is not observable here, so `adelete()` returns `True` unconditionally — it does not reflect whether a key was truly removed. Only the standalone (non-pipeline) call is guaranteed to return `False` for a missing key.
 
 ```python
 success = await user.adelete()
@@ -157,7 +159,9 @@ user = await User.aget("User:abc-123")
 **Parameters:**
 - `key` (str): The Redis key to delete
 **Returns:** `bool`
-**Description:** Deletes a model from Redis by its key without needing to load it first.
+**Description:** Deletes a model from Redis by its key without needing to load it first. Returns `True` only if at least one Redis key was actually removed; returns `False` if no key matched.
+
+> **Warning:** When called inside an active pipeline context (e.g. inside `apipeline()`), the deletion is queued on the outer caller's pipeline and executed later. In that case the actual Redis result is not observable here, so `adelete_by_key()` returns `True` unconditionally — it does not reflect whether a key was truly removed. Only the standalone (non-pipeline) call is guaranteed to return `False` for a missing key.
 
 ```python
 success = await User.adelete_by_key("User:abc-123")
@@ -295,7 +299,7 @@ Deletes multiple model instances from Redis. Supports three input modes: model i
 ```python
 # Delete using model instances
 result = await User.adelete_many(*users)
-print(result.count)  # 4
+print(result.models_deleted)  # 4
 
 # Delete using keys from .key or .pk or a string
 result = await User.adelete_many(users[0].key, users[1].pk, "User:123")
@@ -383,7 +387,7 @@ class User(AtomicRedisModel):
 
 - `redis` - Redis client instance
 - `ttl` - Time-to-live in seconds
-- `refresh_ttl` - Refresh TTL on read/write (default: `True`)
+- `refresh_ttl` - Controls TTL refresh behavior. Accepts `True` (refresh on every operation, default), `False` (never refresh), or an [`ActionGroup`](action-group.md) flag for fine-grained per-category control.
 - `safe_load_all` - Treat all non-Redis fields as SafeLoad (default: `False`)
 - `prefer_normal_json_dump` - Use JSON serialization for compatible fields instead of pickle (default: `False`)
 - `max_delete_per_transaction` - Maximum keys deleted per pipeline transaction in `adelete_many()` (default: `1000`, set to `None` to disable batching)

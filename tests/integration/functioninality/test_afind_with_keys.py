@@ -1,7 +1,7 @@
 import pytest
 import pytest_asyncio
 
-from rapyer.errors import KeyNotFound
+from rapyer.errors import KeyNotFound, UnsupportedArgumentValueError
 from rapyer.fields import RapyerKey
 from tests.models.index_types import IndexTestModel
 
@@ -75,7 +75,7 @@ async def test_afind_with_non_existent_keys_edge_case(
 
 
 @pytest.mark.asyncio
-async def test_afind_with_keys_and_expression_ignores_expression(
+async def test_afind_with_keys_and_expression_raises_error(
     redis_client, inserted_test_models
 ):
     # Arrange
@@ -83,10 +83,6 @@ async def test_afind_with_keys_and_expression_ignores_expression(
     keys = [m.key for m in models]
     IndexTestModel.init_class()
 
-    # Act
-    found_models = await IndexTestModel.afind(*keys, IndexTestModel.age > 100)
-
-    # Assert
-    assert len(found_models) == 4
-    found_names = {m.name for m in found_models}
-    assert found_names == {"Alice", "Bob", "Charlie", "David"}
+    # Act + Assert
+    with pytest.raises(UnsupportedArgumentValueError):
+        await IndexTestModel.afind(*keys, IndexTestModel.age > 100)

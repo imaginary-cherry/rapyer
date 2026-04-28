@@ -1,5 +1,41 @@
 # Changelog
 
+## [1.3.0]
+
+### ✨ Added
+
+- **`SpecialFieldType` Base Class**: Added abstract base for field types that manage their own separate Redis data structures (e.g., Sorted Sets, Streams). Special fields are not found in the json model and can execute complex logic in atomic actions.
+- **`RedisPriorityQueue` Type**: Added a new priority queue field type. Lower priority score = higher precedence.
+  - Supports generic value types: `tasks: RedisPriorityQueue[MyModel]`
+  - Operations: `apush(value, priority)`, `apush_many(items)`, `apop()`, `apeek()`, `asize()`, `aclear()`, `aitems()`, `aremove(value)`
+  - `PriorityQueueItem[T]` dataclass for typed push/list results
+  - Stored under `__rapyer_special__:{model_key}:{field_name}`, not inline in the model JSON
+- **Per-Action TTL Refresh Strategy**: Introduced `ActionGroup` flag enum and a `@mark_actions` decorator that tags every Redis-touching method with the categories of work it performs. `RedisConfig.refresh_ttl` now accepts both `bool` (legacy behavior) and an `ActionGroup` flag set, so users can scope TTL refresh to specific action categories (e.g., refresh on reads but not on appends).
+  - Categories: `READ`, `FETCH`, `CREATE`, `UPDATE`, `APPEND`, `DELETE`, `ERASE`, `ARITHMETIC`
+  - Example: `Meta = RedisConfig(ttl=3600, refresh_ttl=ActionGroup.READ | ActionGroup.UPDATE)`
+  - Refresh is now dispatched at the outermost decorated action boundary (deduplicated by key), instead of being triggered ad-hoc inside individual methods.
+- **`BaseRedisType` Hierarchy**: Introduced a common abstract base (`BaseRedisType`) for all Redis-aware field types, unifying inline `RedisType` fields and separate `SpecialFieldType` fields under one type hierarchy.
+- **`UpdateAtomicModelError`**: New error raised when attempting to use `aupdate()` on special fields, which manage their own Redis storage.
+- **`InvalidRefreshTtlError`**: New error raised when `refresh_ttl` is configured with `ActionGroup.DELETE` (which can never refresh TTL).
+- **`DuplicateModelNameError`**: New error raised when two registered models share the same class name.
+
+### 🛠️ Technical Improvements
+
+- **Centralized TTL Refresh Dispatch**: TTL refresh is no longer scattered across individual methods. The `@mark_actions` decorator opens a per-call action context, registered targets are deduplicated by `model.key`, and a single batched refresh runs at the outermost decorator boundary.
+- **`asave` / `ainsert` First-TTL Semantics Preserved**: When `refresh_ttl=False` but a model is being created for the first time, TTL is still set via `EXPIRE NX` so newly-created keys get their initial TTL.
+- **`apop` / `apopitem` Cannot Run Inside a Pipeline**: `RedisDict.apop()` and `RedisDict.apopitem()` now always execute against the direct Redis client because their callers need the popped value back at call time. Calling them inside `apipeline()` will execute immediately rather than being batched.
+
+
+### 💥 Breaking Changes
+
+- **`apipeline()` No Longer Refreshes TTL on Its Own**: Entering and exiting an `apipeline()` context no longer triggers a TTL refresh by itself. TTL is now refreshed only by the actions executed inside the pipeline, according to `refresh_ttl` configuration. A future release will support per-model TTL changes for every model touched in a pipeline.
+- **Duplicate Model Class Names Are Rejected**: Registering two `AtomicRedisModel` subclasses with the same `__name__` now raises `DuplicateModelNameError` at class-definition time. Rapyer resolves model classes from Redis keys by `__name__`, so duplicates were already unsafe.
+- **`afind()` rejects mixing keys and expressions**: Calling `afind()` with both keys (str) and `Expression` arguments now raises `UnsupportedArgumentValueError` instead of silently ignoring the expressions. Previously this combination logged a warning and dropped the expressions; callers must now choose one mode (keys or filter expressions) per call.
+- **`afind_one()` returns `None` for missing keys**: Calling `Model.afind_one(key)` with a key that does not exist in Redis now returns `None` instead of raising `KeyNotFound`. This aligns the classmethod with the module-level `rapyer.afind_one()` and matches the existing behavior for non-matching expressions.
+- **`adelete()` raises BadDeleteActionError when try to delete from inner model.
+
+
+
 ## [1.2.6]
 
 ### ✨ Added

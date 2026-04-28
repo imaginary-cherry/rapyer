@@ -17,3 +17,40 @@ def with_pipe_context(pipe: Pipeline):
         yield pipe
     finally:
         _context_pipe.reset(pipe_prev)
+
+
+@contextlib.asynccontextmanager
+async def pipe_ctx_from_redix(redis_client):
+    async with redis_client.pipeline() as pipe:
+        with with_pipe_context(pipe):
+            yield pipe
+
+
+@contextlib.asynccontextmanager
+async def ensure_pipeline(meta, should_execute: bool = True):
+    """Yield existing pipeline from context, or create a new transactional one.
+
+    If already inside an active pipeline context, yields that pipeline without
+    creating a new one (the outer context owns execution). Otherwise, creates
+    a new transactional pipeline, sets it in context, executes on exit.
+
+    If ``should_execute`` is False and a new pipeline is created, the caller is
+    responsible for invoking ``pipe.execute()`` themselves before the context
+    exits (useful when the caller needs to inspect the execute results).
+    """
+    existing = _context_pipe.get()
+    if existing is not None:
+        yield existing
+    else:
+        async with meta.redis.pipeline(transaction=True) as pipe:
+            with with_pipe_context(pipe):
+                yield pipe
+                if should_execute:
+                    await pipe.execute()
+
+
+@contextlib.asynccontextmanager
+async def pipeline_with_execution(meta):
+    async with meta.redis.pipeline(transaction=True) as pipe:
+        yield pipe
+        await pipe.execute()

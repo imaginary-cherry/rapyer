@@ -135,8 +135,9 @@ async def main():
 
     # Delete models of different types in one call
     result = await rapyer.adelete_many(user, order)
-    print(result.count)     # 2
-    print(result.by_model)  # {User: 1, Order: 1}
+    print(result.models_deleted)  # 2
+    print(result.keys_deleted)    # 2
+    print(result.by_model)        # {User: 1, Order: 1}
 
     # Delete by keys
     result = await rapyer.adelete_many(user.key, order.key)

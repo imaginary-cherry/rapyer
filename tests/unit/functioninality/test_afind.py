@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from rapyer.errors.base import UnsupportedArgumentValueError
+from tests.models.index_types import IndexTestModel
 from tests.models.simple_types import StrModel
 
 
@@ -47,3 +48,13 @@ async def test_model_afind_with_negative_max_results_raises_error(max_results):
     # Act & Assert
     with pytest.raises(UnsupportedArgumentValueError):
         await StrModel.afind(max_results=max_results)
+
+
+@pytest.mark.asyncio
+async def test_model_afind_with_keys_and_expression_raises_error():
+    # Arrange
+    IndexTestModel.init_class()
+
+    # Act & Assert
+    with pytest.raises(UnsupportedArgumentValueError):
+        await IndexTestModel.afind("IndexTestModel:abc", IndexTestModel.age > 100)

@@ -15,13 +15,6 @@ class RichModel(AtomicRedisModel):
     date1: str = ""
 
 
-class LockTestModel(AtomicRedisModel):
-    name: str = "test"
-    counter: int = 0
-    tags: list[str] = Field(default_factory=list)
-    metadata: dict[str, str] = Field(default_factory=dict)
-
-
 class LockUpdateTestModel(AtomicRedisModel):
     name: str = ""
     value: int = 0

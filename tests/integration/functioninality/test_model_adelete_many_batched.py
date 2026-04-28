@@ -20,7 +20,7 @@ async def test_adelete_many__batched_keys_deletion(real_redis_client):
 
     # Assert
     assert isinstance(result, DeleteResult)
-    assert result.count == 5
+    assert result.models_deleted == 5
     for model in models:
         assert await real_redis_client.exists(model.key) == 0
 
@@ -46,7 +46,7 @@ async def test_adelete_many__batched_filter_deletion(real_redis_client, create_i
 
     # Assert
     assert isinstance(result, DeleteResult)
-    assert result.count == 250
+    assert result.models_deleted == 250
     for model in models[:5] + models[-5:]:
         assert await real_redis_client.exists(model.key) == 0
 
@@ -68,7 +68,7 @@ async def test_adelete_many__no_batching_when_none(real_redis_client):
 
     # Assert
     assert isinstance(result, DeleteResult)
-    assert result.count == 10
+    assert result.models_deleted == 10
     for model in models:
         assert await real_redis_client.exists(model.key) == 0
     assert result.was_committed
@@ -88,7 +88,7 @@ async def test_adelete_many__no_match_filter_with_no_batching(
 
     # Assert
     assert isinstance(result, DeleteResult)
-    assert result.count == 0
+    assert result.models_deleted == 0
     for model in inserted_test_models:
         assert await real_redis_client.exists(model.key) == 1
 
@@ -112,7 +112,7 @@ async def test_adelete_many__pipeline_context_skips_batching(real_redis_client):
 
     # Assert
     assert isinstance(result, DeleteResult)
-    assert result.count == 5
+    assert result.models_deleted == 5
     for model in models:
         assert await real_redis_client.exists(model.key) == 0
     assert not result.was_committed

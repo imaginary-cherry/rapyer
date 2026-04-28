@@ -1,11 +1,14 @@
 import warnings
 
 from rapyer.errors.base import (
+    DuplicateModelNameError,
+    InvalidRefreshTtlError,
     KeyNotFound,
     MissingParameterError,
     RapyerError,
     RapyerModelDoesntExistError,
     UnsupportedArgumentValueError,
+    UpdateAtomicModelError,
 )
 from rapyer.errors.find import (
     BadFilterError,
@@ -30,6 +33,9 @@ def __getattr__(name):
 
 
 __all__ = [
+    "DuplicateModelNameError",
+    "InvalidRefreshTtlError",
+    "UpdateAtomicModelError",
     "BadFilterError",
     "FindError",
     "PersistentNoScriptError",

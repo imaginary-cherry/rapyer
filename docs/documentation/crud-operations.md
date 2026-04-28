@@ -504,7 +504,7 @@ async def bulk_delete_example():
 
     # Delete using model instances
     result = await User.adelete_many(*users)
-    print(result.count)  # 4
+    print(result.models_deleted)  # 4
 
     # Delete using keys from .key or .pk
     result = await User.adelete_many(users[0].key, users[1].key)
@@ -531,11 +531,11 @@ class User(AtomicRedisModel):
 async def delete_with_filters():
     # Delete all inactive users
     result = await User.adelete_many(User.status == "inactive")
-    print(f"Deleted {result.count} inactive users")
+    print(f"Deleted {result.models_deleted} inactive users")
 
     # Combine expressions
     result = await User.adelete_many((User.age < 18) & (User.status == "pending"))
-    print(f"Deleted {result.count} underage pending users")
+    print(f"Deleted {result.models_deleted} underage pending users")
 ```
 
 !!! warning "Cannot Mix Expressions with Keys or Instances"
@@ -545,8 +545,10 @@ async def delete_with_filters():
 
 `adelete_many()` returns a `DeleteResult` with:
 
-- `count` (`int`): Number of keys actually deleted
+- `models_deleted` (`int`): Number of model instances deleted
+- `keys_deleted` (`int`): Total number of Redis keys deleted (includes special-field keys like queues or streams stored alongside each model)
 - `was_committed` (`bool`): `True` when the deletion was executed immediately. `False` when called inside an `apipeline()` context — the delete is queued and committed when the pipeline exits.
+- `count` (`int`, **deprecated**): Alias for `models_deleted`. Emits a `DeprecationWarning`.
 
 ```python
 async def pipeline_delete_example():

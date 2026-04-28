@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict
@@ -9,8 +10,18 @@ if TYPE_CHECKING:
 
 
 class DeleteResult(BaseModel):
-    count: int
+    models_deleted: int
+    keys_deleted: int
     was_committed: bool = True
+
+    @property
+    def count(self) -> int:
+        warnings.warn(
+            "DeleteResult.count is deprecated, use .models_deleted instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.models_deleted
 
 
 class RapyerDeleteResult(DeleteResult):

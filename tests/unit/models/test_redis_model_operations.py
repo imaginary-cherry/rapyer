@@ -405,7 +405,7 @@ class TestRedisModelAupdateOperations:
     )
     @pytest.mark.asyncio
     async def test_aupdate_redis_types_mocks_pipeline_correctly_sanity(
-        self, update_data
+        self, update_data, force_no_ttl_updates
     ):
         # Arrange
         model = OperationsTestModel(str_field="original", int_field=10, bool_field=True)
