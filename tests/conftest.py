@@ -93,10 +93,10 @@ standalone_pipeline_test_for = _make_coverage_decorator(
 
 
 def _is_async_callable(obj) -> bool:
-    if inspect.iscoroutinefunction(obj):
+    if inspect.iscoroutinefunction(obj) or inspect.isasyncgenfunction(obj):
         return True
     wrapped = getattr(obj, "__wrapped__", obj)
-    return inspect.isasyncgenfunction(wrapped)
+    return inspect.iscoroutinefunction(wrapped) or inspect.isasyncgenfunction(wrapped)
 
 
 def get_async_methods(cls, ignore_groups: ActionGroup | None = None):
