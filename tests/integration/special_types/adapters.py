@@ -11,7 +11,7 @@ from tests.models.collection_types import ComprehensiveTestModel
 
 class SpecialFieldAdapter(ABC):
     """
-    An adapter for speical field to help us tests them for each action we need
+    An adapter for special field to help us tests them for each action we need
     """
 
     sf_class: ClassVar[type[SpecialFieldType]]
