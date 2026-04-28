@@ -51,3 +51,15 @@ async def test_afind_one_without_args_returns_single_model(inserted_test_models)
     # Assert
     assert result is not None
     assert isinstance(result, IndexTestModel)
+
+
+@pytest.mark.asyncio
+async def test_afind_one_with_non_existent_key_returns_none_edge_case():
+    # Arrange
+    non_existent_key = "IndexTestModel:non_existent_key_12345"
+
+    # Act
+    result = await IndexTestModel.afind_one(non_existent_key)
+
+    # Assert
+    assert result is None

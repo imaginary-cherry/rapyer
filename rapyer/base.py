@@ -595,11 +595,13 @@ class AtomicRedisModel(BaseModel):
 
         return instances
 
-    # TODO - in version 1.3.0 we need to return None when key not found
     @classmethod
     @mark_actions(ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT)
     async def afind_one(cls, *args) -> Optional[Self]:
-        results = await cls.afind(*args, max_results=1)
+        try:
+            results = await cls.afind(*args, max_results=1)
+        except KeyNotFound:
+            return None
         return results[0] if results else None
 
     @classmethod

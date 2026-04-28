@@ -31,6 +31,7 @@
 - **`apipeline()` No Longer Refreshes TTL on Its Own**: Entering and exiting an `apipeline()` context no longer triggers a TTL refresh by itself. TTL is now refreshed only by the actions executed inside the pipeline, according to `refresh_ttl` configuration. A future release will support per-model TTL changes for every model touched in a pipeline.
 - **Duplicate Model Class Names Are Rejected**: Registering two `AtomicRedisModel` subclasses with the same `__name__` now raises `DuplicateModelNameError` at class-definition time. Rapyer resolves model classes from Redis keys by `__name__`, so duplicates were already unsafe.
 - **`afind()` rejects mixing keys and expressions**: Calling `afind()` with both keys (str) and `Expression` arguments now raises `UnsupportedArgumentValueError` instead of silently ignoring the expressions. Previously this combination logged a warning and dropped the expressions; callers must now choose one mode (keys or filter expressions) per call.
+- **`afind_one()` returns `None` for missing keys**: Calling `Model.afind_one(key)` with a key that does not exist in Redis now returns `None` instead of raising `KeyNotFound`. This aligns the classmethod with the module-level `rapyer.afind_one()` and matches the existing behavior for non-matching expressions.
 
 
 
