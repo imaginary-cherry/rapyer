@@ -1,5 +1,6 @@
 import pytest
 
+from rapyer.errors.delete import BadDeleteActionError
 from tests.models.complex_types import OuterModelWithRedisNested
 from tests.models.specialized import UserModel
 
@@ -92,5 +93,5 @@ async def test_delete_integration__call_delete_on_inner_model_raises_runtime_err
     assert inner_redis_model.is_inner_model() is True
 
     # Act & Assert
-    with pytest.raises(RuntimeError, match="Can only delete from inner model"):
+    with pytest.raises(BadDeleteActionError):
         res = await inner_redis_model.adelete()

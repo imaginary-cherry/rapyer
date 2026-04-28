@@ -50,6 +50,7 @@ from rapyer.errors import (
     UnsupportedIndexedFieldError,
     UpdateAtomicModelError,
 )
+from rapyer.errors.delete import BadDeleteActionError
 from rapyer.fields.expression import AtomicField, Expression, ExpressionField
 from rapyer.fields.index import IndexAnnotation
 from rapyer.fields.key import KeyAnnotation, RapyerKey
@@ -619,7 +620,6 @@ class AtomicRedisModel(BaseModel):
     async def ainsert(cls, *models: Unpack[Self]):
         async with ensure_pipeline(cls.Meta) as pipe:
             for model in models:
-                register_action_target(model, ActionGroup.UPDATE, initial=True)
                 pipe.json().set(model.key, model.json_path, model.redis_dump())
                 for fname in cls._special_field_names:
                     field = getattr(model, fname)
@@ -644,7 +644,7 @@ class AtomicRedisModel(BaseModel):
     @mark_actions(ActionGroup.DELETE, ignore_refresh=True)
     async def adelete(self):
         if self.is_inner_model():
-            raise RuntimeError("Can't delete from inner model")
+            raise BadDeleteActionError("Can't delete from inner model")
         return await self.adelete_by_key(self.key)
 
     @classmethod
