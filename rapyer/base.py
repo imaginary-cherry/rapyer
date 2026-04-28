@@ -644,7 +644,7 @@ class AtomicRedisModel(BaseModel):
     @mark_actions(ActionGroup.DELETE, ignore_refresh=True)
     async def adelete(self):
         if self.is_inner_model():
-            raise RuntimeError("Can only delete from inner model")
+            raise RuntimeError("Can't delete from inner model")
         return await self.adelete_by_key(self.key)
 
     @classmethod
