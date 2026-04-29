@@ -1,8 +1,5 @@
-from unittest.mock import AsyncMock
-
 import pytest
 
-import rapyer.actions
 from rapyer.actions import (
     ActionGroup,
     _action_context,
@@ -31,12 +28,9 @@ async def test_action_context_is_none_after_successful_call(setup_fake_redis):
 
 @pytest.mark.asyncio
 async def test_exception_inside_wrapped_function_resets_context_and_skips_flush(
-    monkeypatch,
+    flush_mock,
 ):
     # Arrange
-    flush_mock = AsyncMock()
-    monkeypatch.setattr(rapyer.actions, "flush_action_targets", flush_mock)
-
     @mark_actions(ActionGroup.UPDATE)
     async def boom(m):
         raise RuntimeError("boom")
@@ -57,13 +51,8 @@ async def test_exception_inside_wrapped_function_resets_context_and_skips_flush(
 
 
 @pytest.mark.asyncio
-async def test_target_self_with_non_registerable_first_arg_does_not_crash(
-    monkeypatch,
-):
+async def test_target_self_with_non_registerable_first_arg_does_not_crash(flush_mock):
     # Arrange
-    flush_mock = AsyncMock()
-    monkeypatch.setattr(rapyer.actions, "flush_action_targets", flush_mock)
-
     @mark_actions(ActionGroup.READ)
     async def f(x):
         return x
@@ -79,11 +68,8 @@ async def test_target_self_with_non_registerable_first_arg_does_not_crash(
 
 
 @pytest.mark.asyncio
-async def test_no_args_call_with_target_self_does_not_crash(monkeypatch):
+async def test_no_args_call_with_target_self_does_not_crash(flush_mock):
     # Arrange
-    flush_mock = AsyncMock()
-    monkeypatch.setattr(rapyer.actions, "flush_action_targets", flush_mock)
-
     @mark_actions(ActionGroup.READ)
     async def f():
         return "no-args"
@@ -97,10 +83,9 @@ async def test_no_args_call_with_target_self_does_not_crash(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_flush_raising_still_resets_action_context(monkeypatch):
+async def test_flush_raising_still_resets_action_context(flush_mock):
     # Arrange
-    flush_mock = AsyncMock(side_effect=RuntimeError("flush-failed"))
-    monkeypatch.setattr(rapyer.actions, "flush_action_targets", flush_mock)
+    flush_mock.side_effect = RuntimeError("flush-failed")
 
     @mark_actions(ActionGroup.UPDATE)
     async def update(m):
@@ -115,6 +100,7 @@ async def test_flush_raising_still_resets_action_context(monkeypatch):
         await update(model)
 
     # Assert: the contextvar was reset by the wrapper's finally block before
+    # flush ran, so it's None even though flush blew up.
     assert _action_context.get() is None
 
 

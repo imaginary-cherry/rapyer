@@ -1,8 +1,10 @@
 from dataclasses import dataclass
 from typing import Optional
+from unittest.mock import AsyncMock
 
 import pytest
 
+import rapyer.actions
 from rapyer.actions import ActionGroup
 from tests.models.simple_types import TTLRefreshTestModel
 
@@ -46,3 +48,11 @@ def refresh_calls(monkeypatch):
 
     monkeypatch.setattr(TTLRefreshTestModel, "refresh_ttl_if_needed", capture)
     return calls
+
+
+@pytest.fixture
+def flush_mock(monkeypatch):
+    """Replace rapyer.actions.flush_action_targets with an AsyncMock."""
+    mock = AsyncMock()
+    monkeypatch.setattr(rapyer.actions, "flush_action_targets", mock)
+    return mock
