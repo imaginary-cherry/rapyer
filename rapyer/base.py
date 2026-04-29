@@ -1,6 +1,7 @@
 import base64
 import contextlib
 import functools
+import inspect
 import logging
 import pickle
 import uuid
@@ -25,8 +26,10 @@ from redis.commands.search.query import Query
 from redis.exceptions import NoScriptError, ResponseError
 
 from rapyer.actions import (
+    MARK_ACTION_PARAMS_ATTR,
     ActionGroup,
     TargetSource,
+    _build_action_wrapper,
     mark_actions,
     register_action_target,
     should_refresh_for_action,
@@ -287,6 +290,55 @@ class AtomicRedisModel(BaseModel):
     def key(self, value: str):
         self._pk = value.split(":", maxsplit=1)[-1]
 
+    @classmethod
+    def build_redis_model(cls):
+        """
+        This function is resposible for building the model according to the model configuration (For example, setting up ttl refresh actions)
+        """
+        seen: set[str] = set()
+        for klass in cls.__mro__:
+            if klass is object:
+                break
+            for name, attr in vars(klass).items():
+                if name in seen:
+                    continue
+                if isinstance(attr, classmethod):
+                    raw_func = attr.__func__
+                    rebuild = classmethod
+                elif isinstance(attr, staticmethod):
+                    raw_func = attr.__func__
+                    rebuild = staticmethod
+                elif inspect.isfunction(attr):
+                    raw_func = attr
+                    rebuild = None
+                else:
+                    continue
+                seen.add(name)
+                params = getattr(raw_func, MARK_ACTION_PARAMS_ATTR, None)
+                if params is None:
+                    continue
+                # If a parent subclass installed a wrapper, walk back to the
+                # truly-bare function so this subclass's decision starts fresh.
+                while hasattr(raw_func, "__wrapped__"):
+                    raw_func = raw_func.__wrapped__
+                combined, target, initial, ignore_refresh = params
+                should_refresh = (
+                    not ignore_refresh
+                    and inspect.iscoroutinefunction(raw_func)
+                    and should_refresh_for_action(cls.Meta, combined)
+                )
+                should_start_ttl = initial and cls.Meta.ttl
+                should_wrap = should_refresh or should_start_ttl
+                if should_wrap:
+                    installed = _build_action_wrapper(
+                        raw_func, combined, target, initial
+                    )
+                else:
+                    installed = raw_func
+                if rebuild is not None:
+                    installed = rebuild(installed)
+                setattr(cls, name, installed)
+
     def __init_subclass__(cls, **kwargs):
         # Find fields with KeyAnnotation and SafeLoadAnnotation
         cls._safe_load_fields = set()
@@ -353,6 +405,8 @@ class AtomicRedisModel(BaseModel):
                     setattr(cls, serializer.__name__, serializer)
                     setattr(cls, validator.__name__, validator)
 
+        cls.build_redis_model()
+
         # Update the redis model list for initialization
         # Skip dynamically created classes from type conversion
         if cls.__doc__ != DYNAMIC_CLASS_DOC and cls.Meta.init_with_rapyer:
@@ -390,7 +444,7 @@ class AtomicRedisModel(BaseModel):
     def is_inner_model(self) -> bool:
         return bool(self.field_name)
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.CREATE, initial=True)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.CREATE, initial=True, version="v2")
     async def asave(self) -> Self:
         model_dump = self.redis_dump()
         async with ensure_pipeline(self.Meta) as pipe:
@@ -414,12 +468,16 @@ class AtomicRedisModel(BaseModel):
             exclude=self._special_field_names or None,
         )
 
-    @mark_actions(ActionGroup.CREATE, target=TargetSource.RESULT, initial=True)
+    @mark_actions(
+        ActionGroup.CREATE, target=TargetSource.RESULT, initial=True, version="v2"
+    )
     async def aduplicate(self) -> Self:
         duplicates = await self.aduplicate_many(1)
         return duplicates[0]
 
-    @mark_actions(ActionGroup.CREATE, target=TargetSource.RESULT, initial=True)
+    @mark_actions(
+        ActionGroup.CREATE, target=TargetSource.RESULT, initial=True, version="v2"
+    )
     async def aduplicate_many(self, num: int) -> list[Self]:
         if self.is_inner_model():
             raise RuntimeError("Can only duplicate from top level model")
@@ -439,7 +497,7 @@ class AtomicRedisModel(BaseModel):
         for field_name, value in kwargs.items():
             setattr(self, field_name, value)
 
-    @mark_actions(ActionGroup.UPDATE)
+    @mark_actions(ActionGroup.UPDATE, version="v2")
     async def aupdate(self, **kwargs):
         # Special fields (e.g. RedisPriorityQueue) manage their own separate
         # Redis storage and cannot be serialized as JSON path updates.
@@ -466,7 +524,7 @@ class AtomicRedisModel(BaseModel):
         async with ensure_pipeline(self.Meta) as pipe:
             update_keys_in_pipeline(pipe, self.key, **json_path_kwargs)
 
-    @mark_actions(ActionGroup.UPDATE, ignore_refresh=True)
+    @mark_actions(ActionGroup.UPDATE, ignore_refresh=True, version="v2")
     async def aset_ttl(self, ttl: int) -> None:
         if self.is_inner_model():
             raise RuntimeError("Can only set TTL from top level model")
@@ -497,7 +555,9 @@ class AtomicRedisModel(BaseModel):
         return key
 
     @classmethod
-    @mark_actions(ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT)
+    @mark_actions(
+        ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT, version="v2"
+    )
     async def aget(cls, key: str) -> Self:
         key = cls._resolve_key(key)
         model_dump = await cls.Meta.redis.json().get(key, "$")  # type: ignore[misc]
@@ -511,7 +571,7 @@ class AtomicRedisModel(BaseModel):
         instance._failed_fields = context.get(FAILED_FIELDS_KEY, set())
         return instance
 
-    @mark_actions(ActionGroup.READ)
+    @mark_actions(ActionGroup.READ, version="v2")
     async def aload(self) -> Self:
         model_dump = await self.Meta.redis.json().get(self.key, self.json_path)  # type: ignore[misc]
         if not model_dump:
@@ -542,7 +602,9 @@ class AtomicRedisModel(BaseModel):
         return model
 
     @classmethod
-    @mark_actions(ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT)
+    @mark_actions(
+        ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT, version="v2"
+    )
     async def afind(cls, *args, max_results: Optional[int] = None) -> list[Self]:
         if max_results is not None and max_results < 0:
             raise UnsupportedArgumentValueError(
@@ -597,7 +659,9 @@ class AtomicRedisModel(BaseModel):
         return instances
 
     @classmethod
-    @mark_actions(ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT)
+    @mark_actions(
+        ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT, version="v2"
+    )
     async def afind_one(cls, *args) -> Optional[Self]:
         try:
             results = await cls.afind(*args, max_results=1)
@@ -606,7 +670,7 @@ class AtomicRedisModel(BaseModel):
         return results[0] if results else None
 
     @classmethod
-    @mark_actions(ActionGroup.READ, ignore_refresh=True)
+    @mark_actions(ActionGroup.READ, ignore_refresh=True, version="v2")
     async def afind_keys(cls, max_results: Optional[int] = None) -> list[RapyerKey]:
         pattern = f"{cls.class_key_initials()}:*"
         if max_results is None:
@@ -616,7 +680,9 @@ class AtomicRedisModel(BaseModel):
         return [RapyerKey(k) for k in keys]
 
     @classmethod
-    @mark_actions(ActionGroup.CREATE, target=TargetSource.RESULT, initial=True)
+    @mark_actions(
+        ActionGroup.CREATE, target=TargetSource.RESULT, initial=True, version="v2"
+    )
     async def ainsert(cls, *models: Unpack[Self]):
         async with ensure_pipeline(cls.Meta) as pipe:
             for model in models:
@@ -628,7 +694,7 @@ class AtomicRedisModel(BaseModel):
             return models
 
     @classmethod
-    @mark_actions(ActionGroup.DELETE, ignore_refresh=True)
+    @mark_actions(ActionGroup.DELETE, ignore_refresh=True, version="v2")
     async def adelete_by_key(cls, key: str) -> bool:
         key = cls._resolve_key(key)
         keys_to_delete = cls._all_keys_for_key(key)
@@ -641,14 +707,14 @@ class AtomicRedisModel(BaseModel):
             results = await pipe.execute()
         return sum(results) > 0
 
-    @mark_actions(ActionGroup.DELETE, ignore_refresh=True)
+    @mark_actions(ActionGroup.DELETE, ignore_refresh=True, version="v2")
     async def adelete(self):
         if self.is_inner_model():
             raise BadDeleteActionError("Can't delete from inner model")
         return await self.adelete_by_key(self.key)
 
     @classmethod
-    @mark_actions(ActionGroup.READ, ignore_refresh=True)
+    @mark_actions(ActionGroup.READ, ignore_refresh=True, version="v2")
     async def aexists(cls, key: str | Self) -> bool:
         key = cls._resolve_key(key)
         client = _context_pipe.get() or cls.Meta.redis
@@ -693,7 +759,7 @@ class AtomicRedisModel(BaseModel):
             yield [k for key in batch for k in cls._all_keys_for_key(key)]
 
     @classmethod
-    @mark_actions(ActionGroup.DELETE, ignore_refresh=True)
+    @mark_actions(ActionGroup.DELETE, ignore_refresh=True, version="v2")
     async def adelete_many(
         cls, *args: Self | RapyerKey | str | Expression
     ) -> DeleteResult:

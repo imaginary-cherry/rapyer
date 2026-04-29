@@ -4,7 +4,7 @@ import contextvars
 import enum
 import functools
 import inspect
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Literal, Optional
 
 from rapyer.context import _context_pipe, ensure_pipeline
 
@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 
 ACTION_GROUPS_ATTR = "_action_groups"
+MARK_ACTION_PARAMS_ATTR = "_mark_action_params"
 
 
 class ActionGroup(enum.Flag):
@@ -131,11 +132,47 @@ async def flush_action_targets(targets: list[ActionContextEntryType]):
             )
 
 
+def _build_action_wrapper(
+    method,
+    combined: "ActionGroup",
+    target: "TargetSource",
+    initial: bool,
+):
+    """Build the async wrapper that opens an action context and flushes on exit."""
+
+    @functools.wraps(method)
+    async def wrapper(*args, **kwargs):
+        is_outer = _action_context.get() is None
+        token = None
+        targets: Optional[list[ActionContextEntryType]] = None
+        if is_outer:
+            targets = []
+            token = _action_context.set(targets)
+        try:
+            if target is TargetSource.SELF and args:
+                first = args[0]
+                if isinstance(first, registerable_types()):
+                    register_action_target(first, combined, initial=initial)
+            result = await method(*args, **kwargs)
+            if target is TargetSource.RESULT:
+                register_from_result(result, combined, initial=initial)
+        finally:
+            if is_outer:
+                _action_context.reset(token)
+        if is_outer and targets is not None:
+            await flush_action_targets(targets)
+        return result
+
+    setattr(wrapper, ACTION_GROUPS_ATTR, combined)
+    return wrapper
+
+
 def mark_actions(
     *groups: ActionGroup,
     target: TargetSource = TargetSource.SELF,
     initial: bool = False,
     ignore_refresh: bool = False,
+    version: Literal["v1", "v2"] = "v1",
 ):
     """Tag a method with action groups for TTL refresh.
 
@@ -156,6 +193,11 @@ def mark_actions(
     ``ignore_refresh=True`` skips wrapping entirely — the method is tagged with
     ``ACTION_GROUPS_ATTR`` for inspection/grouping, but no action context is
     opened and no TTL refresh is triggered (e.g. ``adelete``, ``aset_ttl``).
+
+    ``version`` selects when the wrap/no-wrap decision happens:
+
+    - ``"v1"`` (default): check weather we should refresh at runtime
+    - ``"v2"``: Minimize runtime - adjust the code to run for only actions that need it.
     """
     combined = ActionGroup(0)
     for g in groups:
@@ -164,34 +206,18 @@ def mark_actions(
     def decorator(method):
         setattr(method, ACTION_GROUPS_ATTR, combined)
 
+        if version == "v2":
+            setattr(
+                method,
+                MARK_ACTION_PARAMS_ATTR,
+                (combined, target, initial, ignore_refresh),
+            )
+            return method
+
         if not inspect.iscoroutinefunction(method) or ignore_refresh:
             return method
 
-        @functools.wraps(method)
-        async def wrapper(*args, **kwargs):
-            is_outer = _action_context.get() is None
-            token = None
-            targets: Optional[list[ActionContextEntryType]] = None
-            if is_outer:
-                targets = []
-                token = _action_context.set(targets)
-            try:
-                if target is TargetSource.SELF and args:
-                    first = args[0]
-                    if isinstance(first, registerable_types()):
-                        register_action_target(first, combined, initial=initial)
-                result = await method(*args, **kwargs)
-                if target is TargetSource.RESULT:
-                    register_from_result(result, combined, initial=initial)
-            finally:
-                if is_outer:
-                    _action_context.reset(token)
-            if is_outer and targets is not None:
-                await flush_action_targets(targets)
-            return result
-
-        setattr(wrapper, ACTION_GROUPS_ATTR, combined)
-        return wrapper
+        return _build_action_wrapper(method, combined, target, initial)
 
     return decorator
 
