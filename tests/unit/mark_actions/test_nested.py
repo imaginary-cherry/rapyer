@@ -1,0 +1,142 @@
+import pytest
+
+from rapyer.actions import ActionGroup, mark_actions
+from tests.models.simple_types import TTLRefreshTestModel
+
+
+@pytest.mark.asyncio
+async def test_nested_decorated_calls_flush_only_once(flush_mock):
+    # Arrange
+    @mark_actions(ActionGroup.UPDATE)
+    async def inner(m):
+        return None
+
+    @mark_actions(ActionGroup.UPDATE)
+    async def outer(m):
+        await inner(m)
+
+    model = TTLRefreshTestModel(name="single-flush")
+
+    # Act
+    await outer(model)
+
+    # Assert: both outer and inner registered the same instance → two entries
+    # in the targets list (flush handles dedup later).
+    flush_mock.assert_awaited_once_with(
+        [
+            (model, ActionGroup.UPDATE, False),
+            (model, ActionGroup.UPDATE, False),
+        ]
+    )
+
+
+@pytest.mark.asyncio
+async def test_nested_decorated_calls_with_different_models_collect_all_targets(
+    flush_mock,
+):
+    # Arrange
+    @mark_actions(ActionGroup.UPDATE)
+    async def inner(m):
+        return None
+
+    @mark_actions(ActionGroup.UPDATE)
+    async def outer(m, other):
+        await inner(other)
+
+    a = TTLRefreshTestModel(name="outer-a")
+    b = TTLRefreshTestModel(name="inner-b")
+
+    # Act
+    await outer(a, b)
+
+    # Assert: outer registers `a` first (target=SELF), then inner registers `b`.
+    flush_mock.assert_awaited_once_with(
+        [
+            (a, ActionGroup.UPDATE, False),
+            (b, ActionGroup.UPDATE, False),
+        ]
+    )
+
+
+@pytest.mark.asyncio
+async def test_nested_same_model_dedups_with_merged_action_groups(
+    setup_fake_redis, refresh_calls
+):
+    # Arrange
+    @mark_actions(ActionGroup.READ)
+    async def inner(m):
+        return None
+
+    @mark_actions(ActionGroup.UPDATE)
+    async def outer(m):
+        await inner(m)
+
+    model = TTLRefreshTestModel(name="merge-actions")
+
+    # Act
+    await outer(model)
+
+    # Assert
+    assert len(refresh_calls) == 1
+    assert refresh_calls[0].model is model
+    assert refresh_calls[0].action == ActionGroup.UPDATE | ActionGroup.READ
+
+
+@pytest.mark.asyncio
+async def test_dedup_by_key_with_different_instance_data(
+    setup_fake_redis, refresh_calls
+):
+    """Two distinct instances sharing the same key (different other field data)
+    → flush dedups by `model.key` and calls refresh exactly once."""
+
+    # Arrange
+    @mark_actions(ActionGroup.READ)
+    async def inner(m):
+        return None
+
+    @mark_actions(ActionGroup.UPDATE)
+    async def outer(m, other):
+        await inner(other)
+
+    m1 = TTLRefreshTestModel(name="first-data", age=10)
+    m2 = TTLRefreshTestModel(name="second-data", age=99)
+    # Force m2 to share m1's key while keeping a different instance + data.
+    m2.pk = m1.pk
+    assert m1.key == m2.key
+    assert m1 is not m2
+    assert m1.name != m2.name
+
+    # Act: outer registers m1 via target=SELF; inner registers m2 via target=SELF.
+    await outer(m1, m2)
+
+    # Assert: only one refresh call (deduped by key), action groups OR-merged,
+    # the first registered instance is the one that's kept.
+    assert len(refresh_calls) == 1
+    assert refresh_calls[0].model is m1
+    assert refresh_calls[0].action == ActionGroup.UPDATE | ActionGroup.READ
+
+
+@pytest.mark.asyncio
+async def test_nested_different_models_refreshed_separately(
+    setup_fake_redis, refresh_calls
+):
+    # Arrange
+    @mark_actions(ActionGroup.READ)
+    async def inner(m):
+        return None
+
+    @mark_actions(ActionGroup.UPDATE)
+    async def outer(m, other):
+        await inner(other)
+
+    a = TTLRefreshTestModel(name="dist-a")
+    b = TTLRefreshTestModel(name="dist-b")
+
+    # Act
+    await outer(a, b)
+
+    # Assert: each model gets its own refresh, with its own action group.
+    by_key = {c.model.key: c for c in refresh_calls}
+    assert set(by_key) == {a.key, b.key}
+    assert by_key[a.key].action == ActionGroup.UPDATE
+    assert by_key[b.key].action == ActionGroup.READ
