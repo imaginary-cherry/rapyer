@@ -97,6 +97,28 @@ async def test_no_args_call_with_target_self_does_not_crash(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_flush_raising_still_resets_action_context(monkeypatch):
+    # Arrange
+    flush_mock = AsyncMock(side_effect=RuntimeError("flush-failed"))
+    monkeypatch.setattr(rapyer.actions, "flush_action_targets", flush_mock)
+
+    @mark_actions(ActionGroup.UPDATE)
+    async def update(m):
+        return None
+
+    model = TTLRefreshTestModel(name="lifecycle-flush-raises")
+
+    assert _action_context.get() is None
+
+    # Act / Assert: the flush error propagates out.
+    with pytest.raises(RuntimeError, match="flush-failed"):
+        await update(model)
+
+    # Assert: the contextvar was reset by the wrapper's finally block before
+    assert _action_context.get() is None
+
+
+@pytest.mark.asyncio
 async def test_action_context_does_not_leak_between_independent_calls(
     setup_fake_redis,
 ):
