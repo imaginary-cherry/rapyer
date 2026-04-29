@@ -48,11 +48,12 @@ class AsyncBenchmarkTestWithTTL(AsyncBenchmarkTest):
         for cls in self.models_for_ttl:
             cls.Meta.ttl = BENCHMARK_TTL_SECONDS
             cls.Meta.refresh_ttl = ActionGroup.all(for_ttl=True)
-            cls.model_rebuild(force=True)
+            # Recreate the model to ensure ttl updates actions
+            cls.build_redis_model()
         try:
             self._run(benchmark, event_loop)
         finally:
             for cls, ttl, original_refresh in original:
                 cls.Meta.ttl = ttl
                 cls.Meta.refresh_ttl = original_refresh
-                cls.model_rebuild(force=True)
+                cls.build_redis_model()
