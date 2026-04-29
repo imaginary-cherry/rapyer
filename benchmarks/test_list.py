@@ -1,8 +1,10 @@
-from benchmarks.base import AsyncBenchmarkTest
+from benchmarks.base import AsyncBenchmarkTestWithTTL
 from tests.models.collection_types import SimpleListModel
 
 
-class TestListAppend(AsyncBenchmarkTest):
+class TestListAppend(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (SimpleListModel,)
+
     async def setup(self):
         model = SimpleListModel(items=[])
         await model.asave()
@@ -12,7 +14,9 @@ class TestListAppend(AsyncBenchmarkTest):
         return await model.items.aappend("item")
 
 
-class TestListExtend(AsyncBenchmarkTest):
+class TestListExtend(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (SimpleListModel,)
+
     async def setup(self):
         model = SimpleListModel(items=[])
         await model.asave()
@@ -22,7 +26,8 @@ class TestListExtend(AsyncBenchmarkTest):
         return await model.items.aextend(["a", "b", "c"])
 
 
-class TestListPop(AsyncBenchmarkTest):
+class TestListPop(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (SimpleListModel,)
     expected = "item"
 
     async def setup(self):
@@ -34,7 +39,9 @@ class TestListPop(AsyncBenchmarkTest):
         return await model.items.apop()
 
 
-class TestListInsert(AsyncBenchmarkTest):
+class TestListInsert(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (SimpleListModel,)
+
     async def setup(self):
         model = SimpleListModel(items=["a", "b"])
         await model.asave()
@@ -44,7 +51,9 @@ class TestListInsert(AsyncBenchmarkTest):
         return await model.items.ainsert(1, "x")
 
 
-class TestListClear(AsyncBenchmarkTest):
+class TestListClear(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (SimpleListModel,)
+
     async def setup(self):
         model = SimpleListModel(items=["a", "b"])
         await model.asave()

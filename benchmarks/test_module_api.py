@@ -1,9 +1,11 @@
 import rapyer
-from benchmarks.base import AsyncBenchmarkTest
+from benchmarks.base import AsyncBenchmarkTestWithTTL
 from tests.models.simple_types import IntModel, StrModel
 
 
-class TestModuleAget(AsyncBenchmarkTest):
+class TestModuleAget(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
+
     async def setup(self):
         model = StrModel(name="test")
         await model.asave()
@@ -13,7 +15,9 @@ class TestModuleAget(AsyncBenchmarkTest):
         return await rapyer.aget(key)
 
 
-class TestModuleAfindOneHit(AsyncBenchmarkTest):
+class TestModuleAfindOneHit(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
+
     async def setup(self):
         model = StrModel(name="test")
         await model.asave()
@@ -23,7 +27,8 @@ class TestModuleAfindOneHit(AsyncBenchmarkTest):
         return await rapyer.afind_one(key)
 
 
-class TestModuleAfindOneMiss(AsyncBenchmarkTest):
+class TestModuleAfindOneMiss(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
     expected = None
 
     async def setup(self):
@@ -33,7 +38,8 @@ class TestModuleAfindOneMiss(AsyncBenchmarkTest):
         return await rapyer.afind_one(key)
 
 
-class TestModuleAexistsHit(AsyncBenchmarkTest):
+class TestModuleAexistsHit(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
     expected = True
 
     async def setup(self):
@@ -45,7 +51,8 @@ class TestModuleAexistsHit(AsyncBenchmarkTest):
         return await rapyer.aexists(key)
 
 
-class TestModuleAexistsMiss(AsyncBenchmarkTest):
+class TestModuleAexistsMiss(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
     expected = False
 
     async def setup(self):
@@ -55,7 +62,9 @@ class TestModuleAexistsMiss(AsyncBenchmarkTest):
         return await rapyer.aexists(key)
 
 
-class TestModuleAfindSingle(AsyncBenchmarkTest):
+class TestModuleAfindSingle(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
+
     async def setup(self):
         model = StrModel(name="test")
         await model.asave()
@@ -65,7 +74,9 @@ class TestModuleAfindSingle(AsyncBenchmarkTest):
         return await rapyer.afind(*keys)
 
 
-class TestModuleAfindMany(AsyncBenchmarkTest):
+class TestModuleAfindMany(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
+
     async def setup(self):
         models = [StrModel(name=f"m_{i}") for i in range(10)]
         await rapyer.ainsert(*models)
@@ -75,7 +86,9 @@ class TestModuleAfindMany(AsyncBenchmarkTest):
         return await rapyer.afind(*keys)
 
 
-class TestModuleAfindMixedClasses(AsyncBenchmarkTest):
+class TestModuleAfindMixedClasses(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel, IntModel)
+
     async def setup(self):
         str_models = [StrModel(name=f"s_{i}") for i in range(5)]
         int_models = [IntModel(count=i) for i in range(5)]
@@ -90,7 +103,9 @@ class TestModuleAfindMixedClasses(AsyncBenchmarkTest):
         return await rapyer.afind(*keys)
 
 
-class TestModuleAinsertSingle(AsyncBenchmarkTest):
+class TestModuleAinsertSingle(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
+
     async def setup(self):
         return [StrModel(name="test")]
 
@@ -98,7 +113,9 @@ class TestModuleAinsertSingle(AsyncBenchmarkTest):
         return await rapyer.ainsert(*models)
 
 
-class TestModuleAinsertMany(AsyncBenchmarkTest):
+class TestModuleAinsertMany(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
+
     async def setup(self):
         return [StrModel(name=f"m_{i}") for i in range(10)]
 
@@ -106,7 +123,9 @@ class TestModuleAinsertMany(AsyncBenchmarkTest):
         return await rapyer.ainsert(*models)
 
 
-class TestModuleAinsertMixedClasses(AsyncBenchmarkTest):
+class TestModuleAinsertMixedClasses(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel, IntModel)
+
     async def setup(self):
         str_models = [StrModel(name=f"s_{i}") for i in range(5)]
         int_models = [IntModel(count=i) for i in range(5)]
@@ -116,7 +135,9 @@ class TestModuleAinsertMixedClasses(AsyncBenchmarkTest):
         return await rapyer.ainsert(*models)
 
 
-class TestModuleAdeleteManyByKey(AsyncBenchmarkTest):
+class TestModuleAdeleteManyByKey(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
+
     async def setup(self):
         models = [StrModel(name=f"del_{i}") for i in range(5)]
         await rapyer.ainsert(*models)
@@ -126,7 +147,9 @@ class TestModuleAdeleteManyByKey(AsyncBenchmarkTest):
         return await rapyer.adelete_many(*keys)
 
 
-class TestModuleAdeleteManyByModel(AsyncBenchmarkTest):
+class TestModuleAdeleteManyByModel(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
+
     async def setup(self):
         models = [StrModel(name=f"del_{i}") for i in range(5)]
         await rapyer.ainsert(*models)
@@ -136,13 +159,17 @@ class TestModuleAdeleteManyByModel(AsyncBenchmarkTest):
         return await rapyer.adelete_many(*models)
 
 
-class TestModuleApipelineEmpty(AsyncBenchmarkTest):
+class TestModuleApipelineEmpty(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
+
     async def action(self):
         async with rapyer.apipeline():
             pass
 
 
-class TestModuleApipelineWithOps(AsyncBenchmarkTest):
+class TestModuleApipelineWithOps(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
+
     async def setup(self):
         model = StrModel(name="test")
         await model.asave()
@@ -154,7 +181,9 @@ class TestModuleApipelineWithOps(AsyncBenchmarkTest):
             m.name = "updated"
 
 
-class TestModuleAlockFromKeyExisting(AsyncBenchmarkTest):
+class TestModuleAlockFromKeyExisting(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
+
     async def setup(self):
         model = StrModel(name="test")
         await model.asave()
@@ -165,7 +194,9 @@ class TestModuleAlockFromKeyExisting(AsyncBenchmarkTest):
             pass
 
 
-class TestModuleAlockFromKeyMissing(AsyncBenchmarkTest):
+class TestModuleAlockFromKeyMissing(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
+
     async def setup(self):
         return "StrModel:no-such-key"
 

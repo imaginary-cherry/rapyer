@@ -1,8 +1,9 @@
-from benchmarks.base import AsyncBenchmarkTest
+from benchmarks.base import AsyncBenchmarkTestWithTTL
 from tests.models.collection_types import StrDictModel
 
 
-class TestDictApop(AsyncBenchmarkTest):
+class TestDictApop(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrDictModel,)
     expected = "value"
 
     async def setup(self):
@@ -14,7 +15,8 @@ class TestDictApop(AsyncBenchmarkTest):
         return await model.metadata.apop("key")
 
 
-class TestDictApopitem(AsyncBenchmarkTest):
+class TestDictApopitem(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrDictModel,)
     expected = "value"
 
     async def setup(self):
@@ -26,7 +28,9 @@ class TestDictApopitem(AsyncBenchmarkTest):
         return await model.metadata.apopitem()
 
 
-class TestDictSetItem(AsyncBenchmarkTest):
+class TestDictSetItem(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrDictModel,)
+
     async def setup(self):
         model = StrDictModel(metadata={})
         await model.asave()
@@ -36,7 +40,9 @@ class TestDictSetItem(AsyncBenchmarkTest):
         return await model.metadata.aset_item("key", "val")
 
 
-class TestDictDelItem(AsyncBenchmarkTest):
+class TestDictDelItem(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrDictModel,)
+
     async def setup(self):
         model = StrDictModel(metadata={"key": "value"})
         await model.asave()
@@ -46,7 +52,9 @@ class TestDictDelItem(AsyncBenchmarkTest):
         return await model.metadata.adel_item("key")
 
 
-class TestDictUpdate(AsyncBenchmarkTest):
+class TestDictUpdate(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrDictModel,)
+
     async def setup(self):
         model = StrDictModel(metadata={})
         await model.asave()
@@ -56,7 +64,9 @@ class TestDictUpdate(AsyncBenchmarkTest):
         return await model.metadata.aupdate(key="value")
 
 
-class TestDictClear(AsyncBenchmarkTest):
+class TestDictClear(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrDictModel,)
+
     async def setup(self):
         model = StrDictModel(metadata={"key": "value"})
         await model.asave()

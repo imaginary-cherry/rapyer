@@ -1,4 +1,4 @@
-from benchmarks.base import AsyncBenchmarkTest
+from benchmarks.base import AsyncBenchmarkTestWithTTL
 from rapyer.types.priority_queue import PriorityQueueItem
 from tests.models.special_types import PriorityQueueModel
 
@@ -9,7 +9,9 @@ def _items(n: int) -> list[PriorityQueueItem[str]]:
     return [PriorityQueueItem(value=f"v_{i}", priority=float(i)) for i in range(n)]
 
 
-class PopulatedPQBenchmark(AsyncBenchmarkTest):
+class PopulatedPQBenchmark(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (PriorityQueueModel,)
+
     async def setup(self):
         model = PriorityQueueModel()
         await model.asave()

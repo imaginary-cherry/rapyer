@@ -1,12 +1,14 @@
 import rapyer
-from benchmarks.base import AsyncBenchmarkTest
+from benchmarks.base import AsyncBenchmarkTestWithTTL
 from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.simple_types import IntModel
 
 NUM_MODELS = 100
 
 
-class TestMultiModelPipelineIntIncrement(AsyncBenchmarkTest):
+class TestMultiModelPipelineIntIncrement(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (IntModel,)
+
     async def setup(self):
         models = [IntModel(count=0, score=100) for _ in range(NUM_MODELS)]
         await IntModel.ainsert(*models)
@@ -19,7 +21,9 @@ class TestMultiModelPipelineIntIncrement(AsyncBenchmarkTest):
                 loaded.count += 1
 
 
-class TestMultiModelPipelineStrSet(AsyncBenchmarkTest):
+class TestMultiModelPipelineStrSet(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (ComprehensiveTestModel,)
+
     async def setup(self):
         models = [
             ComprehensiveTestModel(counter=0, name="test", tags=[], metadata={})
@@ -35,7 +39,9 @@ class TestMultiModelPipelineStrSet(AsyncBenchmarkTest):
                 loaded.name = "updated"
 
 
-class TestMultiModelPipelineMixedOps(AsyncBenchmarkTest):
+class TestMultiModelPipelineMixedOps(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (ComprehensiveTestModel,)
+
     async def setup(self):
         models = [
             ComprehensiveTestModel(
