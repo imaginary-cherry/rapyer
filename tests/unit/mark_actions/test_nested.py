@@ -86,9 +86,6 @@ async def test_nested_same_model_dedups_with_merged_action_groups(
 async def test_dedup_by_key_with_different_instance_data(
     setup_fake_redis, refresh_calls
 ):
-    """Two distinct instances sharing the same key (different other field data)
-    → flush dedups by `model.key` and calls refresh exactly once."""
-
     # Arrange
     @mark_actions(ActionGroup.READ)
     async def inner(m):
