@@ -33,6 +33,7 @@ PRIVATE_METHODS = _group(
     RedisPriorityQueue._deserialize_value,
     # AtomicRedisModel
     AtomicRedisModel._search_keys_by_query,
+    AtomicRedisModel.build_redis_model,
     AtomicRedisModel.acreate_index,
     AtomicRedisModel.adelete_index,
     AtomicRedisModel.update,
