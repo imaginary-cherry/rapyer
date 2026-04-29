@@ -261,3 +261,51 @@ def should_refresh_for_action(meta: "RedisConfig", action: "ActionGroup") -> boo
         return False
     # refresh is an ActionGroup flag set
     return bool(refresh & action)
+
+
+def install_marked_action_methods(cls: type["AtomicRedisModel"]):
+    """Wrap methods that need ttl handling"""
+    seen: set[str] = set()
+    for klass in cls.__mro__:
+        if klass is object:
+            break
+        for name, attr in vars(klass).items():
+            if name in seen:
+                continue
+            if isinstance(attr, classmethod):
+                raw_func = attr.__func__
+                rebuild = classmethod
+            elif isinstance(attr, staticmethod):
+                raw_func = attr.__func__
+                rebuild = staticmethod
+            elif inspect.isfunction(attr):
+                raw_func = attr
+                rebuild = None
+            else:
+                continue
+            seen.add(name)
+            params: Optional[MarkActionParams] = getattr(
+                raw_func, MARK_ACTION_PARAMS_ATTR, None
+            )
+            if params is None:
+                continue
+            # If a parent subclass installed a wrapper, walk back to the
+            # truly-bare function so this subclass's decision starts fresh.
+            while hasattr(raw_func, "__wrapped__"):
+                raw_func = raw_func.__wrapped__
+            should_refresh = (
+                not params.ignore_refresh
+                and inspect.iscoroutinefunction(raw_func)
+                and should_refresh_for_action(cls.Meta, params.combined)
+            )
+            should_start_ttl = params.initial and cls.Meta.ttl
+            should_wrap = should_refresh or should_start_ttl
+            if should_wrap:
+                installed = _build_action_wrapper(
+                    raw_func, params.combined, params.target, params.initial
+                )
+            else:
+                installed = raw_func
+            if rebuild is not None:
+                installed = rebuild(installed)
+            setattr(cls, name, installed)
