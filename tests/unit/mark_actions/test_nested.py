@@ -2,18 +2,21 @@ import pytest
 
 from rapyer.actions import ActionGroup, mark_actions
 from tests.models.simple_types import TTLRefreshTestModel
+from tests.unit.mark_actions.conftest import maybe_install_v2
 
 
 @pytest.mark.asyncio
-async def test_nested_decorated_calls_flush_only_once(flush_mock):
+async def test_nested_decorated_calls_flush_only_once(flush_mock, mark_version):
     # Arrange
-    @mark_actions(ActionGroup.UPDATE)
+    @mark_actions(ActionGroup.UPDATE, version=mark_version)
     async def inner(m):
         return None
 
-    @mark_actions(ActionGroup.UPDATE)
+    @mark_actions(ActionGroup.UPDATE, version=mark_version)
     async def outer(m):
         await inner(m)
+
+    inner, outer = maybe_install_v2(mark_version, inner, outer)
 
     model = TTLRefreshTestModel(name="single-flush")
 
@@ -32,16 +35,18 @@ async def test_nested_decorated_calls_flush_only_once(flush_mock):
 
 @pytest.mark.asyncio
 async def test_nested_decorated_calls_with_different_models_collect_all_targets(
-    flush_mock,
+    flush_mock, mark_version
 ):
     # Arrange
-    @mark_actions(ActionGroup.UPDATE)
+    @mark_actions(ActionGroup.UPDATE, version=mark_version)
     async def inner(m):
         return None
 
-    @mark_actions(ActionGroup.UPDATE)
+    @mark_actions(ActionGroup.UPDATE, version=mark_version)
     async def outer(m, other):
         await inner(other)
+
+    inner, outer = maybe_install_v2(mark_version, inner, outer)
 
     a = TTLRefreshTestModel(name="outer-a")
     b = TTLRefreshTestModel(name="inner-b")
@@ -60,16 +65,18 @@ async def test_nested_decorated_calls_with_different_models_collect_all_targets(
 
 @pytest.mark.asyncio
 async def test_nested_same_model_dedups_with_merged_action_groups(
-    setup_fake_redis, refresh_calls
+    setup_fake_redis, refresh_calls, mark_version
 ):
     # Arrange
-    @mark_actions(ActionGroup.READ)
+    @mark_actions(ActionGroup.READ, version=mark_version)
     async def inner(m):
         return None
 
-    @mark_actions(ActionGroup.UPDATE)
+    @mark_actions(ActionGroup.UPDATE, version=mark_version)
     async def outer(m):
         await inner(m)
+
+    inner, outer = maybe_install_v2(mark_version, inner, outer)
 
     model = TTLRefreshTestModel(name="merge-actions")
 
@@ -84,16 +91,18 @@ async def test_nested_same_model_dedups_with_merged_action_groups(
 
 @pytest.mark.asyncio
 async def test_dedup_by_key_with_different_instance_data(
-    setup_fake_redis, refresh_calls
+    setup_fake_redis, refresh_calls, mark_version
 ):
     # Arrange
-    @mark_actions(ActionGroup.READ)
+    @mark_actions(ActionGroup.READ, version=mark_version)
     async def inner(m):
         return None
 
-    @mark_actions(ActionGroup.UPDATE)
+    @mark_actions(ActionGroup.UPDATE, version=mark_version)
     async def outer(m, other):
         await inner(other)
+
+    inner, outer = maybe_install_v2(mark_version, inner, outer)
 
     m1 = TTLRefreshTestModel(name="first-data", age=10)
     m2 = TTLRefreshTestModel(name="second-data", age=99)
@@ -115,16 +124,18 @@ async def test_dedup_by_key_with_different_instance_data(
 
 @pytest.mark.asyncio
 async def test_nested_different_models_refreshed_separately(
-    setup_fake_redis, refresh_calls
+    setup_fake_redis, refresh_calls, mark_version
 ):
     # Arrange
-    @mark_actions(ActionGroup.READ)
+    @mark_actions(ActionGroup.READ, version=mark_version)
     async def inner(m):
         return None
 
-    @mark_actions(ActionGroup.UPDATE)
+    @mark_actions(ActionGroup.UPDATE, version=mark_version)
     async def outer(m, other):
         await inner(other)
+
+    inner, outer = maybe_install_v2(mark_version, inner, outer)
 
     a = TTLRefreshTestModel(name="dist-a")
     b = TTLRefreshTestModel(name="dist-b")

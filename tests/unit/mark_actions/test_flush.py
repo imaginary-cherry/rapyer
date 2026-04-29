@@ -7,24 +7,27 @@ from rapyer.actions import (
     register_action_target,
 )
 from tests.models.simple_types import TTLRefreshTestModel
-
-
-@mark_actions(ActionGroup.UPDATE, target=TargetSource.MANUAL)
-async def _inner_register(model):
-    register_action_target(model, ActionGroup.UPDATE)
-
-
-@mark_actions(ActionGroup.UPDATE, target=TargetSource.MANUAL)
-async def _outer_register(outer_model, inner_model):
-    register_action_target(outer_model, ActionGroup.UPDATE)
-    await _inner_register(inner_model)
+from tests.unit.mark_actions.conftest import maybe_install_v2
 
 
 @pytest.mark.asyncio
 async def test_flush_refreshes_all_registered_models_including_inner_calls(
-    setup_fake_redis, refresh_calls
+    setup_fake_redis, refresh_calls, mark_version
 ):
     # Arrange
+    @mark_actions(ActionGroup.UPDATE, target=TargetSource.MANUAL, version=mark_version)
+    async def _inner_register(model):
+        register_action_target(model, ActionGroup.UPDATE)
+
+    @mark_actions(ActionGroup.UPDATE, target=TargetSource.MANUAL, version=mark_version)
+    async def _outer_register(outer_model, inner_model):
+        register_action_target(outer_model, ActionGroup.UPDATE)
+        await _inner_register(inner_model)
+
+    _inner_register, _outer_register = maybe_install_v2(
+        mark_version, _inner_register, _outer_register
+    )
+
     a = TTLRefreshTestModel(name="flush-outer")
     b = TTLRefreshTestModel(name="flush-inner")
 
@@ -38,12 +41,14 @@ async def test_flush_refreshes_all_registered_models_including_inner_calls(
 
 @pytest.mark.asyncio
 async def test_flush_refreshes_single_model_via_target_self(
-    setup_fake_redis, refresh_calls
+    setup_fake_redis, refresh_calls, mark_version
 ):
     # Arrange
-    @mark_actions(ActionGroup.UPDATE)
+    @mark_actions(ActionGroup.UPDATE, version=mark_version)
     async def update(m):
         return None
+
+    update = maybe_install_v2(mark_version, update)
 
     model = TTLRefreshTestModel(name="flush-self")
 

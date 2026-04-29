@@ -5,7 +5,7 @@ import enum
 import functools
 import inspect
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal, Optional
+from typing import TYPE_CHECKING, Callable, Literal, Optional
 
 from rapyer.context import _context_pipe, ensure_pipeline
 
@@ -263,6 +263,30 @@ def should_refresh_for_action(meta: "RedisConfig", action: "ActionGroup") -> boo
     return bool(refresh & action)
 
 
+def install_action_for_meta(func: Callable, meta: "RedisConfig"):
+    params: Optional[MarkActionParams] = getattr(
+        func, MARK_ACTION_PARAMS_ATTR, None
+    )
+    if params is None:
+        return func
+    # If a parent install already wrapped this, peel back to the truly-bare
+    # function so the new decision starts fresh.
+    raw_func = func
+    while hasattr(raw_func, "__wrapped__"):
+        raw_func = raw_func.__wrapped__
+    should_refresh = (
+        not params.ignore_refresh
+        and inspect.iscoroutinefunction(raw_func)
+        and should_refresh_for_action(meta, params.combined)
+    )
+    should_start_ttl = params.initial and meta.ttl
+    if should_refresh or should_start_ttl:
+        return _build_action_wrapper(
+            raw_func, params.combined, params.target, params.initial
+        )
+    return raw_func
+
+
 def install_marked_action_methods(cls: type["AtomicRedisModel"]):
     """Wrap methods that need ttl handling"""
     seen: set[str] = set()
@@ -284,28 +308,9 @@ def install_marked_action_methods(cls: type["AtomicRedisModel"]):
             else:
                 continue
             seen.add(name)
-            params: Optional[MarkActionParams] = getattr(
-                raw_func, MARK_ACTION_PARAMS_ATTR, None
-            )
-            if params is None:
+            if not hasattr(raw_func, MARK_ACTION_PARAMS_ATTR):
                 continue
-            # If a parent subclass installed a wrapper, walk back to the
-            # truly-bare function so this subclass's decision starts fresh.
-            while hasattr(raw_func, "__wrapped__"):
-                raw_func = raw_func.__wrapped__
-            should_refresh = (
-                not params.ignore_refresh
-                and inspect.iscoroutinefunction(raw_func)
-                and should_refresh_for_action(cls.Meta, params.combined)
-            )
-            should_start_ttl = params.initial and cls.Meta.ttl
-            should_wrap = should_refresh or should_start_ttl
-            if should_wrap:
-                installed = _build_action_wrapper(
-                    raw_func, params.combined, params.target, params.initial
-                )
-            else:
-                installed = raw_func
+            installed = install_action_for_meta(raw_func, cls.Meta)
             if rebuild is not None:
                 installed = rebuild(installed)
             setattr(cls, name, installed)

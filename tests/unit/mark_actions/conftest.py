@@ -5,8 +5,39 @@ from unittest.mock import AsyncMock
 import pytest
 
 import rapyer.actions
-from rapyer.actions import ActionGroup
+from rapyer.actions import ActionGroup, install_action_for_meta
 from tests.models.simple_types import TTLRefreshTestModel
+
+
+@pytest.fixture(params=["v1", "v2"])
+def mark_version(request):
+    """Run each test against both ``mark_actions`` versions.
+
+    For v2 the wrap is decided at install time, not decoration time, so tests
+    that exercise wrapper behavior must route the decorated function through
+    ``maybe_install_v2`` after decorating.
+    """
+    return request.param
+
+
+class RefreshAllMeta:
+    """Meta stub that opts into refresh for every action group — used by tests
+    that just want the v2 wrap to fire so the v1 and v2 codepaths converge."""
+
+    ttl = 60
+    refresh_ttl = ActionGroup.all(for_ttl=True)
+
+
+def maybe_install_v2(mark_version, *funcs):
+    """No-op for v1; for v2, install each func against a refresh-all Meta.
+
+    Returns a single func or a tuple matching the input arity.
+    """
+    if mark_version == "v1":
+        result = funcs
+    else:
+        result = tuple(install_action_for_meta(f, RefreshAllMeta) for f in funcs)
+    return result[0] if len(result) == 1 else result
 
 
 @dataclass

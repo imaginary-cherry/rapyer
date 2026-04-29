@@ -6,14 +6,19 @@ from rapyer.actions import (
     mark_actions,
 )
 from tests.models.simple_types import TTLRefreshTestModel
+from tests.unit.mark_actions.conftest import maybe_install_v2
 
 
 @pytest.mark.asyncio
-async def test_action_context_is_none_after_successful_call(setup_fake_redis):
+async def test_action_context_is_none_after_successful_call(
+    setup_fake_redis, mark_version
+):
     # Arrange
-    @mark_actions(ActionGroup.UPDATE)
+    @mark_actions(ActionGroup.UPDATE, version=mark_version)
     async def update(m):
         return None
+
+    update = maybe_install_v2(mark_version, update)
 
     model = TTLRefreshTestModel(name="lifecycle-success")
 
@@ -28,12 +33,14 @@ async def test_action_context_is_none_after_successful_call(setup_fake_redis):
 
 @pytest.mark.asyncio
 async def test_exception_inside_wrapped_function_resets_context_and_skips_flush(
-    flush_mock,
+    flush_mock, mark_version
 ):
     # Arrange
-    @mark_actions(ActionGroup.UPDATE)
+    @mark_actions(ActionGroup.UPDATE, version=mark_version)
     async def boom(m):
         raise RuntimeError("boom")
+
+    boom = maybe_install_v2(mark_version, boom)
 
     model = TTLRefreshTestModel(name="lifecycle-exception")
 
@@ -51,11 +58,15 @@ async def test_exception_inside_wrapped_function_resets_context_and_skips_flush(
 
 
 @pytest.mark.asyncio
-async def test_target_self_with_non_registerable_first_arg_does_not_crash(flush_mock):
+async def test_target_self_with_non_registerable_first_arg_does_not_crash(
+    flush_mock, mark_version
+):
     # Arrange
-    @mark_actions(ActionGroup.READ)
+    @mark_actions(ActionGroup.READ, version=mark_version)
     async def f(x):
         return x
+
+    f = maybe_install_v2(mark_version, f)
 
     # Act
     result = await f(42)
@@ -66,11 +77,13 @@ async def test_target_self_with_non_registerable_first_arg_does_not_crash(flush_
 
 
 @pytest.mark.asyncio
-async def test_no_args_call_with_target_self_does_not_crash(flush_mock):
+async def test_no_args_call_with_target_self_does_not_crash(flush_mock, mark_version):
     # Arrange
-    @mark_actions(ActionGroup.READ)
+    @mark_actions(ActionGroup.READ, version=mark_version)
     async def f():
         return "no-args"
+
+    f = maybe_install_v2(mark_version, f)
 
     # Act
     result = await f()
@@ -81,13 +94,15 @@ async def test_no_args_call_with_target_self_does_not_crash(flush_mock):
 
 
 @pytest.mark.asyncio
-async def test_flush_raising_still_resets_action_context(flush_mock):
+async def test_flush_raising_still_resets_action_context(flush_mock, mark_version):
     # Arrange
     flush_mock.side_effect = RuntimeError("flush-failed")
 
-    @mark_actions(ActionGroup.UPDATE)
+    @mark_actions(ActionGroup.UPDATE, version=mark_version)
     async def update(m):
         return None
+
+    update = maybe_install_v2(mark_version, update)
 
     model = TTLRefreshTestModel(name="lifecycle-flush-raises")
 
@@ -104,13 +119,15 @@ async def test_flush_raising_still_resets_action_context(flush_mock):
 
 @pytest.mark.asyncio
 async def test_action_context_does_not_leak_between_independent_calls(
-    setup_fake_redis,
+    setup_fake_redis, mark_version
 ):
     # Arrange
-    @mark_actions(ActionGroup.UPDATE)
+    @mark_actions(ActionGroup.UPDATE, version=mark_version)
     async def update(m):
         # Inner observation: context IS set during the call.
         assert _action_context.get() is not None
+
+    update = maybe_install_v2(mark_version, update)
 
     model = TTLRefreshTestModel(name="leak-1")
 
