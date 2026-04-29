@@ -1,6 +1,18 @@
+from dataclasses import dataclass
+from typing import Optional
+
 import pytest
 
+from rapyer.actions import ActionGroup
 from tests.models.simple_types import TTLRefreshTestModel
+
+
+@dataclass
+class RefreshCall:
+    model: TTLRefreshTestModel
+    action: Optional[ActionGroup]
+    initial: bool
+    can_use_pipeline: bool
 
 
 @pytest.fixture
@@ -18,18 +30,18 @@ def setup_fake_redis(fake_redis_client):
 @pytest.fixture
 def refresh_calls(monkeypatch):
     """Replace TTLRefreshTestModel.refresh_ttl_if_needed with a recorder."""
-    calls: list[dict] = []
+    calls: list[RefreshCall] = []
 
     async def capture(
         self, can_use_pipeline: bool = False, action=None, initial: bool = False
     ):
         calls.append(
-            {
-                "model": self,
-                "action": action,
-                "initial": initial,
-                "can_use_pipeline": can_use_pipeline,
-            }
+            RefreshCall(
+                model=self,
+                action=action,
+                initial=initial,
+                can_use_pipeline=can_use_pipeline,
+            )
         )
 
     monkeypatch.setattr(TTLRefreshTestModel, "refresh_ttl_if_needed", capture)

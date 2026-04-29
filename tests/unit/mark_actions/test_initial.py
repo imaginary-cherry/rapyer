@@ -23,7 +23,7 @@ async def test_initial_true_propagates_to_refresh(setup_fake_redis, refresh_call
 
     # Assert
     assert len(refresh_calls) == 1
-    assert refresh_calls[0]["initial"] is True
+    assert refresh_calls[0].initial is True
 
 
 @pytest.mark.asyncio
@@ -41,7 +41,7 @@ async def test_initial_false_default_propagates_as_false(
     await update(model)
 
     # Assert
-    assert refresh_calls[0]["initial"] is False
+    assert refresh_calls[0].initial is False
 
 
 @pytest.mark.asyncio
@@ -64,9 +64,9 @@ async def test_nested_outer_initial_true_inner_false_merges_to_true(
 
     # Assert: deduplicated to a single refresh, initial OR-merged to True.
     assert len(refresh_calls) == 1
-    assert refresh_calls[0]["model"] is model
-    assert refresh_calls[0]["initial"] is True
-    assert refresh_calls[0]["action"] == ActionGroup.CREATE | ActionGroup.UPDATE
+    assert refresh_calls[0].model is model
+    assert refresh_calls[0].initial is True
+    assert refresh_calls[0].action == ActionGroup.CREATE | ActionGroup.UPDATE
 
 
 @pytest.mark.asyncio
@@ -89,7 +89,7 @@ async def test_nested_outer_initial_false_inner_true_merges_to_true(
 
     # Assert: order doesn't matter — initial flag still propagates as True.
     assert len(refresh_calls) == 1
-    assert refresh_calls[0]["initial"] is True
+    assert refresh_calls[0].initial is True
 
 
 @pytest.mark.asyncio
@@ -116,6 +116,6 @@ async def test_two_models_initial_flag_per_model(setup_fake_redis, refresh_calls
     await parent(creating, updating)
 
     # Assert
-    by_model = {id(c["model"]): c for c in refresh_calls}
-    assert by_model[id(creating)]["initial"] is True
-    assert by_model[id(updating)]["initial"] is False
+    by_model = {id(c.model): c for c in refresh_calls}
+    assert by_model[id(creating)].initial is True
+    assert by_model[id(updating)].initial is False

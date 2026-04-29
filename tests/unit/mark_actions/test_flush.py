@@ -32,7 +32,7 @@ async def test_flush_refreshes_all_registered_models_including_inner_calls(
     await _outer_register(a, b)
 
     # Assert
-    refreshed_keys = {c["model"].key for c in refresh_calls}
+    refreshed_keys = {c.model.key for c in refresh_calls}
     assert refreshed_keys == {a.key, b.key}
 
 
@@ -52,4 +52,4 @@ async def test_flush_refreshes_single_model_via_target_self(
 
     # Assert
     assert len(refresh_calls) == 1
-    assert refresh_calls[0]["model"] is model
+    assert refresh_calls[0].model is model
