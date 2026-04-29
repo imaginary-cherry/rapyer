@@ -47,7 +47,7 @@ async def test_exception_inside_wrapped_function_resets_context_and_skips_flush(
     # (line 189 sits outside the try, so a raise from `await method(...)`
     # bypasses it — current behavior pinned down here).
     assert _action_context.get() is None
-    assert flush_mock.await_count == 0
+    flush_mock.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -62,9 +62,7 @@ async def test_target_self_with_non_registerable_first_arg_does_not_crash(flush_
 
     # Assert
     assert result == 42
-    assert flush_mock.await_count == 1
-    (targets,), _ = flush_mock.call_args
-    assert targets == []
+    flush_mock.assert_awaited_once_with([])
 
 
 @pytest.mark.asyncio
@@ -79,7 +77,7 @@ async def test_no_args_call_with_target_self_does_not_crash(flush_mock):
 
     # Assert
     assert result == "no-args"
-    assert flush_mock.await_count == 1
+    flush_mock.assert_awaited_once_with([])
 
 
 @pytest.mark.asyncio
