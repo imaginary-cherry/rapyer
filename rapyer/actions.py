@@ -4,6 +4,7 @@ import contextvars
 import enum
 import functools
 import inspect
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, Optional
 
 from rapyer.context import _context_pipe, ensure_pipeline
@@ -15,6 +16,16 @@ if TYPE_CHECKING:
 
 ACTION_GROUPS_ATTR = "_action_groups"
 MARK_ACTION_PARAMS_ATTR = "_mark_action_params"
+
+
+@dataclass(frozen=True, slots=True)
+class MarkActionParams:
+    """Params recorded by ``mark_actions(version="v2")`` for later install-time use."""
+
+    combined: "ActionGroup"
+    target: "TargetSource"
+    initial: bool
+    ignore_refresh: bool
 
 
 class ActionGroup(enum.Flag):
@@ -210,7 +221,7 @@ def mark_actions(
             setattr(
                 method,
                 MARK_ACTION_PARAMS_ATTR,
-                (combined, target, initial, ignore_refresh),
+                MarkActionParams(combined, target, initial, ignore_refresh),
             )
             return method
 

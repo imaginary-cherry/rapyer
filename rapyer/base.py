@@ -7,7 +7,7 @@ import pickle
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager
-from typing import Any, ClassVar, Optional, get_origin
+from typing import Any, ClassVar, Optional, cast, get_origin
 
 from pydantic import (
     BaseModel,
@@ -28,6 +28,7 @@ from redis.exceptions import NoScriptError, ResponseError
 from rapyer.actions import (
     MARK_ACTION_PARAMS_ATTR,
     ActionGroup,
+    MarkActionParams,
     TargetSource,
     _build_action_wrapper,
     mark_actions,
@@ -314,24 +315,25 @@ class AtomicRedisModel(BaseModel):
                 else:
                     continue
                 seen.add(name)
-                params = getattr(raw_func, MARK_ACTION_PARAMS_ATTR, None)
+                params: MarkActionParams = cast(
+                    MarkActionParams, getattr(raw_func, MARK_ACTION_PARAMS_ATTR, None)
+                )
                 if params is None:
                     continue
                 # If a parent subclass installed a wrapper, walk back to the
                 # truly-bare function so this subclass's decision starts fresh.
                 while hasattr(raw_func, "__wrapped__"):
                     raw_func = raw_func.__wrapped__
-                combined, target, initial, ignore_refresh = params
                 should_refresh = (
-                    not ignore_refresh
+                    not params.ignore_refresh
                     and inspect.iscoroutinefunction(raw_func)
-                    and should_refresh_for_action(cls.Meta, combined)
+                    and should_refresh_for_action(cls.Meta, params.combined)
                 )
-                should_start_ttl = initial and cls.Meta.ttl
+                should_start_ttl = params.initial and cls.Meta.ttl
                 should_wrap = should_refresh or should_start_ttl
                 if should_wrap:
                     installed = _build_action_wrapper(
-                        raw_func, combined, target, initial
+                        raw_func, params.combined, params.target, params.initial
                     )
                 else:
                     installed = raw_func
