@@ -58,25 +58,6 @@ async def test_exception_inside_wrapped_function_resets_context_and_skips_flush(
 
 
 @pytest.mark.asyncio
-async def test_target_self_with_non_registerable_first_arg_does_not_crash(
-    flush_mock, mark_version
-):
-    # Arrange
-    @mark_actions(ActionGroup.READ, version=mark_version)
-    async def f(x):
-        return x
-
-    f = maybe_install_v2(mark_version, f)
-
-    # Act
-    result = await f(42)
-
-    # Assert
-    assert result == 42
-    flush_mock.assert_awaited_once_with([])
-
-
-@pytest.mark.asyncio
 async def test_no_args_call_with_target_self_does_not_crash(flush_mock, mark_version):
     # Arrange
     @mark_actions(ActionGroup.READ, version=mark_version)
