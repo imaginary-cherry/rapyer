@@ -310,12 +310,13 @@ def install_action_for_meta(func: Callable, meta: "RedisConfig"):
     raw_func = func
     while hasattr(raw_func, "__wrapped__"):
         raw_func = raw_func.__wrapped__
+    is_async = inspect.iscoroutinefunction(raw_func)
     should_refresh = (
         not params.ignore_refresh
-        and inspect.iscoroutinefunction(raw_func)
+        and is_async
         and should_refresh_for_action(meta, params.combined)
     )
-    should_start_ttl = params.initial and meta.ttl
+    should_start_ttl = params.initial and meta.ttl and is_async
     if should_refresh or should_start_ttl:
         return _build_action_wrapper(
             raw_func, params.combined, params.target, params.initial
