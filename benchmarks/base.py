@@ -39,7 +39,7 @@ class AsyncBenchmarkTest:
 
 
 class AsyncBenchmarkTestWithTTL(AsyncBenchmarkTest):
-    models_for_ttl: ClassVar[tuple[AtomicRedisModel, ...]] = ()
+    models_for_ttl: ClassVar[tuple[type[AtomicRedisModel], ...]] = ()
 
     def test_benchmark_with_ttl(self, benchmark, event_loop):
         original = [
