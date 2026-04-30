@@ -245,7 +245,7 @@ def mark_actions(
 
     ``version`` selects when the wrap/no-wrap decision happens:
 
-    - ``"v1"`` (default): check weather we should refresh at runtime
+    - ``"v1"`` (default): check whether we should refresh at runtime
     - ``"v2"``: Minimize runtime - adjust the code to run for only actions that need it.
     """
     combined = ActionGroup(0)
