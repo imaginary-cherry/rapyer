@@ -138,7 +138,9 @@ class TestDictApop(ReadActionTestBase, ComprehensiveMetadataOpBase, TTLActionTes
         return {"key2": "value2"}
 
 
-class TestDictApopitem(ReadActionTestBase, ComprehensiveMetadataOpBase, TTLActionTestBase):
+class TestDictApopitem(
+    ReadActionTestBase, ComprehensiveMetadataOpBase, TTLActionTestBase
+):
     covered_method = RedisDict.apopitem
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 

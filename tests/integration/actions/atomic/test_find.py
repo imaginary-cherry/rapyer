@@ -65,7 +65,9 @@ class TestModelAfindOne(ReadActionTestBase, TTLActionTestBase, UpdateActionTestB
         return self.created_models[0]
 
 
-class TestRedisTypeAload(ReadActionTestBase, ComprehensiveCounterOpBase, TTLActionTestBase):
+class TestRedisTypeAload(
+    ReadActionTestBase, ComprehensiveCounterOpBase, TTLActionTestBase
+):
     covered_method = RedisType.aload
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
@@ -82,7 +84,9 @@ class TestRedisTypeAload(ReadActionTestBase, ComprehensiveCounterOpBase, TTLActi
         return 42
 
 
-class TestRapyerFunctionAget(ReadActionTestBase, TTLActionTestBase, UpdateActionTestBase):
+class TestRapyerFunctionAget(
+    ReadActionTestBase, TTLActionTestBase, UpdateActionTestBase
+):
     covered_method = rapyer.aget
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
@@ -96,7 +100,9 @@ class TestRapyerFunctionAget(ReadActionTestBase, TTLActionTestBase, UpdateAction
         return self.created_models[0]
 
 
-class TestRapyerFunctionAfindOne(ReadActionTestBase, TTLActionTestBase, UpdateActionTestBase):
+class TestRapyerFunctionAfindOne(
+    ReadActionTestBase, TTLActionTestBase, UpdateActionTestBase
+):
     covered_method = rapyer.afind_one
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
@@ -110,7 +116,9 @@ class TestRapyerFunctionAfindOne(ReadActionTestBase, TTLActionTestBase, UpdateAc
         return self.created_models[0]
 
 
-class TestRapyerFunctionAfind(ReadActionTestBase, TTLActionTestBase, UpdateActionTestBase):
+class TestRapyerFunctionAfind(
+    ReadActionTestBase, TTLActionTestBase, UpdateActionTestBase
+):
     covered_method = rapyer.afind
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 

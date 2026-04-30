@@ -35,8 +35,7 @@ def test_sync_method_on_class_is_returned_unwrapped(mark_version):
     # Assert
     assert _Holder.do is original
     assert (
-        getattr(_Holder.do, ACTION_GROUPS_ATTR)
-        == ActionGroup.UPDATE | ActionGroup.READ
+        getattr(_Holder.do, ACTION_GROUPS_ATTR) == ActionGroup.UPDATE | ActionGroup.READ
     )
 
 
@@ -57,6 +56,7 @@ def test_async_with_ignore_refresh_is_returned_unwrapped(mark_version):
 
 def test_async_without_ignore_refresh_decoration_shape(mark_version):
     """v1 wraps at decoration time; v2 returns the original and tags it for install."""
+
     # Arrange
     async def original():
         return "ok"
