@@ -1,5 +1,6 @@
 from rapyer.types.dct import RedisDict
 from tests.integration.actions.comprehensive import ComprehensiveMetadataOpBase
+from tests.integration.actions.read import ReadActionTestBase
 from tests.integration.actions.ttl import TTLActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
 
@@ -120,7 +121,7 @@ class TestDictAclear(ComprehensiveMetadataOpBase, TTLActionTestBase):
         return {}
 
 
-class TestDictApop(ComprehensiveMetadataOpBase, TTLActionTestBase):
+class TestDictApop(ReadActionTestBase, ComprehensiveMetadataOpBase, TTLActionTestBase):
     covered_method = RedisDict.apop
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
@@ -128,16 +129,16 @@ class TestDictApop(ComprehensiveMetadataOpBase, TTLActionTestBase):
         return [ComprehensiveTestModel(metadata={"key1": "value1", "key2": "value2"})]
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        await piped.metadata.apop("key1")
+        return await piped.metadata.apop("key1")
 
     def expected_before(self):
-        return {"key1": "value1", "key2": "value2"}
+        return "value1"
 
     def expected_after(self):
         return {"key2": "value2"}
 
 
-class TestDictApopitem(ComprehensiveMetadataOpBase, TTLActionTestBase):
+class TestDictApopitem(ReadActionTestBase, ComprehensiveMetadataOpBase, TTLActionTestBase):
     covered_method = RedisDict.apopitem
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
@@ -146,10 +147,10 @@ class TestDictApopitem(ComprehensiveMetadataOpBase, TTLActionTestBase):
         return [ComprehensiveTestModel(metadata={"only": "value"})]
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        await piped.metadata.apopitem()
+        return await piped.metadata.apopitem()
 
     def expected_before(self):
-        return {"only": "value"}
+        return "value"
 
     def expected_after(self):
         return {}

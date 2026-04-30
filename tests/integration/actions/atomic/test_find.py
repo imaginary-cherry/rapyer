@@ -2,12 +2,13 @@ import rapyer
 from rapyer.base import AtomicRedisModel
 from rapyer.types.base import RedisType
 from tests.integration.actions.comprehensive import ComprehensiveCounterOpBase
+from tests.integration.actions.read import ReadActionTestBase
 from tests.integration.actions.ttl import TTLActionTestBase
 from tests.integration.actions.update import UpdateActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
 
 
-class TestModelAget(TTLActionTestBase, UpdateActionTestBase):
+class TestModelAget(ReadActionTestBase, TTLActionTestBase, UpdateActionTestBase):
     covered_method = AtomicRedisModel.aget
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
@@ -16,10 +17,13 @@ class TestModelAget(TTLActionTestBase, UpdateActionTestBase):
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         model = self.created_models[0]
-        await type(model).aget(model.key)
+        return await type(model).aget(model.key)
+
+    def expected_before(self):
+        return self.created_models[0]
 
 
-class TestModelAload(TTLActionTestBase, UpdateActionTestBase):
+class TestModelAload(ReadActionTestBase, TTLActionTestBase, UpdateActionTestBase):
     covered_method = AtomicRedisModel.aload
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
@@ -27,10 +31,13 @@ class TestModelAload(TTLActionTestBase, UpdateActionTestBase):
         return [ComprehensiveTestModel(name="test", counter=1)]
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        await self.created_models[0].aload()
+        return await self.created_models[0].aload()
+
+    def expected_before(self):
+        return self.created_models[0]
 
 
-class TestModelAfind(TTLActionTestBase, UpdateActionTestBase):
+class TestModelAfind(ReadActionTestBase, TTLActionTestBase, UpdateActionTestBase):
     covered_method = AtomicRedisModel.afind
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
@@ -38,10 +45,13 @@ class TestModelAfind(TTLActionTestBase, UpdateActionTestBase):
         return [ComprehensiveTestModel(name="test", counter=1)]
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        await type(self.created_models[0]).afind()
+        return await type(self.created_models[0]).afind()
+
+    def expected_before(self):
+        return [self.created_models[0]]
 
 
-class TestModelAfindOne(TTLActionTestBase, UpdateActionTestBase):
+class TestModelAfindOne(ReadActionTestBase, TTLActionTestBase, UpdateActionTestBase):
     covered_method = AtomicRedisModel.afind_one
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
@@ -49,10 +59,13 @@ class TestModelAfindOne(TTLActionTestBase, UpdateActionTestBase):
         return [ComprehensiveTestModel(name="test", counter=1)]
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        await type(self.created_models[0]).afind_one()
+        return await type(self.created_models[0]).afind_one()
+
+    def expected_before(self):
+        return self.created_models[0]
 
 
-class TestRedisTypeAload(ComprehensiveCounterOpBase, TTLActionTestBase):
+class TestRedisTypeAload(ReadActionTestBase, ComprehensiveCounterOpBase, TTLActionTestBase):
     covered_method = RedisType.aload
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
@@ -60,7 +73,7 @@ class TestRedisTypeAload(ComprehensiveCounterOpBase, TTLActionTestBase):
         return [ComprehensiveTestModel(counter=42)]
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        await self.created_models[0].counter.aload()
+        return await self.created_models[0].counter.aload()
 
     def expected_before(self):
         return 42
@@ -69,7 +82,7 @@ class TestRedisTypeAload(ComprehensiveCounterOpBase, TTLActionTestBase):
         return 42
 
 
-class TestRapyerFunctionAget(TTLActionTestBase, UpdateActionTestBase):
+class TestRapyerFunctionAget(ReadActionTestBase, TTLActionTestBase, UpdateActionTestBase):
     covered_method = rapyer.aget
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
@@ -77,10 +90,13 @@ class TestRapyerFunctionAget(TTLActionTestBase, UpdateActionTestBase):
         return [ComprehensiveTestModel(name="aget-target")]
 
     async def perform_action(self, piped):
-        assert await rapyer.aget(self.created_models[0].key) is not None
+        return await rapyer.aget(self.created_models[0].key)
+
+    def expected_before(self):
+        return self.created_models[0]
 
 
-class TestRapyerFunctionAfindOne(TTLActionTestBase, UpdateActionTestBase):
+class TestRapyerFunctionAfindOne(ReadActionTestBase, TTLActionTestBase, UpdateActionTestBase):
     covered_method = rapyer.afind_one
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
@@ -88,10 +104,13 @@ class TestRapyerFunctionAfindOne(TTLActionTestBase, UpdateActionTestBase):
         return [ComprehensiveTestModel(name="afind-one-target")]
 
     async def perform_action(self, piped):
-        assert await rapyer.afind_one(self.created_models[0].key) is not None
+        return await rapyer.afind_one(self.created_models[0].key)
+
+    def expected_before(self):
+        return self.created_models[0]
 
 
-class TestRapyerFunctionAfind(TTLActionTestBase, UpdateActionTestBase):
+class TestRapyerFunctionAfind(ReadActionTestBase, TTLActionTestBase, UpdateActionTestBase):
     covered_method = rapyer.afind
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
@@ -99,5 +118,7 @@ class TestRapyerFunctionAfind(TTLActionTestBase, UpdateActionTestBase):
         return [ComprehensiveTestModel(name="afind-target")]
 
     async def perform_action(self, piped):
-        results = await rapyer.afind(self.created_models[0].key)
-        assert len(results) == 1
+        return await rapyer.afind(self.created_models[0].key)
+
+    def expected_before(self):
+        return [self.created_models[0]]

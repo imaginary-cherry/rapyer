@@ -22,6 +22,7 @@ from tests.coverage_helpers import (
     COVER_NO_CLOBBER,
     COVER_NO_TTL_WHEN_NOT_CONFIGURED,
     COVER_PIPELINE_ATOM,
+    COVER_READ_IN_PIPELINE,
     COVER_TTL_NO_REFRESH,
     COVER_TTL_REFRESH,
     COVER_TTL_UPDATE_ONCE,
@@ -102,6 +103,13 @@ COVERAGE_CHECKS: list[CoverageCheck] = [
         name=COVER_PIPELINE_ATOM,
         help_text="pipeline atomicity",
         expected=lambda: _collect_methods(ignore_groups=ActionGroup.READ),
+    ),
+    CoverageCheck(
+        name=COVER_READ_IN_PIPELINE,
+        help_text="read action returns server value inside a pipeline",
+        expected=lambda: _collect_methods(
+            require_groups=ActionGroup.READ | ActionGroup.FETCH
+        ),
     ),
     CoverageCheck(
         name=COVER_TTL_REFRESH,
