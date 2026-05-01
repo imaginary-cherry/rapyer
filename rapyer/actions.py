@@ -333,6 +333,7 @@ def install_marked_action_methods(cls: type["AtomicRedisModel"]):
         for name, attr in vars(klass).items():
             if name in seen:
                 continue
+            seen.add(name)
             if isinstance(attr, classmethod):
                 raw_func = attr.__func__
                 rebuild = classmethod
@@ -344,7 +345,6 @@ def install_marked_action_methods(cls: type["AtomicRedisModel"]):
                 rebuild = None
             else:
                 continue
-            seen.add(name)
             if not hasattr(raw_func, MARK_ACTION_PARAMS_ATTR):
                 continue
             installed = install_action_for_meta(raw_func, cls.Meta)
