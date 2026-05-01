@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.3.1]
+
+### 🐛 Fixed
+
+- **`RedisPriorityQueue.asize()` Inside `apipeline()`**: `asize()` now uses the pipeline-aware `self.redis` client instead of `self.client`, so calling it from within an active `apipeline()` context batches correctly instead of executing immediately against the direct client.
+
+### 🛠️ Technical Improvements
+
+- **Improve runtime for action with no ttl updates**: Actions that dont requires ttl updates are now running less code.
+
+
 ## [1.3.0]
 
 ### ✨ Added
