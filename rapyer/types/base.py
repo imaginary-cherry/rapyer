@@ -87,7 +87,7 @@ class BaseRedisType(ABC):
 
 class RedisType(BaseRedisType):
 
-    @mark_actions(ActionGroup.UPDATE)
+    @mark_actions(ActionGroup.UPDATE, version="v2")
     async def asave(self) -> Self:
         model_dump = self._adapter.dump_python(
             self, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
@@ -95,7 +95,7 @@ class RedisType(BaseRedisType):
         await self.client.json().set(self.key, self.json_path, model_dump)  # type: ignore[misc]
         return self
 
-    @mark_actions(ActionGroup.READ)
+    @mark_actions(ActionGroup.READ, version="v2")
     async def aload(self):
         redis_value = await self.redis.json().get(self.key, self.field_path)  # type: ignore[misc]
         if redis_value is None:

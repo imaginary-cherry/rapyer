@@ -47,7 +47,7 @@ class RedisList(list, GenericRedisType[T]):
     def sub_field_path(self, key: str):
         return f"{self.field_path}[{key}]"
 
-    @mark_actions(ActionGroup.UPDATE)
+    @mark_actions(ActionGroup.UPDATE, version="v2")
     def __setitem__(self, key, value):
         if self.pipeline:
             serialized = self._adapter.dump_python(
@@ -58,12 +58,12 @@ class RedisList(list, GenericRedisType[T]):
         return super().__setitem__(key, new_val)
 
     @marks_redis_updated
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND, version="v2")
     def __iadd__(self, other):
         self.extend(other)
         return self
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND, version="v2")
     def append(self, __object):
         if self.pipeline:
             serialized_object = self._adapter.dump_python(
@@ -76,7 +76,7 @@ class RedisList(list, GenericRedisType[T]):
         new_val = self.create_new_value(key, __object)
         return super().append(new_val)
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND, version="v2")
     def extend(self, new_lst):
         if self.pipeline and new_lst:
             serialized = self._adapter.dump_python(
@@ -87,7 +87,7 @@ class RedisList(list, GenericRedisType[T]):
         new_vals = self.create_new_values(list(new_keys), new_lst)
         return super().extend(new_vals)
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND, version="v2")
     def insert(self, index, __object):
         if self.pipeline:
             serialized = self._adapter.dump_python(
@@ -99,13 +99,13 @@ class RedisList(list, GenericRedisType[T]):
         new_val = self.create_new_value(index, __object)
         return super().insert(index, new_val)
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
     def clear(self):
         if self.pipeline:
             self.pipeline.json().set(self.key, self.json_path, [])
         return super().clear()
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
     def remove_range(self, start: int, end: int):
         if self.pipeline:
             run_sha(
@@ -124,7 +124,7 @@ class RedisList(list, GenericRedisType[T]):
                 "No changes were made. Use 'async with model.apipeline():' to execute."
             )
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND, version="v2")
     async def aappend(self, __object):
         self.append(__object)
 
@@ -137,7 +137,7 @@ class RedisList(list, GenericRedisType[T]):
                 self.key, self.json_path, *serialized_object
             )
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND, version="v2")
     async def aextend(self, __iterable):
         items = list(__iterable)
         self.extend(items)
@@ -154,7 +154,7 @@ class RedisList(list, GenericRedisType[T]):
                 *serialized_items,
             )
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ, version="v2")
     async def apop(self, index=-1):
         if self:
             self.pop(index)
@@ -168,7 +168,7 @@ class RedisList(list, GenericRedisType[T]):
             arrpop, context={REDIS_DUMP_FLAG_NAME: True}
         )[0]
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND, version="v2")
     async def ainsert(self, index, __object):
         self.insert(index, __object)
 
@@ -181,7 +181,7 @@ class RedisList(list, GenericRedisType[T]):
                 self.key, self.json_path, index, *serialized_object
             )
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
     async def aclear(self):
         # Clear local list
         self.clear()
