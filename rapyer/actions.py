@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 ACTION_GROUPS_ATTR = "_action_groups"
 MARK_ACTION_PARAMS_ATTR = "_mark_action_params"
+ACTION_WRAPPER_SENTINEL = "_rapyer_action_wrapper"
 
 
 @dataclass(frozen=True, slots=True)
@@ -213,6 +214,7 @@ def _build_action_wrapper(
             return result
 
     setattr(wrapper, ACTION_GROUPS_ATTR, combined)
+    setattr(wrapper, ACTION_WRAPPER_SENTINEL, True)
     return wrapper
 
 
@@ -305,12 +307,14 @@ def install_action_for_meta(func: Callable, meta: "RedisConfig"):
     params: Optional[MarkActionParams] = getattr(func, MARK_ACTION_PARAMS_ATTR, None)
     if params is None:
         return func
-    # If a parent install already wrapped this, peel back to the truly-bare
-    # function so the new decision starts fresh.
-    raw_func = func
-    while hasattr(raw_func, "__wrapped__"):
-        raw_func = raw_func.__wrapped__
-    is_async = inspect.iscoroutinefunction(raw_func)
+    # Peel back only past wrappers WE installed previously (e.g. parent class
+    # install of the same method with a different meta). Other wrappers like
+    # ``marks_redis_updated`` must stay in place so the call chain is preserved
+    # — both for the wrap branch and the no-wrap branch.
+    base_func = func
+    while getattr(base_func, ACTION_WRAPPER_SENTINEL, False):
+        base_func = base_func.__wrapped__
+    is_async = inspect.iscoroutinefunction(base_func)
     should_refresh = (
         not params.ignore_refresh
         and is_async
@@ -319,13 +323,20 @@ def install_action_for_meta(func: Callable, meta: "RedisConfig"):
     should_start_ttl = params.initial and meta.ttl and is_async
     if should_refresh or should_start_ttl:
         return _build_action_wrapper(
-            raw_func, params.combined, params.target, params.initial
+            base_func, params.combined, params.target, params.initial
         )
-    return raw_func
+    return base_func
 
 
-def install_marked_action_methods(cls: type["AtomicRedisModel"]):
-    """Wrap methods that need ttl handling"""
+def install_marked_action_methods(cls: type, meta: Optional["RedisConfig"] = None):
+    """Wrap methods that need ttl handling.
+
+    When ``meta`` is omitted, falls back to ``cls.Meta`` (the AtomicRedisModel
+    path). For BaseRedisType field subclasses, the owning model's meta is
+    passed in explicitly because they don't carry their own ``Meta`` class.
+    """
+    if meta is None:
+        meta = cls.Meta
     seen: set[str] = set()
     for klass in cls.__mro__:
         if klass is object:
@@ -347,7 +358,7 @@ def install_marked_action_methods(cls: type["AtomicRedisModel"]):
                 continue
             if not hasattr(raw_func, MARK_ACTION_PARAMS_ATTR):
                 continue
-            installed = install_action_for_meta(raw_func, cls.Meta)
+            installed = install_action_for_meta(raw_func, meta)
             if rebuild is not None:
                 installed = rebuild(installed)
             setattr(cls, name, installed)
