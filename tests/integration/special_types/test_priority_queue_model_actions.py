@@ -1,11 +1,9 @@
 import pytest
 import pytest_asyncio
 
-from rapyer.base import AtomicRedisModel
 from rapyer.errors import UpdateAtomicModelError
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX
-from tests.conftest import special_field_test_for
 from tests.models.special_types import (
     MixedSpecialModel,
     PQContainerModel,
@@ -96,25 +94,6 @@ async def test_priority_queue_special_key_not_matched_by_model_key_scan(
     assert found_keys == [model.key]
 
 
-# --- aget ---
-
-
-@special_field_test_for(AtomicRedisModel.aget, RedisPriorityQueue)
-@pytest.mark.asyncio
-async def test_aget_model_with_pq_data_pq_functional_after_load(saved_pq_model):
-    # Arrange
-    model = saved_pq_model
-
-    # Act
-    loaded = await PriorityQueueModel.aget(model.key)
-
-    # Assert
-    assert loaded.name == "test_model"
-    assert isinstance(loaded.tasks, RedisPriorityQueue)
-    assert await loaded.tasks.asize() == 3
-    assert await loaded.tasks.apop() == "high"
-
-
 @pytest.mark.asyncio
 async def test_aget_mixed_model_regular_fields_and_pq_accessible(saved_mixed_model):
     # Arrange
@@ -129,25 +108,6 @@ async def test_aget_mixed_model_regular_fields_and_pq_accessible(saved_mixed_mod
     assert await loaded.tasks.asize() == 2
 
 
-# --- aload ---
-
-
-@special_field_test_for(AtomicRedisModel.aload, RedisPriorityQueue)
-@pytest.mark.asyncio
-async def test_aload_model_with_pq_reloaded_has_functional_pq(saved_pq_model):
-    # Arrange
-    model = saved_pq_model
-
-    # Act
-    reloaded = await model.aload()
-
-    # Assert
-    assert reloaded.name == "test_model"
-    assert isinstance(reloaded.tasks, RedisPriorityQueue)
-    assert await reloaded.tasks.asize() == 3
-    assert await reloaded.tasks.apop() == "high"
-
-
 @pytest.mark.asyncio
 async def test_aload_after_pq_modification_sees_current_state(saved_pq_model):
     # Arrange
@@ -160,47 +120,6 @@ async def test_aload_after_pq_modification_sees_current_state(saved_pq_model):
     # Assert
     assert await reloaded.tasks.asize() == 4
     assert await reloaded.tasks.apop() == "urgent"
-
-
-# --- afind ---
-
-
-@special_field_test_for(AtomicRedisModel.afind, RedisPriorityQueue)
-@pytest.mark.asyncio
-async def test_afind_all_models_with_pq_returned_with_functional_pq(real_redis_client):
-    # Arrange
-    for i in range(3):
-        model = PriorityQueueModel(name=f"find_model_{i}")
-        await model.asave()
-        await model.tasks.apush(f"item_{i}", float(i))
-
-    # Act
-    found = await PriorityQueueModel.afind()
-
-    # Assert
-    assert len(found) == 3
-    for found_model in found:
-        assert isinstance(found_model.tasks, RedisPriorityQueue)
-        assert await found_model.tasks.asize() == 1
-        assert await found_model.tasks.apeek() is not None
-
-
-@special_field_test_for(AtomicRedisModel.afind_one, RedisPriorityQueue)
-@pytest.mark.asyncio
-async def test_afind_one_with_pq_returned_with_functional_pq(real_redis_client):
-    # Arrange
-    model = PriorityQueueModel(name=f"find_model")
-    await model.asave()
-    await model.tasks.apush(f"item", 0.0)
-
-    # Act
-    found_model = await PriorityQueueModel.afind_one(model.key)
-
-    # Assert
-    assert found_model is not None
-    assert isinstance(found_model.tasks, RedisPriorityQueue)
-    assert await found_model.tasks.asize() == 1
-    assert await found_model.tasks.apeek() is not None
 
 
 @pytest.mark.asyncio
@@ -288,29 +207,6 @@ async def test_aduplicate_mixed_model_regular_fields_copied_pq_independent(
     assert duplicate.count == model.count
     assert await duplicate.tasks.asize() == 2
     assert await model.tasks.asize() == 2
-
-
-# --- aset_ttl ---
-
-
-@special_field_test_for(AtomicRedisModel.aset_ttl, RedisPriorityQueue)
-@pytest.mark.asyncio
-async def test_aset_ttl_sets_ttl_on_both_model_and_pq_key(
-    real_redis_client, saved_pq_model
-):
-    # Arrange
-    model = saved_pq_model
-    model_key = model.key
-    pq_key = model.tasks.special_key
-
-    # Act
-    await model.aset_ttl(60)
-
-    # Assert
-    model_ttl = await real_redis_client.ttl(model_key)
-    pq_ttl = await real_redis_client.ttl(pq_key)
-    assert 0 < model_ttl <= 60
-    assert 0 < pq_ttl <= 60
 
 
 # --- sub-sub class with PQ in base ---

@@ -2,6 +2,7 @@ from abc import ABC
 from typing import ClassVar
 
 from rapyer.types.priority_queue import PriorityQueueItem, RedisPriorityQueue
+from tests.integration.actions.read import ReadActionTestBase
 from tests.integration.actions.ttl import TTLActionTestBase
 from tests.integration.actions.update import UpdateActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
@@ -94,12 +95,16 @@ class TestPQAclear(PQActionBase):
         return []
 
 
-class TestPQApop(PQActionBase):
+class TestPQApop(ReadActionTestBase, PQActionBase):
     covered_method = RedisPriorityQueue.apop
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        await self.created_models[0].tasks.apop()
+        return await self.created_models[0].tasks.apop()
+
+    def expected_before(self):
+        # apop returns the highest-priority value (the deserialized member).
+        return INITIAL_ITEMS[0][0]
 
 
 class TestPQAremove(PQActionBase):
@@ -112,25 +117,37 @@ class TestPQAremove(PQActionBase):
         return [('"high"', 1.0), ('"low"', 3.0)]
 
 
-class TestPQApeek(PQActionBase):
+class TestPQApeek(ReadActionTestBase, PQActionBase):
     covered_method = RedisPriorityQueue.apeek
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        await self.created_models[0].tasks.apeek()
+        return await self.created_models[0].tasks.apeek()
+
+    def expected_before(self):
+        return INITIAL_ITEMS[0][0]
 
 
-class TestPQAsize(PQActionBase):
+class TestPQAsize(ReadActionTestBase, PQActionBase):
     covered_method = RedisPriorityQueue.asize
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        await self.created_models[0].tasks.asize()
+        return await self.created_models[0].tasks.asize()
+
+    def expected_before(self):
+        return len(INITIAL_ITEMS)
 
 
-class TestPQAitems(PQActionBase):
+class TestPQAitems(ReadActionTestBase, PQActionBase):
     covered_method = RedisPriorityQueue.aitems
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        await self.created_models[0].tasks.aitems()
+        return await self.created_models[0].tasks.aitems()
+
+    def expected_before(self):
+        return [
+            PriorityQueueItem(value=value, priority=priority)
+            for value, priority in INITIAL_ITEMS
+        ]

@@ -1,8 +1,10 @@
-from benchmarks.base import AsyncBenchmarkTest
+from benchmarks.base import AsyncBenchmarkTestWithTTL
 from tests.models.collection_types import ComprehensiveTestModel
 
 
-class TestPipelineIntIadd(AsyncBenchmarkTest):
+class TestPipelineIntIadd(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (ComprehensiveTestModel,)
+
     async def setup(self):
         model = ComprehensiveTestModel(counter=0, name="test", tags=[], metadata={})
         await model.asave()
@@ -13,7 +15,9 @@ class TestPipelineIntIadd(AsyncBenchmarkTest):
             redis_model.counter += 5
 
 
-class TestPipelineMultipleOps(AsyncBenchmarkTest):
+class TestPipelineMultipleOps(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (ComprehensiveTestModel,)
+
     async def setup(self):
         model = ComprehensiveTestModel(
             counter=0, name="test", tags=["initial"], metadata={"init": "val"}

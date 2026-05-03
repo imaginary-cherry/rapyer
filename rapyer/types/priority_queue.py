@@ -73,7 +73,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
 
     @mark_actions(ActionGroup.READ)
     async def asize(self) -> int:
-        return await self.client.zcard(self.special_key)
+        return await self.redis.zcard(self.special_key)
 
     @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     async def aclear(self):

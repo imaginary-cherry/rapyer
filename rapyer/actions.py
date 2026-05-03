@@ -4,7 +4,8 @@ import contextvars
 import enum
 import functools
 import inspect
-from typing import TYPE_CHECKING, Optional
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Callable, Literal, Optional
 
 from rapyer.context import _context_pipe, ensure_pipeline
 
@@ -14,6 +15,17 @@ if TYPE_CHECKING:
 
 
 ACTION_GROUPS_ATTR = "_action_groups"
+MARK_ACTION_PARAMS_ATTR = "_mark_action_params"
+
+
+@dataclass(frozen=True, slots=True)
+class MarkActionParams:
+    """Params recorded by ``mark_actions(version="v2")`` for later install-time use."""
+
+    combined: "ActionGroup"
+    target: "TargetSource"
+    initial: bool
+    ignore_refresh: bool
 
 
 class ActionGroup(enum.Flag):
@@ -131,11 +143,85 @@ async def flush_action_targets(targets: list[ActionContextEntryType]):
             )
 
 
+def _build_action_wrapper(
+    method,
+    combined: "ActionGroup",
+    target: "TargetSource",
+    initial: bool,
+):
+    """Build the async wrapper that opens an action context and flushes on exit."""
+
+    if target is TargetSource.SELF:
+
+        @functools.wraps(method)
+        async def wrapper(*args, **kwargs):
+            is_outer = _action_context.get() is None
+            token = None
+            targets: Optional[list[ActionContextEntryType]] = None
+            if is_outer:
+                targets = []
+                token = _action_context.set(targets)
+            try:
+                if args:
+                    first = args[0]
+                    register_action_target(first, combined, initial=initial)
+                result = await method(*args, **kwargs)
+            finally:
+                if is_outer:
+                    _action_context.reset(token)
+            if is_outer and targets is not None:
+                await flush_action_targets(targets)
+            return result
+
+    elif target is TargetSource.RESULT:
+
+        @functools.wraps(method)
+        async def wrapper(*args, **kwargs):
+            is_outer = _action_context.get() is None
+            token = None
+            targets: Optional[list[ActionContextEntryType]] = None
+            if is_outer:
+                targets = []
+                token = _action_context.set(targets)
+            try:
+                result = await method(*args, **kwargs)
+                register_from_result(result, combined, initial=initial)
+            finally:
+                if is_outer:
+                    _action_context.reset(token)
+            if is_outer and targets is not None:
+                await flush_action_targets(targets)
+            return result
+
+    else:  # TargetSource.MANUAL
+
+        @functools.wraps(method)
+        async def wrapper(*args, **kwargs):
+            is_outer = _action_context.get() is None
+            token = None
+            targets: Optional[list[ActionContextEntryType]] = None
+            if is_outer:
+                targets = []
+                token = _action_context.set(targets)
+            try:
+                result = await method(*args, **kwargs)
+            finally:
+                if is_outer:
+                    _action_context.reset(token)
+            if is_outer and targets is not None:
+                await flush_action_targets(targets)
+            return result
+
+    setattr(wrapper, ACTION_GROUPS_ATTR, combined)
+    return wrapper
+
+
 def mark_actions(
     *groups: ActionGroup,
     target: TargetSource = TargetSource.SELF,
     initial: bool = False,
     ignore_refresh: bool = False,
+    version: Literal["v1", "v2"] = "v1",
 ):
     """Tag a method with action groups for TTL refresh.
 
@@ -156,6 +242,11 @@ def mark_actions(
     ``ignore_refresh=True`` skips wrapping entirely — the method is tagged with
     ``ACTION_GROUPS_ATTR`` for inspection/grouping, but no action context is
     opened and no TTL refresh is triggered (e.g. ``adelete``, ``aset_ttl``).
+
+    ``version`` selects when the wrap/no-wrap decision happens:
+
+    - ``"v1"`` (default): check whether we should refresh at runtime
+    - ``"v2"``: Minimize runtime - adjust the code to run for only actions that need it.
     """
     combined = ActionGroup(0)
     for g in groups:
@@ -164,34 +255,18 @@ def mark_actions(
     def decorator(method):
         setattr(method, ACTION_GROUPS_ATTR, combined)
 
+        if version == "v2":
+            setattr(
+                method,
+                MARK_ACTION_PARAMS_ATTR,
+                MarkActionParams(combined, target, initial, ignore_refresh),
+            )
+            return method
+
         if not inspect.iscoroutinefunction(method) or ignore_refresh:
             return method
 
-        @functools.wraps(method)
-        async def wrapper(*args, **kwargs):
-            is_outer = _action_context.get() is None
-            token = None
-            targets: Optional[list[ActionContextEntryType]] = None
-            if is_outer:
-                targets = []
-                token = _action_context.set(targets)
-            try:
-                if target is TargetSource.SELF and args:
-                    first = args[0]
-                    if isinstance(first, registerable_types()):
-                        register_action_target(first, combined, initial=initial)
-                result = await method(*args, **kwargs)
-                if target is TargetSource.RESULT:
-                    register_from_result(result, combined, initial=initial)
-            finally:
-                if is_outer:
-                    _action_context.reset(token)
-            if is_outer and targets is not None:
-                await flush_action_targets(targets)
-            return result
-
-        setattr(wrapper, ACTION_GROUPS_ATTR, combined)
-        return wrapper
+        return _build_action_wrapper(method, combined, target, initial)
 
     return decorator
 
@@ -224,3 +299,55 @@ def should_refresh_for_action(meta: "RedisConfig", action: "ActionGroup") -> boo
         return False
     # refresh is an ActionGroup flag set
     return bool(refresh & action)
+
+
+def install_action_for_meta(func: Callable, meta: "RedisConfig"):
+    params: Optional[MarkActionParams] = getattr(func, MARK_ACTION_PARAMS_ATTR, None)
+    if params is None:
+        return func
+    # If a parent install already wrapped this, peel back to the truly-bare
+    # function so the new decision starts fresh.
+    raw_func = func
+    while hasattr(raw_func, "__wrapped__"):
+        raw_func = raw_func.__wrapped__
+    is_async = inspect.iscoroutinefunction(raw_func)
+    should_refresh = (
+        not params.ignore_refresh
+        and is_async
+        and should_refresh_for_action(meta, params.combined)
+    )
+    should_start_ttl = params.initial and meta.ttl and is_async
+    if should_refresh or should_start_ttl:
+        return _build_action_wrapper(
+            raw_func, params.combined, params.target, params.initial
+        )
+    return raw_func
+
+
+def install_marked_action_methods(cls: type["AtomicRedisModel"]):
+    """Wrap methods that need ttl handling"""
+    seen: set[str] = set()
+    for klass in cls.__mro__:
+        if klass is object:
+            break
+        for name, attr in vars(klass).items():
+            if name in seen:
+                continue
+            seen.add(name)
+            if isinstance(attr, classmethod):
+                raw_func = attr.__func__
+                rebuild = classmethod
+            elif isinstance(attr, staticmethod):
+                raw_func = attr.__func__
+                rebuild = staticmethod
+            elif inspect.isfunction(attr):
+                raw_func = attr
+                rebuild = None
+            else:
+                continue
+            if not hasattr(raw_func, MARK_ACTION_PARAMS_ATTR):
+                continue
+            installed = install_action_for_meta(raw_func, cls.Meta)
+            if rebuild is not None:
+                installed = rebuild(installed)
+            setattr(cls, name, installed)

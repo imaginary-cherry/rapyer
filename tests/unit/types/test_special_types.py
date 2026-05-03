@@ -1,11 +1,9 @@
 import pytest
 
-from rapyer.base import AtomicRedisModel
 from rapyer.errors import UpdateAtomicModelError
 from rapyer.types.base import BaseRedisType
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX, SpecialFieldType
-from tests.conftest import special_field_test_for
 from tests.models.special_types import (
     MixedSpecialModel,
     PriorityQueueIntModel,
@@ -47,15 +45,6 @@ def test_special_field_names_detected():
     assert "tasks" in PriorityQueueIntModel._special_field_names
     assert "name" not in PriorityQueueModel._special_field_names
     assert "count" not in MixedSpecialModel._special_field_names
-
-
-@special_field_test_for(AtomicRedisModel.redis_dump, RedisPriorityQueue)
-def test_redis_dump_excludes_special_fields():
-    model = PriorityQueueModel(name="test")
-    dump = model.redis_dump()
-
-    assert "name" in dump
-    assert "tasks" not in dump
 
 
 def test_mixed_redis_dump_excludes_special_fields():

@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.3.1]
+
+### 🐛 Fixed
+
+- **`RedisPriorityQueue.asize()` Inside `apipeline()`**: `asize()` will now return value even inside pipeline.
+
+### 🛠️ Technical Improvements
+
+- **Improve runtime for action with no ttl updates**: Actions that dont requires ttl updates are now running less code.
+
+
 ## [1.3.0]
 
 ### ✨ Added

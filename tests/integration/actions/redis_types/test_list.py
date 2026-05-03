@@ -1,5 +1,6 @@
 from rapyer.types.lst import RedisList
 from tests.integration.actions.comprehensive import ComprehensiveTagsOpBase
+from tests.integration.actions.read import ReadActionTestBase
 from tests.integration.actions.ttl import TTLActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
 
@@ -180,7 +181,7 @@ class TestListAclear(ComprehensiveTagsOpBase, TTLActionTestBase):
         return []
 
 
-class TestListApop(ComprehensiveTagsOpBase, TTLActionTestBase):
+class TestListApop(ReadActionTestBase, ComprehensiveTagsOpBase, TTLActionTestBase):
     covered_method = RedisList.apop
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
@@ -188,10 +189,10 @@ class TestListApop(ComprehensiveTagsOpBase, TTLActionTestBase):
         return [ComprehensiveTestModel(tags=["tag1", "tag2"])]
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        await piped.tags.apop()
+        return await piped.tags.apop()
 
     def expected_before(self):
-        return ["tag1", "tag2"]
+        return "tag2"
 
     def expected_after(self):
         return ["tag1"]

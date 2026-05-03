@@ -1,9 +1,11 @@
-from benchmarks.base import AsyncBenchmarkTest
+from benchmarks.base import AsyncBenchmarkTestWithTTL
 from tests.models.index_types import IndexTestModel
 from tests.models.simple_types import StrModel
 
 
-class TestModelSave(AsyncBenchmarkTest):
+class TestModelSave(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
+
     async def setup(self):
         return StrModel(name="test")
 
@@ -11,7 +13,9 @@ class TestModelSave(AsyncBenchmarkTest):
         return await model.asave()
 
 
-class TestModelGet(AsyncBenchmarkTest):
+class TestModelGet(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
+
     async def setup(self):
         model = StrModel(name="test")
         await model.asave()
@@ -21,7 +25,9 @@ class TestModelGet(AsyncBenchmarkTest):
         return await StrModel.aget(key)
 
 
-class TestModelLoad(AsyncBenchmarkTest):
+class TestModelLoad(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
+
     async def setup(self):
         model = StrModel(name="test")
         await model.asave()
@@ -31,7 +37,9 @@ class TestModelLoad(AsyncBenchmarkTest):
         return await model.aload()
 
 
-class TestModelUpdate(AsyncBenchmarkTest):
+class TestModelUpdate(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
+
     async def setup(self):
         model = StrModel(name="test")
         await model.asave()
@@ -41,7 +49,9 @@ class TestModelUpdate(AsyncBenchmarkTest):
         return await model.aupdate(name="updated")
 
 
-class TestModelDelete(AsyncBenchmarkTest):
+class TestModelDelete(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
+
     async def setup(self):
         model = StrModel(name="test")
         await model.asave()
@@ -51,7 +61,9 @@ class TestModelDelete(AsyncBenchmarkTest):
         return await model.adelete()
 
 
-class TestModelInsert(AsyncBenchmarkTest):
+class TestModelInsert(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
+
     async def setup(self):
         return [StrModel(name=f"model_{i}") for i in range(3)]
 
@@ -59,7 +71,9 @@ class TestModelInsert(AsyncBenchmarkTest):
         return await StrModel.ainsert(*models)
 
 
-class TestModelFind(AsyncBenchmarkTest):
+class TestModelFind(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
+
     async def setup(self):
         model = StrModel(name="test")
         await model.asave()
@@ -69,7 +83,9 @@ class TestModelFind(AsyncBenchmarkTest):
         return await StrModel.afind(key)
 
 
-class TestModelDuplicate(AsyncBenchmarkTest):
+class TestModelDuplicate(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
+
     async def setup(self):
         model = StrModel(name="test")
         await model.asave()
@@ -79,7 +95,9 @@ class TestModelDuplicate(AsyncBenchmarkTest):
         return await model.aduplicate()
 
 
-class TestModelInsertMany(AsyncBenchmarkTest):
+class TestModelInsertMany(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
+
     async def setup(self):
         return [StrModel(name=f"model_{i}") for i in range(10)]
 
@@ -87,7 +105,9 @@ class TestModelInsertMany(AsyncBenchmarkTest):
         return await StrModel.ainsert(*models)
 
 
-class TestModelFindWithFilter(AsyncBenchmarkTest):
+class TestModelFindWithFilter(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (IndexTestModel,)
+
     async def setup(self):
         for i in range(5):
             model = IndexTestModel(name=f"user_{i}", age=20 + i, description="test")
@@ -97,7 +117,9 @@ class TestModelFindWithFilter(AsyncBenchmarkTest):
         return await IndexTestModel.afind(IndexTestModel.age >= 22)
 
 
-class TestModelDeleteMany(AsyncBenchmarkTest):
+class TestModelDeleteMany(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
+
     async def setup(self):
         models = [StrModel(name=f"del_{i}") for i in range(5)]
         await StrModel.ainsert(*models)
@@ -107,7 +129,9 @@ class TestModelDeleteMany(AsyncBenchmarkTest):
         return await StrModel.adelete_many(*models)
 
 
-class TestModelDuplicateMany(AsyncBenchmarkTest):
+class TestModelDuplicateMany(AsyncBenchmarkTestWithTTL):
+    models_for_ttl = (StrModel,)
+
     async def setup(self):
         model = StrModel(name="original")
         await model.asave()
