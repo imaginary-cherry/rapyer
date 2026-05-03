@@ -4,7 +4,7 @@
 
 ### 🐛 Fixed
 
-- **`RedisPriorityQueue.asize()` Inside `apipeline()`**: `asize()` now uses the pipeline-aware `self.redis` client instead of `self.client`, so calling it from within an active `apipeline()` context batches correctly instead of executing immediately against the direct client.
+- **`RedisPriorityQueue.asize()` Inside `apipeline()`**: `asize()` will now return value even inside pipeline.
 
 ### 🛠️ Technical Improvements
 
