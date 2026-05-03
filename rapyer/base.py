@@ -320,6 +320,7 @@ class AtomicRedisModel(BaseModel):
                     f".{field_name}",
                     safe_load=field_name in cls._safe_load_fields
                     or cls.Meta.safe_load_all,
+                    owner_meta=cls.Meta,
                 ),
             )
             for field_name, annotation in original_annotations.items()

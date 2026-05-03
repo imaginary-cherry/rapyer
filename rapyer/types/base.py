@@ -3,7 +3,7 @@ import base64
 import logging
 import pickle
 from abc import ABC
-from typing import Any, Generic, TypeVar, get_args
+from typing import TYPE_CHECKING, Any, Generic, Optional, TypeVar, get_args
 
 from pydantic import GetCoreSchemaHandler, TypeAdapter
 from pydantic_core import core_schema
@@ -11,10 +11,13 @@ from pydantic_core.core_schema import CoreSchema, SerializationInfo, ValidationI
 from redis.commands.search.field import TextField
 
 # Imported here to avoid circular import issues; actions imports context, not types.base
-from rapyer.actions import ActionGroup, mark_actions
+from rapyer.actions import ActionGroup, install_marked_action_methods, mark_actions
 from rapyer.context import _context_pipe
 from rapyer.errors import CantSerializeRedisValueError
 from rapyer.typing_support import Self
+
+if TYPE_CHECKING:
+    from rapyer.config import RedisConfig
 
 logger = logging.getLogger("rapyer")
 
@@ -29,6 +32,15 @@ class BaseRedisType(ABC):
     original_type: type = None
     field_name: str = None
     _adapter: TypeAdapter = None
+
+    def __init_subclass__(cls, *, owner_meta: Optional["RedisConfig"] = None, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if owner_meta is None:
+            # Static (module-load-time) subclass — no Atomic to specialize for yet.
+            # Methods stay tagged with v2 MarkActionParams; the dynamic per-field
+            # subclass created by RedisConverter will install them with its meta.
+            return
+        install_marked_action_methods(cls, owner_meta)
 
     @property
     def redis(self):
