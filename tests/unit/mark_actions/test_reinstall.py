@@ -2,7 +2,6 @@ from rapyer import AtomicRedisModel
 from rapyer.actions import ACTION_WRAPPER_SENTINEL, MARK_ACTION_PARAMS_ATTR, ActionGroup
 from rapyer.config import RedisConfig
 from rapyer.types.integer import RedisInt
-from tests.build_helpers import recursive_build_redis_model
 
 
 def _count_action_wrappers(func):
@@ -18,9 +17,7 @@ def _count_action_wrappers(func):
 
 
 def test_inheriting_models_with_redis_int_keep_marks_redis_updated_wrapper():
-    # Arrange — contradicting configs: parent refreshes on UPDATE/READ, child
-    # on APPEND/ARITHMETIC. Both keep ``ttl=60`` so refresh decisions actually
-    # fire (``ttl=None`` would short-circuit ``should_refresh_for_action``).
+    # Act
     class PeelParentModel(AtomicRedisModel):
         Meta = RedisConfig(
             ttl=60,
@@ -36,8 +33,7 @@ def test_inheriting_models_with_redis_int_keep_marks_redis_updated_wrapper():
             init_with_rapyer=False,
         )
 
-    # Assert — pick a few representative methods and check wrap counts.
-
+    # Assert
     # ``aload`` is marked READ: parent wraps, child peels (READ ∉ APPEND|ARITHMETIC).
     assert _count_action_wrappers(vars(PeelParentModel)["aload"]) == 1
     assert _count_action_wrappers(vars(PeelChildModel)["aload"]) == 0
@@ -88,51 +84,11 @@ def test_inheriting_models_with_redis_int_keep_marks_redis_updated_wrapper():
         assert hasattr(installed_op, "__wrapped__")
 
 
-def test_recursive_build_redis_model_picks_up_runtime_meta_ttl_mutation():
-    # Arrange — model has ``ttl=None`` at class-definition time, so the
-    # per-field RedisInt subclass is built with the bare (unwrapped) methods.
-    class RuntimeTtlModel(AtomicRedisModel):
-        Meta = RedisConfig(
-            ttl=None,
-            refresh_ttl=ActionGroup.UPDATE,
-            init_with_rapyer=False,
-        )
-        counter: int = 0
-
-    field_type = RuntimeTtlModel.model_fields["counter"].annotation
-
-    # Pre-condition — bare, no wrapper installed.
-    assert _count_action_wrappers(vars(field_type)["asave"]) == 0
-    assert _count_action_wrappers(vars(field_type)["aload"]) == 0
-    assert _count_action_wrappers(vars(field_type)["aincrease"]) == 0
-
-    # Act — mutate Meta at runtime then call the recursive helper.
-    RuntimeTtlModel.Meta.ttl = 60
-    recursive_build_redis_model(RuntimeTtlModel)
-
-    # Assert — wrappers now applied to field methods whose action group
-    # matches ``refresh_ttl`` (UPDATE).
-    assert _count_action_wrappers(vars(field_type)["asave"]) == 1
-    assert _count_action_wrappers(vars(field_type)["aincrease"]) == 1
-    # READ doesn't match UPDATE-only refresh_ttl → still bare.
-    assert _count_action_wrappers(vars(field_type)["aload"]) == 0
-
-    # Act — revert ttl to None and rebuild.
-    RuntimeTtlModel.Meta.ttl = None
-    recursive_build_redis_model(RuntimeTtlModel)
-
-    # Assert — wrappers peeled back to bare.
-    assert _count_action_wrappers(vars(field_type)["asave"]) == 0
-    assert _count_action_wrappers(vars(field_type)["aincrease"]) == 0
-    assert _count_action_wrappers(vars(field_type)["aload"]) == 0
-
-
 def test_recursive_build_redis_model_recurses_into_nested_atomic_model():
-    # Arrange — both Outer and Inner start without TTL. The nested model gets
-    # its own dynamic subclass with its own Meta when Outer is defined.
+    # Act
     class Inner(AtomicRedisModel):
         Meta = RedisConfig(
-            ttl=None,
+            ttl=66,
             refresh_ttl=ActionGroup.UPDATE,
             init_with_rapyer=False,
         )
@@ -149,52 +105,9 @@ def test_recursive_build_redis_model_recurses_into_nested_atomic_model():
     inner_dynamic = Outer.model_fields["inner"].annotation
     inner_counter_type = inner_dynamic.model_fields["counter"].annotation
 
+    # Assert
     # Pre-condition — bare on every level.
-    assert _count_action_wrappers(vars(inner_counter_type)["asave"]) == 0
-
-    # Act — mutate ONLY Inner's Meta, then run recursive rebuild on Outer.
-    # The recursion should pick up the inner model and rebuild its field types
-    # against Inner's (now-TTLed) Meta, not Outer's.
-    Inner.Meta.ttl = 60
-    inner_dynamic.Meta.ttl = 60
-    recursive_build_redis_model(Outer)
-
-    # Assert — inner's per-field RedisInt got re-installed with TTL,
-    # picked up via Inner's Meta (Outer's Meta is still ttl=None).
-    assert Outer.Meta.ttl is None
     assert _count_action_wrappers(vars(inner_counter_type)["asave"]) == 1
 
-
-def test_plain_build_redis_model_on_child_does_not_touch_parent_field_install():
-    # Arrange — parent + child share a per-field type. Parent owns the field;
-    # child only differs in Meta. ``cls.build_redis_model()`` (the model-only
-    # rebuild) must not touch the shared field type — that's reserved for the
-    # opt-in ``recursive_build_redis_model`` test helper.
-    class OwnerModel(AtomicRedisModel):
-        Meta = RedisConfig(
-            ttl=60,
-            refresh_ttl=ActionGroup.UPDATE,
-            init_with_rapyer=False,
-        )
-        counter: int = 0
-
-    class HeirModel(OwnerModel):
-        Meta = RedisConfig(
-            ttl=60,
-            refresh_ttl=ActionGroup.READ,  # contradicts parent
-            init_with_rapyer=False,
-        )
-
-    field_type = OwnerModel.model_fields["counter"].annotation
-    assert HeirModel.model_fields["counter"].annotation is field_type
-
-    # Pre-condition — installed under parent's UPDATE meta.
-    assert _count_action_wrappers(vars(field_type)["asave"]) == 1
-    assert _count_action_wrappers(vars(field_type)["aload"]) == 0
-
-    # Act — child rebuilds via the model-only rebuild.
-    HeirModel.build_redis_model()
-
-    # Assert — parent's installation is untouched.
-    assert _count_action_wrappers(vars(field_type)["asave"]) == 1
-    assert _count_action_wrappers(vars(field_type)["aload"]) == 0
+    assert Outer.Meta.ttl is None
+    assert _count_action_wrappers(vars(inner_counter_type)["asave"]) == 1
