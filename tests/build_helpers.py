@@ -1,21 +1,3 @@
-"""Test/benchmark helpers for rebuilding redis models after mutating ``Meta``.
-
-The model class's own ``build_redis_model`` only re-installs marked-action
-methods on the model class itself. Per-field ``BaseRedisType`` subclasses are
-specialized once (in their ``__init_subclass__``) against the owning model's
-``Meta`` snapshot at class-definition time, so they don't pick up later
-mutations to ``Meta.ttl`` / ``Meta.refresh_ttl``.
-
-``recursive_build_redis_model`` walks the fields and rebuilds every dynamic
-``BaseRedisType`` subclass with the model's current ``Meta``. It's intentionally
-test-side (not in the runtime path) — production code should set ``Meta`` at
-class-definition time.
-
-Caller responsibility: the helper walks **all** fields including inherited
-ones. When two classes in an inheritance hierarchy share a per-field subclass
-and have diverging ``Meta``, only call this on the field-owning class.
-"""
-
 from typing import get_args, get_origin
 
 from rapyer.base import AtomicRedisModel
@@ -32,14 +14,29 @@ def _iter_annotation_types(annotation):
         yield from _iter_annotation_types(arg)
 
 
-def recursive_build_redis_model(cls: type[AtomicRedisModel]):
-    """Rebuild ``cls`` and its dynamic per-field ``BaseRedisType`` subclasses."""
+def recursive_build_redis_model(
+    cls: type[AtomicRedisModel],
+    _seen: set[int] | None = None,
+):
+    """Rebuild ``cls``, its per-field ``BaseRedisType`` subclasses, and any
+    nested ``AtomicRedisModel`` fields (each rebuilt against its own ``Meta``).
+    """
+    if _seen is None:
+        _seen = set()
+    if id(cls) in _seen:
+        return
+    _seen.add(id(cls))
+
     cls.build_redis_model()
-    seen: set[int] = set()
     for field_info in cls.model_fields.values():
         for t in _iter_annotation_types(field_info.annotation):
-            if id(t) in seen:
+            if id(t) in _seen:
                 continue
-            seen.add(id(t))
             if issubclass(t, BaseRedisType):
+                _seen.add(id(t))
                 t.build_redis_model(cls.Meta)
+            elif issubclass(t, AtomicRedisModel):
+                # Nested model — recurse with its own Meta. Don't mark it
+                # ``_seen`` here; the recursive call does that to also block
+                # re-entry from inside the nested walk.
+                recursive_build_redis_model(t, _seen)
