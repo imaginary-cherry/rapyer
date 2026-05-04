@@ -99,7 +99,7 @@ def register_from_result(result, action: "ActionGroup", *, initial: bool = False
     if isinstance(result, (list, tuple)):
         for item in result:
             register_action_target(item, action, initial=initial)
-    else:
+    elif result is not None:
         register_action_target(result, action, initial=initial)
 
 
