@@ -1,11 +1,11 @@
 from benchmarks.base import AsyncBenchmarkTestWithTTL, TTLMode
 from benchmarks.models import ComprehensiveTestModelWithTTL
-from tests.models.collection_types import ComprehensiveTestModel
+from tests.models.collection_types import ComprehensiveTestModelNoTTL
 
 
 class TestPipelineIntIadd(AsyncBenchmarkTestWithTTL):
     models = {
-        TTLMode.NO_TTL: ComprehensiveTestModel,
+        TTLMode.NO_TTL: ComprehensiveTestModelNoTTL,
         TTLMode.TTL: ComprehensiveTestModelWithTTL,
     }
 
@@ -22,7 +22,7 @@ class TestPipelineIntIadd(AsyncBenchmarkTestWithTTL):
 
 class TestPipelineMultipleOps(AsyncBenchmarkTestWithTTL):
     models = {
-        TTLMode.NO_TTL: ComprehensiveTestModel,
+        TTLMode.NO_TTL: ComprehensiveTestModelNoTTL,
         TTLMode.TTL: ComprehensiveTestModelWithTTL,
     }
 
