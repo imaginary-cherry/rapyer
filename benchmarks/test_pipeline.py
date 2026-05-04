@@ -1,12 +1,17 @@
-from benchmarks.base import AsyncBenchmarkTestWithTTL
+from benchmarks.base import AsyncBenchmarkTestWithTTL, TTLMode
+from benchmarks.models import ComprehensiveTestModelWithTTL
 from tests.models.collection_types import ComprehensiveTestModel
 
 
 class TestPipelineIntIadd(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (ComprehensiveTestModel,)
+    models = {
+        TTLMode.NO_TTL: ComprehensiveTestModel,
+        TTLMode.TTL: ComprehensiveTestModelWithTTL,
+    }
 
-    async def setup(self):
-        model = ComprehensiveTestModel(counter=0, name="test", tags=[], metadata={})
+    async def setup(self, mode):
+        cls = self.models[mode]
+        model = cls(counter=0, name="test", tags=[], metadata={})
         await model.asave()
         return model
 
@@ -16,10 +21,14 @@ class TestPipelineIntIadd(AsyncBenchmarkTestWithTTL):
 
 
 class TestPipelineMultipleOps(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (ComprehensiveTestModel,)
+    models = {
+        TTLMode.NO_TTL: ComprehensiveTestModel,
+        TTLMode.TTL: ComprehensiveTestModelWithTTL,
+    }
 
-    async def setup(self):
-        model = ComprehensiveTestModel(
+    async def setup(self, mode):
+        cls = self.models[mode]
+        model = cls(
             counter=0, name="test", tags=["initial"], metadata={"init": "val"}
         )
         await model.asave()

@@ -1,13 +1,18 @@
-from benchmarks.base import AsyncBenchmarkTestWithTTL
+from benchmarks.base import AsyncBenchmarkTestWithTTL, TTLMode
+from benchmarks.models import DirectRedisIntModelWithTTL, FloatModelWithTTL
 from tests.models.redis_types import DirectRedisIntModel
 from tests.models.simple_types import FloatModel
 
 
 class TestIntIncrease(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (DirectRedisIntModel,)
+    models = {
+        TTLMode.NO_TTL: DirectRedisIntModel,
+        TTLMode.TTL: DirectRedisIntModelWithTTL,
+    }
 
-    async def setup(self):
-        model = DirectRedisIntModel(count=0)
+    async def setup(self, mode):
+        cls = self.models[mode]
+        model = cls(count=0)
         await model.asave()
         return model
 
@@ -16,10 +21,14 @@ class TestIntIncrease(AsyncBenchmarkTestWithTTL):
 
 
 class TestFloatIncrease(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (FloatModel,)
+    models = {
+        TTLMode.NO_TTL: FloatModel,
+        TTLMode.TTL: FloatModelWithTTL,
+    }
 
-    async def setup(self):
-        model = FloatModel(value=0.0)
+    async def setup(self, mode):
+        cls = self.models[mode]
+        model = cls(value=0.0)
         await model.asave()
         return model
 
