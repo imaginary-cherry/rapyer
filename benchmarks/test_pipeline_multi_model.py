@@ -57,7 +57,9 @@ class TestMultiModelPipelineMixedOps(AsyncBenchmarkTestWithTTL):
     async def setup(self, mode):
         self._cls = self.models[mode]
         models = [
-            self._cls(counter=0, name="test", tags=["initial"], metadata={"init": "val"})
+            self._cls(
+                counter=0, name="test", tags=["initial"], metadata={"init": "val"}
+            )
             for _ in range(NUM_MODELS)
         ]
         await self._cls.ainsert(*models)

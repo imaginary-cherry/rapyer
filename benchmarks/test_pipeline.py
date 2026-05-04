@@ -28,9 +28,7 @@ class TestPipelineMultipleOps(AsyncBenchmarkTestWithTTL):
 
     async def setup(self, mode):
         cls = self.models[mode]
-        model = cls(
-            counter=0, name="test", tags=["initial"], metadata={"init": "val"}
-        )
+        model = cls(counter=0, name="test", tags=["initial"], metadata={"init": "val"})
         await model.asave()
         return model
 
