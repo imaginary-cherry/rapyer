@@ -95,24 +95,12 @@ def register_action_target(
     ctx.append((model, action, initial))
 
 
-def registerable_types() -> tuple:
-    """Types the wrapper recognizes as TTL-refresh targets (lazy to avoid circular imports)."""
-    from rapyer.base import AtomicRedisModel
-    from rapyer.types.base import BaseRedisType
-
-    return AtomicRedisModel, BaseRedisType
-
-
 def register_from_result(result, action: "ActionGroup", *, initial: bool = False):
-    """RESULT-mode helper: push returned model or iterable-of-models into the context."""
-    targetable = registerable_types()
-
-    if isinstance(result, targetable):
-        register_action_target(result, action, initial=initial)
-    elif isinstance(result, (list, tuple)):
+    if isinstance(result, (list, tuple)):
         for item in result:
-            if isinstance(item, targetable):
-                register_action_target(item, action, initial=initial)
+            register_action_target(item, action, initial=initial)
+    else:
+        register_action_target(result, action, initial=initial)
 
 
 async def flush_action_targets(targets: list[ActionContextEntryType]):
