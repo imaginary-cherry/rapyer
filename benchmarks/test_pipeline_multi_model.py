@@ -1,7 +1,7 @@
 import rapyer
 from benchmarks.base import AsyncBenchmarkTestWithTTL, TTLMode
-from benchmarks.models import ComprehensiveTestModelWithTTL, IntModelWithTTL
-from tests.models.collection_types import ComprehensiveTestModel
+from benchmarks.models import IntModelWithTTL
+from tests.models.collection_types import ComprehensiveTestModel, ComprehensiveTestModelNoTTL
 from tests.models.simple_types import IntModel
 
 NUM_MODELS = 100
@@ -28,8 +28,8 @@ class TestMultiModelPipelineIntIncrement(AsyncBenchmarkTestWithTTL):
 
 class TestMultiModelPipelineStrSet(AsyncBenchmarkTestWithTTL):
     models = {
-        TTLMode.NO_TTL: ComprehensiveTestModel,
-        TTLMode.TTL: ComprehensiveTestModelWithTTL,
+        TTLMode.NO_TTL: ComprehensiveTestModelNoTTL,
+        TTLMode.TTL: ComprehensiveTestModel,
     }
 
     async def setup(self, mode):
@@ -50,8 +50,8 @@ class TestMultiModelPipelineStrSet(AsyncBenchmarkTestWithTTL):
 
 class TestMultiModelPipelineMixedOps(AsyncBenchmarkTestWithTTL):
     models = {
-        TTLMode.NO_TTL: ComprehensiveTestModel,
-        TTLMode.TTL: ComprehensiveTestModelWithTTL,
+        TTLMode.NO_TTL: ComprehensiveTestModelNoTTL,
+        TTLMode.TTL: ComprehensiveTestModel,
     }
 
     async def setup(self, mode):

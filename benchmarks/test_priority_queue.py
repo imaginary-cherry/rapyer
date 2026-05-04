@@ -1,5 +1,5 @@
 from benchmarks.base import AsyncBenchmarkTestWithTTL, TTLMode
-from benchmarks.models import PriorityQueueModelWithTTL
+from benchmarks.models import PriorityQueueModelNoTTL
 from rapyer.types.priority_queue import PriorityQueueItem
 from tests.models.special_types import PriorityQueueModel
 
@@ -12,8 +12,8 @@ def _items(n: int) -> list[PriorityQueueItem[str]]:
 
 class PopulatedPQBenchmark(AsyncBenchmarkTestWithTTL):
     models = {
-        TTLMode.NO_TTL: PriorityQueueModel,
-        TTLMode.TTL: PriorityQueueModelWithTTL,
+        TTLMode.NO_TTL: PriorityQueueModelNoTTL,
+        TTLMode.TTL: PriorityQueueModel,
     }
 
     async def setup(self, mode):
