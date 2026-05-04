@@ -84,7 +84,7 @@ def test_inheriting_models_with_redis_int_keep_marks_redis_updated_wrapper():
         assert hasattr(installed_op, "__wrapped__")
 
 
-def test_recursive_build_redis_model_recurses_into_nested_atomic_model():
+def test_recursive_model_recurses_into_nested_atomic_model():
     # Act
     class Inner(AtomicRedisModel):
         Meta = RedisConfig(
