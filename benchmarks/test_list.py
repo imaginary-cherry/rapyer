@@ -1,12 +1,17 @@
-from benchmarks.base import AsyncBenchmarkTestWithTTL
+from benchmarks.base import AsyncBenchmarkTestWithTTL, TTLMode
+from benchmarks.models import SimpleListModelWithTTL
 from tests.models.collection_types import SimpleListModel
 
 
 class TestListAppend(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (SimpleListModel,)
+    models = {
+        TTLMode.NO_TTL: SimpleListModel,
+        TTLMode.TTL: SimpleListModelWithTTL,
+    }
 
-    async def setup(self):
-        model = SimpleListModel(items=[])
+    async def setup(self, mode):
+        cls = self.models[mode]
+        model = cls(items=[])
         await model.asave()
         return model
 
@@ -15,10 +20,14 @@ class TestListAppend(AsyncBenchmarkTestWithTTL):
 
 
 class TestListExtend(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (SimpleListModel,)
+    models = {
+        TTLMode.NO_TTL: SimpleListModel,
+        TTLMode.TTL: SimpleListModelWithTTL,
+    }
 
-    async def setup(self):
-        model = SimpleListModel(items=[])
+    async def setup(self, mode):
+        cls = self.models[mode]
+        model = cls(items=[])
         await model.asave()
         return model
 
@@ -27,11 +36,15 @@ class TestListExtend(AsyncBenchmarkTestWithTTL):
 
 
 class TestListPop(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (SimpleListModel,)
+    models = {
+        TTLMode.NO_TTL: SimpleListModel,
+        TTLMode.TTL: SimpleListModelWithTTL,
+    }
     expected = "item"
 
-    async def setup(self):
-        model = SimpleListModel(items=["item"])
+    async def setup(self, mode):
+        cls = self.models[mode]
+        model = cls(items=["item"])
         await model.asave()
         return model
 
@@ -40,10 +53,14 @@ class TestListPop(AsyncBenchmarkTestWithTTL):
 
 
 class TestListInsert(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (SimpleListModel,)
+    models = {
+        TTLMode.NO_TTL: SimpleListModel,
+        TTLMode.TTL: SimpleListModelWithTTL,
+    }
 
-    async def setup(self):
-        model = SimpleListModel(items=["a", "b"])
+    async def setup(self, mode):
+        cls = self.models[mode]
+        model = cls(items=["a", "b"])
         await model.asave()
         return model
 
@@ -52,10 +69,14 @@ class TestListInsert(AsyncBenchmarkTestWithTTL):
 
 
 class TestListClear(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (SimpleListModel,)
+    models = {
+        TTLMode.NO_TTL: SimpleListModel,
+        TTLMode.TTL: SimpleListModelWithTTL,
+    }
 
-    async def setup(self):
-        model = SimpleListModel(items=["a", "b"])
+    async def setup(self, mode):
+        cls = self.models[mode]
+        model = cls(items=["a", "b"])
         await model.asave()
         return model
 

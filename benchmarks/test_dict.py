@@ -1,13 +1,18 @@
-from benchmarks.base import AsyncBenchmarkTestWithTTL
+from benchmarks.base import AsyncBenchmarkTestWithTTL, TTLMode
+from benchmarks.models import StrDictModelWithTTL
 from tests.models.collection_types import StrDictModel
 
 
 class TestDictApop(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (StrDictModel,)
+    models = {
+        TTLMode.NO_TTL: StrDictModel,
+        TTLMode.TTL: StrDictModelWithTTL,
+    }
     expected = "value"
 
-    async def setup(self):
-        model = StrDictModel(metadata={"key": "value"})
+    async def setup(self, mode):
+        cls = self.models[mode]
+        model = cls(metadata={"key": "value"})
         await model.asave()
         return model
 
@@ -16,11 +21,15 @@ class TestDictApop(AsyncBenchmarkTestWithTTL):
 
 
 class TestDictApopitem(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (StrDictModel,)
+    models = {
+        TTLMode.NO_TTL: StrDictModel,
+        TTLMode.TTL: StrDictModelWithTTL,
+    }
     expected = "value"
 
-    async def setup(self):
-        model = StrDictModel(metadata={"key": "value"})
+    async def setup(self, mode):
+        cls = self.models[mode]
+        model = cls(metadata={"key": "value"})
         await model.asave()
         return model
 
@@ -29,10 +38,14 @@ class TestDictApopitem(AsyncBenchmarkTestWithTTL):
 
 
 class TestDictSetItem(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (StrDictModel,)
+    models = {
+        TTLMode.NO_TTL: StrDictModel,
+        TTLMode.TTL: StrDictModelWithTTL,
+    }
 
-    async def setup(self):
-        model = StrDictModel(metadata={})
+    async def setup(self, mode):
+        cls = self.models[mode]
+        model = cls(metadata={})
         await model.asave()
         return model
 
@@ -41,10 +54,14 @@ class TestDictSetItem(AsyncBenchmarkTestWithTTL):
 
 
 class TestDictDelItem(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (StrDictModel,)
+    models = {
+        TTLMode.NO_TTL: StrDictModel,
+        TTLMode.TTL: StrDictModelWithTTL,
+    }
 
-    async def setup(self):
-        model = StrDictModel(metadata={"key": "value"})
+    async def setup(self, mode):
+        cls = self.models[mode]
+        model = cls(metadata={"key": "value"})
         await model.asave()
         return model
 
@@ -53,10 +70,14 @@ class TestDictDelItem(AsyncBenchmarkTestWithTTL):
 
 
 class TestDictUpdate(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (StrDictModel,)
+    models = {
+        TTLMode.NO_TTL: StrDictModel,
+        TTLMode.TTL: StrDictModelWithTTL,
+    }
 
-    async def setup(self):
-        model = StrDictModel(metadata={})
+    async def setup(self, mode):
+        cls = self.models[mode]
+        model = cls(metadata={})
         await model.asave()
         return model
 
@@ -65,10 +86,14 @@ class TestDictUpdate(AsyncBenchmarkTestWithTTL):
 
 
 class TestDictClear(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (StrDictModel,)
+    models = {
+        TTLMode.NO_TTL: StrDictModel,
+        TTLMode.TTL: StrDictModelWithTTL,
+    }
 
-    async def setup(self):
-        model = StrDictModel(metadata={"key": "value"})
+    async def setup(self, mode):
+        cls = self.models[mode]
+        model = cls(metadata={"key": "value"})
         await model.asave()
         return model
 

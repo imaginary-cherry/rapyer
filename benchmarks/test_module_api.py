@@ -1,13 +1,18 @@
 import rapyer
-from benchmarks.base import AsyncBenchmarkTestWithTTL
+from benchmarks.base import AsyncBenchmarkTestWithTTL, TTLMode
+from benchmarks.models import IntModelWithTTL, StrModelWithTTL
 from tests.models.simple_types import IntModel, StrModel
 
 
 class TestModuleAget(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (StrModel,)
+    models = {
+        TTLMode.NO_TTL: StrModel,
+        TTLMode.TTL: StrModelWithTTL,
+    }
 
-    async def setup(self):
-        model = StrModel(name="test")
+    async def setup(self, mode):
+        cls = self.models[mode]
+        model = cls(name="test")
         await model.asave()
         return model.key
 
@@ -16,10 +21,14 @@ class TestModuleAget(AsyncBenchmarkTestWithTTL):
 
 
 class TestModuleAfindOneHit(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (StrModel,)
+    models = {
+        TTLMode.NO_TTL: StrModel,
+        TTLMode.TTL: StrModelWithTTL,
+    }
 
-    async def setup(self):
-        model = StrModel(name="test")
+    async def setup(self, mode):
+        cls = self.models[mode]
+        model = cls(name="test")
         await model.asave()
         return model.key
 
@@ -28,22 +37,30 @@ class TestModuleAfindOneHit(AsyncBenchmarkTestWithTTL):
 
 
 class TestModuleAfindOneMiss(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (StrModel,)
+    models = {
+        TTLMode.NO_TTL: StrModel,
+        TTLMode.TTL: StrModelWithTTL,
+    }
     expected = None
 
-    async def setup(self):
-        return "StrModel:does-not-exist"
+    async def setup(self, mode):
+        cls = self.models[mode]
+        return f"{cls.__name__}:does-not-exist"
 
     async def action(self, key):
         return await rapyer.afind_one(key)
 
 
 class TestModuleAexistsHit(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (StrModel,)
+    models = {
+        TTLMode.NO_TTL: StrModel,
+        TTLMode.TTL: StrModelWithTTL,
+    }
     expected = True
 
-    async def setup(self):
-        model = StrModel(name="test")
+    async def setup(self, mode):
+        cls = self.models[mode]
+        model = cls(name="test")
         await model.asave()
         return model.key
 
@@ -52,21 +69,29 @@ class TestModuleAexistsHit(AsyncBenchmarkTestWithTTL):
 
 
 class TestModuleAexistsMiss(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (StrModel,)
+    models = {
+        TTLMode.NO_TTL: StrModel,
+        TTLMode.TTL: StrModelWithTTL,
+    }
     expected = False
 
-    async def setup(self):
-        return "StrModel:missing-key"
+    async def setup(self, mode):
+        cls = self.models[mode]
+        return f"{cls.__name__}:missing-key"
 
     async def action(self, key):
         return await rapyer.aexists(key)
 
 
 class TestModuleAfindSingle(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (StrModel,)
+    models = {
+        TTLMode.NO_TTL: StrModel,
+        TTLMode.TTL: StrModelWithTTL,
+    }
 
-    async def setup(self):
-        model = StrModel(name="test")
+    async def setup(self, mode):
+        cls = self.models[mode]
+        model = cls(name="test")
         await model.asave()
         return [model.key]
 
@@ -75,10 +100,14 @@ class TestModuleAfindSingle(AsyncBenchmarkTestWithTTL):
 
 
 class TestModuleAfindMany(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (StrModel,)
+    models = {
+        TTLMode.NO_TTL: StrModel,
+        TTLMode.TTL: StrModelWithTTL,
+    }
 
-    async def setup(self):
-        models = [StrModel(name=f"m_{i}") for i in range(10)]
+    async def setup(self, mode):
+        cls = self.models[mode]
+        models = [cls(name=f"m_{i}") for i in range(10)]
         await rapyer.ainsert(*models)
         return [m.key for m in models]
 
@@ -87,11 +116,22 @@ class TestModuleAfindMany(AsyncBenchmarkTestWithTTL):
 
 
 class TestModuleAfindMixedClasses(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (StrModel, IntModel)
+    # This test exercises two model classes simultaneously. ``models`` only
+    # carries the "primary" — the secondary is fetched via ``_aux_models``.
+    models = {
+        TTLMode.NO_TTL: StrModel,
+        TTLMode.TTL: StrModelWithTTL,
+    }
+    aux_models = {
+        TTLMode.NO_TTL: IntModel,
+        TTLMode.TTL: IntModelWithTTL,
+    }
 
-    async def setup(self):
-        str_models = [StrModel(name=f"s_{i}") for i in range(5)]
-        int_models = [IntModel(count=i) for i in range(5)]
+    async def setup(self, mode):
+        str_cls = self.models[mode]
+        int_cls = self.aux_models[mode]
+        str_models = [str_cls(name=f"s_{i}") for i in range(5)]
+        int_models = [int_cls(count=i) for i in range(5)]
         await rapyer.ainsert(*str_models, *int_models)
         keys = []
         for s, i in zip(str_models, int_models):
@@ -104,31 +144,48 @@ class TestModuleAfindMixedClasses(AsyncBenchmarkTestWithTTL):
 
 
 class TestModuleAinsertSingle(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (StrModel,)
+    models = {
+        TTLMode.NO_TTL: StrModel,
+        TTLMode.TTL: StrModelWithTTL,
+    }
 
-    async def setup(self):
-        return [StrModel(name="test")]
+    async def setup(self, mode):
+        cls = self.models[mode]
+        return [cls(name="test")]
 
     async def action(self, models):
         return await rapyer.ainsert(*models)
 
 
 class TestModuleAinsertMany(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (StrModel,)
+    models = {
+        TTLMode.NO_TTL: StrModel,
+        TTLMode.TTL: StrModelWithTTL,
+    }
 
-    async def setup(self):
-        return [StrModel(name=f"m_{i}") for i in range(10)]
+    async def setup(self, mode):
+        cls = self.models[mode]
+        return [cls(name=f"m_{i}") for i in range(10)]
 
     async def action(self, models):
         return await rapyer.ainsert(*models)
 
 
 class TestModuleAinsertMixedClasses(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (StrModel, IntModel)
+    models = {
+        TTLMode.NO_TTL: StrModel,
+        TTLMode.TTL: StrModelWithTTL,
+    }
+    aux_models = {
+        TTLMode.NO_TTL: IntModel,
+        TTLMode.TTL: IntModelWithTTL,
+    }
 
-    async def setup(self):
-        str_models = [StrModel(name=f"s_{i}") for i in range(5)]
-        int_models = [IntModel(count=i) for i in range(5)]
+    async def setup(self, mode):
+        str_cls = self.models[mode]
+        int_cls = self.aux_models[mode]
+        str_models = [str_cls(name=f"s_{i}") for i in range(5)]
+        int_models = [int_cls(count=i) for i in range(5)]
         return [*str_models, *int_models]
 
     async def action(self, models):
@@ -136,10 +193,14 @@ class TestModuleAinsertMixedClasses(AsyncBenchmarkTestWithTTL):
 
 
 class TestModuleAdeleteManyByKey(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (StrModel,)
+    models = {
+        TTLMode.NO_TTL: StrModel,
+        TTLMode.TTL: StrModelWithTTL,
+    }
 
-    async def setup(self):
-        models = [StrModel(name=f"del_{i}") for i in range(5)]
+    async def setup(self, mode):
+        cls = self.models[mode]
+        models = [cls(name=f"del_{i}") for i in range(5)]
         await rapyer.ainsert(*models)
         return [m.key for m in models]
 
@@ -148,10 +209,14 @@ class TestModuleAdeleteManyByKey(AsyncBenchmarkTestWithTTL):
 
 
 class TestModuleAdeleteManyByModel(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (StrModel,)
+    models = {
+        TTLMode.NO_TTL: StrModel,
+        TTLMode.TTL: StrModelWithTTL,
+    }
 
-    async def setup(self):
-        models = [StrModel(name=f"del_{i}") for i in range(5)]
+    async def setup(self, mode):
+        cls = self.models[mode]
+        models = [cls(name=f"del_{i}") for i in range(5)]
         await rapyer.ainsert(*models)
         return models
 
@@ -160,7 +225,10 @@ class TestModuleAdeleteManyByModel(AsyncBenchmarkTestWithTTL):
 
 
 class TestModuleApipelineEmpty(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (StrModel,)
+    models = {
+        TTLMode.NO_TTL: StrModel,
+        TTLMode.TTL: StrModelWithTTL,
+    }
 
     async def action(self):
         async with rapyer.apipeline():
@@ -168,10 +236,14 @@ class TestModuleApipelineEmpty(AsyncBenchmarkTestWithTTL):
 
 
 class TestModuleApipelineWithOps(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (StrModel,)
+    models = {
+        TTLMode.NO_TTL: StrModel,
+        TTLMode.TTL: StrModelWithTTL,
+    }
 
-    async def setup(self):
-        model = StrModel(name="test")
+    async def setup(self, mode):
+        cls = self.models[mode]
+        model = cls(name="test")
         await model.asave()
         return model.key
 
@@ -182,10 +254,14 @@ class TestModuleApipelineWithOps(AsyncBenchmarkTestWithTTL):
 
 
 class TestModuleAlockFromKeyExisting(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (StrModel,)
+    models = {
+        TTLMode.NO_TTL: StrModel,
+        TTLMode.TTL: StrModelWithTTL,
+    }
 
-    async def setup(self):
-        model = StrModel(name="test")
+    async def setup(self, mode):
+        cls = self.models[mode]
+        model = cls(name="test")
         await model.asave()
         return model.key
 
@@ -195,10 +271,14 @@ class TestModuleAlockFromKeyExisting(AsyncBenchmarkTestWithTTL):
 
 
 class TestModuleAlockFromKeyMissing(AsyncBenchmarkTestWithTTL):
-    models_for_ttl = (StrModel,)
+    models = {
+        TTLMode.NO_TTL: StrModel,
+        TTLMode.TTL: StrModelWithTTL,
+    }
 
-    async def setup(self):
-        return "StrModel:no-such-key"
+    async def setup(self, mode):
+        cls = self.models[mode]
+        return f"{cls.__name__}:no-such-key"
 
     async def action(self, key):
         async with rapyer.alock_from_key(key):

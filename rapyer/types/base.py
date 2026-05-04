@@ -3,7 +3,7 @@ import base64
 import logging
 import pickle
 from abc import ABC
-from typing import Any, Generic, TypeVar, get_args
+from typing import TYPE_CHECKING, Any, Generic, Optional, TypeVar, get_args
 
 from pydantic import GetCoreSchemaHandler, TypeAdapter
 from pydantic_core import core_schema
@@ -11,10 +11,13 @@ from pydantic_core.core_schema import CoreSchema, SerializationInfo, ValidationI
 from redis.commands.search.field import TextField
 
 # Imported here to avoid circular import issues; actions imports context, not types.base
-from rapyer.actions import ActionGroup, mark_actions
+from rapyer.actions import ActionGroup, install_marked_action_methods, mark_actions
 from rapyer.context import _context_pipe
 from rapyer.errors import CantSerializeRedisValueError
 from rapyer.typing_support import Self
+
+if TYPE_CHECKING:
+    from rapyer.config import RedisConfig
 
 logger = logging.getLogger("rapyer")
 
@@ -29,6 +32,27 @@ class BaseRedisType(ABC):
     original_type: type = None
     field_name: str = None
     _adapter: TypeAdapter = None
+
+    def __init_subclass__(cls, *, owner_meta: Optional["RedisConfig"] = None, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if owner_meta is None:
+            # Static (module-load-time) subclass — no Atomic to specialize for yet.
+            # Methods stay tagged with v2 MarkActionParams; the dynamic per-field
+            # subclass created by RedisConverter will install them with its meta.
+            return
+        cls.build_redis_model(owner_meta)
+
+    @classmethod
+    def build_redis_model(cls, meta: "RedisConfig"):
+        """Re-install marked-action methods on this per-field subclass.
+
+        Mirror of ``AtomicRedisModel.build_redis_model`` for the field-type
+        side: dynamic per-field subclasses (created by ``RedisConverter``)
+        decide wrap/no-wrap of each method against the owning model's meta at
+        build time. Tests/benchmarks that mutate ``Meta`` at runtime can call
+        this directly via the test-side ``recursive_build_redis_model`` helper.
+        """
+        install_marked_action_methods(cls, meta)
 
     @property
     def redis(self):
@@ -87,7 +111,7 @@ class BaseRedisType(ABC):
 
 class RedisType(BaseRedisType):
 
-    @mark_actions(ActionGroup.UPDATE)
+    @mark_actions(ActionGroup.UPDATE, version="v2")
     async def asave(self) -> Self:
         model_dump = self._adapter.dump_python(
             self, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
@@ -95,7 +119,7 @@ class RedisType(BaseRedisType):
         await self.client.json().set(self.key, self.json_path, model_dump)  # type: ignore[misc]
         return self
 
-    @mark_actions(ActionGroup.READ)
+    @mark_actions(ActionGroup.READ, version="v2")
     async def aload(self):
         redis_value = await self.redis.json().get(self.key, self.field_path)  # type: ignore[misc]
         if redis_value is None:

@@ -44,7 +44,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
                 self.init_redis_field(f".{key}", value)
         return new_dct
 
-    @mark_actions(ActionGroup.UPDATE)
+    @mark_actions(ActionGroup.UPDATE, version="v2")
     def update(self, m=None, /, **kwargs):
         if self.pipeline:
             m_redis_val = (
@@ -66,13 +66,13 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         kwargs_new_val = self.validate_dict(kwargs)
         return super().update(m_new_val, **kwargs_new_val)
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
     def clear(self):
         if self.pipeline:
             self.pipeline.json().set(self.key, self.json_path, {})
         return super().clear()
 
-    @mark_actions(ActionGroup.UPDATE)
+    @mark_actions(ActionGroup.UPDATE, version="v2")
     def __setitem__(self, key, value):
         if self.pipeline:
             serialized = self._adapter.dump_python(
@@ -84,7 +84,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         new_val = self.validate_dict({key: value})[key]
         super().__setitem__(key, new_val)
 
-    @mark_actions(ActionGroup.UPDATE)
+    @mark_actions(ActionGroup.UPDATE, version="v2")
     async def aset_item(self, key, value):
         self.__setitem__(key, value)
 
@@ -97,13 +97,13 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         )
         return result
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
     async def adel_item(self, key):
         super().__delitem__(key)
         result = await self.client.json().delete(self.key, self.json_field_path(key))  # type: ignore[misc]
         return result
 
-    @mark_actions(ActionGroup.UPDATE)
+    @mark_actions(ActionGroup.UPDATE, version="v2")
     async def aupdate(self, **kwargs):
         self.update(**kwargs)
 
@@ -118,7 +118,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
                 update_keys_in_pipeline(pipeline, self.key, **redis_params)
                 await pipeline.execute()
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ, version="v2")
     async def apop(self, key, default=None):
         result = await arun_sha(
             self.redis,
@@ -138,7 +138,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
             {key: result}, context={REDIS_DUMP_FLAG_NAME: True}
         )[key]
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ, version="v2")
     async def apopitem(self):
         result = await arun_sha(
             self.redis,
@@ -162,7 +162,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
             # If Redis is empty but local dict has items, raise an error for consistency
             raise KeyError("popitem(): dictionary is empty")
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
     async def aclear(self):
         self.clear()
         # Clear Redis dict
