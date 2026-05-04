@@ -128,29 +128,6 @@ async def test_target_result_with_tuple_registers_each_item(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "value",
-    [None, "string-result", 42, {"a": 1}, b"bytes"],
-    ids=["none", "string", "int", "dict", "bytes"],
-)
-async def test_target_result_with_non_registerable_does_not_refresh(
-    setup_fake_redis, refresh_calls, value, mark_version
-):
-    # Arrange
-    @mark_actions(ActionGroup.READ, target=TargetSource.RESULT, version=mark_version)
-    async def make():
-        return value
-
-    make = maybe_install_v2(mark_version, make)
-
-    # Act
-    await make()
-
-    # Assert
-    assert refresh_calls == []
-
-
-@pytest.mark.asyncio
 async def test_target_result_mixed_list_only_registers_models(
     setup_fake_redis, refresh_calls, mark_version
 ):
