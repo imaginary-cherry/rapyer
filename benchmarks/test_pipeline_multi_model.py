@@ -1,7 +1,10 @@
 import rapyer
 from benchmarks.base import AsyncBenchmarkTestWithTTL, TTLMode
 from benchmarks.models import IntModelWithTTL
-from tests.models.collection_types import ComprehensiveTestModel, ComprehensiveTestModelNoTTL
+from tests.models.collection_types import (
+    ComprehensiveTestModel,
+    ComprehensiveTestModelNoTTL,
+)
 from tests.models.simple_types import IntModel
 
 NUM_MODELS = 100
