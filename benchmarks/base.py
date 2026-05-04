@@ -4,6 +4,7 @@ import pytest
 
 from rapyer import AtomicRedisModel
 from rapyer.actions import ActionGroup
+from tests.build_helpers import recursive_build_redis_model
 
 BENCHMARK_TTL_SECONDS = 3600
 
@@ -49,11 +50,11 @@ class AsyncBenchmarkTestWithTTL(AsyncBenchmarkTest):
             cls.Meta.ttl = BENCHMARK_TTL_SECONDS
             cls.Meta.refresh_ttl = ActionGroup.all(for_ttl=True)
             # Recreate the model to ensure ttl updates actions
-            cls.build_redis_model()
+            recursive_build_redis_model(cls)
         try:
             self._run(benchmark, event_loop)
         finally:
             for cls, ttl, original_refresh in original:
                 cls.Meta.ttl = ttl
                 cls.Meta.refresh_ttl = original_refresh
-                cls.build_redis_model()
+                recursive_build_redis_model(cls)
