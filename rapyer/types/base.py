@@ -40,7 +40,19 @@ class BaseRedisType(ABC):
             # Methods stay tagged with v2 MarkActionParams; the dynamic per-field
             # subclass created by RedisConverter will install them with its meta.
             return
-        install_marked_action_methods(cls, owner_meta)
+        cls.build_redis_model(owner_meta)
+
+    @classmethod
+    def build_redis_model(cls, meta: "RedisConfig"):
+        """Re-install marked-action methods on this per-field subclass.
+
+        Mirror of ``AtomicRedisModel.build_redis_model`` for the field-type
+        side: dynamic per-field subclasses (created by ``RedisConverter``)
+        decide wrap/no-wrap of each method against the owning model's meta at
+        build time. Tests/benchmarks that mutate ``Meta`` at runtime can call
+        this directly via the test-side ``recursive_build_redis_model`` helper.
+        """
+        install_marked_action_methods(cls, meta)
 
     @property
     def redis(self):
