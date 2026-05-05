@@ -96,7 +96,6 @@ Rapyer ensures data consistency with built-in atomic operations:
 # These operations are atomic and race-condition safe
 await user.tags.aappend("python")           # Add to list
 await user.metadata.aupdate(role="dev")     # Update dict
-await user.score.set(100)                   # Set value
 ```
 
 ### Lock Context Manager
