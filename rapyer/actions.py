@@ -25,7 +25,6 @@ class MarkActionParams:
 
     combined: "ActionGroup"
     target: "TargetSource"
-    initial: bool
     ignore_refresh: bool
 
 
@@ -74,69 +73,66 @@ class TargetSource(enum.Enum):
     MANUAL = "manual"
 
 
-ActionContextEntryType = tuple["AtomicRedisModel", "ActionGroup", bool]
+ActionContextEntryType = tuple["AtomicRedisModel", "ActionGroup"]
 _action_context: contextvars.ContextVar[Optional[list[ActionContextEntryType]]] = (
     contextvars.ContextVar("rapyer_action_context", default=None)
 )
 
 
-def register_action_target(
-    model: "AtomicRedisModel",
-    action: "ActionGroup",
-    *,
-    initial: bool = False,
-):
+def register_action_target(model: "AtomicRedisModel", action: "ActionGroup"):
     """
     Register a model for TTL refresh at the outer decorator boundary.
     """
     ctx = _action_context.get()
     if ctx is None:
         return
-    ctx.append((model, action, initial))
+    ctx.append((model, action))
 
 
-def register_from_result(result, action: "ActionGroup", *, initial: bool = False):
+def register_from_result(result, action: "ActionGroup"):
     if isinstance(result, (list, tuple)):
         for item in result:
-            register_action_target(item, action, initial=initial)
+            register_action_target(item, action)
     elif result is not None:
-        register_action_target(result, action, initial=initial)
+        register_action_target(result, action)
 
 
-async def flush_action_targets(targets: list[ActionContextEntryType]):
-    """Dedup registered targets by model.key and refresh TTL once per unique key."""
-    merged: dict[str, tuple["AtomicRedisModel", ActionGroup, bool]] = {}
-    for model, action, initial in targets:
+async def flush_action_targets_v1(targets: list[ActionContextEntryType]):
+    merged: dict[str, tuple["AtomicRedisModel", ActionGroup]] = {}
+    for model, action in targets:
         existing = merged.get(model.key)
         if existing is None:
-            merged[model.key] = (model, action, initial)
+            merged[model.key] = (model, action)
         else:
-            # OR-merge action groups and `initial` flag. An `initial=True`
-            # signal from any registrant upgrades the merged entry so that
-            # first-time TTL still gets set even if no registrant triggers
-            # a normal refresh (harmless for existing TTLs — `nx=True`).
-            merged[model.key] = (
-                existing[0],
-                existing[1] | action,
-                existing[2] or initial,
-            )
+            merged[model.key] = (existing[0], existing[1] | action)
 
     if not targets:
         return
     atomic_model = targets[0][0]
 
     async with ensure_pipeline(atomic_model.Meta):
-        for model, action, initial in merged.values():
-            await model.refresh_ttl_if_needed(
-                can_use_pipeline=True, action=action, initial=initial
-            )
+        for model, action in merged.values():
+            await model.refresh_ttl_if_needed(can_use_pipeline=True, action=action)
+
+
+async def flush_action_targets_v2(targets: list[ActionContextEntryType]):
+    if not targets:
+        return
+    seen: dict[str, "AtomicRedisModel"] = {}
+    for model, _action in targets:
+        seen.setdefault(model.key, model)
+
+    atomic_model = targets[0][0]
+    async with ensure_pipeline(atomic_model.Meta):
+        for model in seen.values():
+            await model.refresh_ttl(can_use_pipeline=True)
 
 
 def _build_action_wrapper(
     method,
     combined: "ActionGroup",
     target: "TargetSource",
-    initial: bool,
+    flush_fn: Callable,
 ):
     """Build the async wrapper that opens an action context and flushes on exit."""
 
@@ -152,14 +148,13 @@ def _build_action_wrapper(
                 token = _action_context.set(targets)
             try:
                 if args:
-                    first = args[0]
-                    register_action_target(first, combined, initial=initial)
+                    register_action_target(args[0], combined)
                 result = await method(*args, **kwargs)
             finally:
                 if is_outer:
                     _action_context.reset(token)
             if is_outer and targets is not None:
-                await flush_action_targets(targets)
+                await flush_fn(targets)
             return result
 
     elif target is TargetSource.RESULT:
@@ -174,12 +169,12 @@ def _build_action_wrapper(
                 token = _action_context.set(targets)
             try:
                 result = await method(*args, **kwargs)
-                register_from_result(result, combined, initial=initial)
+                register_from_result(result, combined)
             finally:
                 if is_outer:
                     _action_context.reset(token)
             if is_outer and targets is not None:
-                await flush_action_targets(targets)
+                await flush_fn(targets)
             return result
 
     else:  # TargetSource.MANUAL
@@ -198,7 +193,7 @@ def _build_action_wrapper(
                 if is_outer:
                     _action_context.reset(token)
             if is_outer and targets is not None:
-                await flush_action_targets(targets)
+                await flush_fn(targets)
             return result
 
     setattr(wrapper, ACTION_GROUPS_ATTR, combined)
@@ -209,7 +204,6 @@ def _build_action_wrapper(
 def mark_actions(
     *groups: ActionGroup,
     target: TargetSource = TargetSource.SELF,
-    initial: bool = False,
     ignore_refresh: bool = False,
     version: Literal["v1", "v2"] = "v1",
 ):
@@ -222,12 +216,7 @@ def mark_actions(
     - For sync methods, only tags the method with ``ACTION_GROUPS_ATTR``;
       TTL refresh is deferred to pipeline-exit via ``should_refresh()``.
 
-    ``target`` controls which models the wrapper auto-registers
-
-    ``initial=True`` marks the method as one that creates a model (e.g. ``asave``,
-    ``ainsert``). Auto-registered targets will request "set TTL only if absent"
-    semantics (EXPIRE NX), so that even with ``refresh_ttl=False`` the TTL is
-    still established on first save.
+    ``target`` controls which models the wrapper auto-registers.
 
     ``ignore_refresh=True`` skips wrapping entirely — the method is tagged with
     ``ACTION_GROUPS_ATTR`` for inspection/grouping, but no action context is
@@ -235,8 +224,12 @@ def mark_actions(
 
     ``version`` selects when the wrap/no-wrap decision happens:
 
-    - ``"v1"`` (default): check whether we should refresh at runtime
-    - ``"v2"``: Minimize runtime - adjust the code to run for only actions that need it.
+    - ``"v1"`` (default): wrap at decoration time and re-check ``Meta.refresh_ttl``
+      against the action group at every call (in ``flush_action_targets_v1``).
+    - ``"v2"``: defer the wrap decision to model class install time. If the
+      method is wrapped, runtime refreshes unconditionally (no per-call check).
+      To opt creates into refresh while skipping other actions, set
+      ``Meta.refresh_ttl=ActionGroup.CREATE``.
     """
     combined = ActionGroup(0)
     for g in groups:
@@ -249,14 +242,14 @@ def mark_actions(
             setattr(
                 method,
                 MARK_ACTION_PARAMS_ATTR,
-                MarkActionParams(combined, target, initial, ignore_refresh),
+                MarkActionParams(combined, target, ignore_refresh),
             )
             return method
 
         if not inspect.iscoroutinefunction(method) or ignore_refresh:
             return method
 
-        return _build_action_wrapper(method, combined, target, initial)
+        return _build_action_wrapper(method, combined, target, flush_action_targets_v1)
 
     return decorator
 
@@ -308,10 +301,9 @@ def install_action_for_meta(func: Callable, meta: "RedisConfig"):
         and is_async
         and should_refresh_for_action(meta, params.combined)
     )
-    should_start_ttl = params.initial and meta.ttl and is_async
-    if should_refresh or should_start_ttl:
+    if should_refresh:
         return _build_action_wrapper(
-            base_func, params.combined, params.target, params.initial
+            base_func, params.combined, params.target, flush_action_targets_v2
         )
     return base_func
 

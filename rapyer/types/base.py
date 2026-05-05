@@ -69,11 +69,15 @@ class BaseRedisType(ABC):
     async def refresh_ttl_if_needed(
         self,
         can_use_pipeline: bool = False,
-        action=None,
-        initial: bool = False,
+        action=None
     ):
         return await self._base_model_link.refresh_ttl_if_needed(
-            can_use_pipeline=can_use_pipeline, action=action, initial=initial
+            can_use_pipeline=can_use_pipeline, action=action
+        )
+
+    async def refresh_ttl(self, can_use_pipeline: bool = False):
+        return await self._base_model_link.refresh_ttl(
+            can_use_pipeline=can_use_pipeline
         )
 
     @property

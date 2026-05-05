@@ -200,22 +200,25 @@ class AtomicRedisModel(BaseModel):
         self,
         can_use_pipeline: bool = False,
         action=None,
-        initial: bool = False,
     ):
+        # ``should_refresh_for_action`` already short-circuits when Meta.ttl is None.
+        if not self.should_refresh_for_action(action):
+            return
+        await self.refresh_ttl(can_use_pipeline=can_use_pipeline)
+
+    async def refresh_ttl(self, can_use_pipeline: bool = False):
+        """Refresh TTL unconditionally — used by v2 flush. The wrap decision
+        in ``install_action_for_meta`` already verified Meta.refresh_ttl, so
+        no per-call check is needed."""
         if self.Meta.ttl is None:
             return
-        should_refresh = self.should_refresh_for_action(action)
-        if not should_refresh and not initial:
-            return
-        # initial=True with refresh_ttl=False → set TTL only if none exists (NX)
-        nx = initial and not should_refresh
         pipe_context = ensure_pipeline if can_use_pipeline else pipeline_with_execution
         async with pipe_context(self.Meta) as pipe:
-            pipe.expire(self.key, self.Meta.ttl, nx=nx)
+            pipe.expire(self.key, self.Meta.ttl)
             for fname in self._special_field_names:
                 field = getattr(self, fname)
                 if isinstance(field, SpecialFieldType):
-                    pipe.expire(field.special_key, self.Meta.ttl, nx=nx)
+                    pipe.expire(field.special_key, self.Meta.ttl)
 
     @classmethod
     def redis_schema(cls, redis_name: str = ""):
@@ -401,7 +404,7 @@ class AtomicRedisModel(BaseModel):
     def is_inner_model(self) -> bool:
         return bool(self.field_name)
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.CREATE, initial=True, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.CREATE, version="v2")
     async def asave(self) -> Self:
         model_dump = self.redis_dump()
         async with ensure_pipeline(self.Meta) as pipe:
@@ -425,16 +428,12 @@ class AtomicRedisModel(BaseModel):
             exclude=self._special_field_names or None,
         )
 
-    @mark_actions(
-        ActionGroup.CREATE, target=TargetSource.RESULT, initial=True, version="v2"
-    )
+    @mark_actions(ActionGroup.CREATE, target=TargetSource.RESULT, version="v2")
     async def aduplicate(self) -> Self:
         duplicates = await self.aduplicate_many(1)
         return duplicates[0]
 
-    @mark_actions(
-        ActionGroup.CREATE, target=TargetSource.RESULT, initial=True, version="v2"
-    )
+    @mark_actions(ActionGroup.CREATE, target=TargetSource.RESULT, version="v2")
     async def aduplicate_many(self, num: int) -> list[Self]:
         if self.is_inner_model():
             raise RuntimeError("Can only duplicate from top level model")
@@ -637,9 +636,7 @@ class AtomicRedisModel(BaseModel):
         return [RapyerKey(k) for k in keys]
 
     @classmethod
-    @mark_actions(
-        ActionGroup.CREATE, target=TargetSource.RESULT, initial=True, version="v2"
-    )
+    @mark_actions(ActionGroup.CREATE, target=TargetSource.RESULT, version="v2")
     async def ainsert(cls, *models: Unpack[Self]):
         async with ensure_pipeline(cls.Meta) as pipe:
             for model in models:
@@ -974,11 +971,11 @@ def find_redis_models() -> list[type[AtomicRedisModel]]:
     return REDIS_MODELS
 
 
-@mark_actions(ActionGroup.CREATE, target=TargetSource.MANUAL, initial=True)
+@mark_actions(ActionGroup.CREATE, target=TargetSource.MANUAL)
 async def ainsert(*models: Unpack[AtomicRedisModel]) -> list[AtomicRedisModel]:
     async with ensure_pipeline(AtomicRedisModel.Meta) as pipe:
         for model in models:
-            register_action_target(model, ActionGroup.UPDATE, initial=True)
+            register_action_target(model, ActionGroup.UPDATE)
             pipe.json().set(model.key, model.json_path, model.redis_dump())
             for fname in model.__class__._special_field_names:
                 field = getattr(model, fname)
