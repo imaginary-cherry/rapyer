@@ -103,9 +103,8 @@ For complex multi-field updates:
 
 ```python
 async with user.alock("transaction") as locked_user:
-    locked_user.balance -= 50
-    locked_user.transaction_count += 1
-    # All changes saved atomically
+    # Locked actions, only single process can be inside this lock section at a time
+    call_new_action()
 ```
 
 ### Pipeline Operations
