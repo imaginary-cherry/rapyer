@@ -5,7 +5,7 @@ import enum
 import functools
 import inspect
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Literal, Optional
+from typing import TYPE_CHECKING, Awaitable, Callable, Iterable, Literal, Optional
 
 from rapyer.context import _context_pipe, ensure_pipeline
 
@@ -74,6 +74,7 @@ class TargetSource(enum.Enum):
 
 
 ActionContextEntryType = tuple["AtomicRedisModel", "ActionGroup"]
+RefreshFN = Callable[[Iterable[ActionContextEntryType]], Awaitable[None]]
 _action_context: contextvars.ContextVar[Optional[list[ActionContextEntryType]]] = (
     contextvars.ContextVar("rapyer_action_context", default=None)
 )
@@ -97,42 +98,35 @@ def register_from_result(result, action: "ActionGroup"):
         register_action_target(result, action)
 
 
-async def flush_action_targets_v1(targets: list[ActionContextEntryType]):
-    merged: dict[str, tuple["AtomicRedisModel", ActionGroup]] = {}
+async def flush_action_targets(
+    targets: list[ActionContextEntryType], refresh_fn: RefreshFN
+):
+    if not targets:
+        return
+    seen: dict[str, ActionContextEntryType] = {}
     for model, action in targets:
-        existing = merged.get(model.key)
-        if existing is None:
-            merged[model.key] = (model, action)
-        else:
-            merged[model.key] = (existing[0], existing[1] | action)
-
-    if not targets:
-        return
-    atomic_model = targets[0][0]
-
-    async with ensure_pipeline(atomic_model.Meta):
-        for model, action in merged.values():
-            await model.refresh_ttl_if_needed(can_use_pipeline=True, action=action)
-
-
-async def flush_action_targets_v2(targets: list[ActionContextEntryType]):
-    if not targets:
-        return
-    seen: dict[str, "AtomicRedisModel"] = {}
-    for model, _action in targets:
-        seen.setdefault(model.key, model)
+        seen.setdefault(model.key, (model, action))
 
     atomic_model = targets[0][0]
     async with ensure_pipeline(atomic_model.Meta):
-        for model in seen.values():
-            await model.refresh_ttl(can_use_pipeline=True)
+        await refresh_fn(seen.values())
+
+
+async def refresh_models_v1(targets: Iterable[ActionContextEntryType]):
+    for model, action in targets:
+        await model.refresh_ttl_if_needed(can_use_pipeline=True, action=action)
+
+
+async def refresh_models_v2(targets: Iterable[ActionContextEntryType]):
+    for model, _ in targets:
+        await model.refresh_ttl(can_use_pipeline=True)
 
 
 def _build_action_wrapper(
     method,
     combined: "ActionGroup",
     target: "TargetSource",
-    flush_fn: Callable,
+    refresh_fn: RefreshFN,
 ):
     """Build the async wrapper that opens an action context and flushes on exit."""
 
@@ -154,7 +148,7 @@ def _build_action_wrapper(
                 if is_outer:
                     _action_context.reset(token)
             if is_outer and targets is not None:
-                await flush_fn(targets)
+                await flush_action_targets(targets, refresh_fn)
             return result
 
     elif target is TargetSource.RESULT:
@@ -174,7 +168,7 @@ def _build_action_wrapper(
                 if is_outer:
                     _action_context.reset(token)
             if is_outer and targets is not None:
-                await flush_fn(targets)
+                await refresh_fn(targets)
             return result
 
     else:  # TargetSource.MANUAL
@@ -193,7 +187,7 @@ def _build_action_wrapper(
                 if is_outer:
                     _action_context.reset(token)
             if is_outer and targets is not None:
-                await flush_fn(targets)
+                await refresh_fn(targets)
             return result
 
     setattr(wrapper, ACTION_GROUPS_ATTR, combined)
@@ -249,7 +243,7 @@ def mark_actions(
         if not inspect.iscoroutinefunction(method) or ignore_refresh:
             return method
 
-        return _build_action_wrapper(method, combined, target, flush_action_targets_v1)
+        return _build_action_wrapper(method, combined, target, refresh_models_v1)
 
     return decorator
 
@@ -303,7 +297,7 @@ def install_action_for_meta(func: Callable, meta: "RedisConfig"):
     )
     if should_refresh:
         return _build_action_wrapper(
-            base_func, params.combined, params.target, flush_action_targets_v2
+            base_func, params.combined, params.target, refresh_models_v2
         )
     return base_func
 
