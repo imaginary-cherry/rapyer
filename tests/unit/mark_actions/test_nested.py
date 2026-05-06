@@ -29,8 +29,8 @@ async def test_nested_decorated_calls_flush_only_once(flush_mock, mark_version):
     # in the targets list (flush handles dedup later).
     flush_mock.assert_awaited_once_with(
         [
-            (model, ActionGroup.UPDATE, False),
-            (model, ActionGroup.UPDATE, False),
+            (model, ActionGroup.UPDATE),
+            (model, ActionGroup.UPDATE),
         ],
         ANY,
     )
@@ -60,9 +60,10 @@ async def test_nested_decorated_calls_with_different_models_collect_all_targets(
     # Assert: outer registers `a` first (target=SELF), then inner registers `b`.
     flush_mock.assert_awaited_once_with(
         [
-            (a, ActionGroup.UPDATE, False),
-            (b, ActionGroup.UPDATE, False),
-        ], ANY
+            (a, ActionGroup.UPDATE),
+            (b, ActionGroup.UPDATE),
+        ],
+        ANY,
     )
 
 
