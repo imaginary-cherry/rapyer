@@ -1,6 +1,7 @@
 import asyncio
 import inspect
 from abc import ABC
+from contextlib import contextmanager
 from typing import Any, ClassVar
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -10,6 +11,7 @@ from redis.asyncio.client import Pipeline, Redis
 import rapyer.actions as actions_module
 from rapyer import AtomicRedisModel
 from rapyer.actions import ActionGroup
+from tests.build_helpers import recursive_build_redis_model
 from tests.coverage_helpers import (
     COVER_TTL_NO_REFRESH,
     COVER_TTL_REFRESH,
@@ -50,6 +52,15 @@ class TTLActionTestBase(ActionTestBase, ABC):
         for model in self.models_to_check_ttl():
             keys.extend(self.ttl_keys(model))
         return keys
+
+    @contextmanager
+    def installed_refresh_ttl(self, model_cls: type[AtomicRedisModel], refresh_ttl):
+        try:
+            with patch.object(model_cls.Meta, "refresh_ttl", refresh_ttl):
+                recursive_build_redis_model(model_cls)
+                yield
+        finally:
+            recursive_build_redis_model(model_cls)
 
     def ttl_keys(self, model: AtomicRedisModel) -> list[str]:
         """Redis keys whose TTL should be asserted. Default: ``[model.key]``.
@@ -117,8 +128,8 @@ class TTLActionTestBase(ActionTestBase, ABC):
             ttls_before: list[int] = await adapter.get_additional_ttl(wrapped[0])
 
         # Act
-        with patch.object(
-            type(wrapped[0]).Meta, "refresh_ttl", ActionGroup.all(for_ttl=True)
+        with self.installed_refresh_ttl(
+            type(wrapped[0]), ActionGroup.all(for_ttl=True)
         ):
             await self.perform_action(wrapped[0])
 
@@ -142,9 +153,8 @@ class TTLActionTestBase(ActionTestBase, ABC):
             )
 
         # Act
-        with patch.object(
-            type(model_for_keys).Meta,
-            "refresh_ttl",
+        with self.installed_refresh_ttl(
+            type(model_for_keys),
             ActionGroup.all(for_ttl=True),
         ):
             await self.perform_action(model_for_keys)
@@ -172,9 +182,8 @@ class TTLActionTestBase(ActionTestBase, ABC):
             )
 
         # Act
-        with patch.object(
-            type(model_for_keys).Meta,
-            "refresh_ttl",
+        with self.installed_refresh_ttl(
+            type(model_for_keys),
             ActionGroup(0),
         ):
             await self.perform_action(model_for_keys)
@@ -197,7 +206,9 @@ class TTLActionTestBase(ActionTestBase, ABC):
 
         # Act
         with (
-            patch.object(type(model_for_keys).Meta, "refresh_ttl", ActionGroup(0)),
+            self.installed_refresh_ttl(
+                type(model_for_keys), ActionGroup.all(for_ttl=True)
+            ),
             patch.object(actions_module, "flush_action_targets", flush_spy),
             patch.object(Redis, "expire", redis_expire_spy),
             patch.object(Pipeline, "expire", pipeline_expire_spy),
