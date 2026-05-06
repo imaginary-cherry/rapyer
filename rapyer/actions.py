@@ -75,6 +75,7 @@ class TargetSource(enum.Enum):
 
 ActionContextEntryType = tuple["AtomicRedisModel", "ActionGroup"]
 RefreshFN = Callable[[Iterable[ActionContextEntryType]], Awaitable[None]]
+BuildSeenFn = Callable[[list[ActionContextEntryType]], Iterable[ActionContextEntryType]]
 _action_context: contextvars.ContextVar[Optional[list[ActionContextEntryType]]] = (
     contextvars.ContextVar("rapyer_action_context", default=None)
 )
@@ -98,18 +99,49 @@ def register_from_result(result, action: "ActionGroup"):
         register_action_target(result, action)
 
 
-async def flush_action_targets(
-    targets: list[ActionContextEntryType], refresh_fn: RefreshFN
-):
-    if not targets:
-        return
+def _build_seen_v1(
+    targets: list[ActionContextEntryType],
+) -> Iterable[ActionContextEntryType]:
+    """v1 dedup: OR-merge action groups per key so refresh_ttl_if_needed sees
+    every action triggered for that key (e.g. nested READ + UPDATE)."""
+    seen: dict[str, ActionContextEntryType] = {}
+    for model, action in targets:
+        existing = seen.get(model.key)
+        if existing is None:
+            seen[model.key] = (model, action)
+        else:
+            seen[model.key] = (existing[0], existing[1] | action)
+    return seen.values()
+
+
+def _build_seen_v2(
+    targets: list[ActionContextEntryType],
+) -> Iterable[ActionContextEntryType]:
+    """v2 dedup: first registration per key wins. v2's refresh ignores the
+    action so OR-merging would be wasted work."""
     seen: dict[str, ActionContextEntryType] = {}
     for model, action in targets:
         seen.setdefault(model.key, (model, action))
+    return seen.values()
 
+
+@dataclass(frozen=True, slots=True)
+class FlushVersion:
+    """Per-version flush strategy: how to dedup the registered targets and
+    how to refresh each one."""
+
+    build_seen: BuildSeenFn
+    refresh: RefreshFN
+
+
+async def flush_action_targets(
+    targets: list[ActionContextEntryType], version: FlushVersion
+):
+    if not targets:
+        return
     atomic_model = targets[0][0]
     async with ensure_pipeline(atomic_model.Meta):
-        await refresh_fn(seen.values())
+        await version.refresh(version.build_seen(targets))
 
 
 async def refresh_models_v1(targets: Iterable[ActionContextEntryType]):
@@ -127,7 +159,7 @@ def _build_action_wrapper(
     method,
     combined: "ActionGroup",
     target: "TargetSource",
-    refresh_fn: RefreshFN,
+    version: FlushVersion,
 ):
     """Build the async wrapper that opens an action context and flushes on exit."""
 
@@ -149,7 +181,7 @@ def _build_action_wrapper(
                 if is_outer:
                     _action_context.reset(token)
             if is_outer and targets is not None:
-                await flush_action_targets(targets, refresh_fn)
+                await flush_action_targets(targets, version)
             return result
 
     elif target is TargetSource.RESULT:
@@ -169,7 +201,7 @@ def _build_action_wrapper(
                 if is_outer:
                     _action_context.reset(token)
             if is_outer and targets is not None:
-                await flush_action_targets(targets, refresh_fn)
+                await flush_action_targets(targets, version)
             return result
 
     else:  # TargetSource.MANUAL
@@ -188,7 +220,7 @@ def _build_action_wrapper(
                 if is_outer:
                     _action_context.reset(token)
             if is_outer and targets is not None:
-                await flush_action_targets(targets, refresh_fn)
+                await flush_action_targets(targets, version)
             return result
 
     setattr(wrapper, ACTION_GROUPS_ATTR, combined)
@@ -244,7 +276,7 @@ def mark_actions(
         if not inspect.iscoroutinefunction(method) or ignore_refresh:
             return method
 
-        return _build_action_wrapper(method, combined, target, refresh_models_v1)
+        return _build_action_wrapper(method, combined, target, FLUSH_V1)
 
     return decorator
 
@@ -298,7 +330,7 @@ def install_action_for_meta(func: Callable, meta: "RedisConfig"):
     )
     if should_refresh:
         return _build_action_wrapper(
-            base_func, params.combined, params.target, refresh_models_v2
+            base_func, params.combined, params.target, FLUSH_V2
         )
     return base_func
 
@@ -337,3 +369,7 @@ def install_marked_action_methods(cls: type, meta: Optional["RedisConfig"] = Non
             if rebuild is not None:
                 installed = rebuild(installed)
             setattr(cls, name, installed)
+
+
+FLUSH_V1 = FlushVersion(build_seen=_build_seen_v1, refresh=refresh_models_v1)
+FLUSH_V2 = FlushVersion(build_seen=_build_seen_v2, refresh=refresh_models_v2)
