@@ -168,7 +168,7 @@ def _build_action_wrapper(
                 if is_outer:
                     _action_context.reset(token)
             if is_outer and targets is not None:
-                await refresh_fn(targets)
+                await flush_action_targets(targets, refresh_fn)
             return result
 
     else:  # TargetSource.MANUAL
@@ -187,7 +187,7 @@ def _build_action_wrapper(
                 if is_outer:
                     _action_context.reset(token)
             if is_outer and targets is not None:
-                await refresh_fn(targets)
+                await flush_action_targets(targets, refresh_fn)
             return result
 
     setattr(wrapper, ACTION_GROUPS_ATTR, combined)
