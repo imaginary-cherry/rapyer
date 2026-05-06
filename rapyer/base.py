@@ -207,9 +207,7 @@ class AtomicRedisModel(BaseModel):
         await self.refresh_ttl(can_use_pipeline=can_use_pipeline)
 
     async def refresh_ttl(self, can_use_pipeline: bool = False):
-        """Refresh TTL unconditionally — used by v2 flush. The wrap decision
-        in ``install_action_for_meta`` already verified Meta.refresh_ttl, so
-        no per-call check is needed."""
+        """Refresh TTL unconditionally."""
         if self.Meta.ttl is None:
             return
         pipe_context = ensure_pipeline if can_use_pipeline else pipeline_with_execution

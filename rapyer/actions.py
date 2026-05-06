@@ -118,6 +118,7 @@ async def refresh_models_v1(targets: Iterable[ActionContextEntryType]):
 
 
 async def refresh_models_v2(targets: Iterable[ActionContextEntryType]):
+    """In v2 we dont need to check weather we refresh or not, since the check is done in install time"""
     for model, _ in targets:
         await model.refresh_ttl(can_use_pipeline=True)
 
