@@ -78,6 +78,7 @@ def refresh_calls(monkeypatch):
         )
 
     monkeypatch.setattr(TTLRefreshTestModel, "refresh_ttl_if_needed", capture)
+    monkeypatch.setattr(TTLRefreshTestModel, "refresh_ttl", capture)
     return calls
 
 

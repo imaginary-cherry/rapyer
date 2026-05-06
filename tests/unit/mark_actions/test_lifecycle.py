@@ -1,3 +1,5 @@
+from unittest.mock import ANY
+
 import pytest
 
 from rapyer.actions import (
@@ -71,7 +73,7 @@ async def test_no_args_call_with_target_self_does_not_crash(flush_mock, mark_ver
 
     # Assert
     assert result == "no-args"
-    flush_mock.assert_awaited_once_with([])
+    flush_mock.assert_awaited_once_with([], ANY)
 
 
 @pytest.mark.asyncio

@@ -1,3 +1,5 @@
+from unittest.mock import ANY
+
 import pytest
 
 from rapyer.actions import ActionGroup, mark_actions
@@ -29,7 +31,8 @@ async def test_nested_decorated_calls_flush_only_once(flush_mock, mark_version):
         [
             (model, ActionGroup.UPDATE, False),
             (model, ActionGroup.UPDATE, False),
-        ]
+        ],
+        ANY,
     )
 
 
@@ -59,7 +62,7 @@ async def test_nested_decorated_calls_with_different_models_collect_all_targets(
         [
             (a, ActionGroup.UPDATE, False),
             (b, ActionGroup.UPDATE, False),
-        ]
+        ], ANY
     )
 
 
