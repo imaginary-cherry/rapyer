@@ -44,7 +44,6 @@ def maybe_install_v2(mark_version, *funcs):
 class RefreshCall:
     model: TTLRefreshTestModel
     action: Optional[ActionGroup]
-    initial: bool
     can_use_pipeline: bool
 
 
@@ -65,14 +64,11 @@ def refresh_calls(monkeypatch):
     """Replace TTLRefreshTestModel.refresh_ttl_if_needed with a recorder."""
     calls: list[RefreshCall] = []
 
-    async def capture(
-        self, can_use_pipeline: bool = False, action=None, initial: bool = False
-    ):
+    async def capture(self, can_use_pipeline: bool = False, action=None):
         calls.append(
             RefreshCall(
                 model=self,
                 action=action,
-                initial=initial,
                 can_use_pipeline=can_use_pipeline,
             )
         )
