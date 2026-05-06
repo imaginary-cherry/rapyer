@@ -47,7 +47,9 @@ class RefreshCall:
     can_use_pipeline: bool
 
 
-def assert_action(refresh_call: "RefreshCall", expected: ActionGroup, mark_version: str):
+def assert_action(
+    refresh_call: "RefreshCall", expected: ActionGroup, mark_version: str
+):
     """v2's refresh path doesn't pass ``action`` (the wrap decision is made at
     install time), so the recorder always sees ``None``. Only assert on v1."""
     if mark_version == "v1":

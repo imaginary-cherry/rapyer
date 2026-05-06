@@ -90,9 +90,7 @@ async def test_nested_same_model_dedups_with_merged_action_groups(
     # Assert
     assert len(refresh_calls) == 1
     assert refresh_calls[0].model is model
-    assert_action(
-        refresh_calls[0], ActionGroup.UPDATE | ActionGroup.READ, mark_version
-    )
+    assert_action(refresh_calls[0], ActionGroup.UPDATE | ActionGroup.READ, mark_version)
 
 
 @pytest.mark.asyncio
@@ -125,9 +123,7 @@ async def test_dedup_by_key_with_different_instance_data(
     # the first registered instance is the one that's kept.
     assert len(refresh_calls) == 1
     assert refresh_calls[0].model is m1
-    assert_action(
-        refresh_calls[0], ActionGroup.UPDATE | ActionGroup.READ, mark_version
-    )
+    assert_action(refresh_calls[0], ActionGroup.UPDATE | ActionGroup.READ, mark_version)
 
 
 @pytest.mark.asyncio
