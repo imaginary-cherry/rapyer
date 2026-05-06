@@ -47,6 +47,13 @@ class RefreshCall:
     can_use_pipeline: bool
 
 
+def assert_action(refresh_call: "RefreshCall", expected: ActionGroup, mark_version: str):
+    """v2's refresh path doesn't pass ``action`` (the wrap decision is made at
+    install time), so the recorder always sees ``None``. Only assert on v1."""
+    if mark_version == "v1":
+        assert refresh_call.action == expected
+
+
 @pytest.fixture
 def setup_fake_redis(fake_redis_client):
     """Swap TTLRefreshTestModel.Meta.redis to a fakeredis client for the test."""

@@ -7,7 +7,7 @@ from rapyer.actions import (
     register_action_target,
 )
 from tests.models.simple_types import TTLRefreshTestModel
-from tests.unit.mark_actions.conftest import maybe_install_v2
+from tests.unit.mark_actions.conftest import assert_action, maybe_install_v2
 
 # ---------- target=SELF ----------
 
@@ -31,8 +31,7 @@ async def test_target_self_registers_first_arg(
     # Assert
     assert len(refresh_calls) == 1
     assert refresh_calls[0].model is model
-    assert refresh_calls[0].action == ActionGroup.UPDATE
-    assert refresh_calls[0].initial is False
+    assert_action(refresh_calls[0], ActionGroup.UPDATE, mark_version)
     assert refresh_calls[0].can_use_pipeline is True
 
 
@@ -54,7 +53,9 @@ async def test_target_self_combines_multiple_action_groups(
 
     # Assert
     assert len(refresh_calls) == 1
-    assert refresh_calls[0].action == ActionGroup.UPDATE | ActionGroup.APPEND
+    assert_action(
+        refresh_calls[0], ActionGroup.UPDATE | ActionGroup.APPEND, mark_version
+    )
 
 
 # ---------- target=RESULT ----------
@@ -80,7 +81,7 @@ async def test_target_result_registers_returned_model(
     assert result is returned
     assert len(refresh_calls) == 1
     assert refresh_calls[0].model is returned
-    assert refresh_calls[0].action == ActionGroup.CREATE
+    assert_action(refresh_calls[0], ActionGroup.CREATE, mark_version)
 
 
 @pytest.mark.asyncio
