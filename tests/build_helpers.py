@@ -5,10 +5,13 @@ from rapyer.types.base import BaseRedisType
 
 
 def _iter_annotation_types(annotation):
-    if isinstance(annotation, type):
-        yield annotation
     origin = get_origin(annotation)
-    if isinstance(origin, type):
+    # On Python 3.10, ``isinstance(list[int], type)`` is True for
+    # ``types.GenericAlias`` instances, so gate the direct yield on the
+    # annotation having no parameterization.
+    if origin is None and isinstance(annotation, type):
+        yield annotation
+    elif isinstance(origin, type):
         yield origin
     for arg in get_args(annotation):
         yield from _iter_annotation_types(arg)
