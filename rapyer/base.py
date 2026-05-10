@@ -6,7 +6,7 @@ import pickle
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager
-from typing import Any, ClassVar, Optional, get_origin
+from typing import Annotated, Any, ClassVar, Optional, get_args, get_origin
 
 from pydantic import (
     BaseModel,
@@ -144,6 +144,7 @@ class AtomicRedisModel(BaseModel):
     _key_field_name: ClassVar[str | None] = None
     _safe_load_fields: ClassVar[set[str]] = set()
     _special_field_names: ClassVar[set[str]] = set()
+    _redis_link_field_names: ClassVar[set[str]] = set()
     _field_name: str = PrivateAttr(default="")
     model_config = ConfigDict(validate_assignment=True, validate_default=True)
 
@@ -338,10 +339,18 @@ class AtomicRedisModel(BaseModel):
 
         # Detect special field types
         cls._special_field_names = set(getattr(cls, "_special_field_names", set()))
+        cls._redis_link_field_names = set(
+            getattr(cls, "_redis_link_field_names", set())
+        )
         for field_name, annotation in cls.__annotations__.items():
-            origin = get_origin(annotation) or annotation
+            unwrapped = annotation
+            while get_origin(unwrapped) is Annotated:
+                unwrapped = get_args(unwrapped)[0]
+            origin = get_origin(unwrapped) or unwrapped
             if safe_issubclass(origin, SpecialFieldType):
                 cls._special_field_names.add(field_name)
+            if safe_issubclass(origin, (BaseRedisType, AtomicRedisModel)):
+                cls._redis_link_field_names.add(field_name)
 
         super().__init_subclass__(**kwargs)
 
@@ -874,9 +883,13 @@ class AtomicRedisModel(BaseModel):
 
     @model_validator(mode="after")
     def assign_fields_links(self):
-        for field_name in self.__class__.model_fields.keys():
-            attr = getattr(self, field_name)
-            if isinstance(attr, (BaseRedisType, AtomicRedisModel)):
+        link_fields = self.__class__._redis_link_field_names
+        if not link_fields:
+            return self
+        instance_dict = self.__dict__
+        for name in link_fields:
+            attr = instance_dict.get(name)
+            if attr is not None:
                 attr._base_model_link = self
         return self
 
