@@ -9,6 +9,7 @@
 ### 🛠️ Technical Improvements
 
 - **Improve runtime for action with no ttl updates**: Actions that dont requires ttl updates are now running less code.
+- **Optimize runtime for pipeline actions**: removed duplicated calls in pipeline actions to check if ttl needs to be updated, now we check only once per action group instead of every action.
 
 
 ## [1.3.0]
