@@ -17,12 +17,25 @@ _context_pipe_json: contextvars.ContextVar[Optional["JSON"]] = contextvars.Conte
 @contextlib.contextmanager
 def with_pipe_context(pipe: Pipeline):
     pipe_prev = _context_pipe.set(pipe)
-    json_prev = _context_pipe_json.set(pipe.json())
+    json_prev = _context_pipe_json.set(None)
     try:
         yield pipe
     finally:
         _context_pipe_json.reset(json_prev)
         _context_pipe.reset(pipe_prev)
+
+
+def get_pipe_json() -> Optional["JSON"]:
+    """JSON commands client for the current pipeline (lazy + cached)."""
+    json_client = _context_pipe_json.get()
+    if json_client is not None:
+        return json_client
+    pipe = _context_pipe.get()
+    if pipe is None:
+        return None
+    json_client = pipe.json()
+    _context_pipe_json.set(json_client)
+    return json_client
 
 
 @contextlib.asynccontextmanager

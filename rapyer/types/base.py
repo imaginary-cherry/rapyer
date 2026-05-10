@@ -12,7 +12,7 @@ from redis.commands.search.field import TextField
 
 # Imported here to avoid circular import issues; actions imports context, not types.base
 from rapyer.actions import ActionGroup, install_marked_action_methods, mark_actions
-from rapyer.context import _context_pipe, _context_pipe_json
+from rapyer.context import _context_pipe, get_pipe_json
 from rapyer.errors import CantSerializeRedisValueError
 from rapyer.typing_support import Self
 
@@ -87,7 +87,7 @@ class BaseRedisType(ABC):
 
     @property
     def pipeline_json(self):
-        return _context_pipe_json.get()
+        return get_pipe_json()
 
     @property
     def client(self):
@@ -95,7 +95,7 @@ class BaseRedisType(ABC):
 
     @property
     def client_json(self):
-        return _context_pipe_json.get() or self.Meta.redis_json
+        return get_pipe_json() or self.Meta.redis_json
 
     @property
     def json_path(self):

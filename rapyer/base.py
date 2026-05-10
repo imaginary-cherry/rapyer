@@ -35,8 +35,8 @@ from rapyer.actions import (
 from rapyer.config import RedisConfig
 from rapyer.context import (
     _context_pipe,
-    _context_pipe_json,
     ensure_pipeline,
+    get_pipe_json,
     pipeline_with_execution,
     with_pipe_context,
 )
@@ -189,7 +189,7 @@ class AtomicRedisModel(BaseModel):
 
     @property
     def client_json(self):
-        return _context_pipe_json.get() or self.Meta.redis_json
+        return get_pipe_json() or self.Meta.redis_json
 
     @classmethod
     def should_refresh_for_action(cls, action=None):
@@ -411,7 +411,7 @@ class AtomicRedisModel(BaseModel):
     async def asave(self) -> Self:
         model_dump = self.redis_dump()
         async with ensure_pipeline(self.Meta):
-            pipeline_json = _context_pipe_json.get()
+            pipeline_json = get_pipe_json()
             pipeline_json.set(self.key, self.json_path, model_dump)
             for fname in self._special_field_names:
                 field = getattr(self, fname)
@@ -482,7 +482,7 @@ class AtomicRedisModel(BaseModel):
         }
 
         async with ensure_pipeline(self.Meta):
-            pipe_json = _context_pipe_json.get()
+            pipe_json = get_pipe_json()
             update_keys_in_pipeline(pipe_json, self.key, **json_path_kwargs)
 
     @mark_actions(ActionGroup.UPDATE, ignore_refresh=True, version="v2")
@@ -644,7 +644,7 @@ class AtomicRedisModel(BaseModel):
     @mark_actions(ActionGroup.CREATE, target=TargetSource.RESULT, version="v2")
     async def ainsert(cls, *models: Unpack[Self]):
         async with ensure_pipeline(cls.Meta):
-            pipe_json = _context_pipe_json.get()
+            pipe_json = get_pipe_json()
             for model in models:
                 pipe_json.set(model.key, model.json_path, model.redis_dump())
                 for fname in cls._special_field_names:
@@ -855,7 +855,7 @@ class AtomicRedisModel(BaseModel):
                 include={name},
             )
             json_path = f"{self.json_path}.{name}"
-            _context_pipe_json.get().set(self.key, json_path, serialized[name])
+            get_pipe_json().set(self.key, json_path, serialized[name])
 
     def __eq__(self, other):
         if not isinstance(other, BaseModel):
@@ -980,7 +980,7 @@ def find_redis_models() -> list[type[AtomicRedisModel]]:
 @mark_actions(ActionGroup.CREATE, target=TargetSource.MANUAL)
 async def ainsert(*models: Unpack[AtomicRedisModel]) -> list[AtomicRedisModel]:
     async with ensure_pipeline(AtomicRedisModel.Meta):
-        pipe_json = _context_pipe_json.get()
+        pipe_json = get_pipe_json()
         for model in models:
             register_action_target(model, ActionGroup.UPDATE)
             pipe_json.set(model.key, model.json_path, model.redis_dump())
