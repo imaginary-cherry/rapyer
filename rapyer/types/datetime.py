@@ -34,7 +34,7 @@ class RedisDatetime(datetime, RedisType):
         return datetime.fromtimestamp(self.timestamp())
 
     @marks_redis_updated
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC, version="v2")
     def __iadd__(self, other: timedelta) -> "RedisDatetime":
         if not isinstance(other, timedelta):
             return NotImplemented
@@ -52,7 +52,7 @@ class RedisDatetime(datetime, RedisType):
         return new_value
 
     @marks_redis_updated
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC, version="v2")
     def __isub__(self, other: timedelta) -> "RedisDatetime":
         if not isinstance(other, timedelta):
             return NotImplemented
@@ -109,27 +109,27 @@ class RedisDatetimeTimestamp(RedisDatetime):
         return NumericField(f"$.{field_name}", as_name=field_name)
 
     @marks_redis_updated
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC, version="v2")
     def __iadd__(self, other: timedelta) -> "RedisDatetimeTimestamp":
         if not isinstance(other, timedelta):
             return NotImplemented
         new_dt = self + other
         new_value = RedisDatetimeTimestamp(new_dt)
         if self.pipeline:
-            self.pipeline.json().numincrby(
+            self.pipeline_json.numincrby(
                 self.key, self.json_path, other.total_seconds()
             )
         return new_value
 
     @marks_redis_updated
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC, version="v2")
     def __isub__(self, other: timedelta) -> "RedisDatetimeTimestamp":
         if not isinstance(other, timedelta):
             return NotImplemented
         new_dt = self - other
         new_value = RedisDatetimeTimestamp(new_dt)
         if self.pipeline:
-            self.pipeline.json().numincrby(
+            self.pipeline_json.numincrby(
                 self.key, self.json_path, -other.total_seconds()
             )
         return new_value

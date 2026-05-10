@@ -10,6 +10,7 @@ def cover_marker(*parts: str) -> str:
 
 
 COVER_PIPELINE_ATOM = cover_marker("pipeline_atom")
+COVER_READ_IN_PIPELINE = cover_marker("read_in_pipeline")
 COVER_TTL_REFRESH = cover_marker("ttl_refresh")
 COVER_TTL_NO_REFRESH = cover_marker("ttl_no_refresh")
 COVER_TTL_UPDATE_ONCE = cover_marker("ttl_update_once")

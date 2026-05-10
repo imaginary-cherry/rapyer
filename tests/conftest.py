@@ -22,6 +22,7 @@ from tests.coverage_helpers import (
     COVER_NO_CLOBBER,
     COVER_NO_TTL_WHEN_NOT_CONFIGURED,
     COVER_PIPELINE_ATOM,
+    COVER_READ_IN_PIPELINE,
     COVER_TTL_NO_REFRESH,
     COVER_TTL_REFRESH,
     COVER_TTL_UPDATE_ONCE,
@@ -33,63 +34,12 @@ from tests.coverage_helpers import (
     special_field_cover_marker,
 )
 
-TTL_TESTED_METHODS: set[tuple[str, str]] = set()
-TTL_NO_REFRESH_TESTED_METHODS: set[tuple[str, str]] = set()
-SPECIAL_FIELD_TESTED_METHODS: set[tuple[str, str, str]] = set()
-SPECIAL_FIELD_TTL_TESTED_METHODS: set[tuple[str, str, str]] = set()
-BASE_MODEL_TTL_TESTED_METHODS: set[tuple[str, str]] = set()
-MODEL_PIPELINE_TESTED_METHODS: set[tuple[str, str]] = set()
-STANDALONE_PIPELINE_TESTED_METHODS: set[tuple[str, str]] = set()
-
 
 @pytest.fixture
 def force_no_ttl_updates(monkeypatch):
     flush_mock = AsyncMock()
     monkeypatch.setattr(rapyer.actions, "flush_action_targets", flush_mock)
     return flush_mock
-
-
-def _make_coverage_decorator(coverage_set: set[tuple[str, str]]):
-    def coverage_test_for(method: Callable):
-        class_name, method_name = cover_tuple(method)
-
-        def decorator(func):
-            coverage_set.add((class_name, method_name))
-            return func
-
-        return decorator
-
-    return coverage_test_for
-
-
-ttl_test_for = _make_coverage_decorator(TTL_TESTED_METHODS)
-ttl_no_refresh_test_for = _make_coverage_decorator(TTL_NO_REFRESH_TESTED_METHODS)
-
-
-def _make_special_field_coverage_decorator(coverage_set: set[tuple[str, str, str]]):
-    def coverage_test_for(method: Callable, field_type: type):
-        class_name, method_name = cover_tuple(method)
-
-        def decorator(func):
-            coverage_set.add((class_name, method_name, field_type.__name__))
-            return func
-
-        return decorator
-
-    return coverage_test_for
-
-
-special_field_test_for = _make_special_field_coverage_decorator(
-    SPECIAL_FIELD_TESTED_METHODS
-)
-special_field_ttl_test_for = _make_special_field_coverage_decorator(
-    SPECIAL_FIELD_TTL_TESTED_METHODS
-)
-base_model_ttl_test_for = _make_coverage_decorator(BASE_MODEL_TTL_TESTED_METHODS)
-model_pipeline_test_for = _make_coverage_decorator(MODEL_PIPELINE_TESTED_METHODS)
-standalone_pipeline_test_for = _make_coverage_decorator(
-    STANDALONE_PIPELINE_TESTED_METHODS
-)
 
 
 def _is_async_callable(obj) -> bool:
@@ -153,6 +103,13 @@ COVERAGE_CHECKS: list[CoverageCheck] = [
         name=COVER_PIPELINE_ATOM,
         help_text="pipeline atomicity",
         expected=lambda: _collect_methods(ignore_groups=ActionGroup.READ),
+    ),
+    CoverageCheck(
+        name=COVER_READ_IN_PIPELINE,
+        help_text="read action returns server value inside a pipeline",
+        expected=lambda: _collect_methods(
+            require_groups=ActionGroup.READ | ActionGroup.FETCH
+        ),
     ),
     CoverageCheck(
         name=COVER_TTL_REFRESH,

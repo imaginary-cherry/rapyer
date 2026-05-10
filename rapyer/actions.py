@@ -4,7 +4,8 @@ import contextvars
 import enum
 import functools
 import inspect
-from typing import TYPE_CHECKING, Optional
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Awaitable, Callable, Iterable, Literal, Optional
 
 from rapyer.context import _context_pipe, ensure_pipeline
 
@@ -14,6 +15,17 @@ if TYPE_CHECKING:
 
 
 ACTION_GROUPS_ATTR = "_action_groups"
+MARK_ACTION_PARAMS_ATTR = "_mark_action_params"
+ACTION_WRAPPER_SENTINEL = "_rapyer_action_wrapper"
+
+
+@dataclass(frozen=True, slots=True)
+class MarkActionParams:
+    """Params recorded by ``mark_actions(version="v2")`` for later install-time use."""
+
+    combined: "ActionGroup"
+    target: "TargetSource"
+    ignore_refresh: bool
 
 
 class ActionGroup(enum.Flag):
@@ -61,111 +73,97 @@ class TargetSource(enum.Enum):
     MANUAL = "manual"
 
 
-ActionContextEntryType = tuple["AtomicRedisModel", "ActionGroup", bool]
+ActionContextEntryType = tuple["AtomicRedisModel", "ActionGroup"]
+RefreshFN = Callable[[Iterable[ActionContextEntryType]], Awaitable[None]]
+BuildSeenFn = Callable[[list[ActionContextEntryType]], Iterable[ActionContextEntryType]]
 _action_context: contextvars.ContextVar[Optional[list[ActionContextEntryType]]] = (
     contextvars.ContextVar("rapyer_action_context", default=None)
 )
 
 
-def register_action_target(
-    model: "AtomicRedisModel",
-    action: "ActionGroup",
-    *,
-    initial: bool = False,
-):
+def register_action_target(model: "AtomicRedisModel", action: "ActionGroup"):
     """
     Register a model for TTL refresh at the outer decorator boundary.
     """
     ctx = _action_context.get()
     if ctx is None:
         return
-    ctx.append((model, action, initial))
+    ctx.append((model, action))
 
 
-def registerable_types() -> tuple:
-    """Types the wrapper recognizes as TTL-refresh targets (lazy to avoid circular imports)."""
-    from rapyer.base import AtomicRedisModel
-    from rapyer.types.base import BaseRedisType
-
-    return AtomicRedisModel, BaseRedisType
-
-
-def register_from_result(result, action: "ActionGroup", *, initial: bool = False):
-    """RESULT-mode helper: push returned model or iterable-of-models into the context."""
-    targetable = registerable_types()
-
-    if isinstance(result, targetable):
-        register_action_target(result, action, initial=initial)
-    elif isinstance(result, (list, tuple)):
+def register_from_result(result, action: "ActionGroup"):
+    if isinstance(result, (list, tuple)):
         for item in result:
-            if isinstance(item, targetable):
-                register_action_target(item, action, initial=initial)
+            register_action_target(item, action)
+    elif result is not None:
+        register_action_target(result, action)
 
 
-async def flush_action_targets(targets: list[ActionContextEntryType]):
-    """Dedup registered targets by model.key and refresh TTL once per unique key."""
-    merged: dict[str, tuple["AtomicRedisModel", ActionGroup, bool]] = {}
-    for model, action, initial in targets:
-        existing = merged.get(model.key)
+def _build_seen_v1(
+    targets: list[ActionContextEntryType],
+) -> Iterable[ActionContextEntryType]:
+    """v1 dedup: OR-merge action groups per key so refresh_ttl_if_needed sees
+    every action triggered for that key (e.g. nested READ + UPDATE)."""
+    seen: dict[str, ActionContextEntryType] = {}
+    for model, action in targets:
+        existing = seen.get(model.key)
         if existing is None:
-            merged[model.key] = (model, action, initial)
+            seen[model.key] = (model, action)
         else:
-            # OR-merge action groups and `initial` flag. An `initial=True`
-            # signal from any registrant upgrades the merged entry so that
-            # first-time TTL still gets set even if no registrant triggers
-            # a normal refresh (harmless for existing TTLs — `nx=True`).
-            merged[model.key] = (
-                existing[0],
-                existing[1] | action,
-                existing[2] or initial,
-            )
+            seen[model.key] = (existing[0], existing[1] | action)
+    return seen.values()
 
+
+def _build_seen_v2(
+    targets: list[ActionContextEntryType],
+) -> Iterable[ActionContextEntryType]:
+    """v2 dedup: first registration per key wins. v2's refresh ignores the
+    action so OR-merging would be wasted work."""
+    seen: dict[str, ActionContextEntryType] = {}
+    for model, action in targets:
+        seen.setdefault(model.key, (model, action))
+    return seen.values()
+
+
+@dataclass(frozen=True, slots=True)
+class FlushVersion:
+    """Per-version flush strategy: how to dedup the registered targets and
+    how to refresh each one."""
+
+    build_seen: BuildSeenFn
+    refresh: RefreshFN
+
+
+async def flush_action_targets(
+    targets: list[ActionContextEntryType], version: FlushVersion
+):
     if not targets:
         return
     atomic_model = targets[0][0]
-
     async with ensure_pipeline(atomic_model.Meta):
-        for model, action, initial in merged.values():
-            await model.refresh_ttl_if_needed(
-                can_use_pipeline=True, action=action, initial=initial
-            )
+        await version.refresh(version.build_seen(targets))
 
 
-def mark_actions(
-    *groups: ActionGroup,
-    target: TargetSource = TargetSource.SELF,
-    initial: bool = False,
-    ignore_refresh: bool = False,
+async def refresh_models_v1(targets: Iterable[ActionContextEntryType]):
+    for model, action in targets:
+        await model.refresh_ttl_if_needed(can_use_pipeline=True, action=action)
+
+
+async def refresh_models_v2(targets: Iterable[ActionContextEntryType]):
+    """In v2 we dont need to check weather we refresh or not, since the check is done in install time"""
+    for model, _ in targets:
+        await model.refresh_ttl(can_use_pipeline=True)
+
+
+def _build_action_wrapper(
+    method,
+    combined: "ActionGroup",
+    target: "TargetSource",
+    version: FlushVersion,
 ):
-    """Tag a method with action groups for TTL refresh.
+    """Build the async wrapper that opens an action context and flushes on exit."""
 
-    - For async methods, wraps the method so that, at the outermost decorator
-      boundary, TTL is refreshed for every model registered into the action
-      context during the call. Nested decorated calls only contribute targets;
-      they do not flush.
-    - For sync methods, only tags the method with ``ACTION_GROUPS_ATTR``;
-      TTL refresh is deferred to pipeline-exit via ``should_refresh()``.
-
-    ``target`` controls which models the wrapper auto-registers
-
-    ``initial=True`` marks the method as one that creates a model (e.g. ``asave``,
-    ``ainsert``). Auto-registered targets will request "set TTL only if absent"
-    semantics (EXPIRE NX), so that even with ``refresh_ttl=False`` the TTL is
-    still established on first save.
-
-    ``ignore_refresh=True`` skips wrapping entirely — the method is tagged with
-    ``ACTION_GROUPS_ATTR`` for inspection/grouping, but no action context is
-    opened and no TTL refresh is triggered (e.g. ``adelete``, ``aset_ttl``).
-    """
-    combined = ActionGroup(0)
-    for g in groups:
-        combined |= g
-
-    def decorator(method):
-        setattr(method, ACTION_GROUPS_ATTR, combined)
-
-        if not inspect.iscoroutinefunction(method) or ignore_refresh:
-            return method
+    if target is TargetSource.SELF:
 
         @functools.wraps(method)
         async def wrapper(*args, **kwargs):
@@ -176,22 +174,109 @@ def mark_actions(
                 targets = []
                 token = _action_context.set(targets)
             try:
-                if target is TargetSource.SELF and args:
-                    first = args[0]
-                    if isinstance(first, registerable_types()):
-                        register_action_target(first, combined, initial=initial)
+                if args:
+                    register_action_target(args[0], combined)
                 result = await method(*args, **kwargs)
-                if target is TargetSource.RESULT:
-                    register_from_result(result, combined, initial=initial)
             finally:
                 if is_outer:
                     _action_context.reset(token)
             if is_outer and targets is not None:
-                await flush_action_targets(targets)
+                await flush_action_targets(targets, version)
             return result
 
-        setattr(wrapper, ACTION_GROUPS_ATTR, combined)
-        return wrapper
+    elif target is TargetSource.RESULT:
+
+        @functools.wraps(method)
+        async def wrapper(*args, **kwargs):
+            is_outer = _action_context.get() is None
+            token = None
+            targets: Optional[list[ActionContextEntryType]] = None
+            if is_outer:
+                targets = []
+                token = _action_context.set(targets)
+            try:
+                result = await method(*args, **kwargs)
+                register_from_result(result, combined)
+            finally:
+                if is_outer:
+                    _action_context.reset(token)
+            if is_outer and targets is not None:
+                await flush_action_targets(targets, version)
+            return result
+
+    else:  # TargetSource.MANUAL
+
+        @functools.wraps(method)
+        async def wrapper(*args, **kwargs):
+            is_outer = _action_context.get() is None
+            token = None
+            targets: Optional[list[ActionContextEntryType]] = None
+            if is_outer:
+                targets = []
+                token = _action_context.set(targets)
+            try:
+                result = await method(*args, **kwargs)
+            finally:
+                if is_outer:
+                    _action_context.reset(token)
+            if is_outer and targets is not None:
+                await flush_action_targets(targets, version)
+            return result
+
+    setattr(wrapper, ACTION_GROUPS_ATTR, combined)
+    setattr(wrapper, ACTION_WRAPPER_SENTINEL, True)
+    return wrapper
+
+
+def mark_actions(
+    *groups: ActionGroup,
+    target: TargetSource = TargetSource.SELF,
+    ignore_refresh: bool = False,
+    version: Literal["v1", "v2"] = "v1",
+):
+    """Tag a method with action groups for TTL refresh.
+
+    - For async methods, wraps the method so that, at the outermost decorator
+      boundary, TTL is refreshed for every model registered into the action
+      context during the call. Nested decorated calls only contribute targets;
+      they do not flush.
+    - For sync methods, only tags the method with ``ACTION_GROUPS_ATTR``;
+      TTL refresh is deferred to pipeline-exit via ``should_refresh()``.
+
+    ``target`` controls which models the wrapper auto-registers.
+
+    ``ignore_refresh=True`` skips wrapping entirely — the method is tagged with
+    ``ACTION_GROUPS_ATTR`` for inspection/grouping, but no action context is
+    opened and no TTL refresh is triggered (e.g. ``adelete``, ``aset_ttl``).
+
+    ``version`` selects when the wrap/no-wrap decision happens:
+
+    - ``"v1"`` (default): wrap at decoration time and re-check ``Meta.refresh_ttl``
+      against the action group at every call (in ``flush_action_targets_v1``).
+    - ``"v2"``: defer the wrap decision to model class install time. If the
+      method is wrapped, runtime refreshes unconditionally (no per-call check).
+      To opt creates into refresh while skipping other actions, set
+      ``Meta.refresh_ttl=ActionGroup.CREATE``.
+    """
+    combined = ActionGroup(0)
+    for g in groups:
+        combined |= g
+
+    def decorator(method):
+        setattr(method, ACTION_GROUPS_ATTR, combined)
+
+        if version == "v2":
+            setattr(
+                method,
+                MARK_ACTION_PARAMS_ATTR,
+                MarkActionParams(combined, target, ignore_refresh),
+            )
+            return method
+
+        if not inspect.iscoroutinefunction(method) or ignore_refresh:
+            return method
+
+        return _build_action_wrapper(method, combined, target, FLUSH_V1)
 
     return decorator
 
@@ -224,3 +309,67 @@ def should_refresh_for_action(meta: "RedisConfig", action: "ActionGroup") -> boo
         return False
     # refresh is an ActionGroup flag set
     return bool(refresh & action)
+
+
+def install_action_for_meta(func: Callable, meta: "RedisConfig"):
+    params: Optional[MarkActionParams] = getattr(func, MARK_ACTION_PARAMS_ATTR, None)
+    if params is None:
+        return func
+    # Peel back only past wrappers WE installed previously (e.g. parent class
+    # install of the same method with a different meta). Other wrappers like
+    # ``marks_redis_updated`` must stay in place so the call chain is preserved
+    # — both for the wrap branch and the no-wrap branch.
+    base_func = func
+    while getattr(base_func, ACTION_WRAPPER_SENTINEL, False):
+        base_func = base_func.__wrapped__
+    is_async = inspect.iscoroutinefunction(base_func)
+    should_refresh = (
+        not params.ignore_refresh
+        and is_async
+        and should_refresh_for_action(meta, params.combined)
+    )
+    if should_refresh:
+        return _build_action_wrapper(
+            base_func, params.combined, params.target, FLUSH_V2
+        )
+    return base_func
+
+
+def install_marked_action_methods(cls: type, meta: Optional["RedisConfig"] = None):
+    """Wrap methods that need ttl handling.
+
+    When ``meta`` is omitted, falls back to ``cls.Meta`` (the AtomicRedisModel
+    path). For BaseRedisType field subclasses, the owning model's meta is
+    passed in explicitly because they don't carry their own ``Meta`` class.
+    """
+    if meta is None:
+        meta = cls.Meta
+    seen: set[str] = set()
+    for klass in cls.__mro__:
+        if klass is object:
+            break
+        for name, attr in vars(klass).items():
+            if name in seen:
+                continue
+            seen.add(name)
+            if isinstance(attr, classmethod):
+                raw_func = attr.__func__
+                rebuild = classmethod
+            elif isinstance(attr, staticmethod):
+                raw_func = attr.__func__
+                rebuild = staticmethod
+            elif inspect.isfunction(attr):
+                raw_func = attr
+                rebuild = None
+            else:
+                continue
+            if not hasattr(raw_func, MARK_ACTION_PARAMS_ATTR):
+                continue
+            installed = install_action_for_meta(raw_func, meta)
+            if rebuild is not None:
+                installed = rebuild(installed)
+            setattr(cls, name, installed)
+
+
+FLUSH_V1 = FlushVersion(build_seen=_build_seen_v1, refresh=refresh_models_v1)
+FLUSH_V2 = FlushVersion(build_seen=_build_seen_v2, refresh=refresh_models_v2)

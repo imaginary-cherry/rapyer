@@ -33,6 +33,7 @@ PRIVATE_METHODS = _group(
     RedisPriorityQueue._deserialize_value,
     # AtomicRedisModel
     AtomicRedisModel._search_keys_by_query,
+    AtomicRedisModel.build_redis_model,
     AtomicRedisModel.acreate_index,
     AtomicRedisModel.adelete_index,
     AtomicRedisModel.update,
@@ -95,6 +96,7 @@ NON_ACTION_METHODS = _group(
     # TTL primitives: they ARE the TTL mechanism, not actions subject to it.
     AtomicRedisModel.aset_ttl,
     AtomicRedisModel.refresh_ttl_if_needed,
+    AtomicRedisModel.refresh_ttl,
     # afind_keys / aexists are lightweight queries (keys / existence only) that
     # never load model data, so TTL refresh doesn't apply.
     AtomicRedisModel.afind_keys,

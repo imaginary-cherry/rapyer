@@ -12,7 +12,7 @@ class RedisStr(str, RedisType):
         return str(self)
 
     @marks_redis_updated
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND, version="v2")
     def __iadd__(self, other):
         new_value = self + other
         if self.pipeline:
@@ -27,7 +27,7 @@ class RedisStr(str, RedisType):
         return self.__class__(new_value)
 
     @marks_redis_updated
-    @mark_actions(ActionGroup.UPDATE)
+    @mark_actions(ActionGroup.UPDATE, version="v2")
     def __imul__(self, other):
         new_value = self * other
         if self.pipeline:

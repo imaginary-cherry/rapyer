@@ -14,11 +14,11 @@ class RedisBytes(bytes, RedisType):
         return bytes(self)
 
     @marks_redis_updated
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND, version="v2")
     def __iadd__(self, other):
         new_value = self + other
         if self.pipeline:
-            self.pipeline.json().set(
+            self.pipeline_json.set(
                 self.key, self.json_path, self.serialize_unknown(new_value)
             )
         return self.__class__(new_value)

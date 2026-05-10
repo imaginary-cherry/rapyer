@@ -20,32 +20,32 @@ class RedisInt(int, RedisType):
     def redis_schema(cls, field_name: str):
         return NumericField(f"$.{field_name}", as_name=field_name)
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC, version="v2")
     async def aincrease(self, amount: int = 1):
-        result = await self.client.json().numincrby(self.key, self.json_path, amount)  # type: ignore[misc]
+        result = await self.client_json.numincrby(self.key, self.json_path, amount)  # type: ignore[misc]
         return result[0] if isinstance(result, list) and result else result
 
     def clone(self):
         return int(self)
 
     @marks_redis_updated
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC, version="v2")
     def __iadd__(self, other):
         if self.pipeline:
-            self.pipeline.json().numincrby(self.key, self.json_path, other)
+            self.pipeline_json.numincrby(self.key, self.json_path, other)
         new_value = self + other
         return self.__class__(new_value)
 
     @marks_redis_updated
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC, version="v2")
     def __isub__(self, other):
         if self.pipeline:
-            self.pipeline.json().numincrby(self.key, self.json_path, -other)
+            self.pipeline_json.numincrby(self.key, self.json_path, -other)
         new_value = self - other
         return self.__class__(new_value)
 
     @marks_redis_updated
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC, version="v2")
     def __imul__(self, other):
         new_value = self * other
         if self.pipeline:
@@ -55,7 +55,7 @@ class RedisInt(int, RedisType):
         return self.__class__(new_value)
 
     @marks_redis_updated
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC, version="v2")
     def __ifloordiv__(self, other):
         new_value = self // other
         if self.pipeline:
@@ -70,7 +70,7 @@ class RedisInt(int, RedisType):
         return self.__class__(new_value)
 
     @marks_redis_updated
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC, version="v2")
     def __imod__(self, other):
         new_value = self % other
         if self.pipeline:
@@ -80,7 +80,7 @@ class RedisInt(int, RedisType):
         return self.__class__(new_value)
 
     @marks_redis_updated
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC)
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC, version="v2")
     def __ipow__(self, other):
         new_value = self**other
         if self.pipeline:

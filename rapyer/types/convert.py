@@ -1,4 +1,5 @@
-from typing import get_origin
+import types as _python_types
+from typing import TYPE_CHECKING, Optional, get_origin
 
 from pydantic import BaseModel, PrivateAttr, TypeAdapter
 
@@ -8,6 +9,9 @@ from rapyer.types.special import SpecialFieldType
 from rapyer.utils.annotation import DYNAMIC_CLASS_DOC, TypeConverter
 from rapyer.utils.pythonic import safe_issubclass
 
+if TYPE_CHECKING:
+    from rapyer.config import RedisConfig
+
 
 class RedisConverter(TypeConverter):
     def __init__(
@@ -15,10 +19,22 @@ class RedisConverter(TypeConverter):
         supported_types: dict[type, type],
         field_name: str,
         safe_load: bool = False,
+        owner_meta: Optional["RedisConfig"] = None,
     ):
         self.supported_types = supported_types
         self.field_name = field_name
         self.safe_load = safe_load
+        self.owner_meta = owner_meta
+
+    def _build_redis_subclass(self, name: str, base: type, namespace: dict) -> type:
+        """Create a per-field BaseRedisType subclass and pass owner_meta into __init_subclass__."""
+        kwds = {"owner_meta": self.owner_meta} if self.owner_meta is not None else {}
+        return _python_types.new_class(
+            name,
+            bases=(base,),
+            kwds=kwds,
+            exec_body=lambda ns: ns.update(namespace),
+        )
 
     def is_redis_type(self, type_to_check: type) -> bool:
         origin = get_origin(type_to_check) or type_to_check
@@ -66,9 +82,9 @@ class RedisConverter(TypeConverter):
             redis_type = self.supported_types[type_to_convert]
             original_type = type_to_convert
 
-        new_type = type(
+        new_type = self._build_redis_subclass(
             redis_type.__name__,
-            (redis_type,),
+            redis_type,
             dict(
                 field_name=self.field_name,
                 original_type=original_type,
@@ -92,9 +108,9 @@ class RedisConverter(TypeConverter):
             original_type = type_to_covert
             original_type = original_type[generic_values]
 
-        new_type = type(
+        new_type = self._build_redis_subclass(
             redis_type.__name__,
-            (redis_type,),
+            redis_type,
             dict(
                 field_name=self.field_name,
                 original_type=original_type,
