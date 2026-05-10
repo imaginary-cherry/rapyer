@@ -483,9 +483,7 @@ class AtomicRedisModel(BaseModel):
 
         async with ensure_pipeline(self.Meta):
             pipe_json = _context_pipe_json.get()
-            update_keys_in_pipeline(
-                pipe_json, self.key, **json_path_kwargs
-            )
+            update_keys_in_pipeline(pipe_json, self.key, **json_path_kwargs)
 
     @mark_actions(ActionGroup.UPDATE, ignore_refresh=True, version="v2")
     async def aset_ttl(self, ttl: int) -> None:

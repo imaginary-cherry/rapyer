@@ -69,9 +69,7 @@ class RedisList(list, GenericRedisType[T]):
             serialized_object = self._adapter.dump_python(
                 [__object], mode="json", context={REDIS_DUMP_FLAG_NAME: True}
             )
-            self.pipeline_json.arrappend(
-                self.key, self.json_path, serialized_object[0]
-            )
+            self.pipeline_json.arrappend(self.key, self.json_path, serialized_object[0])
         key = len(self)
         new_val = self.create_new_value(key, __object)
         return super().append(new_val)
@@ -93,9 +91,7 @@ class RedisList(list, GenericRedisType[T]):
             serialized = self._adapter.dump_python(
                 [__object], mode="json", context={REDIS_DUMP_FLAG_NAME: True}
             )
-            self.pipeline_json.arrinsert(
-                self.key, self.json_path, index, serialized[0]
-            )
+            self.pipeline_json.arrinsert(self.key, self.json_path, index, serialized[0])
         new_val = self.create_new_value(index, __object)
         return super().insert(index, new_val)
 
