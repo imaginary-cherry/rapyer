@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Any, Union
+from typing import Annotated, Union
 
 import redis
 from pydantic import (
@@ -13,6 +13,7 @@ from pydantic import (
     model_validator,
 )
 from redis.asyncio import Redis
+from redis.commands.json import JSON
 
 from rapyer.actions import ActionGroup
 from rapyer.errors import InvalidRefreshTtlError
@@ -55,7 +56,7 @@ class RedisConfig(BaseModel):
     # Maximum number of keys to delete per pipeline transaction in adelete_many
     max_delete_per_transaction: int | None = 1000
 
-    _redis_json: Any = PrivateAttr(default=None)
+    _redis_json: JSON = PrivateAttr(default=None)
 
     @model_validator(mode="after")
     def _build_redis_json(self):
