@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import Annotated, Union
+from typing import Annotated, Any, Union
 
 import redis
-from pydantic import BaseModel, ConfigDict, Field, SkipValidation, field_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, SkipValidation, field_validator
 from redis.asyncio import Redis
 
 from rapyer.actions import ActionGroup
@@ -46,6 +46,24 @@ class RedisConfig(BaseModel):
     is_fake_redis: bool = False
     # Maximum number of keys to delete per pipeline transaction in adelete_many
     max_delete_per_transaction: int | None = 1000
+
+    _redis_json_cache: Any = PrivateAttr(default=None)
+
+    @property
+    def redis_json(self):
+        """Cached JSON commands client for ``self.redis``.
+
+        Re-creates the JSON wrapper if ``self.redis`` is replaced (tests swap
+        in FakeRedis on Meta), so callers always get a wrapper bound to the
+        current Redis instance.
+        """
+        cached = self._redis_json_cache
+        redis_client = self.redis
+        if cached is not None and cached[0] is redis_client:
+            return cached[1]
+        json_client = redis_client.json()
+        self._redis_json_cache = (redis_client, json_client)
+        return json_client
 
     @field_validator("refresh_ttl", mode="after")
     @classmethod

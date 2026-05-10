@@ -3,19 +3,25 @@ import contextvars
 from typing import Optional
 
 from redis.asyncio.client import Pipeline
+from redis.commands.json import JSON
 
 # Create a context variable to store the context
 _context_pipe: contextvars.ContextVar[Optional["Pipeline"]] = contextvars.ContextVar(
     "redis", default=None
+)
+_context_pipe_json: contextvars.ContextVar[Optional["JSON"]] = contextvars.ContextVar(
+    "redis_pipe_json", default=None
 )
 
 
 @contextlib.contextmanager
 def with_pipe_context(pipe: Pipeline):
     pipe_prev = _context_pipe.set(pipe)
+    json_prev = _context_pipe_json.set(pipe.json())
     try:
         yield pipe
     finally:
+        _context_pipe_json.reset(json_prev)
         _context_pipe.reset(pipe_prev)
 
 

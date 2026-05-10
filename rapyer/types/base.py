@@ -12,7 +12,7 @@ from redis.commands.search.field import TextField
 
 # Imported here to avoid circular import issues; actions imports context, not types.base
 from rapyer.actions import ActionGroup, install_marked_action_methods, mark_actions
-from rapyer.context import _context_pipe
+from rapyer.context import _context_pipe, _context_pipe_json
 from rapyer.errors import CantSerializeRedisValueError
 from rapyer.typing_support import Self
 
@@ -86,8 +86,16 @@ class BaseRedisType(ABC):
         return _context_pipe.get()
 
     @property
+    def pipeline_json(self):
+        return _context_pipe_json.get()
+
+    @property
     def client(self):
         return _context_pipe.get() or self.redis
+
+    @property
+    def client_json(self):
+        return _context_pipe_json.get() or self.Meta.redis_json
 
     @property
     def json_path(self):
@@ -116,12 +124,12 @@ class RedisType(BaseRedisType):
         model_dump = self._adapter.dump_python(
             self, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
         )
-        await self.client.json().set(self.key, self.json_path, model_dump)  # type: ignore[misc]
+        await self.client_json.set(self.key, self.json_path, model_dump)  # type: ignore[misc]
         return self
 
     @mark_actions(ActionGroup.READ, version="v2")
     async def aload(self):
-        redis_value = await self.redis.json().get(self.key, self.field_path)  # type: ignore[misc]
+        redis_value = await self.Meta.redis_json.get(self.key, self.field_path)  # type: ignore[misc]
         if redis_value is None:
             return None
         result = self._adapter.validate_python(

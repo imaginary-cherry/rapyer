@@ -35,6 +35,7 @@ from rapyer.actions import (
 from rapyer.config import RedisConfig
 from rapyer.context import (
     _context_pipe,
+    _context_pipe_json,
     ensure_pipeline,
     pipeline_with_execution,
     with_pipe_context,
@@ -185,6 +186,10 @@ class AtomicRedisModel(BaseModel):
     @property
     def client(self):
         return _context_pipe.get() or self.Meta.redis
+
+    @property
+    def client_json(self):
+        return _context_pipe_json.get() or self.Meta.redis_json
 
     @classmethod
     def should_refresh_for_action(cls, action=None):
@@ -405,8 +410,9 @@ class AtomicRedisModel(BaseModel):
     @mark_actions(ActionGroup.UPDATE, ActionGroup.CREATE, version="v2")
     async def asave(self) -> Self:
         model_dump = self.redis_dump()
-        async with ensure_pipeline(self.Meta) as pipe:
-            pipe.json().set(self.key, self.json_path, model_dump)
+        async with ensure_pipeline(self.Meta):
+            pipeline_json = _context_pipe_json.get()
+            pipeline_json.set(self.key, self.json_path, model_dump)
             for fname in self._special_field_names:
                 field = getattr(self, fname)
                 if isinstance(field, SpecialFieldType):
@@ -475,8 +481,11 @@ class AtomicRedisModel(BaseModel):
             for field_name in kwargs.keys()
         }
 
-        async with ensure_pipeline(self.Meta) as pipe:
-            update_keys_in_pipeline(pipe, self.key, **json_path_kwargs)
+        async with ensure_pipeline(self.Meta):
+            pipe_json = _context_pipe_json.get()
+            update_keys_in_pipeline(
+                pipe_json, self.key, **json_path_kwargs
+            )
 
     @mark_actions(ActionGroup.UPDATE, ignore_refresh=True, version="v2")
     async def aset_ttl(self, ttl: int) -> None:
@@ -514,7 +523,7 @@ class AtomicRedisModel(BaseModel):
     )
     async def aget(cls, key: str) -> Self:
         key = cls._resolve_key(key)
-        model_dump = await cls.Meta.redis.json().get(key, "$")  # type: ignore[misc]
+        model_dump = await cls.Meta.redis_json.get(key, "$")  # type: ignore[misc]
         if not model_dump:
             raise KeyNotFound(f"{key} is missing in redis")
         model_dump = model_dump[0]
@@ -527,7 +536,7 @@ class AtomicRedisModel(BaseModel):
 
     @mark_actions(ActionGroup.READ, version="v2")
     async def aload(self) -> Self:
-        model_dump = await self.Meta.redis.json().get(self.key, self.json_path)  # type: ignore[misc]
+        model_dump = await self.Meta.redis_json.get(self.key, self.json_path)  # type: ignore[misc]
         if not model_dump:
             raise KeyNotFound(f"{self.key} is missing in redis")
         model_dump = model_dump[0]
@@ -595,7 +604,7 @@ class AtomicRedisModel(BaseModel):
             return []
 
         # Fetch the actual documents
-        models = await cls.Meta.redis.json().mget(keys=targeted_keys, path="$")  # type: ignore[misc]
+        models = await cls.Meta.redis_json.mget(keys=targeted_keys, path="$")  # type: ignore[misc]
 
         instances = []
         for model, key in zip(models, targeted_keys):
@@ -636,9 +645,10 @@ class AtomicRedisModel(BaseModel):
     @classmethod
     @mark_actions(ActionGroup.CREATE, target=TargetSource.RESULT, version="v2")
     async def ainsert(cls, *models: Unpack[Self]):
-        async with ensure_pipeline(cls.Meta) as pipe:
+        async with ensure_pipeline(cls.Meta):
+            pipe_json = _context_pipe_json.get()
             for model in models:
-                pipe.json().set(model.key, model.json_path, model.redis_dump())
+                pipe_json.set(model.key, model.json_path, model.redis_dump())
                 for fname in cls._special_field_names:
                     field = getattr(model, fname)
                     if isinstance(field, SpecialFieldType):
@@ -847,7 +857,7 @@ class AtomicRedisModel(BaseModel):
                 include={name},
             )
             json_path = f"{self.json_path}.{name}"
-            pipeline.json().set(self.key, json_path, serialized[name])
+            _context_pipe_json.get().set(self.key, json_path, serialized[name])
 
     def __eq__(self, other):
         if not isinstance(other, BaseModel):
@@ -943,7 +953,7 @@ async def afind(*redis_keys: str, skip_missing: bool = False) -> list[AtomicRedi
             )
         key_to_class[key] = klass
 
-    models_data = await AtomicRedisModel.Meta.redis.json().mget(  # type: ignore[misc]
+    models_data = await AtomicRedisModel.Meta.redis_json.mget(  # type: ignore[misc]
         keys=redis_keys, path="$"
     )
 
@@ -971,10 +981,11 @@ def find_redis_models() -> list[type[AtomicRedisModel]]:
 
 @mark_actions(ActionGroup.CREATE, target=TargetSource.MANUAL)
 async def ainsert(*models: Unpack[AtomicRedisModel]) -> list[AtomicRedisModel]:
-    async with ensure_pipeline(AtomicRedisModel.Meta) as pipe:
+    async with ensure_pipeline(AtomicRedisModel.Meta):
+        pipe_json = _context_pipe_json.get()
         for model in models:
             register_action_target(model, ActionGroup.UPDATE)
-            pipe.json().set(model.key, model.json_path, model.redis_dump())
+            pipe_json.set(model.key, model.json_path, model.redis_dump())
             for fname in model.__class__._special_field_names:
                 field = getattr(model, fname)
                 if isinstance(field, SpecialFieldType):
