@@ -5,6 +5,7 @@ from redis import Redis
 
 from rapyer.base import AtomicRedisModel
 from rapyer.types.priority_queue import RedisPriorityQueue
+from rapyer.types.redis_set import RedisSet
 from rapyer.types.special import SpecialFieldType
 from tests.models.collection_types import ComprehensiveTestModel
 
@@ -70,4 +71,27 @@ class PriorityQueueAdapter(SpecialFieldAdapter):
         assert not exists, f"PQ key {sp_key} unexpectedly still exists"
 
 
-SPECIAL_FIELD_ADAPTERS = [PriorityQueueAdapter()]
+class RedisSetAdapter(SpecialFieldAdapter):
+    sf_class = RedisSet
+    EXPECTED_SIZE = 3
+
+    def additional_ttl_keys(self, model: ComprehensiveTestModel) -> list[str]:
+        return [model.labels.special_key]
+
+    async def populate(self, model: ComprehensiveTestModel) -> None:
+        await model.labels.aadd_many(["alpha", "beta", "gamma"])
+
+    async def assert_data_present_by_key(self, model: ComprehensiveTestModel):
+        sp_key = model.labels.special_key
+        size = await self.redis_client.scard(sp_key)
+        assert (
+            size == self.EXPECTED_SIZE
+        ), f"Set key {sp_key} has {size} items; expected {self.EXPECTED_SIZE}"
+
+    async def assert_data_absent_by_key(self, model: ComprehensiveTestModel):
+        sp_key = model.labels.special_key
+        exists = await self.redis_client.exists(sp_key)
+        assert not exists, f"Set key {sp_key} unexpectedly still exists"
+
+
+SPECIAL_FIELD_ADAPTERS = [PriorityQueueAdapter(), RedisSetAdapter()]
