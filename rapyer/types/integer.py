@@ -22,7 +22,7 @@ class RedisInt(int, RedisType):
 
     @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC, version="v2")
     async def aincrease(self, amount: int = 1):
-        result = await self.client.json().numincrby(self.key, self.json_path, amount)  # type: ignore[misc]
+        result = await self.client_json.numincrby(self.key, self.json_path, amount)  # type: ignore[misc]
         return result[0] if isinstance(result, list) and result else result
 
     def clone(self):
@@ -32,7 +32,7 @@ class RedisInt(int, RedisType):
     @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC, version="v2")
     def __iadd__(self, other):
         if self.pipeline:
-            self.pipeline.json().numincrby(self.key, self.json_path, other)
+            self.pipeline_json.numincrby(self.key, self.json_path, other)
         new_value = self + other
         return self.__class__(new_value)
 
@@ -40,7 +40,7 @@ class RedisInt(int, RedisType):
     @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC, version="v2")
     def __isub__(self, other):
         if self.pipeline:
-            self.pipeline.json().numincrby(self.key, self.json_path, -other)
+            self.pipeline_json.numincrby(self.key, self.json_path, -other)
         new_value = self - other
         return self.__class__(new_value)
 

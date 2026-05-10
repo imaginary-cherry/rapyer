@@ -3,8 +3,17 @@ from __future__ import annotations
 from typing import Annotated, Union
 
 import redis
-from pydantic import BaseModel, ConfigDict, Field, SkipValidation, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    SkipValidation,
+    field_validator,
+    model_validator,
+)
 from redis.asyncio import Redis
+from redis.commands.json import JSON
 
 from rapyer.actions import ActionGroup
 from rapyer.errors import InvalidRefreshTtlError
@@ -46,6 +55,17 @@ class RedisConfig(BaseModel):
     is_fake_redis: bool = False
     # Maximum number of keys to delete per pipeline transaction in adelete_many
     max_delete_per_transaction: int | None = 1000
+
+    _redis_json: JSON = PrivateAttr(default=None)
+
+    @model_validator(mode="after")
+    def _build_redis_json(self):
+        self._redis_json = self.redis.json()
+        return self
+
+    @property
+    def redis_json(self):
+        return self._redis_json
 
     @field_validator("refresh_ttl", mode="after")
     @classmethod

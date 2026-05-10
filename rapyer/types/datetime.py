@@ -116,7 +116,7 @@ class RedisDatetimeTimestamp(RedisDatetime):
         new_dt = self + other
         new_value = RedisDatetimeTimestamp(new_dt)
         if self.pipeline:
-            self.pipeline.json().numincrby(
+            self.pipeline_json.numincrby(
                 self.key, self.json_path, other.total_seconds()
             )
         return new_value
@@ -129,7 +129,7 @@ class RedisDatetimeTimestamp(RedisDatetime):
         new_dt = self - other
         new_value = RedisDatetimeTimestamp(new_dt)
         if self.pipeline:
-            self.pipeline.json().numincrby(
+            self.pipeline_json.numincrby(
                 self.key, self.json_path, -other.total_seconds()
             )
         return new_value

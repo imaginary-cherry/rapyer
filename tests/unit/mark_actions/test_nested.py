@@ -1,8 +1,10 @@
+from unittest.mock import ANY
+
 import pytest
 
 from rapyer.actions import ActionGroup, mark_actions
 from tests.models.simple_types import TTLRefreshTestModel
-from tests.unit.mark_actions.conftest import maybe_install_v2
+from tests.unit.mark_actions.conftest import assert_action, maybe_install_v2
 
 
 @pytest.mark.asyncio
@@ -27,9 +29,10 @@ async def test_nested_decorated_calls_flush_only_once(flush_mock, mark_version):
     # in the targets list (flush handles dedup later).
     flush_mock.assert_awaited_once_with(
         [
-            (model, ActionGroup.UPDATE, False),
-            (model, ActionGroup.UPDATE, False),
-        ]
+            (model, ActionGroup.UPDATE),
+            (model, ActionGroup.UPDATE),
+        ],
+        ANY,
     )
 
 
@@ -57,9 +60,10 @@ async def test_nested_decorated_calls_with_different_models_collect_all_targets(
     # Assert: outer registers `a` first (target=SELF), then inner registers `b`.
     flush_mock.assert_awaited_once_with(
         [
-            (a, ActionGroup.UPDATE, False),
-            (b, ActionGroup.UPDATE, False),
-        ]
+            (a, ActionGroup.UPDATE),
+            (b, ActionGroup.UPDATE),
+        ],
+        ANY,
     )
 
 
@@ -86,7 +90,7 @@ async def test_nested_same_model_dedups_with_merged_action_groups(
     # Assert
     assert len(refresh_calls) == 1
     assert refresh_calls[0].model is model
-    assert refresh_calls[0].action == ActionGroup.UPDATE | ActionGroup.READ
+    assert_action(refresh_calls[0], ActionGroup.UPDATE | ActionGroup.READ, mark_version)
 
 
 @pytest.mark.asyncio
@@ -119,7 +123,7 @@ async def test_dedup_by_key_with_different_instance_data(
     # the first registered instance is the one that's kept.
     assert len(refresh_calls) == 1
     assert refresh_calls[0].model is m1
-    assert refresh_calls[0].action == ActionGroup.UPDATE | ActionGroup.READ
+    assert_action(refresh_calls[0], ActionGroup.UPDATE | ActionGroup.READ, mark_version)
 
 
 @pytest.mark.asyncio
@@ -146,5 +150,5 @@ async def test_nested_different_models_refreshed_separately(
     # Assert: each model gets its own refresh, with its own action group.
     by_key = {c.model.key: c for c in refresh_calls}
     assert set(by_key) == {a.key, b.key}
-    assert by_key[a.key].action == ActionGroup.UPDATE
-    assert by_key[b.key].action == ActionGroup.READ
+    assert_action(by_key[a.key], ActionGroup.UPDATE, mark_version)
+    assert_action(by_key[b.key], ActionGroup.READ, mark_version)

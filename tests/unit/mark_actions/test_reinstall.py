@@ -42,12 +42,11 @@ def test_inheriting_models_with_redis_int_keep_marks_redis_updated_wrapper():
     assert _count_action_wrappers(vars(PeelParentModel)["aupdate"]) == 1
     assert _count_action_wrappers(vars(PeelChildModel)["aupdate"]) == 0
 
-    # ``asave`` is UPDATE|CREATE with ``initial=True``. Both metas wrap (parent
-    # via UPDATE match, child via initial+ttl). Wrap count must still be 1 on
-    # the child — the install peeled parent's wrapper before re-wrapping.
+    # ``asave`` is UPDATE|CREATE: parent wraps via UPDATE match, child peels
+    # — refresh on first save now requires opting in via ``refresh_ttl=CREATE``,
+    # which child's APPEND|ARITHMETIC meta does not include.
     assert _count_action_wrappers(vars(PeelParentModel)["asave"]) == 1
-    assert _count_action_wrappers(vars(PeelChildModel)["asave"]) == 1
-    assert vars(PeelChildModel)["asave"] is not vars(PeelParentModel)["asave"]
+    assert _count_action_wrappers(vars(PeelChildModel)["asave"]) == 0
 
     # ``aset_ttl`` carries ``ignore_refresh=True`` — never wrapped, regardless
     # of meta. If install ever stacked a wrapper here, count would be 1.

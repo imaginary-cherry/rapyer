@@ -96,6 +96,7 @@ NON_ACTION_METHODS = _group(
     # TTL primitives: they ARE the TTL mechanism, not actions subject to it.
     AtomicRedisModel.aset_ttl,
     AtomicRedisModel.refresh_ttl_if_needed,
+    AtomicRedisModel.refresh_ttl,
     # afind_keys / aexists are lightweight queries (keys / existence only) that
     # never load model data, so TTL refresh doesn't apply.
     AtomicRedisModel.afind_keys,

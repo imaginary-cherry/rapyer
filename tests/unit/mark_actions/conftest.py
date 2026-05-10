@@ -44,8 +44,16 @@ def maybe_install_v2(mark_version, *funcs):
 class RefreshCall:
     model: TTLRefreshTestModel
     action: Optional[ActionGroup]
-    initial: bool
     can_use_pipeline: bool
+
+
+def assert_action(
+    refresh_call: "RefreshCall", expected: ActionGroup, mark_version: str
+):
+    """v2's refresh path doesn't pass ``action`` (the wrap decision is made at
+    install time), so the recorder always sees ``None``. Only assert on v1."""
+    if mark_version == "v1":
+        assert refresh_call.action == expected
 
 
 @pytest.fixture
@@ -65,19 +73,17 @@ def refresh_calls(monkeypatch):
     """Replace TTLRefreshTestModel.refresh_ttl_if_needed with a recorder."""
     calls: list[RefreshCall] = []
 
-    async def capture(
-        self, can_use_pipeline: bool = False, action=None, initial: bool = False
-    ):
+    async def capture(self, can_use_pipeline: bool = False, action=None):
         calls.append(
             RefreshCall(
                 model=self,
                 action=action,
-                initial=initial,
                 can_use_pipeline=can_use_pipeline,
             )
         )
 
     monkeypatch.setattr(TTLRefreshTestModel, "refresh_ttl_if_needed", capture)
+    monkeypatch.setattr(TTLRefreshTestModel, "refresh_ttl", capture)
     return calls
 
 

@@ -76,7 +76,7 @@ include = ["rapyer/**/*.lua"]
 dev = ["black>=26.3.1", "mypy>=1.0.0", "ruff>=0.9.0"]
 benchmark = ["pytest>=8.4.2", "pytest-benchmark>=5.2.3", "pytest-codspeed>=4.2.0"]
 
-[tool.ruff]
+[tool.ruff.lint]
 select = ["I", "F401"]
 
 [tool.ruff.lint.isort]

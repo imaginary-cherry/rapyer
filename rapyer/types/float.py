@@ -23,7 +23,7 @@ class RedisFloat(float, RedisType):
 
     @mark_actions(ActionGroup.UPDATE, ActionGroup.ARITHMETIC, version="v2")
     async def aincrease(self, amount: float = 1.0):
-        result = await self.client.json().numincrby(self.key, self.json_path, amount)  # type: ignore[misc]
+        result = await self.client_json.numincrby(self.key, self.json_path, amount)  # type: ignore[misc]
         return result[0] if isinstance(result, list) and result else result
 
     def clone(self):
@@ -34,7 +34,7 @@ class RedisFloat(float, RedisType):
     def __iadd__(self, other):
         new_value = self + other
         if self.pipeline:
-            self.pipeline.json().numincrby(self.key, self.json_path, other)
+            self.pipeline_json.numincrby(self.key, self.json_path, other)
         return self.__class__(new_value)
 
     @marks_redis_updated
@@ -42,7 +42,7 @@ class RedisFloat(float, RedisType):
     def __isub__(self, other):
         new_value = self - other
         if self.pipeline:
-            self.pipeline.json().numincrby(self.key, self.json_path, -other)
+            self.pipeline_json.numincrby(self.key, self.json_path, -other)
         return self.__class__(new_value)
 
     @marks_redis_updated

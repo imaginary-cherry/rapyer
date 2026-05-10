@@ -13,9 +13,9 @@ def acquire_lock(
     return redis.lock(lock_key, sleep=sleep_time)
 
 
-def update_keys_in_pipeline(pipeline, redis_key: str, **kwargs):
+def update_keys_in_pipeline(pipeline_json, redis_key: str, **kwargs):
     for json_path, value in kwargs.items():
-        pipeline.json().set(redis_key, json_path, value)
+        pipeline_json.set(redis_key, json_path, value)
 
 
 async def batched(iterable, n):

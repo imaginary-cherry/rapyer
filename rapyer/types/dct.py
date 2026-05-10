@@ -61,7 +61,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
             updated_values = {
                 self.json_field_path(key): v for key, v in updated_values.items()
             }
-            update_keys_in_pipeline(self.pipeline, self.key, **updated_values)
+            update_keys_in_pipeline(self.pipeline_json, self.key, **updated_values)
         m_new_val = self.validate_dict(m) if m else {}
         kwargs_new_val = self.validate_dict(kwargs)
         return super().update(m_new_val, **kwargs_new_val)
@@ -69,7 +69,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
     @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
     def clear(self):
         if self.pipeline:
-            self.pipeline.json().set(self.key, self.json_path, {})
+            self.pipeline_json.set(self.key, self.json_path, {})
         return super().clear()
 
     @mark_actions(ActionGroup.UPDATE, version="v2")
@@ -78,9 +78,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
             serialized = self._adapter.dump_python(
                 {key: value}, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
             )
-            self.pipeline.json().set(
-                self.key, self.json_field_path(key), serialized[key]
-            )
+            self.pipeline_json.set(self.key, self.json_field_path(key), serialized[key])
         new_val = self.validate_dict({key: value})[key]
         super().__setitem__(key, new_val)
 
@@ -92,7 +90,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         serialized_value = self._adapter.dump_python(
             {key: value}, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
         )
-        result = await self.client.json().set(  # type: ignore[misc]
+        result = await self.client_json.set(  # type: ignore[misc]
             self.key, self.json_field_path(key), serialized_value[key]
         )
         return result
@@ -100,7 +98,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
     @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
     async def adel_item(self, key):
         super().__delitem__(key)
-        result = await self.client.json().delete(self.key, self.json_field_path(key))  # type: ignore[misc]
+        result = await self.client_json.delete(self.key, self.json_field_path(key))  # type: ignore[misc]
         return result
 
     @mark_actions(ActionGroup.UPDATE, version="v2")
@@ -115,7 +113,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
 
         if not self.pipeline:
             async with self.redis.pipeline() as pipeline:
-                update_keys_in_pipeline(pipeline, self.key, **redis_params)
+                update_keys_in_pipeline(pipeline.json(), self.key, **redis_params)
                 await pipeline.execute()
 
     @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ, version="v2")
@@ -166,7 +164,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
     async def aclear(self):
         self.clear()
         # Clear Redis dict
-        result = await self.client.json().set(self.key, self.json_path, {})  # type: ignore[misc]
+        result = await self.client_json.set(self.key, self.json_path, {})  # type: ignore[misc]
         return result
 
     def clone(self):

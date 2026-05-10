@@ -53,7 +53,7 @@ class RedisList(list, GenericRedisType[T]):
             serialized = self._adapter.dump_python(
                 [value], mode="json", context={REDIS_DUMP_FLAG_NAME: True}
             )
-            self.pipeline.json().set(self.key, self.json_field_path(key), serialized[0])
+            self.pipeline_json.set(self.key, self.json_field_path(key), serialized[0])
         new_val = self.create_new_value(key, value)
         return super().__setitem__(key, new_val)
 
@@ -69,9 +69,7 @@ class RedisList(list, GenericRedisType[T]):
             serialized_object = self._adapter.dump_python(
                 [__object], mode="json", context={REDIS_DUMP_FLAG_NAME: True}
             )
-            self.pipeline.json().arrappend(
-                self.key, self.json_path, serialized_object[0]
-            )
+            self.pipeline_json.arrappend(self.key, self.json_path, serialized_object[0])
         key = len(self)
         new_val = self.create_new_value(key, __object)
         return super().append(new_val)
@@ -82,7 +80,7 @@ class RedisList(list, GenericRedisType[T]):
             serialized = self._adapter.dump_python(
                 list(new_lst), mode="json", context={REDIS_DUMP_FLAG_NAME: True}
             )
-            self.pipeline.json().arrappend(self.key, self.json_path, *serialized)
+            self.pipeline_json.arrappend(self.key, self.json_path, *serialized)
         new_keys = range(len(self), len(self) + len(new_lst))
         new_vals = self.create_new_values(list(new_keys), new_lst)
         return super().extend(new_vals)
@@ -93,16 +91,14 @@ class RedisList(list, GenericRedisType[T]):
             serialized = self._adapter.dump_python(
                 [__object], mode="json", context={REDIS_DUMP_FLAG_NAME: True}
             )
-            self.pipeline.json().arrinsert(
-                self.key, self.json_path, index, serialized[0]
-            )
+            self.pipeline_json.arrinsert(self.key, self.json_path, index, serialized[0])
         new_val = self.create_new_value(index, __object)
         return super().insert(index, new_val)
 
     @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
     def clear(self):
         if self.pipeline:
-            self.pipeline.json().set(self.key, self.json_path, [])
+            self.pipeline_json.set(self.key, self.json_path, [])
         return super().clear()
 
     @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
@@ -133,7 +129,7 @@ class RedisList(list, GenericRedisType[T]):
             serialized_object = self._adapter.dump_python(
                 [__object], mode="json", context={REDIS_DUMP_FLAG_NAME: True}
             )
-            await self.redis.json().arrappend(  # type: ignore[misc]
+            await self.Meta.redis_json.arrappend(  # type: ignore[misc]
                 self.key, self.json_path, *serialized_object
             )
 
@@ -148,7 +144,7 @@ class RedisList(list, GenericRedisType[T]):
             serialized_items = self._adapter.dump_python(
                 items, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
             )
-            await self.redis.json().arrappend(  # type: ignore[misc]
+            await self.Meta.redis_json.arrappend(  # type: ignore[misc]
                 self.key,
                 self.json_path,
                 *serialized_items,
@@ -158,7 +154,7 @@ class RedisList(list, GenericRedisType[T]):
     async def apop(self, index=-1):
         if self:
             self.pop(index)
-        arrpop = await self.redis.json().arrpop(self.key, self.json_path, index)  # type: ignore[misc]
+        arrpop = await self.Meta.redis_json.arrpop(self.key, self.json_path, index)  # type: ignore[misc]
 
         # Handle case where arrpop returns [None] for an empty list
         if arrpop[0] is None:
@@ -177,7 +173,7 @@ class RedisList(list, GenericRedisType[T]):
             serialized_object = self._adapter.dump_python(
                 [__object], mode="json", context={REDIS_DUMP_FLAG_NAME: True}
             )
-            await self.redis.json().arrinsert(  # type: ignore[misc]
+            await self.Meta.redis_json.arrinsert(  # type: ignore[misc]
                 self.key, self.json_path, index, *serialized_object
             )
 
@@ -188,7 +184,7 @@ class RedisList(list, GenericRedisType[T]):
 
         # Clear Redis list
         if not self.pipeline:
-            await self.client.json().set(self.key, self.json_path, [])  # type: ignore[misc]
+            await self.client_json.set(self.key, self.json_path, [])  # type: ignore[misc]
 
     def clone(self):
         return [v.clone() if isinstance(v, RedisType) else v for v in self]
