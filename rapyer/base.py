@@ -17,6 +17,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+from pydantic.fields import FieldInfo
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
 from redis.asyncio.client import Pipeline
 from redis.commands.search.aggregation import AggregateRequest
@@ -319,6 +320,11 @@ class AtomicRedisModel(BaseModel):
         }
         original_annotations = cls.__annotations__.copy()
         original_annotations.update(new_annotation)
+
+        def _check_is_excluded(name_of_field: str) -> bool:
+            info = pydantic_annotation.get(name_of_field) or cls.__dict__.get(name_of_field)
+            return isinstance(info, FieldInfo) and info.exclude is True
+
         new_annotations = {
             field_name: replace_to_redis_types_in_annotation(
                 annotation,
@@ -332,6 +338,7 @@ class AtomicRedisModel(BaseModel):
             )
             for field_name, annotation in original_annotations.items()
             if is_redis_field(field_name, annotation)
+            if not _check_is_excluded(field_name)
         }
         cls.__annotations__ = {**cls.__annotations__, **new_annotations}
         for field_name, field in pydantic_annotation.items():
@@ -356,7 +363,7 @@ class AtomicRedisModel(BaseModel):
 
         # Set new default values if needed
         for attr_name, attr_type in cls.__annotations__.items():
-            if not is_redis_field(attr_name, attr_type):
+            if attr_name not in new_annotations:
                 continue
             if safe_issubclass(attr_type, RapyerKey):
                 continue
