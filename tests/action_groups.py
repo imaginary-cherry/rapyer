@@ -9,6 +9,7 @@ from rapyer.types.datetime import RedisDatetimeTimestamp
 from rapyer.types.dct import RedisDict
 from rapyer.types.lst import RedisList
 from rapyer.types.priority_queue import RedisPriorityQueue
+from rapyer.types.redis_set import RedisSet
 from rapyer.types.special import SpecialFieldType
 from tests.coverage_helpers import cover_tuple
 
@@ -31,6 +32,9 @@ PRIVATE_METHODS = _group(
     # RedisPriorityQueue
     RedisPriorityQueue._serialize_value,
     RedisPriorityQueue._deserialize_value,
+    # RedisSet
+    RedisSet._serialize_value,
+    RedisSet._deserialize_value,
     # AtomicRedisModel
     AtomicRedisModel._search_keys_by_query,
     AtomicRedisModel.build_redis_model,
@@ -80,6 +84,7 @@ PRIVATE_INHERITED_METHODS = _group(
     SpecialFieldType.aduplicate_special,
     RedisPriorityQueue.find_inner_type,
     RedisPriorityQueue.aremove,
+    RedisSet.find_inner_type,
     AtomicRedisModel.redis_schema,
 )
 
