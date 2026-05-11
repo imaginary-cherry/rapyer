@@ -250,7 +250,7 @@ async def test_redis_dump_all_types_with_json_sanity(model_instance, expected_ty
 
 def test_model_dump_with_unsupported_redis_types_sanity():
     # Arrange
-    model = NonRedisDumpableModel(set_field={"1"})
+    model = NonRedisDumpableModel(set_field=frozenset("1"))
 
     # Act
     result = model.model_dump(mode="json")
