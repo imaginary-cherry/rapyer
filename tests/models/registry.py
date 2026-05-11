@@ -79,13 +79,18 @@ from tests.models.simple_types import (
     UserModelWithTTL,
 )
 from tests.models.special_types import (
+    AutoMappedSetModel,
     GenericPriorityQueueModel,
+    GenericRedisSetModel,
     MixedSpecialModel,
     OptionalPriorityQueueModel,
+    OptionalRedisSetModel,
     PQContainerModel,
     PriorityQueueIntModel,
     PriorityQueueModel,
+    RedisSetContainerModel,
     SubSubPriorityQueueModel,
+    SubSubRedisSetModel,
 )
 from tests.models.specialized import UserModel
 from tests.models.unknown_types import (
@@ -188,4 +193,10 @@ TESTED_REDIS_MODELS = [
     OptionalPriorityQueueModel,
     SubSubPriorityQueueModel,
     PQContainerModel,
+    # Special types (redis set)
+    GenericRedisSetModel,
+    OptionalRedisSetModel,
+    AutoMappedSetModel,
+    SubSubRedisSetModel,
+    RedisSetContainerModel,
 ]
