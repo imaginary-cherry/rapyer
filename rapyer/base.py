@@ -42,6 +42,7 @@ from rapyer.context import (
     with_pipe_context,
 )
 from rapyer.errors import (
+    BadDeleteActionError,
     CantSerializeRedisValueError,
     DuplicateModelNameError,
     KeyNotFound,
@@ -53,7 +54,6 @@ from rapyer.errors import (
     UnsupportedIndexedFieldError,
     UpdateAtomicModelError,
 )
-from rapyer.errors.delete import BadDeleteActionError
 from rapyer.fields.expression import AtomicField, Expression, ExpressionField
 from rapyer.fields.index import IndexAnnotation
 from rapyer.fields.key import KeyAnnotation, RapyerKey

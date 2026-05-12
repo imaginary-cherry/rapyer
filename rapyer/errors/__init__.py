@@ -1,6 +1,7 @@
 import warnings
 
 from rapyer.errors.base import (
+    CorruptedModelError,
     DuplicateModelNameError,
     InvalidRefreshTtlError,
     KeyNotFound,
@@ -10,6 +11,7 @@ from rapyer.errors.base import (
     UnsupportedArgumentValueError,
     UpdateAtomicModelError,
 )
+from rapyer.errors.delete import BadDeleteActionError
 from rapyer.errors.find import (
     BadFilterError,
     CantSerializeRedisValueError,
@@ -48,4 +50,6 @@ __all__ = [
     "MissingParameterError",
     "UnsupportedArgumentValueError",
     "UnsupportedArgumentTypeError",
+    "BadDeleteActionError",
+    "CorruptedModelError",
 ]
