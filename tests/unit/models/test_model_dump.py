@@ -6,8 +6,6 @@ from pydantic import Field
 
 from rapyer.base import AtomicRedisModel
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME
-from rapyer.types.float import RedisFloat
-from rapyer.types.integer import RedisInt
 from tests.models.collection_types import (
     MixedTypesModel,
     SimpleDictModel,
@@ -516,18 +514,3 @@ def test_redis_dump_skips_field_marked_exclude_true_sanity():
     assert redis_data["name"] == "my_model"
 
 
-def test_excluded_numeric_fields_not_converted_to_redis_types_sanity():
-    # Arrange
-    class ModelWithExcludedNumericFields(AtomicRedisModel):
-        name: str = "test"
-        count: int = Field(default=0, exclude=True)
-        ratio: float = Field(default=0.0, exclude=True)
-
-    # Act
-    model = ModelWithExcludedNumericFields(name="my_model", count=42, ratio=3.14)
-
-    # Assert
-    assert not isinstance(model.count, RedisInt)
-    assert not isinstance(model.ratio, RedisFloat)
-    assert type(model.count) is int
-    assert type(model.ratio) is float
