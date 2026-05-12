@@ -44,6 +44,7 @@ from rapyer.context import (
 from rapyer.errors import (
     BadDeleteActionError,
     CantSerializeRedisValueError,
+    CorruptedModelError,
     DuplicateModelNameError,
     KeyNotFound,
     MissingParameterError,
