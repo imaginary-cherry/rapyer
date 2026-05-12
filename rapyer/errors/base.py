@@ -9,6 +9,11 @@ class KeyNotFound(RapyerError):
 
     pass
 
+class CorruptedModelError(RapyerError):
+    """Raised when a model is corrupted."""
+
+    pass
+
 
 class RapyerModelDoesntExistError(RapyerError):
     """Raised when a model doesn't exist."""

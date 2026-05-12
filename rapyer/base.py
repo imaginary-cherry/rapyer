@@ -537,10 +537,24 @@ class AtomicRedisModel(BaseModel):
     )
     async def aget(cls, key: str) -> Self:
         key = cls._resolve_key(key)
-        model_dump = await cls.Meta.redis_json.get(key, "$")  # type: ignore[misc]
+        if not cls._special_field_names:
+            model_dump = await cls.Meta.redis_json.get(key, "$")  # type: ignore[misc]
+            if not model_dump:
+                raise KeyNotFound(f"{key} is missing in redis")
+            model = cls.create_redis_model(model_dump[0], key)
+            if model is None:
+                raise CorruptedModelError(f"Cant validate model {model}")
+            return model
+        async with cls.Meta.redis.pipeline(transaction=True) as pipe:
+            pipe.json().get(key, "$")
+            plan = cls._queue_special_loads_in_pipeline(pipe, [key])
+            results = await pipe.execute()
+        model_dump = results[0]
         if not model_dump:
             raise KeyNotFound(f"{key} is missing in redis")
         model_dump = model_dump[0]
+        special_data = {fname: raw for (_, fname), raw in zip(plan, results[1:])}
+        return cls.create_redis_model(model_dump, key, special_data=special_data)
 
         context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
         instance = cls.model_validate(model_dump, context=context)
@@ -562,7 +576,45 @@ class AtomicRedisModel(BaseModel):
         return instance
 
     @classmethod
-    def create_redis_model(cls, model_dump: dict, key: str) -> Optional[Self]:
+    def _queue_special_loads_in_pipeline(
+        cls, pipe, keys: list[str]
+    ) -> list[tuple[str, str]]:
+        """Queue special-field load ops for each (key, field) in the pipeline.
+
+        Sync — pipe methods queue without await. Returns a plan
+        ``[(key, field_name), ...]`` in queue order so the caller can pair
+        ``pipe.execute()`` results back to fields.
+        """
+        plan: list[tuple[str, str]] = []
+        if not cls._special_field_names:
+            return plan
+        for key in keys:
+            for fname in cls._special_field_names:
+                field_cls = cls.model_fields[fname].annotation
+                sk = field_cls.special_field_key(key, fname)
+                if field_cls.queue_load_in_pipeline(pipe, sk):
+                    plan.append((key, fname))
+        return plan
+
+    # TODO - we need to use the schem from pydatnic, not this method
+    @staticmethod
+    def _apply_special_data(
+        instance: "AtomicRedisModel", data: Optional[dict[str, Any]]
+    ) -> None:
+        if not data:
+            return
+        for fname, raw in data.items():
+            field = getattr(instance, fname, None)
+            if isinstance(field, SpecialFieldType):
+                field.apply_load_result(raw)
+
+    @classmethod
+    def create_redis_model(
+        cls,
+        model_dump: dict,
+        key: str,
+        special_data: dict = None
+    ) -> Optional[Self]:
         context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
         try:
             model = cls.model_validate(model_dump, context=context)
@@ -576,6 +628,7 @@ class AtomicRedisModel(BaseModel):
             return None
         model.key = key
         model._failed_fields = context.get(FAILED_FIELDS_KEY, set())
+        cls._apply_special_data(model, special_data)
         return model
 
     @classmethod
