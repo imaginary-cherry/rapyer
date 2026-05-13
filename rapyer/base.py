@@ -661,17 +661,35 @@ class AtomicRedisModel(BaseModel):
         if not targeted_keys:
             return []
 
-        # Fetch the actual documents
-        models = await cls.Meta.redis_json.mget(keys=targeted_keys, path="$")  # type: ignore[misc]
+        contains_sf_field = cls.contains_sf_field()
+        if contains_sf_field:
+            # Atomic snapshot: JSON.MGET + all special-field loads in one transaction.
+            plans_per_key: list[list[list[str]]] = []
+            async with cls.Meta.redis.pipeline(transaction=True) as pipe:
+                pipe.json().mget(keys=targeted_keys, path="$")
+                for tkey in targeted_keys:
+                    plan_for_key: list[list[str]] = []
+                    cls.queue_special_loads_in_pipeline(pipe, tkey, plan_for_key)
+                    plans_per_key.append(plan_for_key)
+                results = await pipe.execute()
+            models = results[0]
+        else:
+            models = await cls.Meta.redis_json.mget(keys=targeted_keys, path="$")  # type: ignore[misc]
+            plans_per_key = [[] for _ in targeted_keys]
 
         instances = []
-        for model, key in zip(models, targeted_keys):
+        cursor = 1  # index into `results`; results[0] is the mget
+        for model, key, key_plan in zip(models, targeted_keys, plans_per_key):
+            slice_end = cursor + len(key_plan)
+            raw_slice = results[cursor:slice_end] if contains_sf_field else []
+            cursor = slice_end
             if model is None:
                 if raise_on_missing:
                     raise KeyNotFound(f"{key} is missing in redis")
                 continue
             if not cls.Meta.is_fake_redis:
                 model = model[0]
+            inject_at_paths(model, key_plan, raw_slice)
             model = cls.create_redis_model(model, key)
             if model is None:
                 continue
