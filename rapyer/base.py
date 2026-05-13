@@ -86,8 +86,10 @@ from rapyer.utils.pythonic import inject_at_paths, safe_issubclass
 from rapyer.utils.redis import (
     acquire_lock,
     batched,
+    build_models_from_dumps,
     delete_in_batches,
     execute_load_pipeline,
+    fetch_models_with_sf_loads,
     scan_keys,
     update_keys_in_pipeline,
 )
@@ -668,37 +670,13 @@ class AtomicRedisModel(BaseModel):
         if not targeted_keys:
             return []
 
-        if cls.contains_sf_field():
-            # Atomic snapshot: JSON.MGET + all special-field loads in one transaction.
-            models, plans_per_key, sf_raw = await execute_load_pipeline(
-                cls.Meta.redis,
-                [cls] * len(targeted_keys),
-                targeted_keys,
-            )
-        else:
-            models = await cls.Meta.redis_json.mget(keys=targeted_keys, path="$")  # type: ignore[misc]
-            plans_per_key = [[] for _ in targeted_keys]
-            sf_raw = []
-
-        instances = []
-        cursor = 0
-        for model, key, key_plan in zip(models, targeted_keys, plans_per_key):
-            slice_end = cursor + len(key_plan)
-            raw_slice = sf_raw[cursor:slice_end]
-            cursor = slice_end
-            if model is None:
-                if raise_on_missing:
-                    raise KeyNotFound(f"{key} is missing in redis")
-                continue
-            if not cls.Meta.is_fake_redis:
-                model = model[0]
-            inject_at_paths(model, key_plan, raw_slice)
-            model = cls.create_redis_model(model, key)
-            if model is None:
-                continue
-            instances.append(model)
-
-        return instances
+        classes = [cls] * len(targeted_keys)
+        models, plans_per_key, sf_raw = await fetch_models_with_sf_loads(
+            cls.Meta.redis, classes, targeted_keys
+        )
+        return build_models_from_dumps(
+            models, classes, targeted_keys, plans_per_key, sf_raw, raise_on_missing
+        )
 
     @classmethod
     @mark_actions(
@@ -1036,40 +1014,19 @@ async def afind(*redis_keys: str, skip_missing: bool = False) -> list[AtomicRedi
             )
         key_to_class[key] = klass
 
-    if any(key_to_class[key].contains_sf_field() for key in redis_keys):
-        # Atomic snapshot: JSON.MGET + all special-field loads in one transaction.
-        models_data, plans_per_key, sf_raw = await execute_load_pipeline(
-            AtomicRedisModel.Meta.redis,
-            [key_to_class[k] for k in redis_keys],
-            list(redis_keys),
-        )
-    else:
-        models_data = await AtomicRedisModel.Meta.redis_json.mget(  # type: ignore[misc]
-            keys=redis_keys, path="$"
-        )
-        plans_per_key = [[] for _ in redis_keys]
-        sf_raw = []
-
-    instances = []
-    cursor = 0
-    for data, key, key_plan in zip(models_data, redis_keys, plans_per_key):
-        slice_end = cursor + len(key_plan)
-        raw_slice = sf_raw[cursor:slice_end]
-        cursor = slice_end
-        if data is None:
-            if not skip_missing:
-                raise KeyNotFound(f"{key} is missing in redis")
-            continue
-        klass = key_to_class[key]
-        if not klass.Meta.is_fake_redis:
-            data = data[0]
-        inject_at_paths(data, key_plan, raw_slice)
-        model = klass.create_redis_model(data, key)
-        if model is None:
-            continue
-        instances.append(model)
-
-    return instances
+    classes = [key_to_class[k] for k in redis_keys]
+    keys_list = list(redis_keys)
+    models_data, plans_per_key, sf_raw = await fetch_models_with_sf_loads(
+        AtomicRedisModel.Meta.redis, classes, keys_list
+    )
+    return build_models_from_dumps(
+        models_data,
+        classes,
+        keys_list,
+        plans_per_key,
+        sf_raw,
+        raise_on_missing=not skip_missing,
+    )
 
 
 def find_redis_models() -> list[type[AtomicRedisModel]]:
