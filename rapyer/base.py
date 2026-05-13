@@ -547,19 +547,22 @@ class AtomicRedisModel(BaseModel):
     )
     async def aget(cls, key: str) -> Self:
         key = cls._resolve_key(key)
-        plan: list[list[str]] = []
+        plan = []
+        sf_raw = []
         if not cls.contains_sf_field():
             model_dump = await cls.Meta.redis_json.get(key, "$")  # type: ignore[misc]
         else:
-            async with cls.Meta.redis.pipeline(transaction=True) as pipe:
-                pipe.json().get(key, "$")
-                cls.queue_special_loads_in_pipeline(pipe, key, plan)
-                results = await pipe.execute()
-            model_dump = results[0]
+            models_dump, plans_per_key, sf_raw = await execute_load_pipeline(
+                cls.Meta.redis, [cls], [key]
+            )
+            model_dump = models_dump[0]
+            plan = plans_per_key[0]
         if not model_dump:
             raise KeyNotFound(f"{key} is missing in redis")
-        model_dump = model_dump[0]
-        inject_at_paths(model_dump, plan, results[1:])
+        # Under real redis with JSONPath "$" mget returns [<dict>] per key;
+        # under fakeredis the per-key result is already the dict.
+        model_dump = model_dump[0] if isinstance(model_dump, list) else model_dump
+        inject_at_paths(model_dump, plan, sf_raw)
         model = cls.create_redis_model(model_dump, key)
         if model is None:
             raise CorruptedModelError(f"Cant validate model {model}")
@@ -569,19 +572,22 @@ class AtomicRedisModel(BaseModel):
     async def aload(self) -> Self:
         cls = self.__class__
         plan: list[list[str]] = []
-        results: list = []
+        sf_raw = []
         if not cls.contains_sf_field():
             model_dump = await self.Meta.redis_json.get(self.key, self.json_path)  # type: ignore[misc]
+            if not model_dump:
+                raise KeyNotFound(f"{self.key} is missing in redis")
+            model_dump = model_dump[0]
         else:
-            async with cls.Meta.redis.pipeline(transaction=True) as pipe:
-                pipe.json().get(self.key, self.json_path)
-                cls.queue_special_loads_in_pipeline(pipe, self.key, plan)
-                results = await pipe.execute()
-            model_dump = results[0]
+            models_dump, plans_per_key, sf_raw = await execute_load_pipeline(
+                cls.Meta.redis, [cls], [self.key]
+            )
+            model_dump = models_dump[0]
+            plan = plans_per_key[0]
         if not model_dump:
             raise KeyNotFound(f"{self.key} is missing in redis")
-        model_dump = model_dump[0]
-        inject_at_paths(model_dump, plan, results[1:])
+        model_dump = model_dump[0] if isinstance(model_dump, list) else model_dump
+        inject_at_paths(model_dump, plan, sf_raw)
         context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
         instance = cls.model_validate(model_dump, context=context)
         instance._pk = self._pk
