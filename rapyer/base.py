@@ -627,12 +627,7 @@ class AtomicRedisModel(BaseModel):
                 field.apply_load_result(raw)
 
     @classmethod
-    def create_redis_model(
-        cls,
-        model_dump: dict,
-        key: str,
-        special_data: dict = None
-    ) -> Optional[Self]:
+    def create_redis_model(cls, model_dump: dict, key: str) -> Optional[Self]:
         context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
         try:
             model = cls.model_validate(model_dump, context=context)
@@ -646,7 +641,6 @@ class AtomicRedisModel(BaseModel):
             return None
         model.key = key
         model._failed_fields = context.get(FAILED_FIELDS_KEY, set())
-        cls._apply_special_data(model, special_data)
         return model
 
     @classmethod
