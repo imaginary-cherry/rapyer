@@ -1,9 +1,13 @@
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager
+from typing import TYPE_CHECKING, Any
 
 from redis.asyncio import Redis
 
 from rapyer.context import _context_pipe
+
+if TYPE_CHECKING:
+    from rapyer import AtomicRedisModel
 
 
 def acquire_lock(
@@ -16,6 +20,26 @@ def acquire_lock(
 def update_keys_in_pipeline(pipeline_json, redis_key: str, **kwargs):
     for json_path, value in kwargs.items():
         pipeline_json.set(redis_key, json_path, value)
+
+
+Plan = list[list[str]]
+
+
+async def execute_load_pipeline(
+    redis: Redis,
+    classes: list[type["AtomicRedisModel"]],
+    keys: list[str],
+) -> tuple[Any, list[Plan], list[Any]]:
+    """Returns ``(models_dump, plans_per_key, sf_raw_results)``."""
+    plans_per_key: list[Plan] = []
+    async with redis.pipeline(transaction=True) as pipe:
+        pipe.json().mget(keys=keys, path="$")
+        for klass, key in zip(classes, keys):
+            plan_for_key: Plan = []
+            klass.queue_special_loads_in_pipeline(pipe, key, plan_for_key)
+            plans_per_key.append(plan_for_key)
+        results = await pipe.execute()
+    return results[0], plans_per_key, results[1:]
 
 
 async def batched(iterable, n):
