@@ -82,7 +82,7 @@ from rapyer.utils.fields import (
     is_redis_field,
     is_type_json_serializable,
 )
-from rapyer.utils.pythonic import safe_issubclass
+from rapyer.utils.pythonic import inject_at_paths, safe_issubclass
 from rapyer.utils.redis import (
     acquire_lock,
     batched,
@@ -147,6 +147,7 @@ class AtomicRedisModel(BaseModel):
     _safe_load_fields: ClassVar[set[str]] = set()
     _special_field_names: ClassVar[set[str]] = set()
     _redis_link_field_names: ClassVar[set[str]] = set()
+    _contain_sf: ClassVar[set[str]] = set()
     _field_name: str = PrivateAttr(default="")
     model_config = ConfigDict(validate_assignment=True, validate_default=True)
 
@@ -323,7 +324,9 @@ class AtomicRedisModel(BaseModel):
         original_annotations.update(new_annotation)
 
         def _check_is_excluded(name_of_field: str) -> bool:
-            info = pydantic_annotation.get(name_of_field) or cls.__dict__.get(name_of_field)
+            info = pydantic_annotation.get(name_of_field) or cls.__dict__.get(
+                name_of_field
+            )
             return isinstance(info, FieldInfo) and info.exclude is True
 
         new_annotations = {
@@ -350,6 +353,7 @@ class AtomicRedisModel(BaseModel):
         cls._redis_link_field_names = set(
             getattr(cls, "_redis_link_field_names", set())
         )
+        cls._contain_sf = set(getattr(cls, "_contain_sf", set()))
         for field_name, annotation in cls.__annotations__.items():
             unwrapped = annotation
             while get_origin(unwrapped) is Annotated:
@@ -358,7 +362,10 @@ class AtomicRedisModel(BaseModel):
             if safe_issubclass(origin, SpecialFieldType):
                 cls._special_field_names.add(field_name)
             if safe_issubclass(origin, (BaseRedisType, AtomicRedisModel)):
+                origin: BaseRedisType | AtomicRedisModel
                 cls._redis_link_field_names.add(field_name)
+                if origin.contains_sf_field():
+                    cls._contain_sf.add(field_name)
 
         super().__init_subclass__(**kwargs)
 
