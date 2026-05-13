@@ -590,6 +590,10 @@ class AtomicRedisModel(BaseModel):
         return instance
 
     @classmethod
+    def contains_sf_field(cls) -> bool:
+        return bool(cls._contain_sf) or bool(cls._special_field_names)
+
+    @classmethod
     def _queue_special_loads_in_pipeline(
         cls, pipe, keys: list[str]
     ) -> list[tuple[str, str]]:
