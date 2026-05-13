@@ -8,12 +8,8 @@ from typing_extensions import TypeAlias
 
 from rapyer.actions import ActionGroup, mark_actions, marks_redis_updated
 from rapyer.scripts import REMOVE_RANGE_SCRIPT_NAME, run_sha
-from rapyer.types.base import (
-    REDIS_DUMP_FLAG_NAME,
-    SKIP_SENTINEL,
-    GenericRedisType,
-    RedisType,
-)
+from rapyer.types.base import REDIS_DUMP_FLAG_NAME, RedisType
+from rapyer.types.generic import SKIP_SENTINEL, GenericRedisType
 
 logger = logging.getLogger("rapyer")
 

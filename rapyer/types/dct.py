@@ -4,12 +4,8 @@ from pydantic_core import core_schema
 
 from rapyer.actions import ActionGroup, mark_actions
 from rapyer.scripts import DICT_POP_SCRIPT_NAME, DICT_POPITEM_SCRIPT_NAME, arun_sha
-from rapyer.types.base import (
-    REDIS_DUMP_FLAG_NAME,
-    SKIP_SENTINEL,
-    GenericRedisType,
-    RedisType,
-)
+from rapyer.types.base import REDIS_DUMP_FLAG_NAME, RedisType
+from rapyer.types.generic import SKIP_SENTINEL, GenericRedisType
 from rapyer.utils.redis import update_keys_in_pipeline
 
 T = TypeVar("T")

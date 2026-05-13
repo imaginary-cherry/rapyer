@@ -1,30 +1,23 @@
 import abc
 import base64
-import logging
 import pickle
 from abc import ABC
-from typing import TYPE_CHECKING, Any, Generic, Optional, TypeVar, get_args
+from typing import TYPE_CHECKING, Any, Optional
 
 from pydantic import GetCoreSchemaHandler, TypeAdapter
 from pydantic_core import core_schema
-from pydantic_core.core_schema import CoreSchema, SerializationInfo, ValidationInfo
 from redis.commands.search.field import TextField
 
 # Imported here to avoid circular import issues; actions imports context, not types.base
 from rapyer.actions import ActionGroup, install_marked_action_methods, mark_actions
 from rapyer.context import _context_pipe, get_pipe_json
-from rapyer.errors import CantSerializeRedisValueError
 from rapyer.typing_support import Self
-from rapyer.utils.pythonic import safe_issubclass
 
 if TYPE_CHECKING:
     from rapyer.config import RedisConfig
 
-logger = logging.getLogger("rapyer")
-
 REDIS_DUMP_FLAG_NAME = "__rapyer_dumped__"
 FAILED_FIELDS_KEY = "__rapyer_failed_fields__"
-SKIP_SENTINEL = object()
 
 
 class BaseRedisType(ABC):
@@ -171,107 +164,3 @@ class RedisType(BaseRedisType):
     @staticmethod
     def deserialize_unknown(value: str):
         return pickle.loads(base64.b64decode(value))
-
-
-T = TypeVar("T")
-
-
-class GenericRedisType(RedisType, Generic[T], ABC):
-    safe_load: bool = False
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for key, val in self.iterate_items():
-            self.init_redis_field(key, val)
-
-    @classmethod
-    def find_inner_type(cls, type_):
-        args = get_args(type_)
-        return args[0] if args else Any
-
-    @classmethod
-    def contains_sf_field(cls) -> bool:
-        # Lazy import — rapyer.types.special imports from this module.
-        from rapyer.types.special import SpecialFieldType
-
-        if cls.original_type is None:
-            return False
-        inner = cls.find_inner_type(cls.original_type)
-        if inner is Any:
-            return False
-        if safe_issubclass(inner, SpecialFieldType):
-            return True
-        contains = getattr(inner, "contains_sf_field", None)
-        if contains is None:
-            return False
-        return contains()
-
-    @classmethod
-    @abc.abstractmethod
-    def build_typed_original(cls, source_args):
-        pass  # pragma: no cover
-
-    @classmethod
-    def try_deserialize_item(cls, item, identifier):
-        try:
-            return cls.deserialize_unknown(item)
-        except Exception as e:
-            if cls.safe_load:
-                logger.warning(
-                    "SafeLoad: Failed to deserialize item at '%s'.", identifier
-                )
-                return SKIP_SENTINEL
-            raise CantSerializeRedisValueError() from e
-
-    @abc.abstractmethod
-    def iterate_items(self):
-        pass  # pragma: no cover
-
-    @classmethod
-    @abc.abstractmethod
-    def full_serializer(cls, value, info: SerializationInfo):
-        pass  # pragma: no cover
-
-    @classmethod
-    @abc.abstractmethod
-    def full_deserializer(cls, value, info: ValidationInfo):
-        pass  # pragma: no cover
-
-    @classmethod
-    @abc.abstractmethod
-    def schema_for_unknown(cls):
-        pass  # pragma: no cover
-
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls, source_type: Any, handler: GetCoreSchemaHandler
-    ) -> CoreSchema:
-        # Extract the generic type argument T from source_type
-        element_type = cls.find_inner_type(source_type)
-        from rapyer.types.convert import RedisConverter
-
-        checker = RedisConverter({}, "")
-        should_pickle = not checker.is_redis_type(element_type)
-
-        if should_pickle:
-            # Build schema with both validator and serializer
-            python_schema = core_schema.with_info_before_validator_function(
-                cls.full_deserializer, handler(cls.original_type)
-            )
-
-            return core_schema.with_info_after_validator_function(
-                lambda v, info: cls(v),
-                python_schema,
-                serialization=core_schema.plain_serializer_function_ser_schema(
-                    cls.full_serializer,
-                    info_arg=True,
-                    return_schema=cls.schema_for_unknown(),
-                ),
-            )
-        else:
-            # Normal serialization for concrete types — preserve inner type args
-            args = get_args(source_type)
-            inner_type = cls.build_typed_original(args)
-            return core_schema.no_info_after_validator_function(
-                cls, handler(inner_type)
-            )

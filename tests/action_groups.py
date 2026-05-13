@@ -3,7 +3,8 @@ from typing import Callable
 import rapyer
 from rapyer import find_redis_models, init_rapyer, teardown_rapyer
 from rapyer.base import AtomicRedisModel
-from rapyer.types.base import BaseRedisType, GenericRedisType, RedisType
+from rapyer.types.base import BaseRedisType, RedisType
+from rapyer.types.generic import GenericRedisType
 from rapyer.types.byte import RedisBytes
 from rapyer.types.datetime import RedisDatetimeTimestamp
 from rapyer.types.dct import RedisDict
