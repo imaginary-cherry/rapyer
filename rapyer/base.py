@@ -568,12 +568,22 @@ class AtomicRedisModel(BaseModel):
 
     @mark_actions(ActionGroup.READ, version="v2")
     async def aload(self) -> Self:
-        model_dump = await self.Meta.redis_json.get(self.key, self.json_path)  # type: ignore[misc]
+        cls = self.__class__
+        plan: list[tuple[str, ...]] = []
+        if not cls.contains_sf_field():
+            model_dump = await self.Meta.redis_json.get(self.key, self.json_path)  # type: ignore[misc]
+        else:
+            async with cls.Meta.redis.pipeline(transaction=True) as pipe:
+                pipe.json().get(self.key, self.json_path)
+                cls.queue_special_loads_in_pipeline(pipe, self.key, (), plan)
+                results = await pipe.execute()
+            model_dump = results[0]
         if not model_dump:
             raise KeyNotFound(f"{self.key} is missing in redis")
         model_dump = model_dump[0]
+        inject_at_paths(model_dump, plan, results[1:])
         context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
-        instance = self.__class__.model_validate(model_dump, context=context)
+        instance = cls.model_validate(model_dump, context=context)
         instance._pk = self._pk
         instance._base_model_link = self._base_model_link
         instance._failed_fields = context.get(FAILED_FIELDS_KEY, set())
