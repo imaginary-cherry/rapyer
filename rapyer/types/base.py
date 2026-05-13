@@ -15,6 +15,7 @@ from rapyer.actions import ActionGroup, install_marked_action_methods, mark_acti
 from rapyer.context import _context_pipe, get_pipe_json
 from rapyer.errors import CantSerializeRedisValueError
 from rapyer.typing_support import Self
+from rapyer.utils.pythonic import safe_issubclass
 
 if TYPE_CHECKING:
     from rapyer.config import RedisConfig
@@ -53,6 +54,18 @@ class BaseRedisType(ABC):
         this directly via the test-side ``recursive_build_redis_model`` helper.
         """
         install_marked_action_methods(cls, meta)
+
+    @classmethod
+    def contains_sf_field(cls) -> bool:
+        """Check if this type contains speical field (in generic value - like list[RedisSet]"""
+        return False
+
+    @classmethod
+    def queue_special_loads_in_pipeline(
+        cls, pipe, key: str, path: tuple, plan: list
+    ) -> None:
+        """Queue any special-field loads this type contributes into ``pipe``., it will be used by the pipe creator"""
+        return
 
     @property
     def redis(self):
