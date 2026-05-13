@@ -566,12 +566,6 @@ class AtomicRedisModel(BaseModel):
             raise CorruptedModelError(f"Cant validate model {model}")
         return model
 
-        context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
-        instance = cls.model_validate(model_dump, context=context)
-        instance.key = key
-        instance._failed_fields = context.get(FAILED_FIELDS_KEY, set())
-        return instance
-
     @mark_actions(ActionGroup.READ, version="v2")
     async def aload(self) -> Self:
         model_dump = await self.Meta.redis_json.get(self.key, self.json_path)  # type: ignore[misc]
