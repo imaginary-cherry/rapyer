@@ -190,6 +190,23 @@ class GenericRedisType(RedisType, Generic[T], ABC):
         return args[0] if args else Any
 
     @classmethod
+    def contains_sf_field(cls) -> bool:
+        # Lazy import — rapyer.types.special imports from this module.
+        from rapyer.types.special import SpecialFieldType
+
+        if cls.original_type is None:
+            return False
+        inner = cls.find_inner_type(cls.original_type)
+        if inner is Any:
+            return False
+        if safe_issubclass(inner, SpecialFieldType):
+            return True
+        contains = getattr(inner, "contains_sf_field", None)
+        if contains is None:
+            return False
+        return contains()
+
+    @classmethod
     @abc.abstractmethod
     def build_typed_original(cls, source_args):
         pass  # pragma: no cover
