@@ -546,21 +546,19 @@ class AtomicRedisModel(BaseModel):
     )
     async def aget(cls, key: str) -> Self:
         key = cls._resolve_key(key)
+        plan: list[list[str]] = []
         if not cls.contains_sf_field():
             model_dump = await cls.Meta.redis_json.get(key, "$")  # type: ignore[misc]
-            if not model_dump:
-                raise KeyNotFound(f"{key} is missing in redis")
         else:
-            plan: list[list[str]] = []
             async with cls.Meta.redis.pipeline(transaction=True) as pipe:
                 pipe.json().get(key, "$")
                 cls.queue_special_loads_in_pipeline(pipe, key, plan)
                 results = await pipe.execute()
             model_dump = results[0]
-            if not model_dump:
-                raise KeyNotFound(f"{key} is missing in redis")
-            model_dump = model_dump[0]
-            inject_at_paths(model_dump, plan, results[1:])
+        if not model_dump:
+            raise KeyNotFound(f"{key} is missing in redis")
+        model_dump = model_dump[0]
+        inject_at_paths(model_dump, plan, results[1:])
         model = cls.create_redis_model(model_dump, key)
         if model is None:
             raise CorruptedModelError(f"Cant validate model {model}")
