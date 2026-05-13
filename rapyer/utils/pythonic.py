@@ -5,18 +5,14 @@ def safe_issubclass(cls, class_or_tuple):
         return False
 
 
-def inject_at_paths(
-    model_dump: dict,
-    plan: list[tuple[str, ...]],
-    raw_results: list,
-):
+def inject_at_paths(model_dump: dict, plan: list[list[str]], raw_results: list):
     """
     Inject results from a pipeline into the model dump along the recorded paths.
-    Each entry in ``plan`` is the path of one ``raw_results`` entry,
-    in queue order. All entries belong to the same model dump (the caller that built the plan picked the key).
+    Each entry in ``plan`` is a list of field-name parts, e.g. ``["tags"]`` or
+    ``["inner_set", "tags"]``.
     """
-    for path, raw in zip(plan, raw_results):
+    for parts, raw in zip(plan, raw_results):
         target = model_dump
-        for part in path[:-1]:
+        for part in parts[:-1]:
             target = target[part]
-        target[path[-1]] = raw
+        target[parts[-1]] = raw

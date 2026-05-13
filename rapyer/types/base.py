@@ -61,9 +61,7 @@ class BaseRedisType(ABC):
         return False
 
     @classmethod
-    def queue_special_loads_in_pipeline(
-        cls, pipe, key: str, path: tuple, plan: list
-    ) -> None:
+    def queue_special_loads_in_pipeline(cls, pipe, key: str, plan: list):
         """Queue any special-field loads this type contributes into ``pipe``., it will be used by the pipe creator"""
         return
 

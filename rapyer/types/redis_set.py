@@ -116,10 +116,15 @@ class RedisSet(SpecialFieldType, Generic[T]):
         if members:
             await self.client.sadd(target_special_key, *members)
 
-    def __eq__(self, other):
-        if not isinstance(other, RedisSet):
-            return False
-        return self.special_key == other.special_key
+    @classmethod
+    def queue_special_loads_in_pipeline(cls, pipe, key: str, plan: list):
+        pipe.smembers(cls.special_field_key(key))
+        plan.append([cls.field_name.lstrip(".")])
+
+    def clone(self):
+        new = self.__class__()
+        set.update(new, self)
+        return new
 
     # --- Pydantic schema ---
 

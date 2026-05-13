@@ -551,10 +551,10 @@ class AtomicRedisModel(BaseModel):
             if not model_dump:
                 raise KeyNotFound(f"{key} is missing in redis")
         else:
-            plan: list[tuple[str, ...]] = []
+            plan: list[list[str]] = []
             async with cls.Meta.redis.pipeline(transaction=True) as pipe:
                 pipe.json().get(key, "$")
-                cls.queue_special_loads_in_pipeline(pipe, key, (), plan)
+                cls.queue_special_loads_in_pipeline(pipe, key, plan)
                 results = await pipe.execute()
             model_dump = results[0]
             if not model_dump:
@@ -569,13 +569,14 @@ class AtomicRedisModel(BaseModel):
     @mark_actions(ActionGroup.READ, version="v2")
     async def aload(self) -> Self:
         cls = self.__class__
-        plan: list[tuple[str, ...]] = []
+        plan: list[list[str]] = []
+        results: list = []
         if not cls.contains_sf_field():
             model_dump = await self.Meta.redis_json.get(self.key, self.json_path)  # type: ignore[misc]
         else:
             async with cls.Meta.redis.pipeline(transaction=True) as pipe:
                 pipe.json().get(self.key, self.json_path)
-                cls.queue_special_loads_in_pipeline(pipe, self.key, (), plan)
+                cls.queue_special_loads_in_pipeline(pipe, self.key, plan)
                 results = await pipe.execute()
             model_dump = results[0]
         if not model_dump:
@@ -594,37 +595,17 @@ class AtomicRedisModel(BaseModel):
         return bool(cls._contain_sf) or bool(cls._special_field_names)
 
     @classmethod
-    def _queue_special_loads_in_pipeline(
-        cls, pipe, keys: list[str]
-    ) -> list[tuple[str, str]]:
-        """Queue special-field load ops for each (key, field) in the pipeline.
-
-        Sync — pipe methods queue without await. Returns a plan
-        ``[(key, field_name), ...]`` in queue order so the caller can pair
-        ``pipe.execute()`` results back to fields.
-        """
-        plan: list[tuple[str, str]] = []
-        if not cls._special_field_names:
-            return plan
-        for key in keys:
-            for fname in cls._special_field_names:
-                field_cls = cls.model_fields[fname].annotation
-                sk = field_cls.special_field_key(key)
-                if field_cls.queue_load_in_pipeline(pipe, sk):
-                    plan.append((key, fname))
-        return plan
-
-    # TODO - we need to use the schem from pydatnic, not this method
-    @staticmethod
-    def _apply_special_data(
-        instance: "AtomicRedisModel", data: Optional[dict[str, Any]]
-    ) -> None:
-        if not data:
-            return
-        for fname, raw in data.items():
-            field = getattr(instance, fname, None)
-            if isinstance(field, SpecialFieldType):
-                field.apply_load_result(raw)
+    def queue_special_loads_in_pipeline(cls, pipe, key: str, plan: list):
+        """Queue load ops for every SF reachable from this model. both directly and nested (in a list or container model)"""
+        for fname in cls._special_field_names:
+            field_cls = cls.model_fields[fname].annotation
+            field_cls.queue_special_loads_in_pipeline(pipe, key, plan)
+        for fname in cls._contain_sf:
+            field_cls = cls.model_fields[fname].annotation
+            max_before_queueing = len(plan)
+            field_cls.queue_special_loads_in_pipeline(pipe, key, plan)
+            for i in range(max_before_queueing, len(plan)):
+                plan[i].insert(0, fname)
 
     @classmethod
     def create_redis_model(cls, model_dump: dict, key: str) -> Optional[Self]:
