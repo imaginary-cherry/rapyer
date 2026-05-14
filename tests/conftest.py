@@ -19,6 +19,7 @@ from tests.action_groups import (
     PRIVATE_METHODS,
 )
 from tests.coverage_helpers import (
+    COVER_ACTION_EFFECT,
     COVER_NO_CLOBBER,
     COVER_NO_TTL_WHEN_NOT_CONFIGURED,
     COVER_PIPELINE_ATOM,
@@ -139,6 +140,11 @@ COVERAGE_CHECKS: list[CoverageCheck] = [
             # Delete and create effect the entire model
             ignore_groups=(ActionGroup.DELETE | ActionGroup.CREATE)
         ),
+    ),
+    CoverageCheck(
+        name=COVER_ACTION_EFFECT,
+        help_text="async action effect on the model in Redis",
+        expected=lambda: _collect_methods(only_async=True),
     ),
     CoverageCheck(
         name=COVER_NO_TTL_WHEN_NOT_CONFIGURED,

@@ -2,7 +2,7 @@ import asyncio
 
 import rapyer
 from rapyer.base import AtomicRedisModel
-from tests.integration.actions.base import ActionTestBase
+from tests.integration.actions.async_action import AsyncActionTestBase
 from tests.integration.actions.create import CreateActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
 
@@ -38,7 +38,7 @@ class TestModelAinsert(CreateActionTestBase):
         return self.created_models
 
 
-class TestRapyerAinsert(ActionTestBase):
+class TestRapyerAinsert(AsyncActionTestBase):
     covered_method = AtomicRedisModel.ainsert
 
     def create_models(self):
