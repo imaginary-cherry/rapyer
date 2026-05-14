@@ -1,8 +1,6 @@
 from abc import ABC
 from typing import ClassVar
 
-import pytest
-
 import rapyer
 from rapyer.types.redis_set import RedisSet
 from tests.integration.actions.read import ReadActionTestBase
@@ -93,20 +91,6 @@ class TestSetApop(ReadActionTestBase, RedisSetActionBase):
 
     def expected_before(self):
         return set(INITIAL_ITEMS)
-
-    @pytest.mark.asyncio
-    async def test_read_in_pipeline_returns_server_value(self, test_input):
-        # apop returns *some* member of the set — assert membership rather
-        # than equality (the underlying SPOP picks a random element).
-        self.test_input = test_input
-        self.created_models = await self.setup_data()
-
-        expected = self.expected_before()
-        async with rapyer.apipeline():
-            actual = await self.perform_action(self.created_models[0])
-            assert (
-                actual in expected
-            ), f"apop returned {actual!r}; expected an element of {expected!r}"
 
 
 class TestSetAcontains(ReadActionTestBase, RedisSetActionBase):
