@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Optional, get_origin
 from pydantic import BaseModel, PrivateAttr, TypeAdapter
 
 from rapyer.fields.key import RapyerKey
-from rapyer.types.base import BaseRedisType, RedisType
+from rapyer.types.base import BaseRedisType
 from rapyer.utils.annotation import DYNAMIC_CLASS_DOC, TypeConverter
 from rapyer.utils.pythonic import safe_issubclass
 
@@ -120,6 +120,6 @@ class RedisConverter(TypeConverter):
         )
 
         adapter_type = new_type[generic_values]
-        if issubclass(redis_type, RedisType):
+        if issubclass(redis_type, BaseRedisType):
             new_type._adapter = TypeAdapter(adapter_type)
         return new_type[generic_values]

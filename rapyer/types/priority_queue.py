@@ -1,11 +1,11 @@
-import json
 from dataclasses import dataclass
 from typing import Any, Generic, Optional, TypeVar, get_args
 
-from pydantic import GetCoreSchemaHandler, TypeAdapter
+from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
 
 from rapyer.actions import ActionGroup, mark_actions
+from rapyer.types.base import REDIS_DUMP_FLAG_NAME
 from rapyer.types.special import SpecialFieldType
 
 T = TypeVar("T")
@@ -23,36 +23,38 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
     """
 
     original_type: type = type(None)
-    _value_adapter: TypeAdapter = None
 
-    @classmethod
-    def find_inner_type(cls, type_):
-        args = get_args(type_)
-        return args[0] if args else Any
+    # --- Serialization helpers ---
 
-    def _serialize_value(self, value) -> str:
-        if self._value_adapter:
-            return json.dumps(self._value_adapter.dump_python(value, mode="json"))
-        return json.dumps(value)
+    def _dump_members(self, values) -> list[str]:
+        import json as _json
+        serialized = self._adapter.dump_python(
+            list(values), mode="json", context={REDIS_DUMP_FLAG_NAME: True}
+        )
+        return [_json.dumps(s) for s in serialized]
 
-    def _deserialize_value(self, raw):
-        if isinstance(raw, bytes):
-            raw = raw.decode()
-        parsed = json.loads(raw)
-        if self._value_adapter:
-            return self._value_adapter.validate_python(parsed)
-        return parsed
+    def _dump_member(self, value: T) -> str:
+        return self._dump_members([value])[0]
+
+    def _load_member(self, raw):
+        import json as _json
+        parsed = _json.loads(raw.decode() if isinstance(raw, bytes) else raw)
+        return self._adapter.validate_python(
+            [parsed], context={REDIS_DUMP_FLAG_NAME: True}
+        )[0]
 
     # --- Queue operations ---
 
     @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND, version="v2")
     async def apush(self, value: T, priority: float):
-        serialized = self._serialize_value(value)
-        await self.client.zadd(self.special_key, {serialized: priority})
+        await self.client.zadd(self.special_key, {self._dump_member(value): priority})
 
     @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND, version="v2")
     async def apush_many(self, items: list[PriorityQueueItem[T]]):
-        mapping = {self._serialize_value(item.value): item.priority for item in items}
+        if not items:
+            return
+        serialized = self._dump_members(item.value for item in items)
+        mapping = {s: item.priority for s, item in zip(serialized, items)}
         await self.client.zadd(self.special_key, mapping)
 
     @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ, version="v2")
@@ -61,7 +63,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         if not result:
             return None
         member, score = result[0]
-        return self._deserialize_value(member)
+        return self._load_member(member)
 
     @mark_actions(ActionGroup.READ, version="v2")
     async def apeek(self):
@@ -69,7 +71,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         if not result:
             return None
         member, score = result[0]
-        return self._deserialize_value(member)
+        return self._load_member(member)
 
     @mark_actions(ActionGroup.READ, version="v2")
     async def asize(self) -> int:
@@ -83,14 +85,12 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
     async def aitems(self) -> list[PriorityQueueItem]:
         result = await self.redis.zrange(self.special_key, 0, -1, withscores=True)
         return [
-            PriorityQueueItem(value=self._deserialize_value(m), priority=s)
-            for m, s in result
+            PriorityQueueItem(value=self._load_member(m), priority=s) for m, s in result
         ]
 
     @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
     async def aremove(self, value) -> Optional[bool]:
-        serialized = self._serialize_value(value)
-        removed = await self.client.zrem(self.special_key, serialized)
+        removed = await self.client.zrem(self.special_key, self._dump_member(value))
         if self.pipeline:
             return None
         return removed > 0
@@ -126,9 +126,13 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
     def __get_pydantic_core_schema__(
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
-        return core_schema.no_info_plain_validator_function(
-            lambda v: v if isinstance(v, cls) else cls(),
-            serialization=core_schema.plain_serializer_function_ser_schema(
-                lambda v: None,
-            ),
+        # Declare to pydantic that PQ behaves as ``list[T]``.
+        # No custom serializer — parent model uses ``exclude=`` to skip SF
+        # fields explicitly, so we can let the schema dump real data here.
+        # (PROBLEM: PQ has no local state to actually dump, see below.)
+        args = get_args(source_type)
+        inner = args[0] if args else Any
+        return core_schema.no_info_after_validator_function(
+            cls,
+            handler(list[inner]),
         )
