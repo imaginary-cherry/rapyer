@@ -44,11 +44,11 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
 
     # --- Queue operations ---
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND)
     async def apush(self, value: T, priority: float):
         await self.client.zadd(self.special_key, {self._dump_member(value): priority})
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND)
     async def apush_many(self, items: list[PriorityQueueItem[T]]):
         if not items:
             return
@@ -56,7 +56,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         mapping = {s: item.priority for s, item in zip(serialized, items)}
         await self.client.zadd(self.special_key, mapping)
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ)
     async def apop(self):
         result = await self.redis.zpopmin(self.special_key, count=1)
         if not result:
@@ -64,7 +64,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         member, score = result[0]
         return self._load_member(member)
 
-    @mark_actions(ActionGroup.READ, version="v2")
+    @mark_actions(ActionGroup.READ)
     async def apeek(self):
         result = await self.redis.zrange(self.special_key, 0, 0, withscores=True)
         if not result:
@@ -72,22 +72,22 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         member, score = result[0]
         return self._load_member(member)
 
-    @mark_actions(ActionGroup.READ, version="v2")
+    @mark_actions(ActionGroup.READ)
     async def asize(self) -> int:
         return await self.redis.zcard(self.special_key)
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     async def aclear(self):
         await self.client.delete(self.special_key)
 
-    @mark_actions(ActionGroup.READ, version="v2")
+    @mark_actions(ActionGroup.READ)
     async def aitems(self) -> list[PriorityQueueItem]:
         result = await self.redis.zrange(self.special_key, 0, -1, withscores=True)
         return [
             PriorityQueueItem(value=self._load_member(m), priority=s) for m, s in result
         ]
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     async def aremove(self, value) -> Optional[bool]:
         removed = await self.client.zrem(self.special_key, self._dump_member(value))
         if self.pipeline:

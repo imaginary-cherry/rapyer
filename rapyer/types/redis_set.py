@@ -40,25 +40,25 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
 
     # --- Sync set methods ---
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND)
     def add(self, value: T):
         if self.pipeline:
             self.pipeline.sadd(self.special_key, self._dump_member(value))
         set.add(self, value)
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     def discard(self, value: T):
         if self.pipeline:
             self.pipeline.srem(self.special_key, self._dump_member(value))
         set.discard(self, value)
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     def remove(self, value: T):
         if self.pipeline:
             self.pipeline.srem(self.special_key, self._dump_member(value))
         set.remove(self, value)
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ)
     def pop(self) -> T:
         # Returns a value chosen from the LOCAL set (Python's choice), not from
         # Redis. Inside a pipeline, queues SREM of that local value.
@@ -67,13 +67,13 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
             self.pipeline.srem(self.special_key, self._dump_member(value))
         return value
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     def clear(self):
         if self.pipeline:
             self.pipeline.delete(self.special_key)
         set.clear(self)
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND)
     def update(self, *iterables: Iterable[T]):
         all_values = [v for it in iterables for v in it]
         if not all_values:
@@ -82,7 +82,7 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
             self.pipeline.sadd(self.special_key, *self._dump_members(all_values))
         set.update(self, all_values)
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     def difference_update(self, *iterables: Iterable[T]):
         all_values = [v for it in iterables for v in it]
         if not all_values:
@@ -91,7 +91,7 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
             self.pipeline.srem(self.special_key, *self._dump_members(all_values))
         set.difference_update(self, all_values)
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     def intersection_update(self, *iterables: Iterable[T]):
         set.intersection_update(self, *iterables)
         if self.pipeline:
@@ -99,7 +99,7 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
             if self:
                 self.pipeline.sadd(self.special_key, *self._dump_members(self))
 
-    @mark_actions(ActionGroup.UPDATE, version="v2")
+    @mark_actions(ActionGroup.UPDATE)
     def symmetric_difference_update(self, other: Iterable[T]):
         set.symmetric_difference_update(self, other)
         if self.pipeline:
@@ -125,12 +125,12 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
 
     # --- Async mutators (Redis-backed; also update local mirror) ---
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND)
     async def aadd(self, value: T):
         await self.client.sadd(self.special_key, self._dump_member(value))
         set.add(self, value)
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND)
     async def aadd_many(self, values: Iterable[T]):
         values = list(values)
         if not values:
@@ -138,7 +138,7 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
         await self.client.sadd(self.special_key, *self._dump_members(values))
         set.update(self, values)
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     async def aremove(self, value: T) -> Optional[bool]:
         removed = await self.client.srem(self.special_key, self._dump_member(value))
         set.discard(self, value)
@@ -146,7 +146,7 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
             return None
         return removed > 0
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ)
     async def apop(self) -> Optional[T]:
         # Redis-decided pop (atomic SPOP). The local mirror is also discarded
         # if the value is present. Sync ``pop`` chooses from the local set.
@@ -157,41 +157,41 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
         set.discard(self, value)
         return value
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     async def aclear(self):
         await self.client.delete(self.special_key)
         set.clear(self)
 
     # --- Async reads ---
 
-    @mark_actions(ActionGroup.READ, version="v2")
+    @mark_actions(ActionGroup.READ)
     async def acontains(self, value: T) -> bool:
         return bool(
             await self.redis.sismember(self.special_key, self._dump_member(value))
         )
 
-    @mark_actions(ActionGroup.READ, version="v2")
+    @mark_actions(ActionGroup.READ)
     async def amembers(self) -> set:
         raw = await self.redis.smembers(self.special_key)
         return self._load_members(raw)
 
-    @mark_actions(ActionGroup.READ, version="v2")
+    @mark_actions(ActionGroup.READ)
     async def asize(self) -> int:
         return await self.redis.scard(self.special_key)
 
     # --- Multi-set algebra ---
 
-    @mark_actions(ActionGroup.READ, version="v2")
+    @mark_actions(ActionGroup.READ)
     async def aunion(self, *others: "RedisSet[T]") -> set:
         keys = [self.special_key, *(o.special_key for o in others)]
         return self._load_members(await self.redis.sunion(*keys))
 
-    @mark_actions(ActionGroup.READ, version="v2")
+    @mark_actions(ActionGroup.READ)
     async def aintersect(self, *others: "RedisSet[T]") -> set:
         keys = [self.special_key, *(o.special_key for o in others)]
         return self._load_members(await self.redis.sinter(*keys))
 
-    @mark_actions(ActionGroup.READ, version="v2")
+    @mark_actions(ActionGroup.READ)
     async def adifference(self, *others: "RedisSet[T]") -> set:
         keys = [self.special_key, *(o.special_key for o in others)]
         return self._load_members(await self.redis.sdiff(*keys))

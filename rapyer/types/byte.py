@@ -14,7 +14,7 @@ class RedisBytes(bytes, RedisType):
         return bytes(self)
 
     @marks_redis_updated
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND)
     def __iadd__(self, other):
         new_value = self + other
         if self.pipeline:
