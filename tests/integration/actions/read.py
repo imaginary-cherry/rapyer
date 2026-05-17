@@ -37,12 +37,9 @@ class ReadActionTestBase(AsyncActionTestBase, ABC):
         self.created_models = await self.setup_data()
 
         # Act + Assert
-        expected = self.expected_before()
         async with rapyer.apipeline():
             actual = await self.perform_action(self.created_models[0])
-            assert (
-                actual == expected
-            ), f"Read action returned {actual!r} inside pipeline; expected {expected!r}"
+            self.assert_action_effect(None, actual)
 
     def __init_subclass__(cls, **kwargs: Any):
         super().__init_subclass__(**kwargs)
