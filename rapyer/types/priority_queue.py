@@ -96,11 +96,6 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
 
     # --- SpecialFieldType interface ---
 
-    @classmethod
-    def queue_load_in_pipeline(cls, pipe, special_key: str) -> bool:
-        """Special fields dont need to load data since the object itself is entirley contained in the server"""
-        return False
-
     async def asave_special(self):
         # NOTE - nothing to save
         pass
