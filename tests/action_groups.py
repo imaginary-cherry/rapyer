@@ -31,8 +31,9 @@ PRIVATE_METHODS = _group(
     RedisDatetimeTimestamp._validate_timestamp,
     RedisDatetimeTimestamp._serialize_timestamp,
     # RedisPriorityQueue
-    RedisPriorityQueue._serialize_value,
-    RedisPriorityQueue._deserialize_value,
+    RedisPriorityQueue._dump_member,
+    RedisPriorityQueue._dump_members,
+    RedisPriorityQueue._load_member,
     # AtomicRedisModel
     AtomicRedisModel._search_keys_by_query,
     AtomicRedisModel.build_redis_model,
@@ -80,7 +81,6 @@ PRIVATE_INHERITED_METHODS = _group(
     SpecialFieldType.asave_special,
     SpecialFieldType.adelete_special,
     SpecialFieldType.aduplicate_special,
-    RedisPriorityQueue.find_inner_type,
     RedisPriorityQueue.aremove,
     AtomicRedisModel.redis_schema,
 )
