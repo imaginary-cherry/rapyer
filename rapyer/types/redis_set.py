@@ -26,10 +26,9 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
     # --- Serialization helpers ---
 
     def _dump_members(self, values: Iterable[T]) -> list[str]:
-        serialized = self._adapter.dump_python(
+        return self._adapter.dump_python(
             set(values), mode="json", context={REDIS_DUMP_FLAG_NAME: True}
         )
-        return [json.dumps(s) for s in serialized]
 
     def _dump_member(self, value: T) -> str:
         return self._dump_members([value])[0]
@@ -239,6 +238,17 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
                 v = {json.loads(m.decode() if isinstance(m, bytes) else m) for m in v}
             return cls(handler_call(v))
 
+        def _serialize_wrap(v, serializer, info):
+            base = serializer(v)
+            ctx = info.context or {}
+            if ctx.get(REDIS_DUMP_FLAG_NAME):
+                return [json.dumps(m) for m in base]
+            return base
+
+        schema = handler(set[inner])
+        serialization = core_schema.wrap_serializer_function_ser_schema(
+            _serialize_wrap, info_arg=True, schema=schema
+        )
         return core_schema.with_info_wrap_validator_function(
-            _validate_wrap, handler(set[inner])
+            _validate_wrap, schema, serialization=serialization
         )
