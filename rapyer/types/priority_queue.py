@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 from typing import Any, Generic, Optional, TypeVar, get_args
 
@@ -27,18 +28,16 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
     # --- Serialization helpers ---
 
     def _dump_members(self, values) -> list[str]:
-        import json as _json
         serialized = self._adapter.dump_python(
             list(values), mode="json", context={REDIS_DUMP_FLAG_NAME: True}
         )
-        return [_json.dumps(s) for s in serialized]
+        return [json.dumps(s) for s in serialized]
 
     def _dump_member(self, value: T) -> str:
         return self._dump_members([value])[0]
 
     def _load_member(self, raw):
-        import json as _json
-        parsed = _json.loads(raw.decode() if isinstance(raw, bytes) else raw)
+        parsed = json.loads(raw.decode() if isinstance(raw, bytes) else raw)
         return self._adapter.validate_python(
             [parsed], context={REDIS_DUMP_FLAG_NAME: True}
         )[0]
@@ -126,13 +125,32 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
     def __get_pydantic_core_schema__(
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
-        # Declare to pydantic that PQ behaves as ``list[T]``.
-        # No custom serializer — parent model uses ``exclude=`` to skip SF
-        # fields explicitly, so we can let the schema dump real data here.
-        # (PROBLEM: PQ has no local state to actually dump, see below.)
         args = get_args(source_type)
         inner = args[0] if args else Any
-        return core_schema.no_info_after_validator_function(
-            cls,
-            handler(list[inner]),
+
+        def _validate_wrap(v, handler_call, info):
+            if isinstance(v, cls):
+                return v
+            if isinstance(v, list):
+                if (info.context or {}).get(REDIS_DUMP_FLAG_NAME):
+                    return handler_call(v)
+                raise ValueError(
+                    f"Cannot initialize {cls.__name__} from a list — "
+                    "assign a RedisPriorityQueue instance instead."
+                )
+            return cls()
+
+        def _serialize(v, serializer):
+            if isinstance(v, list):
+                return serializer(v)  # ← let pydantic serialize as list[T]
+            if isinstance(v, cls):
+                return cls()
+            return v
+
+        schema = handler(list[inner])
+        serialization = core_schema.wrap_serializer_function_ser_schema(
+            _serialize, schema=schema
+        )
+        return core_schema.with_info_wrap_validator_function(
+            _validate_wrap, schema, serialization=serialization
         )

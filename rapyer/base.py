@@ -450,13 +450,13 @@ class AtomicRedisModel(BaseModel):
         return self.model_dump(
             mode="json",
             context={REDIS_DUMP_FLAG_NAME: True},
-            exclude=self._special_field_names or None,
+            exclude=self.build_redis_dump_exclude() or None,
         )
 
     def redis_dump_json(self):
         return self.model_dump_json(
             context={REDIS_DUMP_FLAG_NAME: True},
-            exclude=self._special_field_names or None,
+            exclude=self.build_redis_dump_exclude() or None,
         )
 
     @mark_actions(ActionGroup.CREATE, target=TargetSource.RESULT, version="v2")
@@ -600,6 +600,23 @@ class AtomicRedisModel(BaseModel):
     @classmethod
     def contains_sf_field(cls) -> bool:
         return bool(cls._contain_sf) or bool(cls._special_field_names)
+
+    @classmethod
+    @functools.cache
+    def build_redis_dump_exclude(cls) -> dict:
+        exclude: dict = {}
+        for fname in cls._special_field_names:
+            exclude[fname] = True
+        for fname in cls._contain_sf:
+            if fname in exclude:
+                continue
+            annotation = cls.model_fields[fname].annotation
+            inner = get_origin(annotation) or annotation
+            if isinstance(inner, type) and issubclass(inner, AtomicRedisModel):
+                nested = inner.build_redis_dump_exclude()
+                if nested:
+                    exclude[fname] = nested
+        return exclude
 
     @classmethod
     def queue_special_loads_in_pipeline(cls, pipe, key: str, plan: list):
