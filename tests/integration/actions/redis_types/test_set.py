@@ -92,6 +92,12 @@ class TestSetApop(ReadActionTestBase, RedisSetActionBase):
     def expected_before(self):
         return set(INITIAL_ITEMS)
 
+    def assert_action_effect(self, loaded, action_result):
+        expected = self.expected_read_output()
+        assert (
+            action_result in expected
+        ), f"Action returned {action_result!r}; expected one of {expected!r}"
+
 
 class TestSetAcontains(ReadActionTestBase, RedisSetActionBase):
     covered_method = RedisSet.acontains
