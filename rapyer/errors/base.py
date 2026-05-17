@@ -9,6 +9,7 @@ class KeyNotFound(RapyerError):
 
     pass
 
+
 class CorruptedModelError(RapyerError):
     """Raised when a model is corrupted."""
 

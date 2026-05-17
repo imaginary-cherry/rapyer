@@ -512,5 +512,3 @@ def test_redis_dump_skips_field_marked_exclude_true_sanity():
     # Assert
     assert "secret" not in redis_data
     assert redis_data["name"] == "my_model"
-
-

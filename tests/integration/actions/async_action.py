@@ -20,9 +20,7 @@ class AsyncActionTestBase(ActionTestBase, ABC):
 
     def assert_action_effect(self, loaded: Any, action_result: Any):
         expected_after = self.expected_after()
-        assert loaded == expected_after, (
-            f"Expected {expected_after!r}, got {loaded!r}"
-        )
+        assert loaded == expected_after, f"Expected {expected_after!r}, got {loaded!r}"
 
     @pytest.mark.asyncio
     async def test_async_action_effect(self, test_input):

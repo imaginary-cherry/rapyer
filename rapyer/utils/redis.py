@@ -72,9 +72,7 @@ def build_models_from_dumps(
     when ``raise_on_missing`` is True; otherwise they are skipped."""
     instances: list = []
     cursor = 0
-    for data, key, klass, key_plan in zip(
-        models_dump, keys, classes, plans_per_key
-    ):
+    for data, key, klass, key_plan in zip(models_dump, keys, classes, plans_per_key):
         slice_end = cursor + len(key_plan)
         raw_slice = sf_raw[cursor:slice_end]
         cursor = slice_end

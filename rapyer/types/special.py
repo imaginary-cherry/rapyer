@@ -9,9 +9,6 @@ from rapyer.types.base import BaseRedisType
 SPECIAL_FIELD_KEY_PREFIX = "__rapyer_special__"
 
 
-
-
-
 class SpecialFieldType(BaseRedisType, abc.ABC):
     """Base for field types stored separately from the model's JSON dump.
 
