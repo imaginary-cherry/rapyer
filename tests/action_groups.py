@@ -3,14 +3,14 @@ from typing import Callable
 import rapyer
 from rapyer import find_redis_models, init_rapyer, teardown_rapyer
 from rapyer.base import AtomicRedisModel
+from rapyer.types import RedisSet
 from rapyer.types.base import BaseRedisType, RedisType
-from rapyer.types.generic import GenericRedisType
 from rapyer.types.byte import RedisBytes
 from rapyer.types.datetime import RedisDatetimeTimestamp
 from rapyer.types.dct import RedisDict
+from rapyer.types.generic import GenericRedisType
 from rapyer.types.lst import RedisList
 from rapyer.types.priority_queue import RedisPriorityQueue
-from rapyer.types.redis_set import RedisSet
 from rapyer.types.special import SpecialFieldType
 from tests.coverage_helpers import cover_tuple
 
@@ -34,6 +34,14 @@ PRIVATE_METHODS = _group(
     RedisPriorityQueue._dump_member,
     RedisPriorityQueue._dump_members,
     RedisPriorityQueue._load_member,
+    # Redis set
+    RedisSet._dump_members,
+    RedisSet._dump_member,
+    RedisSet._load_members,
+    RedisSet.queue_special_loads_in_pipeline,
+    RedisSet.special_field_key,
+    # Generic
+    GenericRedisType.contains_sf_field,
     # AtomicRedisModel
     AtomicRedisModel._search_keys_by_query,
     AtomicRedisModel.build_redis_model,
@@ -56,6 +64,9 @@ PRIVATE_METHODS = _group(
     AtomicRedisModel.iter_filter_batches,
     AtomicRedisModel.should_refresh,
     AtomicRedisModel.should_refresh_for_action,
+    AtomicRedisModel.build_redis_dump_exclude,
+    AtomicRedisModel.contains_sf_field,
+    AtomicRedisModel.queue_special_loads_in_pipeline,
 )
 
 # PRIVATE_INHERITED_METHODS — MRO-aware. Any subclass that inherits OR
