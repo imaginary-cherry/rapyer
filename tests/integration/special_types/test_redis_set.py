@@ -1,5 +1,3 @@
-import json
-
 import pytest
 import pytest_asyncio
 
@@ -44,9 +42,7 @@ async def test_set_save_and_aadd_persists_members(
         await model.tags.aadd(value)
 
     # Assert
-    raw = await real_redis_client.smembers(model.tags.special_key)
-    decoded = {json.loads(m) for m in raw}
-    assert decoded == set(items)
+    assert await model.tags.amembers() == set(items)
 
 
 @pytest.mark.parametrize(["model_class", "items"], SET_INIT_PARAMS)
@@ -64,10 +60,7 @@ async def test_set_aadd_many_persists_members(
     await model.tags.aadd_many(items)
 
     # Assert
-    decoded = {
-        json.loads(m) for m in await real_redis_client.smembers(model.tags.special_key)
-    }
-    assert decoded == set(items)
+    assert await model.tags.amembers() == set(items)
 
 
 @pytest.mark.asyncio
