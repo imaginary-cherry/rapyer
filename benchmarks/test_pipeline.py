@@ -1,16 +1,13 @@
 from datetime import datetime
 
 from benchmarks.base import AsyncBenchmarkTestWithTTL, TTLMode
-from tests.models.collection_types import (
-    ComprehensiveTestModel,
-    ComprehensiveTestModelNoTTL,
-)
+from benchmarks.models import BenchmarkPipelineModel, BenchmarkPipelineModelWithTTL
 
 
 class TestPipelineIntIadd(AsyncBenchmarkTestWithTTL):
     models = {
-        TTLMode.NO_TTL: ComprehensiveTestModelNoTTL,
-        TTLMode.TTL: ComprehensiveTestModel,
+        TTLMode.NO_TTL: BenchmarkPipelineModel,
+        TTLMode.TTL: BenchmarkPipelineModelWithTTL,
     }
 
     async def setup(self, mode):
@@ -26,8 +23,8 @@ class TestPipelineIntIadd(AsyncBenchmarkTestWithTTL):
 
 class TestPipelineMultipleOps(AsyncBenchmarkTestWithTTL):
     models = {
-        TTLMode.NO_TTL: ComprehensiveTestModelNoTTL,
-        TTLMode.TTL: ComprehensiveTestModel,
+        TTLMode.NO_TTL: BenchmarkPipelineModel,
+        TTLMode.TTL: BenchmarkPipelineModelWithTTL,
     }
 
     async def setup(self, mode):
@@ -48,8 +45,8 @@ class TestPipelineMultiAssign(AsyncBenchmarkTestWithTTL):
     """Pipeline body that performs many direct ``=`` field assignments."""
 
     models = {
-        TTLMode.NO_TTL: ComprehensiveTestModelNoTTL,
-        TTLMode.TTL: ComprehensiveTestModel,
+        TTLMode.NO_TTL: BenchmarkPipelineModel,
+        TTLMode.TTL: BenchmarkPipelineModelWithTTL,
     }
 
     async def setup(self, mode):
@@ -72,8 +69,8 @@ class TestPipelineWithAupdate(AsyncBenchmarkTestWithTTL):
     """Pipeline body that issues ``aupdate`` calls — they defer to the outer pipe."""
 
     models = {
-        TTLMode.NO_TTL: ComprehensiveTestModelNoTTL,
-        TTLMode.TTL: ComprehensiveTestModel,
+        TTLMode.NO_TTL: BenchmarkPipelineModel,
+        TTLMode.TTL: BenchmarkPipelineModelWithTTL,
     }
 
     async def setup(self, mode):
