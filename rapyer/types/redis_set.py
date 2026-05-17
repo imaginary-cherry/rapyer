@@ -1,112 +1,208 @@
 import json
 from typing import Any, Generic, Iterable, Optional, TypeVar, get_args
 
-from pydantic import GetCoreSchemaHandler, TypeAdapter
+from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
 
 from rapyer.actions import ActionGroup, mark_actions
+from rapyer.types.base import REDIS_DUMP_FLAG_NAME
 from rapyer.types.special import SpecialFieldType
 
 T = TypeVar("T")
 
 
-class RedisSet(SpecialFieldType, Generic[T]):
+class RedisSet(set, SpecialFieldType, Generic[T]):
     """
     Unordered, unique-member collection backed by a Redis SET. Pure Redis proxy —
     no local state.
     """
 
-    original_type: type = type(None)
-    _value_adapter: TypeAdapter = None
+    original_type: type = set
 
-    @classmethod
-    def find_inner_type(cls, type_):
-        args = get_args(type_)
-        return args[0] if args else Any
+    def __init__(self, *args, **kwargs):
+        set.__init__(self, *args, **kwargs)
+        SpecialFieldType.__init__(self)
 
-    def _serialize_value(self, value) -> str:
-        if self._value_adapter:
-            return json.dumps(self._value_adapter.dump_python(value, mode="json"))
-        return json.dumps(value)
+    # --- Serialization helpers ---
 
-    def _deserialize_value(self, raw):
-        if isinstance(raw, bytes):
-            raw = raw.decode()
-        parsed = json.loads(raw)
-        if self._value_adapter:
-            return self._value_adapter.validate_python(parsed)
-        return parsed
+    def _dump_members(self, values: Iterable[T]) -> list[str]:
+        serialized = self._adapter.dump_python(
+            set(values), mode="json", context={REDIS_DUMP_FLAG_NAME: True}
+        )
+        return [json.dumps(s) for s in serialized]
 
-    # --- Core operations ---
+    def _dump_member(self, value: T) -> str:
+        return self._dump_members([value])[0]
+
+    def _load_members(self, raw_iterable) -> set:
+        return self._adapter.validate_python(
+            raw_iterable, context={REDIS_DUMP_FLAG_NAME: True}
+        )
+
+    # --- Sync set methods ---
+
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND, version="v2")
+    def add(self, value: T):
+        if self.pipeline:
+            self.pipeline.sadd(self.special_key, self._dump_member(value))
+        set.add(self, value)
+
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
+    def discard(self, value: T):
+        if self.pipeline:
+            self.pipeline.srem(self.special_key, self._dump_member(value))
+        set.discard(self, value)
+
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
+    def remove(self, value: T):
+        if self.pipeline:
+            self.pipeline.srem(self.special_key, self._dump_member(value))
+        set.remove(self, value)
+
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ, version="v2")
+    def pop(self) -> T:
+        # Returns a value chosen from the LOCAL set (Python's choice), not from
+        # Redis. Inside a pipeline, queues SREM of that local value.
+        value = set.pop(self)
+        if self.pipeline:
+            self.pipeline.srem(self.special_key, self._dump_member(value))
+        return value
+
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
+    def clear(self):
+        if self.pipeline:
+            self.pipeline.delete(self.special_key)
+        set.clear(self)
+
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND, version="v2")
+    def update(self, *iterables: Iterable[T]):
+        all_values = [v for it in iterables for v in it]
+        if not all_values:
+            return
+        if self.pipeline:
+            self.pipeline.sadd(self.special_key, *self._dump_members(all_values))
+        set.update(self, all_values)
+
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
+    def difference_update(self, *iterables: Iterable[T]):
+        all_values = [v for it in iterables for v in it]
+        if not all_values:
+            return
+        if self.pipeline:
+            self.pipeline.srem(self.special_key, *self._dump_members(all_values))
+        set.difference_update(self, all_values)
+
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
+    def intersection_update(self, *iterables: Iterable[T]):
+        set.intersection_update(self, *iterables)
+        if self.pipeline:
+            self.pipeline.delete(self.special_key)
+            if self:
+                self.pipeline.sadd(self.special_key, *self._dump_members(self))
+
+    @mark_actions(ActionGroup.UPDATE, version="v2")
+    def symmetric_difference_update(self, other: Iterable[T]):
+        set.symmetric_difference_update(self, other)
+        if self.pipeline:
+            self.pipeline.delete(self.special_key)
+            if self:
+                self.pipeline.sadd(self.special_key, *self._dump_members(self))
+
+    def __ior__(self, other):
+        self.update(other)
+        return self
+
+    def __iand__(self, other):
+        self.intersection_update(other)
+        return self
+
+    def __isub__(self, other):
+        self.difference_update(other)
+        return self
+
+    def __ixor__(self, other):
+        self.symmetric_difference_update(other)
+        return self
+
+    # --- Async mutators (Redis-backed; also update local mirror) ---
 
     @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND, version="v2")
     async def aadd(self, value: T):
-        await self.client.sadd(self.special_key, self._serialize_value(value))
+        await self.client.sadd(self.special_key, self._dump_member(value))
+        set.add(self, value)
 
     @mark_actions(ActionGroup.UPDATE, ActionGroup.APPEND, version="v2")
     async def aadd_many(self, values: Iterable[T]):
-        serialized = [self._serialize_value(v) for v in values]
-        if serialized:
-            await self.client.sadd(self.special_key, *serialized)
+        values = list(values)
+        if not values:
+            return
+        await self.client.sadd(self.special_key, *self._dump_members(values))
+        set.update(self, values)
 
     @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
     async def aremove(self, value: T) -> Optional[bool]:
-        removed = await self.client.srem(self.special_key, self._serialize_value(value))
+        removed = await self.client.srem(self.special_key, self._dump_member(value))
+        set.discard(self, value)
         if self.pipeline:
             return None
         return removed > 0
 
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ, version="v2")
+    async def apop(self) -> Optional[T]:
+        # Redis-decided pop (atomic SPOP). The local mirror is also discarded
+        # if the value is present. Sync ``pop`` chooses from the local set.
+        raw = await self.redis.spop(self.special_key)
+        if raw is None:
+            return None
+        (value,) = self._load_members([raw])
+        set.discard(self, value)
+        return value
+
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
+    async def aclear(self):
+        await self.client.delete(self.special_key)
+        set.clear(self)
+
+    # --- Async reads ---
+
     @mark_actions(ActionGroup.READ, version="v2")
     async def acontains(self, value: T) -> bool:
         return bool(
-            await self.redis.sismember(self.special_key, self._serialize_value(value))
+            await self.redis.sismember(self.special_key, self._dump_member(value))
         )
 
     @mark_actions(ActionGroup.READ, version="v2")
-    async def amembers(self) -> set[T]:
+    async def amembers(self) -> set:
         raw = await self.redis.smembers(self.special_key)
-        return {self._deserialize_value(m) for m in raw}
+        return self._load_members(raw)
 
     @mark_actions(ActionGroup.READ, version="v2")
     async def asize(self) -> int:
         return await self.redis.scard(self.special_key)
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ, version="v2")
-    async def apop(self) -> Optional[T]:
-        raw = await self.redis.spop(self.special_key)
-        if raw is None:
-            return None
-        return self._deserialize_value(raw)
-
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
-    async def aclear(self):
-        await self.client.delete(self.special_key)
-
     # --- Multi-set algebra ---
 
     @mark_actions(ActionGroup.READ, version="v2")
-    async def aunion(self, *others: "RedisSet[T]") -> set[T]:
+    async def aunion(self, *others: "RedisSet[T]") -> set:
         keys = [self.special_key, *(o.special_key for o in others)]
-        raw = await self.redis.sunion(*keys)
-        return {self._deserialize_value(m) for m in raw}
+        return self._load_members(await self.redis.sunion(*keys))
 
     @mark_actions(ActionGroup.READ, version="v2")
-    async def aintersect(self, *others: "RedisSet[T]") -> set[T]:
+    async def aintersect(self, *others: "RedisSet[T]") -> set:
         keys = [self.special_key, *(o.special_key for o in others)]
-        raw = await self.redis.sinter(*keys)
-        return {self._deserialize_value(m) for m in raw}
+        return self._load_members(await self.redis.sinter(*keys))
 
     @mark_actions(ActionGroup.READ, version="v2")
-    async def adifference(self, *others: "RedisSet[T]") -> set[T]:
+    async def adifference(self, *others: "RedisSet[T]") -> set:
         keys = [self.special_key, *(o.special_key for o in others)]
-        raw = await self.redis.sdiff(*keys)
-        return {self._deserialize_value(m) for m in raw}
+        return self._load_members(await self.redis.sdiff(*keys))
 
-    # --- SpecialFieldType interface ---
+    # --- SpecialFieldType lifecycle ---
 
     async def asave_special(self):
-        # NOTE - nothing to save; every op writes through to Redis directly.
-        pass
+        await self.client.delete(self.special_key)
+        if self:
+            await self.client.sadd(self.special_key, *self._dump_members(self))
 
     async def adelete_special(self):
         await self.client.delete(self.special_key)
@@ -132,9 +228,17 @@ class RedisSet(SpecialFieldType, Generic[T]):
     def __get_pydantic_core_schema__(
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
-        return core_schema.no_info_plain_validator_function(
-            lambda v: v if isinstance(v, cls) else cls(),
-            serialization=core_schema.plain_serializer_function_ser_schema(
-                lambda v: None,
-            ),
+        args = get_args(source_type)
+        inner = args[0] if args else Any
+
+        def _validate_wrap(v, handler_call, info):
+            ctx = info.context or {}
+            is_redis = ctx.get(REDIS_DUMP_FLAG_NAME)
+            not_redis_set_obj = not isinstance(v, cls)
+            if is_redis and not_redis_set_obj:
+                v = {json.loads(m.decode() if isinstance(m, bytes) else m) for m in v}
+            return cls(handler_call(v))
+
+        return core_schema.with_info_wrap_validator_function(
+            _validate_wrap, handler(set[inner])
         )
