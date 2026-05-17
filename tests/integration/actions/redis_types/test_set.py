@@ -186,3 +186,128 @@ class TestSetAdifference(_TwoSetActionBase):
 
     def expected_before(self):
         return set(self.initial_items) - set(self.other_items)
+
+
+class RedisSetSyncActionBase(UpdateActionTestBase, ABC):
+    """Sync set methods queue Redis ops onto an open pipeline; outside a
+    pipeline they only mutate the local mirror. They aren't async, so TTL
+    refresh / action-effect coverage doesn't apply — pipeline atomicity and
+    no-clobber are what we need."""
+
+    initial_items: ClassVar[list[str]] = INITIAL_ITEMS
+
+    def create_models(self):
+        return [ComprehensiveTestModel(name="set_sync_test")]
+
+    async def setup_data(self):
+        models = await super().setup_data()
+        for inst in models:
+            await inst.labels.aadd_many(self.initial_items)
+        return models
+
+    async def load_data(self):
+        return frozenset(
+            await self.real_redis_client.smembers(
+                self.created_models[0].labels.special_key
+            )
+        )
+
+    def expected_before(self):
+        return INITIAL_SERIALIZED
+
+
+class TestSetAdd(RedisSetSyncActionBase):
+    covered_method = RedisSet.add
+
+    async def perform_action(self, piped: ComprehensiveTestModel):
+        piped.labels.add("delta")
+
+    def expected_after(self):
+        return INITIAL_SERIALIZED | {'"delta"'}
+
+
+class TestSetUpdate(RedisSetSyncActionBase):
+    covered_method = RedisSet.update
+
+    async def perform_action(self, piped: ComprehensiveTestModel):
+        piped.labels.update(["delta", "epsilon"])
+
+    def expected_after(self):
+        return INITIAL_SERIALIZED | {'"delta"', '"epsilon"'}
+
+
+class TestSetRemove(RedisSetSyncActionBase):
+    covered_method = RedisSet.remove
+
+    async def perform_action(self, piped: ComprehensiveTestModel):
+        piped.labels.remove("beta")
+
+    def expected_after(self):
+        return INITIAL_SERIALIZED - {'"beta"'}
+
+
+class TestSetDiscard(RedisSetSyncActionBase):
+    covered_method = RedisSet.discard
+
+    async def perform_action(self, piped: ComprehensiveTestModel):
+        piped.labels.discard("beta")
+
+    def expected_after(self):
+        return INITIAL_SERIALIZED - {'"beta"'}
+
+
+class TestSetClear(RedisSetSyncActionBase):
+    covered_method = RedisSet.clear
+
+    async def perform_action(self, piped: ComprehensiveTestModel):
+        piped.labels.clear()
+
+    def expected_after(self):
+        return frozenset()
+
+
+class TestSetDifferenceUpdate(RedisSetSyncActionBase):
+    covered_method = RedisSet.difference_update
+
+    async def perform_action(self, piped: ComprehensiveTestModel):
+        piped.labels.difference_update({"alpha"})
+
+    def expected_after(self):
+        return INITIAL_SERIALIZED - {'"alpha"'}
+
+
+class TestSetIntersectionUpdate(RedisSetSyncActionBase):
+    covered_method = RedisSet.intersection_update
+
+    async def perform_action(self, piped: ComprehensiveTestModel):
+        piped.labels.intersection_update({"alpha", "delta"})
+
+    def expected_after(self):
+        return frozenset({'"alpha"'})
+
+
+class TestSetSymmetricDifferenceUpdate(RedisSetSyncActionBase):
+    covered_method = RedisSet.symmetric_difference_update
+
+    async def perform_action(self, piped: ComprehensiveTestModel):
+        piped.labels.symmetric_difference_update({"alpha", "delta"})
+
+    def expected_after(self):
+        return (INITIAL_SERIALIZED - {'"alpha"'}) | {'"delta"'}
+
+
+class TestSetPop(ReadActionTestBase, RedisSetSyncActionBase):
+    covered_method = RedisSet.pop
+    skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
+
+    async def perform_action(self, piped: ComprehensiveTestModel):
+        return piped.labels.pop()
+
+    def expected_before(self):
+        return set(INITIAL_ITEMS)
+
+    def assert_action_effect(self, loaded, action_result):
+        expected = self.expected_read_output()
+        assert (
+            action_result in expected
+        ), f"Action returned {action_result!r}; expected one of {expected!r}"
