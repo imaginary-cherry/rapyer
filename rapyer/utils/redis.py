@@ -10,6 +10,7 @@ from rapyer.utils.pythonic import inject_at_paths
 
 if TYPE_CHECKING:
     from rapyer import AtomicRedisModel
+    from rapyer.config import RedisConfig
 
 
 def acquire_lock(
@@ -28,13 +29,13 @@ Plan = list[list[str]]
 
 
 async def execute_load_pipeline(
-    redis: Redis,
+    meta: "RedisConfig",
     classes: list[type["AtomicRedisModel"]],
     keys: list[str],
 ) -> tuple[Any, list[Plan], list[Any]]:
     """Returns ``(models_dump, plans_per_key, sf_raw_results)``."""
     plans_per_key: list[Plan] = []
-    async with redis.pipeline(transaction=True) as pipe:
+    async with meta.redis.pipeline(transaction=True) as pipe:
         pipe.json().mget(keys=keys, path="$")
         for klass, key in zip(classes, keys):
             plan_for_key: Plan = []
@@ -45,7 +46,7 @@ async def execute_load_pipeline(
 
 
 async def fetch_models_with_sf_loads(
-    redis: Redis,
+    meta: "RedisConfig",
     classes: list[type["AtomicRedisModel"]],
     keys: list[str],
 ) -> tuple[Any, list[Plan], list[Any]]:
@@ -53,8 +54,8 @@ async def fetch_models_with_sf_loads(
     transaction pipeline when any class has SF; otherwise a direct ``JSON.MGET``.
     Returns ``(models_dump, plans_per_key, sf_raw_results)``."""
     if any(c.contains_sf_field() for c in classes):
-        return await execute_load_pipeline(redis, classes, keys)
-    models = await redis.json().mget(keys=keys, path="$")
+        return await execute_load_pipeline(meta, classes, keys)
+    models = await meta.redis_json.mget(keys=keys, path="$")
     return models, [[] for _ in keys], []
 
 

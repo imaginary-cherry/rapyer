@@ -554,7 +554,7 @@ class AtomicRedisModel(BaseModel):
             model_dump = await cls.Meta.redis_json.get(key, "$")  # type: ignore[misc]
         else:
             models_dump, plans_per_key, sf_raw = await execute_load_pipeline(
-                cls.Meta.redis, [cls], [key]
+                cls.Meta, [cls], [key]
             )
             model_dump = models_dump[0]
             plan = plans_per_key[0]
@@ -581,7 +581,7 @@ class AtomicRedisModel(BaseModel):
             model_dump = model_dump[0]
         else:
             models_dump, plans_per_key, sf_raw = await execute_load_pipeline(
-                cls.Meta.redis, [cls], [self.key]
+                cls.Meta, [cls], [self.key]
             )
             model_dump = models_dump[0]
             plan = plans_per_key[0]
@@ -686,7 +686,7 @@ class AtomicRedisModel(BaseModel):
 
         classes = [cls] * len(targeted_keys)
         models, plans_per_key, sf_raw = await fetch_models_with_sf_loads(
-            cls.Meta.redis, classes, targeted_keys
+            cls.Meta, classes, targeted_keys
         )
         return build_models_from_dumps(
             models, classes, targeted_keys, plans_per_key, sf_raw, raise_on_missing
@@ -1044,7 +1044,7 @@ async def afind(*redis_keys: str, skip_missing: bool = False) -> list[AtomicRedi
     classes = [key_to_class[k] for k in redis_keys]
     keys_list = list(redis_keys)
     models_data, plans_per_key, sf_raw = await fetch_models_with_sf_loads(
-        AtomicRedisModel.Meta.redis, classes, keys_list
+        AtomicRedisModel.Meta, classes, keys_list
     )
     return build_models_from_dumps(
         models_data,
