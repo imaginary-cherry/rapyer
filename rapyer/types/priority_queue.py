@@ -6,6 +6,7 @@ from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
 
 from rapyer.actions import ActionGroup, mark_actions
+from rapyer.errors.base import RapyerSerializationError
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME
 from rapyer.types.special import SpecialFieldType
 
@@ -133,7 +134,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
                     f"Cannot initialize {cls.__name__} from a list — "
                     "assign a RedisPriorityQueue instance instead."
                 )
-            return cls()
+            raise RapyerSerializationError(f"PriorityQueue can serialize list or Prioirty queue object only, got {type(v)}")
 
         def _serialize(v, serializer):
             if isinstance(v, list):

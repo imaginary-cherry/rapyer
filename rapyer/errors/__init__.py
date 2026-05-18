@@ -8,6 +8,7 @@ from rapyer.errors.base import (
     MissingParameterError,
     RapyerError,
     RapyerModelDoesntExistError,
+    RapyerSerializationError,
     UnsupportedArgumentValueError,
     UpdateAtomicModelError,
 )
@@ -52,4 +53,5 @@ __all__ = [
     "UnsupportedArgumentTypeError",
     "BadDeleteActionError",
     "CorruptedModelError",
+    "RapyerSerializationError",
 ]
