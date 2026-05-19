@@ -15,10 +15,13 @@ class CreateActionTestBase(TTLActionTestBase, ABC):
 
     skip_no_ttl_when_not_configured: ClassVar[str | None] = None
 
+    async def setup_for_creation(self):
+        return self.create_models()
+
     @pytest.mark.asyncio
     async def test_no_ttl_set_when_ttl_not_configured(self):
         # Arrange
-        self.created_models = self.create_models()
+        self.created_models = await self.setup_for_creation()
         model_for_keys = self.created_models[0]
 
         # Act
