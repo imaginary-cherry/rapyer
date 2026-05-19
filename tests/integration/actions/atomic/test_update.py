@@ -25,3 +25,11 @@ class TestRapyerAupdate(UpdateActionTestBase, TTLActionTestBase):
 
     def expected_after(self):
         return "updated", 99
+
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        # aupdate only writes name + counter; mutate tags locally to verify
+        # that fields outside its kwargs don't leak into Redis.
+        m.tags.append("__local_marker__")
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> list:
+        return list(m.tags)

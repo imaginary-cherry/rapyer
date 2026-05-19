@@ -38,6 +38,12 @@ class TestRapyerAduplicate(UpdateActionTestBase, CreateActionTestBase):
         super().assert_after_pipeline(loaded)
         assert self.duplicate.key != self.created_models[0].key
 
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        m.counter += 7919
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> int:
+        return int(m.counter)
+
 
 class TestRapyerAduplicateMany(UpdateActionTestBase, CreateActionTestBase):
     covered_method = AtomicRedisModel.aduplicate_many
@@ -78,3 +84,9 @@ class TestRapyerAduplicateMany(UpdateActionTestBase, CreateActionTestBase):
         super().assert_after_pipeline(loaded)
         all_pks = [self.created_models[0].pk] + [d.pk for d in self.duplicates_lst()]
         assert len(set(all_pks)) == 4
+
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        m.counter += 7919
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> int:
+        return int(m.counter)

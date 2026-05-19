@@ -25,6 +25,12 @@ class TestIntegerAddition(UpdateActionTestBase):
     def expected_after(self):
         return 125
 
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        m.counter += 7919
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> int:
+        return int(m.counter)
+
 
 class TestRedisIntAincrease(ComprehensiveCounterOpBase, TTLActionTestBase):
     covered_method = RedisInt.aincrease

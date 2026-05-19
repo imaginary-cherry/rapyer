@@ -37,6 +37,12 @@ class RedisSetActionBase(UpdateActionTestBase, TTLActionTestBase, ABC):
     def expected_before(self):
         return INITIAL_SERIALIZED
 
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        m.labels.add("__local_marker__")
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> set:
+        return set(m.labels)
+
 
 class TestSetAadd(RedisSetActionBase):
     covered_method = RedisSet.aadd
@@ -214,6 +220,12 @@ class RedisSetSyncActionBase(UpdateActionTestBase, ABC):
 
     def expected_before(self):
         return INITIAL_SERIALIZED
+
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        m.labels.add("__local_marker__")
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> set:
+        return set(m.labels)
 
 
 class TestSetAdd(RedisSetSyncActionBase):

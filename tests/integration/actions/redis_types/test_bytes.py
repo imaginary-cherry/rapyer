@@ -21,3 +21,9 @@ class TestRedisBytesIadd(UpdateActionTestBase):
 
     def expected_after(self):
         return b"hello world"
+
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        m.data += b"_local_marker"
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> bytes:
+        return bytes(m.data)

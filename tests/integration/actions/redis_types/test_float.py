@@ -37,6 +37,12 @@ class TestRedisFloatAllOperationsCombined(UpdateActionTestBase):
     def expected_after(self):
         return 36.0
 
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        m.amount += 1.2345e-5
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> float:
+        return float(m.amount)
+
 
 class TestFloatAincrease(UpdateActionTestBase, TTLActionTestBase):
     covered_method = RedisFloat.aincrease
@@ -56,6 +62,12 @@ class TestFloatAincrease(UpdateActionTestBase, TTLActionTestBase):
 
     def expected_after(self):
         return 60.5
+
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        m.amount += 1.2345e-5
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> float:
+        return float(m.amount)
 
 
 class TestRedisFloatItruediv(ComprehensiveAmountOpBase):

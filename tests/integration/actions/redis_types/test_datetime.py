@@ -30,6 +30,14 @@ class DatetimeBothModelsOpBase(UpdateActionTestBase, ABC):
     def expected_after(self):
         return self.test_input.expected, self.test_input.expected
 
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        offset = timedelta(days=999)
+        m.event_time += offset
+        m.event_timestamp += offset
+
+    def get_target_field(self, m: ComprehensiveTestModel):
+        return (m.event_time, m.event_timestamp)
+
 
 class TestRedisDatetimeIadd(DatetimeBothModelsOpBase):
     covered_method = [RedisDatetime.__iadd__, RedisDatetimeTimestamp.__iadd__]

@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from datetime import timedelta
 from typing import Generic, TypeVar
 
 from tests.integration.actions.update import UpdateActionTestBase
@@ -51,6 +52,12 @@ class ComprehensiveAmountOpBase(ComprehensiveBinaryOpBase[float]):
     def make_model(v: float) -> ComprehensiveTestModel:
         return ComprehensiveTestModel(amount=v)
 
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        m.amount += 1.2345e-5
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> float:
+        return float(m.amount)
+
 
 class ComprehensiveCounterOpBase(ComprehensiveBinaryOpBase[int]):
     """RedisInt binary ops on ``ComprehensiveTestModel.counter``. Sync / pipeline-only."""
@@ -63,6 +70,12 @@ class ComprehensiveCounterOpBase(ComprehensiveBinaryOpBase[int]):
     def make_model(v: int) -> ComprehensiveTestModel:
         return ComprehensiveTestModel(counter=v)
 
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        m.counter += 7919
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> int:
+        return int(m.counter)
+
 
 class ComprehensiveDataOpBase(ComprehensiveOpBase[bytes]):
     """RedisBytes ops on ``ComprehensiveTestModel.data``."""
@@ -71,12 +84,24 @@ class ComprehensiveDataOpBase(ComprehensiveOpBase[bytes]):
     def field_getter(m: ComprehensiveTestModel) -> bytes:
         return m.data
 
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        m.data += b"_local_marker"
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> bytes:
+        return bytes(m.data)
+
 
 class ComprehensiveEventTimeOpBase(ComprehensiveOpBase):
     """RedisDatetime ops on ``ComprehensiveTestModel.event_time``."""
 
     @staticmethod
     def field_getter(m: ComprehensiveTestModel):
+        return m.event_time
+
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        m.event_time += timedelta(days=999)
+
+    def get_target_field(self, m: ComprehensiveTestModel):
         return m.event_time
 
 
@@ -87,6 +112,12 @@ class ComprehensiveEventTimestampOpBase(ComprehensiveOpBase):
     def field_getter(m: ComprehensiveTestModel):
         return m.event_timestamp
 
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        m.event_timestamp += timedelta(days=999)
+
+    def get_target_field(self, m: ComprehensiveTestModel):
+        return m.event_timestamp
+
 
 class ComprehensiveMetadataOpBase(ComprehensiveOpBase[dict]):
     """Dict ops on ``ComprehensiveTestModel.metadata``. Sync / pipeline-only."""
@@ -94,6 +125,12 @@ class ComprehensiveMetadataOpBase(ComprehensiveOpBase[dict]):
     @staticmethod
     def field_getter(m: ComprehensiveTestModel) -> dict:
         return m.metadata
+
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        m.metadata["__local_marker__"] = "__local_value__"
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> dict:
+        return dict(m.metadata)
 
 
 class ComprehensiveNameOpBase(ComprehensiveOpBase[str]):
@@ -103,6 +140,12 @@ class ComprehensiveNameOpBase(ComprehensiveOpBase[str]):
     def field_getter(m: ComprehensiveTestModel) -> str:
         return m.name
 
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        m.name += "_local_marker"
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> str:
+        return str(m.name)
+
 
 class ComprehensiveTagsOpBase(ComprehensiveOpBase[list]):
     """List ops on ``ComprehensiveTestModel.tags``. Sync / pipeline-only."""
@@ -110,6 +153,12 @@ class ComprehensiveTagsOpBase(ComprehensiveOpBase[list]):
     @staticmethod
     def field_getter(m: ComprehensiveTestModel) -> list:
         return m.tags
+
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        m.tags.append("__local_marker__")
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> list:
+        return list(m.tags)
 
 
 class ComprehensiveTasksOpBase(ComprehensiveOpBase):

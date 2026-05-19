@@ -60,3 +60,9 @@ class TestStringSet(UpdateActionTestBase, TTLActionTestBase):
 
     def expected_after(self):
         return "updated"
+
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        m.name += "_local_marker"
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> str:
+        return str(m.name)
