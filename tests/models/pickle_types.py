@@ -28,4 +28,4 @@ class ListPickableTypesModel(AtomicRedisModel):
 
 
 class NonRedisDumpableModel(AtomicRedisModel):
-    set_field: frozenset[str] = Field(default_factory=set)
+    set_field: frozenset[str] = Field(default_factory=frozenset)
