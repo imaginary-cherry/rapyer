@@ -2,31 +2,9 @@ from datetime import datetime
 
 import pytest
 
-from rapyer.types.priority_queue import RedisPriorityQueue
-from rapyer.types.redis_set import RedisSet
-from rapyer.types.special import SpecialFieldType
+import rapyer
+from tests.integration.functioninality._assertions import assert_no_field_at_default
 from tests.models.collection_types import ComprehensiveTestModel
-
-
-async def _extract_redis_set(field: RedisSet):
-    return await field.amembers()
-
-
-async def _extract_redis_priority_queue(field: RedisPriorityQueue):
-    return await field.aitems()
-
-
-_SF_EXTRACTORS = {
-    RedisSet: _extract_redis_set,
-    RedisPriorityQueue: _extract_redis_priority_queue,
-}
-
-
-async def extract_sf_data(field: SpecialFieldType):
-    for sf_type, extractor in _SF_EXTRACTORS.items():
-        if isinstance(field, sf_type):
-            return await extractor(field)
-    raise NotImplementedError(f"No extractor for SF type {type(field).__name__}")
 
 
 @pytest.mark.asyncio
@@ -52,21 +30,48 @@ async def test_comprehensive_model_asave_aget_roundtrip_all_fields_non_default()
     # Act
     retrieved = await ComprehensiveTestModel.aget(model.key)
 
-    # Assert — round-trip correctness
+    # Assert
     assert retrieved == model
+    await assert_no_field_at_default(retrieved)
 
-    # Assert — no field is at its default value
-    default_model = ComprehensiveTestModel()
-    for field_name in ComprehensiveTestModel.model_fields:
-        retrieved_value = getattr(retrieved, field_name)
-        default_value = getattr(default_model, field_name)
-        if isinstance(retrieved_value, SpecialFieldType):
-            retrieved_data = await extract_sf_data(retrieved_value)
-            default_data = await extract_sf_data(default_value)
-            assert retrieved_data != default_data, (
-                f"SF field {field_name!r} extracted same data as default"
-            )
-        else:
-            assert retrieved_value != default_value, (
-                f"Field {field_name!r} is at its default value"
-            )
+
+@pytest.mark.asyncio
+async def test_comprehensive_model_afind_multiple_keys_all_fields_non_default():
+    # Arrange
+    model_a = ComprehensiveTestModel(
+        tags=["alpha", "beta"],
+        metadata={"env": "prod", "region": "us-east"},
+        name="model_a",
+        counter=42,
+        amount=3.14159,
+        data=b"\x00\x01\x02payload_a",
+        event_time=datetime(2026, 1, 15, 12, 30, 45),
+        event_timestamp=datetime(2025, 6, 1, 9, 0, 0),
+    )
+    model_b = ComprehensiveTestModel(
+        tags=["gamma", "delta"],
+        metadata={"tier": "free", "region": "eu-west"},
+        name="model_b",
+        counter=99,
+        amount=2.71828,
+        data=b"\xff\xfe\xfdpayload_b",
+        event_time=datetime(2024, 11, 30, 23, 59, 59),
+        event_timestamp=datetime(2023, 3, 14, 15, 9, 26),
+    )
+    await model_a.asave()
+    await model_b.asave()
+    await model_a.tasks.apush("high", 1.0)
+    await model_a.tasks.apush("medium", 2.0)
+    await model_b.tasks.apush("urgent", 0.1)
+    await model_a.labels.aadd_many({"red", "green", "blue"})
+    await model_b.labels.aadd_many({"yellow", "orange"})
+
+    # Act
+    retrieved = await rapyer.afind(model_a.key, model_b.key)
+
+    # Assert
+    assert len(retrieved) == 2
+    assert retrieved[0] == model_a
+    assert retrieved[1] == model_b
+    for model in retrieved:
+        await assert_no_field_at_default(model)
