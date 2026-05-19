@@ -38,7 +38,7 @@ class Article(AtomicRedisModel):
 **Type:** `async` method
 **Parameters:**
 - `value` (T): The item to remove
-**Returns:** `bool` — `True` if the item was removed, `False` if not found.
+**Returns:** `bool` outside a pipeline — `True` if the item was removed, `False` if not found. Returns `None` inside `apipeline()`.
 **Description:** Removes a member from the set.
 
 #### `apop()`
@@ -102,16 +102,13 @@ Add a member. Queues `SADD` in a pipeline.
 Add members from one or more iterables. Queues `SADD` in a pipeline.
 
 #### `remove(value)` / `discard(value)`
-Remove a member. Queues `SREM` in a pipeline. `remove` raises `KeyError` if missing; `discard` is silent.
-
-#### `pop()`
-Removes and returns a value chosen by the **local** Python set. Queues `SREM` for that value in a pipeline. Use `apop()` for an atomic Redis-side pick.
+Remove a member. Queues `SREM` in a pipeline. Outside a pipeline, `remove` raises `KeyError` if missing; `discard` is silent. Inside a pipeline, both are silent — Redis is the source of truth and the local mirror is not allowed to raise.
 
 #### `clear()`
 Remove all members. Queues `DELETE` of the special key.
 
 #### `difference_update(*iterables)` / `intersection_update(*iterables)` / `symmetric_difference_update(other)`
-In-place set algebra. Inside a pipeline, the special key is rewritten to match the resulting members.
+In-place set algebra. Inside a pipeline the result is computed atomically on the Redis side via `SINTERSTORE` / `SDIFFSTORE` / `SUNIONSTORE` against temp keys — the local mirror never feeds into Redis.
 
 #### In-Place Operators
 - `|=` — calls `update`

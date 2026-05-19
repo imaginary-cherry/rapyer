@@ -7,7 +7,7 @@
 
 `RedisSet` is an unordered, unique-member collection backed by a Redis **SET**. Items appear only once and have no defined order.
 
-Unlike regular Redis types (`RedisStr`, `RedisList`, etc.), `RedisSet` stores its data in a **separate Redis key** — not inline with the model's JSON. All mutations go straight to Redis.
+Unlike regular Redis types (`RedisStr`, `RedisList`, etc.), `RedisSet` stores its data in a **separate Redis key** — not inline with the model's JSON. It is a pure Redis proxy: every mutation goes straight to Redis and the local mirror is never used to overwrite server state.
 
 ```python
 from pydantic import Field
@@ -101,12 +101,15 @@ async with article.apipeline():
 Supported sync mutators:
 
 - `add(value)`, `update(*iterables)`
-- `remove(value)`, `discard(value)`, `pop()`, `clear()`
+- `remove(value)`, `discard(value)`, `clear()`
 - `difference_update`, `intersection_update`, `symmetric_difference_update`
 - `|=`, `&=`, `-=`, `^=`
 
-!!! note "Sync `pop()` vs async `apop()`"
-    `pop()` removes a value chosen by the **local** Python set and queues the matching `SREM` in the pipeline. `apop()` runs an atomic Redis `SPOP` and lets Redis pick the member.
+!!! note "No sync `pop()`"
+    `RedisSet` does not support sync `pop()`. Use `await tags.apop()` for an atomic Redis-side pick.
+
+!!! note "`remove` inside a pipeline does not raise"
+    Outside a pipeline, `remove(value)` matches Python's `set.remove` and raises `KeyError` for a missing member. Inside `apipeline()` the local mirror is not authoritative, so `remove` behaves like `discard` and silently queues `SREM`.
 
 ## Optional Fields
 
