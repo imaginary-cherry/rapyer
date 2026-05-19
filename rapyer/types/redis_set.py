@@ -1,4 +1,5 @@
 import json
+import uuid
 from typing import Any, Generic, Iterable, Optional, TypeVar, get_args
 
 from pydantic import GetCoreSchemaHandler
@@ -37,6 +38,9 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
         return self._adapter.validate_python(
             raw_iterable, context={REDIS_DUMP_FLAG_NAME: True}
         )
+
+    def _tmp_key(self, label: str) -> str:
+        return f"{self.special_key}:__tmp_{label}:{uuid.uuid4().hex}"
 
     # --- Sync set methods ---
 
@@ -87,19 +91,43 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
 
     @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     def intersection_update(self, *iterables: Iterable[T]):
-        set.intersection_update(self, *iterables)
-        if self.pipeline:
-            self.pipeline.delete(self.special_key)
-            if self:
-                self.pipeline.sadd(self.special_key, *self._dump_members(self))
+        # Redis side: push each iterable into a temp set, SINTERSTORE writes
+        # the intersection of self_key with all temps back into self_key,
+        # temps deleted. Local side: independent Python computation. Both
+        # sides converge on the same result without local state ever
+        # feeding into Redis.
+        materialized = [set(it) for it in iterables]
+        if self.pipeline and materialized:
+            temp_keys = []
+            for it in materialized:
+                temp_key = self._tmp_key("inter")
+                members = self._dump_members(it)
+                if members:
+                    self.pipeline.sadd(temp_key, *members)
+                temp_keys.append(temp_key)
+            self.pipeline.sinterstore(
+                self.special_key, self.special_key, *temp_keys
+            )
+            self.pipeline.delete(*temp_keys)
+        set.intersection_update(self, *materialized)
 
     @mark_actions(ActionGroup.UPDATE)
     def symmetric_difference_update(self, other: Iterable[T]):
-        set.symmetric_difference_update(self, other)
+        # A ⊖ B = (A − B) ∪ (B − A). Computed on Redis via SDIFFSTORE
+        # twice + SUNIONSTORE; local mirror computes independently.
+        other = set(other)
         if self.pipeline:
-            self.pipeline.delete(self.special_key)
-            if self:
-                self.pipeline.sadd(self.special_key, *self._dump_members(self))
+            other_key = self._tmp_key("symdiff_b")
+            only_a_key = self._tmp_key("symdiff_only_a")
+            only_b_key = self._tmp_key("symdiff_only_b")
+            other_members = self._dump_members(other)
+            if other_members:
+                self.pipeline.sadd(other_key, *other_members)
+            self.pipeline.sdiffstore(only_a_key, self.special_key, other_key)
+            self.pipeline.sdiffstore(only_b_key, other_key, self.special_key)
+            self.pipeline.sunionstore(self.special_key, only_a_key, only_b_key)
+            self.pipeline.delete(other_key, only_a_key, only_b_key)
+        set.symmetric_difference_update(self, other)
 
     def __ior__(self, other):
         self.update(other)
