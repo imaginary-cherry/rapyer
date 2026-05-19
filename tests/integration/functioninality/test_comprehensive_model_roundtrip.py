@@ -3,7 +3,7 @@ from datetime import datetime
 import pytest
 
 import rapyer
-from tests.integration.functioninality._assertions import assert_no_field_at_default
+from tests.integration.functioninality.assertions import assert_no_field_at_default
 from tests.models.collection_types import ComprehensiveTestModel
 
 
