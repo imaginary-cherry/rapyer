@@ -11,7 +11,7 @@ from tests.models.collection_types import SimpleListModel, StrDictModel
 from tests.models.index_types import IndexTestModel
 from tests.models.redis_types import DirectRedisIntModel
 from tests.models.simple_types import FloatModel, IntModel, StrModel
-from tests.models.special_types import PriorityQueueModel
+from tests.models.special_types import GenericRedisSetModel, PriorityQueueModel
 
 BENCHMARK_TTL_SECONDS = 3600
 
@@ -89,3 +89,14 @@ class DirectRedisIntModelWithTTL(DirectRedisIntModel):
 
 class PriorityQueueModelNoTTL(PriorityQueueModel):
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=None)
+
+
+class GenericRedisSetModelNoTTL(GenericRedisSetModel[str]):
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=None)
+
+
+class GenericRedisSetModelWithTTL(GenericRedisSetModel[str]):
+    Meta: ClassVar[RedisConfig] = RedisConfig(
+        ttl=BENCHMARK_TTL_SECONDS,
+        refresh_ttl=ActionGroup.all(for_ttl=True),
+    )

@@ -1,7 +1,12 @@
 from datetime import datetime
 
 from benchmarks.base import AsyncBenchmarkTestWithTTL, TTLMode
-from benchmarks.models import BenchmarkPipelineModel, BenchmarkPipelineModelWithTTL
+from benchmarks.models import (
+    BenchmarkPipelineModel,
+    BenchmarkPipelineModelWithTTL,
+    PriorityQueueModelNoTTL,
+)
+from tests.models.special_types import PriorityQueueModel
 
 
 class TestPipelineIntIadd(AsyncBenchmarkTestWithTTL):
@@ -92,3 +97,27 @@ class TestPipelineWithAupdate(AsyncBenchmarkTestWithTTL):
                 event_time=datetime.now(),
                 event_timestamp=datetime.now(),
             )
+
+
+class TestPipelineWithSpecialField(AsyncBenchmarkTestWithTTL):
+    """Isolates the SF prefetch cost in instance-level ``apipeline()``.
+
+    Same shape as ``TestPipelineMultiAssign`` but on a model that contains a
+    ``RedisPriorityQueue`` — exercises the ``execute_load_pipeline`` branch of
+    ``apipeline`` so regressions in that path are visible.
+    """
+
+    models = {
+        TTLMode.NO_TTL: PriorityQueueModelNoTTL,
+        TTLMode.TTL: PriorityQueueModel,
+    }
+
+    async def setup(self, mode):
+        cls = self.models[mode]
+        model = cls(name="initial")
+        await model.asave()
+        return model
+
+    async def action(self, model):
+        async with model.apipeline() as redis_model:
+            redis_model.name = "updated"
