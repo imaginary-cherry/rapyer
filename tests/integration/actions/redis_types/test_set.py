@@ -105,6 +105,17 @@ class TestSetApop(ReadActionTestBase, RedisSetActionBase):
     def expected_before(self):
         return set(INITIAL_ITEMS)
 
+    def corrupt_local_mirror(self, m: ComprehensiveTestModel) -> None:
+        # Wipe the local mirror entirely — native set.pop() on an empty set
+        # raises KeyError, but apop() still returns a value from Redis.
+        set.clear(m.labels)
+
+    def assert_after_pipeline(self, loaded):
+        # apop's choice of value is non-deterministic, so just verify Redis
+        # state shrank by one and remains a subset of the initial items.
+        assert len(loaded) == len(INITIAL_ITEMS) - 1
+        assert loaded <= INITIAL_SERIALIZED
+
     def assert_action_effect(self, loaded, action_result):
         expected = self.expected_read_output()
         assert (
@@ -115,6 +126,7 @@ class TestSetApop(ReadActionTestBase, RedisSetActionBase):
 class TestSetAcontains(ReadActionTestBase, RedisSetActionBase):
     covered_method = RedisSet.acontains
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
+    skip_stale_mirror_in_pipeline = "pure read; no local-mirror failure mode"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         return await self.created_models[0].labels.acontains("alpha")
@@ -126,6 +138,7 @@ class TestSetAcontains(ReadActionTestBase, RedisSetActionBase):
 class TestSetAmembers(ReadActionTestBase, RedisSetActionBase):
     covered_method = RedisSet.amembers
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
+    skip_stale_mirror_in_pipeline = "pure read; no local-mirror failure mode"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         return await self.created_models[0].labels.amembers()
@@ -137,6 +150,7 @@ class TestSetAmembers(ReadActionTestBase, RedisSetActionBase):
 class TestSetAsize(ReadActionTestBase, RedisSetActionBase):
     covered_method = RedisSet.asize
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
+    skip_stale_mirror_in_pipeline = "pure read; no local-mirror failure mode"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         return await self.created_models[0].labels.asize()
@@ -147,6 +161,9 @@ class TestSetAsize(ReadActionTestBase, RedisSetActionBase):
 
 class _TwoSetActionBase(ReadActionTestBase, RedisSetActionBase, ABC):
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
+    skip_stale_mirror_in_pipeline = (
+        "multi-set read; server-side only, no local-mirror dependency"
+    )
     other_items: ClassVar[list[str]] = ["gamma", "delta", "epsilon"]
 
     def create_models(self):

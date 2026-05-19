@@ -9,6 +9,9 @@ from tests.models.collection_types import ComprehensiveTestModel
 class TestModelAget(ReadActionTestBase, TTLActionTestBase):
     covered_method = AtomicRedisModel.aget
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
+    skip_stale_mirror_in_pipeline = (
+        "atomic read action; no field-level local mirror to corrupt"
+    )
 
     def create_models(self):
         return [ComprehensiveTestModel(name="test", counter=1)]
@@ -24,6 +27,9 @@ class TestModelAget(ReadActionTestBase, TTLActionTestBase):
 class TestModelAload(ReadActionTestBase, TTLActionTestBase):
     covered_method = AtomicRedisModel.aload
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
+    skip_stale_mirror_in_pipeline = (
+        "atomic read action; no field-level local mirror to corrupt"
+    )
 
     def create_models(self):
         return [ComprehensiveTestModel(name="test", counter=1)]
@@ -38,6 +44,9 @@ class TestModelAload(ReadActionTestBase, TTLActionTestBase):
 class TestModelAfind(ReadActionTestBase, TTLActionTestBase):
     covered_method = AtomicRedisModel.afind
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
+    skip_stale_mirror_in_pipeline = (
+        "atomic read action; no field-level local mirror to corrupt"
+    )
 
     def create_models(self):
         return [ComprehensiveTestModel(name="test", counter=1)]
@@ -52,6 +61,9 @@ class TestModelAfind(ReadActionTestBase, TTLActionTestBase):
 class TestModelAfindOne(ReadActionTestBase, TTLActionTestBase):
     covered_method = AtomicRedisModel.afind_one
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
+    skip_stale_mirror_in_pipeline = (
+        "atomic read action; no field-level local mirror to corrupt"
+    )
 
     def create_models(self):
         return [ComprehensiveTestModel(name="test", counter=1)]
@@ -66,6 +78,9 @@ class TestModelAfindOne(ReadActionTestBase, TTLActionTestBase):
 class TestRedisTypeAload(ReadActionTestBase, TTLActionTestBase):
     covered_method = RedisType.aload
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
+    skip_stale_mirror_in_pipeline = (
+        "atomic read action; no field-level local mirror to corrupt"
+    )
 
     def create_models(self):
         return [ComprehensiveTestModel(counter=42)]
@@ -80,6 +95,9 @@ class TestRedisTypeAload(ReadActionTestBase, TTLActionTestBase):
 class TestRapyerFunctionAget(ReadActionTestBase, TTLActionTestBase):
     covered_method = rapyer.aget
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
+    skip_stale_mirror_in_pipeline = (
+        "atomic read action; no field-level local mirror to corrupt"
+    )
 
     def create_models(self):
         return [ComprehensiveTestModel(name="aget-target")]
@@ -94,6 +112,9 @@ class TestRapyerFunctionAget(ReadActionTestBase, TTLActionTestBase):
 class TestRapyerFunctionAfindOne(ReadActionTestBase, TTLActionTestBase):
     covered_method = rapyer.afind_one
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
+    skip_stale_mirror_in_pipeline = (
+        "atomic read action; no field-level local mirror to corrupt"
+    )
 
     def create_models(self):
         return [ComprehensiveTestModel(name="afind-one-target")]
@@ -108,6 +129,9 @@ class TestRapyerFunctionAfindOne(ReadActionTestBase, TTLActionTestBase):
 class TestRapyerFunctionAfind(ReadActionTestBase, TTLActionTestBase):
     covered_method = rapyer.afind
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
+    skip_stale_mirror_in_pipeline = (
+        "atomic read action; no field-level local mirror to corrupt"
+    )
 
     def create_models(self):
         return [ComprehensiveTestModel(name="afind-target")]

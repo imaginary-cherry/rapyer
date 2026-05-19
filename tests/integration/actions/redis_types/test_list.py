@@ -86,6 +86,9 @@ class TestRedisListClear(ComprehensiveTagsOpBase, SyncActionTestBase):
         native.clear()
         return native
 
+    def corrupt_local_mirror(self, m: ComprehensiveTestModel) -> None:
+        list.clear(m.tags)
+
     def expected_before(self):
         return ["tag1", "tag2", "tag3"]
 
@@ -233,13 +236,17 @@ class TestListAclear(ComprehensiveTagsOpBase, TTLActionTestBase):
 class TestListApop(ReadActionTestBase, ComprehensiveTagsOpBase, TTLActionTestBase):
     covered_method = RedisList.apop
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
-    skip_stale_mirror_in_pipeline = None  # apop is ERASE — opt back in
 
     def create_models(self):
         return [ComprehensiveTestModel(tags=["tag1", "tag2"])]
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         return await piped.tags.apop()
+
+    def corrupt_local_mirror(self, m: ComprehensiveTestModel) -> None:
+        # Wipe the local mirror — native list.pop() on an empty list raises
+        # IndexError, but apop() still returns a value from Redis.
+        list.clear(m.tags)
 
     def expected_before(self):
         return "tag2"

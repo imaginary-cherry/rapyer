@@ -180,7 +180,6 @@ class TestDictApopitem(
 ):
     covered_method = RedisDict.apopitem
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
-    skip_stale_mirror_in_pipeline = None  # apopitem is ERASE — opt back in
 
     def create_models(self):
         # Single-entry dict so the popped item is deterministic.
