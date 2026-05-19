@@ -42,8 +42,6 @@ from tests.coverage_helpers import (
 )
 
 
-
-
 @pytest.fixture
 def force_no_ttl_updates(monkeypatch):
     flush_mock = AsyncMock()
@@ -251,9 +249,7 @@ def pytest_runtest_makereport(item, call):
                 check.covered.update(marker.args)
 
 
-def _iter_class_methods(
-    cls, include_async: bool = True, include_sync: bool = True
-):
+def _iter_class_methods(cls, include_async: bool = True, include_sync: bool = True):
     # When the caller wants only async methods, use ``inspect.getmembers`` so
     # inherited async methods are picked up (e.g. RedisStr inheriting asave
     # from RedisType). For sync-only or mixed, ``vars(cls).items()`` keeps the

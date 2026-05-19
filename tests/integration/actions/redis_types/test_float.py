@@ -147,4 +147,4 @@ class TestRedisFloatIpow(ComprehensiveAmountOpBase, SyncActionTestBase):
         piped.amount **= self.test_input.operand
 
     def apply_native_action(self, native: float) -> float:
-        return native ** self.test_input.operand
+        return native**self.test_input.operand

@@ -348,7 +348,9 @@ class TestSetDifferenceUpdate(RedisSetSyncActionBase):
 
 class TestSetIntersectionUpdate(RedisSetSyncActionBase):
     covered_method = RedisSet.intersection_update
-    skip_sync_native_raises_on_corruption = "native set.intersection_update never raises"
+    skip_sync_native_raises_on_corruption = (
+        "native set.intersection_update never raises"
+    )
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         piped.labels.intersection_update({"alpha", "delta"})
@@ -363,9 +365,7 @@ class TestSetIntersectionUpdate(RedisSetSyncActionBase):
 
 class TestSetSymmetricDifferenceUpdate(RedisSetSyncActionBase):
     covered_method = RedisSet.symmetric_difference_update
-    skip_stale_mirror_in_pipeline = (
-        "UPDATE-only action (no ERASE tag); native set.symmetric_difference_update never raises"
-    )
+    skip_stale_mirror_in_pipeline = "UPDATE-only action (no ERASE tag); native set.symmetric_difference_update never raises"
     skip_sync_native_raises_on_corruption = (
         "native set.symmetric_difference_update never raises"
     )

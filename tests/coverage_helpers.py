@@ -19,7 +19,9 @@ COVER_ACTION_EFFECT = cover_marker("action_effect")
 COVER_NO_TTL_WHEN_NOT_CONFIGURED = cover_marker("no_ttl_when_not_configured")
 COVER_SYNC_NATIVE_EFFECT = cover_marker("sync_native_effect")
 COVER_STALE_MIRROR_IN_PIPELINE = cover_marker("stale_mirror_in_pipeline")
-COVER_SYNC_NATIVE_RAISES_ON_CORRUPTION = cover_marker("sync_native_raises_on_corruption")
+COVER_SYNC_NATIVE_RAISES_ON_CORRUPTION = cover_marker(
+    "sync_native_raises_on_corruption"
+)
 
 SPECIAL_FIELD_LIFECYCLE = "lifecycle"
 SPECIAL_FIELD_TTL_REFRESH = "ttl_refresh"

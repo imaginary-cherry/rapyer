@@ -12,7 +12,9 @@ class TestIntegerAddition(UpdateActionTestBase, SyncActionTestBase):
     skip_stale_mirror_in_pipeline = (
         "scalar value is its own mirror; no stale-mirror failure mode"
     )
-    skip_sync_native_raises_on_corruption = "int arithmetic never raises on a stale value"
+    skip_sync_native_raises_on_corruption = (
+        "int arithmetic never raises on a stale value"
+    )
 
     def create_models(self):
         return [ComprehensiveTestModel(counter=100)]
@@ -128,4 +130,4 @@ class TestRedisIntIpow(ComprehensiveCounterOpBase, SyncActionTestBase):
         piped.counter **= self.test_input.operand
 
     def apply_native_action(self, native: int) -> int:
-        return native ** self.test_input.operand
+        return native**self.test_input.operand
