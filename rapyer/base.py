@@ -471,8 +471,9 @@ class AtomicRedisModel(BaseModel):
             raise RuntimeError("Can only duplicate from top level model")
 
         duplicated_models = [self.__class__(**self.model_dump()) for _ in range(num)]
-        async with ensure_pipeline(self.Meta):
-            await self.ainsert(*duplicated_models)
+        async with ensure_pipeline(self.Meta) as pipe:
+            for dup in duplicated_models:
+                pipe.copy(self.key, dup.key)
             for fname in self._special_field_names:
                 source_field = getattr(self, fname)
                 if isinstance(source_field, SpecialFieldType):
