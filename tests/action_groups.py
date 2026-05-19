@@ -40,6 +40,7 @@ PRIVATE_METHODS = _group(
     RedisSet._load_members,
     RedisSet.queue_special_loads_in_pipeline,
     RedisSet.special_field_key,
+    RedisSet._tmp_key,
     # Generic
     GenericRedisType.contains_sf_field,
     # AtomicRedisModel
