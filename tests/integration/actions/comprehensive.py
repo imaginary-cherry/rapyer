@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from datetime import timedelta
 from typing import Generic, TypeVar
 
 from tests.integration.actions.update import UpdateActionTestBase
@@ -77,46 +76,8 @@ class ComprehensiveCounterOpBase(ComprehensiveBinaryOpBase[int]):
         return int(m.counter)
 
 
-class ComprehensiveDataOpBase(ComprehensiveOpBase[bytes]):
-    """RedisBytes ops on ``ComprehensiveTestModel.data``."""
-
-    @staticmethod
-    def field_getter(m: ComprehensiveTestModel) -> bytes:
-        return m.data
-
-    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
-        m.data += b"_local_marker"
-
-    def get_target_field(self, m: ComprehensiveTestModel) -> bytes:
-        return bytes(m.data)
 
 
-class ComprehensiveEventTimeOpBase(ComprehensiveOpBase):
-    """RedisDatetime ops on ``ComprehensiveTestModel.event_time``."""
-
-    @staticmethod
-    def field_getter(m: ComprehensiveTestModel):
-        return m.event_time
-
-    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
-        m.event_time += timedelta(days=999)
-
-    def get_target_field(self, m: ComprehensiveTestModel):
-        return m.event_time
-
-
-class ComprehensiveEventTimestampOpBase(ComprehensiveOpBase):
-    """RedisDatetimeTimestamp ops on ``ComprehensiveTestModel.event_timestamp``."""
-
-    @staticmethod
-    def field_getter(m: ComprehensiveTestModel):
-        return m.event_timestamp
-
-    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
-        m.event_timestamp += timedelta(days=999)
-
-    def get_target_field(self, m: ComprehensiveTestModel):
-        return m.event_timestamp
 
 
 class ComprehensiveMetadataOpBase(ComprehensiveOpBase[dict]):
@@ -160,10 +121,3 @@ class ComprehensiveTagsOpBase(ComprehensiveOpBase[list]):
     def get_target_field(self, m: ComprehensiveTestModel) -> list:
         return list(m.tags)
 
-
-class ComprehensiveTasksOpBase(ComprehensiveOpBase):
-    """RedisPriorityQueue ops on ``ComprehensiveTestModel.tasks``."""
-
-    @staticmethod
-    def field_getter(m: ComprehensiveTestModel):
-        return m.tasks
