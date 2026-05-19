@@ -125,13 +125,13 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         inner = args[0] if args else Any
 
         def _validate_wrap(v, handler_call, info):
-            if isinstance(v, cls):
+            if isinstance(v, RedisPriorityQueue):
                 return v
             if isinstance(v, list):
                 if (info.context or {}).get(REDIS_DUMP_FLAG_NAME):
                     return handler_call(v)
                 raise ValueError(
-                    f"Cannot initialize {cls.__name__} from a list — "
+                    f"Cannot initialize {RedisPriorityQueue.__name__} from a list — "
                     "assign a RedisPriorityQueue instance instead."
                 )
             raise RapyerSerializationError(f"PriorityQueue can serialize list or Prioirty queue object only, got {type(v)}")
@@ -139,8 +139,8 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         def _serialize(v, serializer):
             if isinstance(v, list):
                 return serializer(v)  # ← let pydantic serialize as list[T]
-            if isinstance(v, cls):
-                return cls()
+            if isinstance(v, RedisPriorityQueue):
+                return RedisPriorityQueue()
             return v
 
         schema = handler(list[inner])
