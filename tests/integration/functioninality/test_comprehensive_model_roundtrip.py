@@ -2,7 +2,31 @@ from datetime import datetime
 
 import pytest
 
+from rapyer.types.priority_queue import RedisPriorityQueue
+from rapyer.types.redis_set import RedisSet
+from rapyer.types.special import SpecialFieldType
 from tests.models.collection_types import ComprehensiveTestModel
+
+
+async def _extract_redis_set(field: RedisSet):
+    return await field.amembers()
+
+
+async def _extract_redis_priority_queue(field: RedisPriorityQueue):
+    return await field.aitems()
+
+
+_SF_EXTRACTORS = {
+    RedisSet: _extract_redis_set,
+    RedisPriorityQueue: _extract_redis_priority_queue,
+}
+
+
+async def extract_sf_data(field: SpecialFieldType):
+    for sf_type, extractor in _SF_EXTRACTORS.items():
+        if isinstance(field, sf_type):
+            return await extractor(field)
+    raise NotImplementedError(f"No extractor for SF type {type(field).__name__}")
 
 
 @pytest.mark.asyncio
@@ -34,6 +58,15 @@ async def test_comprehensive_model_asave_aget_roundtrip_all_fields_non_default()
     # Assert — no field is at its default value
     default_model = ComprehensiveTestModel()
     for field_name in ComprehensiveTestModel.model_fields:
-        assert getattr(retrieved, field_name) != getattr(default_model, field_name), (
-            f"Field {field_name!r} is at its default value"
-        )
+        retrieved_value = getattr(retrieved, field_name)
+        default_value = getattr(default_model, field_name)
+        if isinstance(retrieved_value, SpecialFieldType):
+            retrieved_data = await extract_sf_data(retrieved_value)
+            default_data = await extract_sf_data(default_value)
+            assert retrieved_data != default_data, (
+                f"SF field {field_name!r} extracted same data as default"
+            )
+        else:
+            assert retrieved_value != default_value, (
+                f"Field {field_name!r} is at its default value"
+            )
