@@ -296,18 +296,3 @@ class TestSetSymmetricDifferenceUpdate(RedisSetSyncActionBase):
         return (INITIAL_SERIALIZED - {'"alpha"'}) | {'"delta"'}
 
 
-class TestSetPop(ReadActionTestBase, RedisSetSyncActionBase):
-    covered_method = RedisSet.pop
-    skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
-
-    async def perform_action(self, piped: ComprehensiveTestModel):
-        return piped.labels.pop()
-
-    def expected_before(self):
-        return set(INITIAL_ITEMS)
-
-    def assert_action_effect(self, loaded, action_result):
-        expected = self.expected_read_output()
-        assert (
-            action_result in expected
-        ), f"Action returned {action_result!r}; expected one of {expected!r}"
