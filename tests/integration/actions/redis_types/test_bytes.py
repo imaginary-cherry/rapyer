@@ -6,6 +6,10 @@ from tests.models.collection_types import ComprehensiveTestModel
 
 class TestRedisBytesIadd(UpdateActionTestBase, SyncActionTestBase):
     covered_method = RedisBytes.__iadd__
+    skip_stale_mirror_in_pipeline = (
+        "scalar value is its own mirror; bytes concatenation has no stale-mirror failure mode"
+    )
+    skip_sync_native_raises_on_corruption = "bytes concatenation never raises"
 
     def create_models(self):
         return [ComprehensiveTestModel(data=b"hello")]

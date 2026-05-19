@@ -9,6 +9,9 @@ class TestRapyerAupdate(UpdateActionTestBase, TTLActionTestBase):
     pipeline like every other mutation."""
 
     covered_method = AtomicRedisModel.aupdate
+    skip_stale_mirror_in_pipeline = (
+        "atomic aupdate; no field-level local mirror to corrupt"
+    )
 
     def create_models(self):
         return [ComprehensiveTestModel(name="original", counter=10)]

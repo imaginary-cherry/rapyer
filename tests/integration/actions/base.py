@@ -11,6 +11,7 @@ from rapyer import AtomicRedisModel
 from rapyer.actions import ActionGroup
 from tests.coverage_helpers import (
     COVER_PIPELINE_ATOM,
+    COVER_STALE_MIRROR_IN_PIPELINE,
     SPECIAL_FIELD_LIFECYCLE,
     action_groups_for,
     cover_tuple,
@@ -53,6 +54,12 @@ class ActionTestBase(ABC):
     skip_special_field_lifecycle: ClassVar[str | None] = None
     skip_special_field_ttl: ClassVar[str | None] = None
 
+    skip_stale_mirror_in_pipeline: ClassVar[str | None] = None
+    """If set to a reason string, :meth:`test_action_in_pipeline_tolerates_stale_local_mirror`
+    is skipped with that reason. Auto-populated for non-``BaseRedisType`` actions
+    (e.g. ``AtomicRedisModel.asave``, ``rapyer.afind``) — those don't operate on
+    a field-level local mirror, so the corruption concept doesn't apply."""
+
     created_models: Any = None
     test_input: Any = None
 
@@ -75,6 +82,17 @@ class ActionTestBase(ABC):
     @abstractmethod
     async def perform_action(self, piped: Any):
         """Perform the mutation inside the pipeline."""
+
+    def corrupt_local_mirror(self, model: PipelineActionModel) -> None:
+        """Mutate the local Python mirror of the field that ``perform_action``
+        targets in a way that would make a native-Python equivalent fail
+        (e.g. ``set.discard`` the value before ``aremove``, or clear before
+        ``apop``). Subclasses must override unless
+        ``skip_stale_mirror_in_pipeline`` is set."""
+        raise NotImplementedError(
+            f"{type(self).__name__} must implement corrupt_local_mirror "
+            f"or set skip_stale_mirror_in_pipeline"
+        )
 
     async def load_data(self) -> Any:
         """Read state from Redis via ``self.handle``. Default: ``None``."""
@@ -156,6 +174,23 @@ class ActionTestBase(ABC):
         loaded_after = await self.load_data()
         self.assert_after_pipeline(loaded_after)
 
+    @pytest.mark.asyncio
+    async def test_action_in_pipeline_tolerates_stale_local_mirror(self, test_input):
+        # Arrange — set up data, then corrupt the local mirror in a way that
+        # would make a native-Python equivalent of perform_action fail.
+        self.test_input = test_input
+        self.created_models = await self.setup_data()
+        self.corrupt_local_mirror(self.created_models[0])
+
+        # Act — run inside a pipeline; Redis remains the source of truth.
+        async with rapyer.apipeline():
+            await self.perform_action(self.created_models[0])
+
+        # Assert — the action still produced the correct Redis state, despite
+        # the stale local mirror.
+        loaded_after = await self.load_data()
+        self.assert_after_pipeline(loaded_after)
+
     @classmethod
     def _prepare_action_test(
         cls,
@@ -217,6 +252,12 @@ class ActionTestBase(ABC):
             test_attr="test_pipeline_atomicity",
             cover_marker=COVER_PIPELINE_ATOM,
             skip_attr="skip_pipeline_atomicity",
+            parametrize=True,
+        )
+        cls._prepare_action_test(
+            test_attr="test_action_in_pipeline_tolerates_stale_local_mirror",
+            cover_marker=COVER_STALE_MIRROR_IN_PIPELINE,
+            skip_attr="skip_stale_mirror_in_pipeline",
             parametrize=True,
         )
         action_groups = action_groups_for(cls.covered_method)

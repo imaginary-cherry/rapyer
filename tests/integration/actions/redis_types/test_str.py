@@ -52,6 +52,9 @@ class TestRedisStrImul(ComprehensiveNameOpBase, SyncActionTestBase):
 
 class TestStringSet(UpdateActionTestBase, TTLActionTestBase):
     covered_method = RedisType.asave
+    skip_stale_mirror_in_pipeline = (
+        "scalar value is its own mirror; no stale-mirror failure mode"
+    )
 
     def create_models(self):
         return [ComprehensiveTestModel(name="original")]

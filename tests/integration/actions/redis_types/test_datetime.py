@@ -9,13 +9,21 @@ from tests.models.collection_types import ComprehensiveTestModel
 
 
 class DatetimeBothModelsOpBase(UpdateActionTestBase, SyncActionTestBase, ABC):
-    """Datetime iadd/isub tests that mutate both storage flavors at once.
+    """
+    Datetime iadd/isub tests that mutate both storage flavors at once.
 
     Setup creates a single :class:`ComprehensiveTestModel` whose ``event_time``
     is a regular datetime (RedisDatetime — ISO storage) and ``event_timestamp``
     is a :class:`RedisDatetimeTimestamp` (numeric storage). Both fields share
     the same initial value.
     """
+
+    skip_stale_mirror_in_pipeline = (
+        "scalar value is its own mirror; no stale-mirror failure mode"
+    )
+    skip_sync_native_raises_on_corruption = (
+        "datetime arithmetic never raises on a stale local mirror"
+    )
 
     def create_models(self):
         initial = self.test_input.initial

@@ -11,6 +11,9 @@ class TestModelAinsert(CreateActionTestBase):
     covered_method = AtomicRedisModel.ainsert
     model_exists_before_action = False
     skip_ttl_no_refresh = "Ainsert is initial so we always set ttl"
+    skip_stale_mirror_in_pipeline = (
+        "atomic ainsert; no field-level local mirror to corrupt"
+    )
 
     def create_models(self):
         # Only the existing model is inserted; the new model is the test subject.
@@ -40,6 +43,9 @@ class TestModelAinsert(CreateActionTestBase):
 
 class TestRapyerAinsert(AsyncActionTestBase):
     covered_method = AtomicRedisModel.ainsert
+    skip_stale_mirror_in_pipeline = (
+        "atomic ainsert; no field-level local mirror to corrupt"
+    )
 
     def create_models(self):
         return [
@@ -71,6 +77,9 @@ class TestRapyerFunctionAinsert(CreateActionTestBase):
     covered_method = rapyer.ainsert
     model_exists_before_action = False
     skip_ttl_no_refresh = "Ainsert is initial so we always set ttl"
+    skip_stale_mirror_in_pipeline = (
+        "module-level rapyer.ainsert; no field-level local mirror to corrupt"
+    )
 
     def create_models(self):
         return [

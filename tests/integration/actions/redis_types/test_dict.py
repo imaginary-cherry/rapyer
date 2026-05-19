@@ -8,6 +8,8 @@ from tests.models.collection_types import ComprehensiveTestModel
 
 class TestDictUpdate(ComprehensiveMetadataOpBase, SyncActionTestBase):
     covered_method = RedisDict.update
+    skip_stale_mirror_in_pipeline = "UPDATE action (no ERASE); native dict.update never raises"
+    skip_sync_native_raises_on_corruption = "native dict.update never raises"
 
     def create_models(self):
         return [ComprehensiveTestModel()]
@@ -28,6 +30,8 @@ class TestDictUpdate(ComprehensiveMetadataOpBase, SyncActionTestBase):
 
 class TestDictSetitem(ComprehensiveMetadataOpBase, SyncActionTestBase):
     covered_method = RedisDict.__setitem__
+    skip_stale_mirror_in_pipeline = "UPDATE action (no ERASE); native d[k]=v never raises"
+    skip_sync_native_raises_on_corruption = "native d[k]=v never raises"
 
     def create_models(self):
         return [ComprehensiveTestModel()]
@@ -48,6 +52,7 @@ class TestDictSetitem(ComprehensiveMetadataOpBase, SyncActionTestBase):
 
 class TestRedisDictClear(ComprehensiveMetadataOpBase, SyncActionTestBase):
     covered_method = RedisDict.clear
+    skip_sync_native_raises_on_corruption = "native dict.clear is idempotent"
 
     def create_models(self):
         return [ComprehensiveTestModel(metadata={"key1": "val1", "key2": "val2"})]
@@ -59,6 +64,9 @@ class TestRedisDictClear(ComprehensiveMetadataOpBase, SyncActionTestBase):
         native.clear()
         return native
 
+    def corrupt_local_mirror(self, m: ComprehensiveTestModel) -> None:
+        dict.clear(m.metadata)
+
     def expected_before(self):
         return {"key1": "val1", "key2": "val2"}
 
@@ -68,6 +76,9 @@ class TestRedisDictClear(ComprehensiveMetadataOpBase, SyncActionTestBase):
 
 class TestDictAsetItem(ComprehensiveMetadataOpBase, TTLActionTestBase):
     covered_method = RedisDict.aset_item
+    skip_stale_mirror_in_pipeline = (
+        "UPDATE action (no ERASE); native d[k]=v never raises"
+    )
 
     def create_models(self):
         return [ComprehensiveTestModel(metadata={"existing": "value"})]
@@ -91,6 +102,9 @@ class TestDictAdelItem(ComprehensiveMetadataOpBase, TTLActionTestBase):
     async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.metadata.adel_item("key1")
 
+    def corrupt_local_mirror(self, m: ComprehensiveTestModel) -> None:
+        dict.pop(m.metadata, "key1", None)
+
     def expected_before(self):
         return {"key1": "value1", "key2": "value2"}
 
@@ -100,6 +114,9 @@ class TestDictAdelItem(ComprehensiveMetadataOpBase, TTLActionTestBase):
 
 class TestDictAupdate(ComprehensiveMetadataOpBase, TTLActionTestBase):
     covered_method = RedisDict.aupdate
+    skip_stale_mirror_in_pipeline = (
+        "UPDATE action (no ERASE); native dict.update never raises"
+    )
 
     def create_models(self):
         return [ComprehensiveTestModel(metadata={"existing": "value"})]
@@ -120,12 +137,16 @@ class TestDictAupdate(ComprehensiveMetadataOpBase, TTLActionTestBase):
 
 class TestDictAclear(ComprehensiveMetadataOpBase, TTLActionTestBase):
     covered_method = RedisDict.aclear
+    skip_sync_native_raises_on_corruption = "native dict.clear is idempotent"
 
     def create_models(self):
         return [ComprehensiveTestModel(metadata={"key1": "value1", "key2": "value2"})]
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.metadata.aclear()
+
+    def corrupt_local_mirror(self, m: ComprehensiveTestModel) -> None:
+        dict.clear(m.metadata)
 
     def expected_before(self):
         return {"key1": "value1", "key2": "value2"}
@@ -144,6 +165,9 @@ class TestDictApop(ReadActionTestBase, ComprehensiveMetadataOpBase, TTLActionTes
     async def perform_action(self, piped: ComprehensiveTestModel):
         return await piped.metadata.apop("key1")
 
+    def corrupt_local_mirror(self, m: ComprehensiveTestModel) -> None:
+        dict.pop(m.metadata, "key1", None)
+
     def expected_before(self):
         return "value1"
 
@@ -156,6 +180,7 @@ class TestDictApopitem(
 ):
     covered_method = RedisDict.apopitem
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
+    skip_stale_mirror_in_pipeline = None  # apopitem is ERASE — opt back in
 
     def create_models(self):
         # Single-entry dict so the popped item is deterministic.
@@ -163,6 +188,11 @@ class TestDictApopitem(
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         return await piped.metadata.apopitem()
+
+    def corrupt_local_mirror(self, m: ComprehensiveTestModel) -> None:
+        # Wipe the local mirror — native dict.popitem() on an empty dict
+        # raises KeyError, but apopitem() should still pop from Redis.
+        dict.clear(m.metadata)
 
     def expected_before(self):
         return "value"

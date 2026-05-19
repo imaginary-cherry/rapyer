@@ -44,9 +44,14 @@ class RedisSetActionBase(UpdateActionTestBase, TTLActionTestBase, ABC):
     def get_target_field(self, m: ComprehensiveTestModel) -> set:
         return set(m.labels)
 
+    def corrupt_local_mirror(self, m: ComprehensiveTestModel) -> None:
+        # Drop the value most ERASE-style actions in this hierarchy target.
+        set.discard(m.labels, "beta")
+
 
 class TestSetAadd(RedisSetActionBase):
     covered_method = RedisSet.aadd
+    skip_stale_mirror_in_pipeline = "APPEND action; native set.add never raises"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.labels.aadd("delta")
@@ -57,6 +62,7 @@ class TestSetAadd(RedisSetActionBase):
 
 class TestSetAaddMany(RedisSetActionBase):
     covered_method = RedisSet.aadd_many
+    skip_stale_mirror_in_pipeline = "APPEND action; native set.update never raises"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.labels.aadd_many(["delta", "epsilon"])
@@ -228,9 +234,14 @@ class RedisSetSyncActionBase(UpdateActionTestBase, SyncActionTestBase, ABC):
     def get_target_field(self, m: ComprehensiveTestModel) -> set:
         return set(m.labels)
 
+    def corrupt_local_mirror(self, m: ComprehensiveTestModel) -> None:
+        set.discard(m.labels, "beta")
+
 
 class TestSetAdd(RedisSetSyncActionBase):
     covered_method = RedisSet.add
+    skip_stale_mirror_in_pipeline = "APPEND action; native set.add never raises"
+    skip_sync_native_raises_on_corruption = "native set.add never raises"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         piped.labels.add("delta")
@@ -245,6 +256,8 @@ class TestSetAdd(RedisSetSyncActionBase):
 
 class TestSetUpdate(RedisSetSyncActionBase):
     covered_method = RedisSet.update
+    skip_stale_mirror_in_pipeline = "APPEND action; native set.update never raises"
+    skip_sync_native_raises_on_corruption = "native set.update never raises"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         piped.labels.update(["delta", "epsilon"])
@@ -273,6 +286,7 @@ class TestSetRemove(RedisSetSyncActionBase):
 
 class TestSetDiscard(RedisSetSyncActionBase):
     covered_method = RedisSet.discard
+    skip_sync_native_raises_on_corruption = "native set.discard never raises"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         piped.labels.discard("beta")
@@ -287,6 +301,7 @@ class TestSetDiscard(RedisSetSyncActionBase):
 
 class TestSetClear(RedisSetSyncActionBase):
     covered_method = RedisSet.clear
+    skip_sync_native_raises_on_corruption = "native set.clear is idempotent"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         piped.labels.clear()
@@ -301,6 +316,7 @@ class TestSetClear(RedisSetSyncActionBase):
 
 class TestSetDifferenceUpdate(RedisSetSyncActionBase):
     covered_method = RedisSet.difference_update
+    skip_sync_native_raises_on_corruption = "native set.difference_update never raises"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         piped.labels.difference_update({"alpha"})
@@ -315,6 +331,7 @@ class TestSetDifferenceUpdate(RedisSetSyncActionBase):
 
 class TestSetIntersectionUpdate(RedisSetSyncActionBase):
     covered_method = RedisSet.intersection_update
+    skip_sync_native_raises_on_corruption = "native set.intersection_update never raises"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         piped.labels.intersection_update({"alpha", "delta"})
@@ -329,6 +346,12 @@ class TestSetIntersectionUpdate(RedisSetSyncActionBase):
 
 class TestSetSymmetricDifferenceUpdate(RedisSetSyncActionBase):
     covered_method = RedisSet.symmetric_difference_update
+    skip_stale_mirror_in_pipeline = (
+        "UPDATE-only action (no ERASE tag); native set.symmetric_difference_update never raises"
+    )
+    skip_sync_native_raises_on_corruption = (
+        "native set.symmetric_difference_update never raises"
+    )
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         piped.labels.symmetric_difference_update({"alpha", "delta"})

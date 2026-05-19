@@ -8,6 +8,9 @@ from tests.models.collection_types import ComprehensiveTestModel
 class TestRapyerAduplicate(UpdateActionTestBase, CreateActionTestBase):
     covered_method = AtomicRedisModel.aduplicate
     model_exists_before_action = False
+    skip_stale_mirror_in_pipeline = (
+        "atomic aduplicate; no field-level local mirror to corrupt"
+    )
 
     duplicate: ComprehensiveTestModel | None = None
 
@@ -54,6 +57,9 @@ class TestRapyerAduplicate(UpdateActionTestBase, CreateActionTestBase):
 class TestRapyerAduplicateMany(UpdateActionTestBase, CreateActionTestBase):
     covered_method = AtomicRedisModel.aduplicate_many
     model_exists_before_action = False
+    skip_stale_mirror_in_pipeline = (
+        "atomic aduplicate_many; no field-level local mirror to corrupt"
+    )
 
     duplicates: list[ComprehensiveTestModel] | None = None
 

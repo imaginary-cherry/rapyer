@@ -13,6 +13,11 @@ class ReadActionTestBase(AsyncActionTestBase, ABC):
     skip_read_in_pipeline: ClassVar[str | None] = None
     """If set to a reason string, :meth:`test_read_in_pipeline_returns_server_value` is skipped with that reason."""
 
+    skip_stale_mirror_in_pipeline = (
+        "pure read action; no local-mirror failure mode. Read+ERASE actions "
+        "(apop, apopitem) override this with ``= None`` to opt back in."
+    )
+
     def expected_read_output(self) -> Any:
         """Value the read action is expected to return. Defaults to
         :meth:`expected_before`; override when the expected return value

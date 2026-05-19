@@ -15,6 +15,12 @@ class TestRedisFloatAllOperationsCombined(UpdateActionTestBase, SyncActionTestBa
         RedisFloat.__isub__,
         RedisFloat.__imul__,
     ]
+    skip_stale_mirror_in_pipeline = (
+        "scalar value is its own mirror; no stale-mirror failure mode"
+    )
+    skip_sync_native_raises_on_corruption = (
+        "float arithmetic never raises on a stale value"
+    )
 
     def create_models(self):
         return [ComprehensiveTestModel(amount=100.0)]
@@ -57,6 +63,9 @@ class TestRedisFloatAllOperationsCombined(UpdateActionTestBase, SyncActionTestBa
 
 class TestFloatAincrease(UpdateActionTestBase, TTLActionTestBase):
     covered_method = RedisFloat.aincrease
+    skip_stale_mirror_in_pipeline = (
+        "scalar value is its own mirror; aincrease is server-side arithmetic"
+    )
 
     def create_models(self):
         return [ComprehensiveTestModel(amount=50.0)]

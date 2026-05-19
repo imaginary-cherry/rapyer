@@ -8,6 +8,8 @@ from tests.models.collection_types import ComprehensiveTestModel
 
 class TestListAppend(ComprehensiveTagsOpBase, SyncActionTestBase):
     covered_method = RedisList.append
+    skip_stale_mirror_in_pipeline = "APPEND action; native list.append never raises"
+    skip_sync_native_raises_on_corruption = "native list.append never raises"
 
     def create_models(self):
         return [ComprehensiveTestModel()]
@@ -28,6 +30,8 @@ class TestListAppend(ComprehensiveTagsOpBase, SyncActionTestBase):
 
 class TestListExtend(ComprehensiveTagsOpBase, SyncActionTestBase):
     covered_method = RedisList.extend
+    skip_stale_mirror_in_pipeline = "APPEND action; native list.extend never raises"
+    skip_sync_native_raises_on_corruption = "native list.extend never raises"
 
     def create_models(self):
         return [ComprehensiveTestModel()]
@@ -48,6 +52,8 @@ class TestListExtend(ComprehensiveTagsOpBase, SyncActionTestBase):
 
 class TestRedisListInsert(ComprehensiveTagsOpBase, SyncActionTestBase):
     covered_method = RedisList.insert
+    skip_stale_mirror_in_pipeline = "APPEND action; native list.insert never raises"
+    skip_sync_native_raises_on_corruption = "native list.insert never raises"
 
     def create_models(self):
         return [ComprehensiveTestModel(tags=["first", "last"])]
@@ -68,6 +74,7 @@ class TestRedisListInsert(ComprehensiveTagsOpBase, SyncActionTestBase):
 
 class TestRedisListClear(ComprehensiveTagsOpBase, SyncActionTestBase):
     covered_method = RedisList.clear
+    skip_sync_native_raises_on_corruption = "native list.clear is idempotent"
 
     def create_models(self):
         return [ComprehensiveTestModel(tags=["tag1", "tag2", "tag3"])]
@@ -90,6 +97,9 @@ class TestRedisListRemoveRange(ComprehensiveTagsOpBase):
     # remove_range is pipeline-only; it does not mutate the local mirror
     # outside an open pipeline, so it is exempt from COVER_SYNC_NATIVE_EFFECT.
     covered_method = RedisList.remove_range
+    skip_stale_mirror_in_pipeline = (
+        "remove_range is pipeline-only; no local mirror to corrupt outside a pipeline"
+    )
 
     def create_models(self):
         return [ComprehensiveTestModel(tags=["a", "b", "c", "d", "e"])]
@@ -106,6 +116,10 @@ class TestRedisListRemoveRange(ComprehensiveTagsOpBase):
 
 class TestRedisListSetitem(ComprehensiveTagsOpBase, SyncActionTestBase):
     covered_method = RedisList.__setitem__
+    skip_stale_mirror_in_pipeline = (
+        "UPDATE action (no ERASE); native list[i]=x never raises on a valid index"
+    )
+    skip_sync_native_raises_on_corruption = "native list[i]=x never raises"
 
     def create_models(self):
         return [ComprehensiveTestModel(tags=["first", "second", "third"])]
@@ -126,6 +140,8 @@ class TestRedisListSetitem(ComprehensiveTagsOpBase, SyncActionTestBase):
 
 class TestRedisListIadd(ComprehensiveTagsOpBase, SyncActionTestBase):
     covered_method = RedisList.__iadd__
+    skip_stale_mirror_in_pipeline = "APPEND action; native list += never raises"
+    skip_sync_native_raises_on_corruption = "native list += never raises"
 
     def create_models(self):
         return [ComprehensiveTestModel(tags=["initial"])]
@@ -146,6 +162,7 @@ class TestRedisListIadd(ComprehensiveTagsOpBase, SyncActionTestBase):
 
 class TestListAappend(ComprehensiveTagsOpBase, TTLActionTestBase):
     covered_method = RedisList.aappend
+    skip_stale_mirror_in_pipeline = "APPEND action; native list.append never raises"
 
     def create_models(self):
         return [ComprehensiveTestModel(tags=["initial"])]
@@ -162,6 +179,7 @@ class TestListAappend(ComprehensiveTagsOpBase, TTLActionTestBase):
 
 class TestListAextend(ComprehensiveTagsOpBase, TTLActionTestBase):
     covered_method = RedisList.aextend
+    skip_stale_mirror_in_pipeline = "APPEND action; native list.extend never raises"
 
     def create_models(self):
         return [ComprehensiveTestModel(tags=["initial"])]
@@ -178,6 +196,7 @@ class TestListAextend(ComprehensiveTagsOpBase, TTLActionTestBase):
 
 class TestListAinsert(ComprehensiveTagsOpBase, TTLActionTestBase):
     covered_method = RedisList.ainsert
+    skip_stale_mirror_in_pipeline = "APPEND action; native list.insert never raises"
 
     def create_models(self):
         return [ComprehensiveTestModel(tags=["first", "last"])]
@@ -201,6 +220,9 @@ class TestListAclear(ComprehensiveTagsOpBase, TTLActionTestBase):
     async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.tags.aclear()
 
+    def corrupt_local_mirror(self, m: ComprehensiveTestModel) -> None:
+        list.clear(m.tags)
+
     def expected_before(self):
         return ["tag1", "tag2"]
 
@@ -211,6 +233,7 @@ class TestListAclear(ComprehensiveTagsOpBase, TTLActionTestBase):
 class TestListApop(ReadActionTestBase, ComprehensiveTagsOpBase, TTLActionTestBase):
     covered_method = RedisList.apop
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
+    skip_stale_mirror_in_pipeline = None  # apop is ERASE — opt back in
 
     def create_models(self):
         return [ComprehensiveTestModel(tags=["tag1", "tag2"])]

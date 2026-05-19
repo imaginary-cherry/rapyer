@@ -43,6 +43,13 @@ class ComprehensiveBinaryOpBase(ComprehensiveOpBase[T], ABC, Generic[T]):
 class ComprehensiveAmountOpBase(ComprehensiveBinaryOpBase[float]):
     """RedisFloat binary ops on ``ComprehensiveTestModel.amount``."""
 
+    skip_stale_mirror_in_pipeline = (
+        "scalar value is its own mirror; no stale-mirror failure mode"
+    )
+    skip_sync_native_raises_on_corruption = (
+        "scalar arithmetic never raises on a stale value"
+    )
+
     @staticmethod
     def field_getter(m: ComprehensiveTestModel) -> float:
         return m.amount
@@ -60,6 +67,13 @@ class ComprehensiveAmountOpBase(ComprehensiveBinaryOpBase[float]):
 
 class ComprehensiveCounterOpBase(ComprehensiveBinaryOpBase[int]):
     """RedisInt binary ops on ``ComprehensiveTestModel.counter``. Sync / pipeline-only."""
+
+    skip_stale_mirror_in_pipeline = (
+        "scalar value is its own mirror; no stale-mirror failure mode"
+    )
+    skip_sync_native_raises_on_corruption = (
+        "scalar arithmetic never raises on a stale value"
+    )
 
     @staticmethod
     def field_getter(m: ComprehensiveTestModel) -> int:
@@ -92,6 +106,13 @@ class ComprehensiveMetadataOpBase(ComprehensiveOpBase[dict]):
 
 class ComprehensiveNameOpBase(ComprehensiveOpBase[str]):
     """RedisStr ops on ``ComprehensiveTestModel.name``."""
+
+    skip_stale_mirror_in_pipeline = (
+        "scalar value is its own mirror; no stale-mirror failure mode"
+    )
+    skip_sync_native_raises_on_corruption = (
+        "scalar arithmetic never raises on a stale value"
+    )
 
     @staticmethod
     def field_getter(m: ComprehensiveTestModel) -> str:
