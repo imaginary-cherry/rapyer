@@ -1,3 +1,4 @@
+import copy
 from abc import ABC
 from datetime import datetime, timedelta
 
@@ -45,7 +46,7 @@ class DatetimeBothModelsOpBase(UpdateActionTestBase, SyncActionTestBase, ABC):
         m.event_timestamp += offset
 
     def get_target_field(self, m: ComprehensiveTestModel):
-        return (m.event_time, m.event_timestamp)
+        return copy.deepcopy((m.event_time, m.event_timestamp))
 
 
 class TestRedisDatetimeIadd(DatetimeBothModelsOpBase):
