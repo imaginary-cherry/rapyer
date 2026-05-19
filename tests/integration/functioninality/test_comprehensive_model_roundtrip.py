@@ -13,6 +13,7 @@ async def test_comprehensive_model_asave_aget_roundtrip_all_fields_non_default()
     event_time = datetime(2026, 1, 15, 12, 30, 45)
     event_timestamp = datetime(2025, 6, 1, 9, 0, 0)
     model = ComprehensiveTestModel(
+        pipeline_no_clobber_sentinel="custom_sentinel",
         tags=["alpha", "beta"],
         metadata={"env": "prod", "region": "us-east"},
         name="comprehensive_roundtrip",
