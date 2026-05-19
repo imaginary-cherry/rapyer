@@ -51,7 +51,7 @@ class ComprehensiveAmountOpBase(ComprehensiveBinaryOpBase[float]):
     def make_model(v: float) -> ComprehensiveTestModel:
         return ComprehensiveTestModel(amount=v)
 
-    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+    def local_mutate_target_field(self, m: ComprehensiveTestModel):
         m.amount += 1.2345e-5
 
     def get_target_field(self, m: ComprehensiveTestModel) -> float:
@@ -69,15 +69,11 @@ class ComprehensiveCounterOpBase(ComprehensiveBinaryOpBase[int]):
     def make_model(v: int) -> ComprehensiveTestModel:
         return ComprehensiveTestModel(counter=v)
 
-    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+    def local_mutate_target_field(self, m: ComprehensiveTestModel):
         m.counter += 7919
 
     def get_target_field(self, m: ComprehensiveTestModel) -> int:
         return int(m.counter)
-
-
-
-
 
 
 class ComprehensiveMetadataOpBase(ComprehensiveOpBase[dict]):
@@ -87,7 +83,7 @@ class ComprehensiveMetadataOpBase(ComprehensiveOpBase[dict]):
     def field_getter(m: ComprehensiveTestModel) -> dict:
         return m.metadata
 
-    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+    def local_mutate_target_field(self, m: ComprehensiveTestModel):
         m.metadata["__local_marker__"] = "__local_value__"
 
     def get_target_field(self, m: ComprehensiveTestModel) -> dict:
@@ -101,7 +97,7 @@ class ComprehensiveNameOpBase(ComprehensiveOpBase[str]):
     def field_getter(m: ComprehensiveTestModel) -> str:
         return m.name
 
-    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+    def local_mutate_target_field(self, m: ComprehensiveTestModel):
         m.name += "_local_marker"
 
     def get_target_field(self, m: ComprehensiveTestModel) -> str:
@@ -115,9 +111,8 @@ class ComprehensiveTagsOpBase(ComprehensiveOpBase[list]):
     def field_getter(m: ComprehensiveTestModel) -> list:
         return m.tags
 
-    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+    def local_mutate_target_field(self, m: ComprehensiveTestModel):
         m.tags.append("__local_marker__")
 
     def get_target_field(self, m: ComprehensiveTestModel) -> list:
         return list(m.tags)
-
