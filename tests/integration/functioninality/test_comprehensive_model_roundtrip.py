@@ -32,13 +32,8 @@ async def test_comprehensive_model_asave_aget_roundtrip_all_fields_non_default()
     assert retrieved == model
 
     # Assert — no field is at its default value
-    assert retrieved.tags != []
-    assert retrieved.metadata != {}
-    assert retrieved.name != ""
-    assert retrieved.counter != 0
-    assert retrieved.amount != 0.0
-    assert retrieved.data != b""
-    assert retrieved.event_time == event_time
-    assert retrieved.event_timestamp == event_timestamp
-    assert await retrieved.tasks.asize() > 0
-    assert await retrieved.labels.asize() > 0
+    default_model = ComprehensiveTestModel()
+    for field_name in ComprehensiveTestModel.model_fields:
+        assert getattr(retrieved, field_name) != getattr(default_model, field_name), (
+            f"Field {field_name!r} is at its default value"
+        )
