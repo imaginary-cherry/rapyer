@@ -93,7 +93,9 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
 
     @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     async def adel_item(self, key):
-        super().__delitem__(key)
+        # Tolerant local pop so a stale mirror (key already missing locally)
+        # cannot raise after the Redis delete has been queued / issued.
+        super().pop(key, None)
         result = await self.client_json.delete(self.key, self.json_field_path(key))  # type: ignore[misc]
         return result
 
@@ -145,10 +147,9 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
 
         if result is not None:
             redis_key, redis_value = result
-            # Pop the same key from the local dict
-            super().pop(
-                redis_key.decode() if isinstance(redis_key, bytes) else redis_key
-            )
+            # Pop the same key from the local dict — tolerant of a stale
+            key = redis_key.decode() if isinstance(redis_key, bytes) else redis_key
+            super().pop(key, None)
             return self._adapter.validate_python(
                 {redis_key: redis_value}, context={REDIS_DUMP_FLAG_NAME: True}
             )[redis_key]
