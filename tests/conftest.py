@@ -12,6 +12,7 @@ import rapyer.types  # noqa: F401  # ensure all BaseRedisType subclasses are reg
 from rapyer.actions import ACTION_GROUPS_ATTR, ActionGroup
 from rapyer.base import AtomicRedisModel
 from rapyer.types.base import BaseRedisType
+from rapyer.types.lst import RedisList
 from rapyer.types.special import SpecialFieldType
 from tests.action_groups import (
     NON_ACTION_METHODS,
@@ -24,6 +25,7 @@ from tests.coverage_helpers import (
     COVER_NO_TTL_WHEN_NOT_CONFIGURED,
     COVER_PIPELINE_ATOM,
     COVER_READ_IN_PIPELINE,
+    COVER_SYNC_NATIVE_EFFECT,
     COVER_TTL_NO_REFRESH,
     COVER_TTL_REFRESH,
     COVER_TTL_UPDATE_ONCE,
@@ -33,6 +35,14 @@ from tests.coverage_helpers import (
     cover_tuple,
     should_ignore_group,
     special_field_cover_marker,
+)
+
+
+# Sync action methods that are pipeline-only by design: outside an open
+# pipeline they do not mutate the local mirror, so they cannot satisfy the
+# "same effect as native Python" contract checked by COVER_SYNC_NATIVE_EFFECT.
+SYNC_NATIVE_EFFECT_EXEMPT: frozenset[tuple[str, str]] = frozenset(
+    {cover_tuple(RedisList.remove_range)}
 )
 
 
@@ -154,6 +164,16 @@ COVERAGE_CHECKS: list[CoverageCheck] = [
             only_async=True, require_groups=ActionGroup.CREATE
         ),
     ),
+    CoverageCheck(
+        name=COVER_SYNC_NATIVE_EFFECT,
+        help_text="sync action local effect matches native Python equivalent",
+        expected=lambda: _collect_methods(
+            sync_only=True,
+            require_groups=ActionGroup.UPDATE,
+            ignore_groups=ActionGroup.DELETE | ActionGroup.CREATE,
+        )
+        - SYNC_NATIVE_EFFECT_EXEMPT,
+    ),
 ]
 
 for sf_class in all_subclasses(SpecialFieldType):
@@ -211,7 +231,7 @@ def pytest_runtest_makereport(item, call):
                 check.covered.update(marker.args)
 
 
-def _iter_class_methods(cls, async_only: bool):
+def _iter_class_methods(cls, async_only: bool, sync_only: bool = False):
     members = (
         inspect.getmembers(cls, predicate=_is_async_callable)
         if async_only
@@ -223,6 +243,8 @@ def _iter_class_methods(cls, async_only: bool):
         if name.startswith("__") or not callable(method):
             continue
         if cover_tuple(method)[0] != cls.__name__:
+            continue
+        if sync_only and _is_async_callable(method):
             continue
         yield cls, name, method
 
@@ -257,11 +279,13 @@ def _collect_methods(
     require_groups: ActionGroup | None = None,
     ignore_private: bool = True,
     only_async: bool = False,
+    sync_only: bool = False,
     include_redis_types: bool = True,
 ):
     """Callable methods on BaseRedisType subclasses + async methods on AtomicRedisModel.
 
     When only_async=True, BaseRedisType subclasses are also restricted to async.
+    When sync_only=True, async methods are excluded.
     AtomicRedisModel is always async-only since non-async members aren't Redis ops.
     When require_groups is set, only methods tagged with at least one of those
     action groups are included.
@@ -269,9 +293,16 @@ def _collect_methods(
     candidates = []
     if include_redis_types:
         for cls in all_subclasses(BaseRedisType):
-            candidates.extend(_iter_class_methods(cls, async_only=only_async))
-    candidates.extend(_iter_class_methods(AtomicRedisModel, async_only=only_async))
-    candidates.extend(_iter_module_functions(rapyer))
+            candidates.extend(
+                _iter_class_methods(cls, async_only=only_async, sync_only=sync_only)
+            )
+    candidates.extend(
+        _iter_class_methods(
+            AtomicRedisModel, async_only=only_async, sync_only=sync_only
+        )
+    )
+    if not sync_only:
+        candidates.extend(_iter_module_functions(rapyer))
 
     result = set()
     for holder, name, method in candidates:

@@ -3,12 +3,13 @@ import pytest
 from rapyer.types.float import RedisFloat
 from tests.integration.actions.base import BinaryOpCase
 from tests.integration.actions.comprehensive import ComprehensiveAmountOpBase
+from tests.integration.actions.sync_action import SyncActionTestBase
 from tests.integration.actions.ttl import TTLActionTestBase
 from tests.integration.actions.update import UpdateActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
 
 
-class TestRedisFloatAllOperationsCombined(UpdateActionTestBase):
+class TestRedisFloatAllOperationsCombined(UpdateActionTestBase, SyncActionTestBase):
     covered_method = [
         RedisFloat.__iadd__,
         RedisFloat.__isub__,
@@ -26,6 +27,16 @@ class TestRedisFloatAllOperationsCombined(UpdateActionTestBase):
         piped.amount //= 3.0
         piped.amount %= 10.0
         piped.amount **= 2.0
+
+    def apply_native_action(self, native: float) -> float:
+        native += 50.0
+        native -= 25.0
+        native *= 2.0
+        native /= 5.0
+        native //= 3.0
+        native %= 10.0
+        native **= 2.0
+        return native
 
     async def load_data(self):
         loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
@@ -70,7 +81,7 @@ class TestFloatAincrease(UpdateActionTestBase, TTLActionTestBase):
         return float(m.amount)
 
 
-class TestRedisFloatItruediv(ComprehensiveAmountOpBase):
+class TestRedisFloatItruediv(ComprehensiveAmountOpBase, SyncActionTestBase):
     covered_method = RedisFloat.__itruediv__
     params = [
         BinaryOpCase(100.0, 4.0, 25.0),
@@ -81,8 +92,11 @@ class TestRedisFloatItruediv(ComprehensiveAmountOpBase):
     async def perform_action(self, piped):
         piped.amount /= self.test_input.operand
 
+    def apply_native_action(self, native: float) -> float:
+        return native / self.test_input.operand
 
-class TestRedisFloatIfloordiv(ComprehensiveAmountOpBase):
+
+class TestRedisFloatIfloordiv(ComprehensiveAmountOpBase, SyncActionTestBase):
     covered_method = RedisFloat.__ifloordiv__
     params = [
         BinaryOpCase(17.0, 5.0, 3.0),
@@ -93,8 +107,11 @@ class TestRedisFloatIfloordiv(ComprehensiveAmountOpBase):
     async def perform_action(self, piped):
         piped.amount //= self.test_input.operand
 
+    def apply_native_action(self, native: float) -> float:
+        return native // self.test_input.operand
 
-class TestRedisFloatImod(ComprehensiveAmountOpBase):
+
+class TestRedisFloatImod(ComprehensiveAmountOpBase, SyncActionTestBase):
     covered_method = RedisFloat.__imod__
     params = [
         BinaryOpCase(17.5, 5.0, 2.5),
@@ -105,8 +122,11 @@ class TestRedisFloatImod(ComprehensiveAmountOpBase):
     async def perform_action(self, piped):
         piped.amount %= self.test_input.operand
 
+    def apply_native_action(self, native: float) -> float:
+        return native % self.test_input.operand
 
-class TestRedisFloatIpow(ComprehensiveAmountOpBase):
+
+class TestRedisFloatIpow(ComprehensiveAmountOpBase, SyncActionTestBase):
     covered_method = RedisFloat.__ipow__
     params = [
         BinaryOpCase(2.0, 3.0, 8.0),
@@ -116,3 +136,6 @@ class TestRedisFloatIpow(ComprehensiveAmountOpBase):
 
     async def perform_action(self, piped):
         piped.amount **= self.test_input.operand
+
+    def apply_native_action(self, native: float) -> float:
+        return native ** self.test_input.operand

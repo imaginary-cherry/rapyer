@@ -4,6 +4,7 @@ from typing import ClassVar
 import rapyer
 from rapyer.types.redis_set import RedisSet
 from tests.integration.actions.read import ReadActionTestBase
+from tests.integration.actions.sync_action import SyncActionTestBase
 from tests.integration.actions.ttl import TTLActionTestBase
 from tests.integration.actions.update import UpdateActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
@@ -194,7 +195,7 @@ class TestSetAdifference(_TwoSetActionBase):
         return set(self.initial_items) - set(self.other_items)
 
 
-class RedisSetSyncActionBase(UpdateActionTestBase, ABC):
+class RedisSetSyncActionBase(UpdateActionTestBase, SyncActionTestBase, ABC):
     """Sync set methods queue Redis ops onto an open pipeline; outside a
     pipeline they only mutate the local mirror. They aren't async, so TTL
     refresh / action-effect coverage doesn't apply — pipeline atomicity and
@@ -234,6 +235,10 @@ class TestSetAdd(RedisSetSyncActionBase):
     async def perform_action(self, piped: ComprehensiveTestModel):
         piped.labels.add("delta")
 
+    def apply_native_action(self, native: set) -> set:
+        native.add("delta")
+        return native
+
     def expected_after(self):
         return INITIAL_SERIALIZED | {'"delta"'}
 
@@ -243,6 +248,10 @@ class TestSetUpdate(RedisSetSyncActionBase):
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         piped.labels.update(["delta", "epsilon"])
+
+    def apply_native_action(self, native: set) -> set:
+        native.update(["delta", "epsilon"])
+        return native
 
     def expected_after(self):
         return INITIAL_SERIALIZED | {'"delta"', '"epsilon"'}
@@ -254,6 +263,10 @@ class TestSetRemove(RedisSetSyncActionBase):
     async def perform_action(self, piped: ComprehensiveTestModel):
         piped.labels.remove("beta")
 
+    def apply_native_action(self, native: set) -> set:
+        native.remove("beta")
+        return native
+
     def expected_after(self):
         return INITIAL_SERIALIZED - {'"beta"'}
 
@@ -263,6 +276,10 @@ class TestSetDiscard(RedisSetSyncActionBase):
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         piped.labels.discard("beta")
+
+    def apply_native_action(self, native: set) -> set:
+        native.discard("beta")
+        return native
 
     def expected_after(self):
         return INITIAL_SERIALIZED - {'"beta"'}
@@ -274,6 +291,10 @@ class TestSetClear(RedisSetSyncActionBase):
     async def perform_action(self, piped: ComprehensiveTestModel):
         piped.labels.clear()
 
+    def apply_native_action(self, native: set) -> set:
+        native.clear()
+        return native
+
     def expected_after(self):
         return frozenset()
 
@@ -283,6 +304,10 @@ class TestSetDifferenceUpdate(RedisSetSyncActionBase):
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         piped.labels.difference_update({"alpha"})
+
+    def apply_native_action(self, native: set) -> set:
+        native.difference_update({"alpha"})
+        return native
 
     def expected_after(self):
         return INITIAL_SERIALIZED - {'"alpha"'}
@@ -294,6 +319,10 @@ class TestSetIntersectionUpdate(RedisSetSyncActionBase):
     async def perform_action(self, piped: ComprehensiveTestModel):
         piped.labels.intersection_update({"alpha", "delta"})
 
+    def apply_native_action(self, native: set) -> set:
+        native.intersection_update({"alpha", "delta"})
+        return native
+
     def expected_after(self):
         return frozenset({'"alpha"'})
 
@@ -303,6 +332,10 @@ class TestSetSymmetricDifferenceUpdate(RedisSetSyncActionBase):
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         piped.labels.symmetric_difference_update({"alpha", "delta"})
+
+    def apply_native_action(self, native: set) -> set:
+        native.symmetric_difference_update({"alpha", "delta"})
+        return native
 
     def expected_after(self):
         return (INITIAL_SERIALIZED - {'"alpha"'}) | {'"delta"'}

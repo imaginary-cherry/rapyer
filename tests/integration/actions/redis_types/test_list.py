@@ -1,11 +1,12 @@
 from rapyer.types.lst import RedisList
 from tests.integration.actions.comprehensive import ComprehensiveTagsOpBase
 from tests.integration.actions.read import ReadActionTestBase
+from tests.integration.actions.sync_action import SyncActionTestBase
 from tests.integration.actions.ttl import TTLActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
 
 
-class TestListAppend(ComprehensiveTagsOpBase):
+class TestListAppend(ComprehensiveTagsOpBase, SyncActionTestBase):
     covered_method = RedisList.append
 
     def create_models(self):
@@ -14,6 +15,10 @@ class TestListAppend(ComprehensiveTagsOpBase):
     async def perform_action(self, piped):
         piped.tags.append("item1")
 
+    def apply_native_action(self, native: list) -> list:
+        native.append("item1")
+        return native
+
     def expected_before(self):
         return []
 
@@ -21,7 +26,7 @@ class TestListAppend(ComprehensiveTagsOpBase):
         return ["item1"]
 
 
-class TestListExtend(ComprehensiveTagsOpBase):
+class TestListExtend(ComprehensiveTagsOpBase, SyncActionTestBase):
     covered_method = RedisList.extend
 
     def create_models(self):
@@ -30,6 +35,10 @@ class TestListExtend(ComprehensiveTagsOpBase):
     async def perform_action(self, piped):
         piped.tags.extend(["item1", "item2"])
 
+    def apply_native_action(self, native: list) -> list:
+        native.extend(["item1", "item2"])
+        return native
+
     def expected_before(self):
         return []
 
@@ -37,7 +46,7 @@ class TestListExtend(ComprehensiveTagsOpBase):
         return ["item1", "item2"]
 
 
-class TestRedisListInsert(ComprehensiveTagsOpBase):
+class TestRedisListInsert(ComprehensiveTagsOpBase, SyncActionTestBase):
     covered_method = RedisList.insert
 
     def create_models(self):
@@ -46,6 +55,10 @@ class TestRedisListInsert(ComprehensiveTagsOpBase):
     async def perform_action(self, piped):
         piped.tags.insert(1, "middle")
 
+    def apply_native_action(self, native: list) -> list:
+        native.insert(1, "middle")
+        return native
+
     def expected_before(self):
         return ["first", "last"]
 
@@ -53,7 +66,7 @@ class TestRedisListInsert(ComprehensiveTagsOpBase):
         return ["first", "middle", "last"]
 
 
-class TestRedisListClear(ComprehensiveTagsOpBase):
+class TestRedisListClear(ComprehensiveTagsOpBase, SyncActionTestBase):
     covered_method = RedisList.clear
 
     def create_models(self):
@@ -61,6 +74,10 @@ class TestRedisListClear(ComprehensiveTagsOpBase):
 
     async def perform_action(self, piped):
         piped.tags.clear()
+
+    def apply_native_action(self, native: list) -> list:
+        native.clear()
+        return native
 
     def expected_before(self):
         return ["tag1", "tag2", "tag3"]
@@ -70,6 +87,8 @@ class TestRedisListClear(ComprehensiveTagsOpBase):
 
 
 class TestRedisListRemoveRange(ComprehensiveTagsOpBase):
+    # remove_range is pipeline-only; it does not mutate the local mirror
+    # outside an open pipeline, so it is exempt from COVER_SYNC_NATIVE_EFFECT.
     covered_method = RedisList.remove_range
 
     def create_models(self):
@@ -85,7 +104,7 @@ class TestRedisListRemoveRange(ComprehensiveTagsOpBase):
         return ["a", "d", "e"]
 
 
-class TestRedisListSetitem(ComprehensiveTagsOpBase):
+class TestRedisListSetitem(ComprehensiveTagsOpBase, SyncActionTestBase):
     covered_method = RedisList.__setitem__
 
     def create_models(self):
@@ -94,6 +113,10 @@ class TestRedisListSetitem(ComprehensiveTagsOpBase):
     async def perform_action(self, piped):
         piped.tags[1] = "modified"
 
+    def apply_native_action(self, native: list) -> list:
+        native[1] = "modified"
+        return native
+
     def expected_before(self):
         return ["first", "second", "third"]
 
@@ -101,7 +124,7 @@ class TestRedisListSetitem(ComprehensiveTagsOpBase):
         return ["first", "modified", "third"]
 
 
-class TestRedisListIadd(ComprehensiveTagsOpBase):
+class TestRedisListIadd(ComprehensiveTagsOpBase, SyncActionTestBase):
     covered_method = RedisList.__iadd__
 
     def create_models(self):
@@ -109,6 +132,10 @@ class TestRedisListIadd(ComprehensiveTagsOpBase):
 
     async def perform_action(self, piped):
         piped.tags += ["added1", "added2"]
+
+    def apply_native_action(self, native: list) -> list:
+        native += ["added1", "added2"]
+        return native
 
     def expected_before(self):
         return ["initial"]

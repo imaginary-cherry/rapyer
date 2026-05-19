@@ -1,9 +1,10 @@
 from rapyer.types.byte import RedisBytes
+from tests.integration.actions.sync_action import SyncActionTestBase
 from tests.integration.actions.update import UpdateActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
 
 
-class TestRedisBytesIadd(UpdateActionTestBase):
+class TestRedisBytesIadd(UpdateActionTestBase, SyncActionTestBase):
     covered_method = RedisBytes.__iadd__
 
     def create_models(self):
@@ -11,6 +12,9 @@ class TestRedisBytesIadd(UpdateActionTestBase):
 
     async def perform_action(self, piped):
         piped.data += b" world"
+
+    def apply_native_action(self, native: bytes) -> bytes:
+        return native + b" world"
 
     async def load_data(self):
         loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)

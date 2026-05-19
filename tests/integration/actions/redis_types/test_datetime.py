@@ -3,11 +3,12 @@ from datetime import datetime, timedelta
 
 from rapyer.types.datetime import RedisDatetime, RedisDatetimeTimestamp
 from tests.integration.actions.base import BinaryOpCase
+from tests.integration.actions.sync_action import SyncActionTestBase
 from tests.integration.actions.update import UpdateActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
 
 
-class DatetimeBothModelsOpBase(UpdateActionTestBase, ABC):
+class DatetimeBothModelsOpBase(UpdateActionTestBase, SyncActionTestBase, ABC):
     """Datetime iadd/isub tests that mutate both storage flavors at once.
 
     Setup creates a single :class:`ComprehensiveTestModel` whose ``event_time``
@@ -63,6 +64,10 @@ class TestRedisDatetimeIadd(DatetimeBothModelsOpBase):
         piped.event_time += self.test_input.operand
         piped.event_timestamp += self.test_input.operand
 
+    def apply_native_action(self, native):
+        dt, ts = native
+        return dt + self.test_input.operand, ts + self.test_input.operand
+
 
 class TestRedisDatetimeIsub(DatetimeBothModelsOpBase):
     covered_method = [RedisDatetime.__isub__, RedisDatetimeTimestamp.__isub__]
@@ -87,3 +92,7 @@ class TestRedisDatetimeIsub(DatetimeBothModelsOpBase):
     async def perform_action(self, piped):
         piped.event_time -= self.test_input.operand
         piped.event_timestamp -= self.test_input.operand
+
+    def apply_native_action(self, native):
+        dt, ts = native
+        return dt - self.test_input.operand, ts - self.test_input.operand

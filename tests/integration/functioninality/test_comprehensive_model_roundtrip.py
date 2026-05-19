@@ -40,6 +40,7 @@ async def test_comprehensive_model_asave_aget_roundtrip_all_fields_non_default()
 async def test_comprehensive_model_afind_multiple_keys_all_fields_non_default():
     # Arrange
     model_a = ComprehensiveTestModel(
+        pipeline_no_clobber_sentinel="custom_sentinel",
         tags=["alpha", "beta"],
         metadata={"env": "prod", "region": "us-east"},
         name="model_a",
@@ -50,6 +51,7 @@ async def test_comprehensive_model_afind_multiple_keys_all_fields_non_default():
         event_timestamp=datetime(2025, 6, 1, 9, 0, 0),
     )
     model_b = ComprehensiveTestModel(
+        pipeline_no_clobber_sentinel="custom_sentinel",
         tags=["gamma", "delta"],
         metadata={"tier": "free", "region": "eu-west"},
         name="model_b",

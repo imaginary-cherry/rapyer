@@ -1,11 +1,12 @@
 from rapyer.types.dct import RedisDict
 from tests.integration.actions.comprehensive import ComprehensiveMetadataOpBase
 from tests.integration.actions.read import ReadActionTestBase
+from tests.integration.actions.sync_action import SyncActionTestBase
 from tests.integration.actions.ttl import TTLActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
 
 
-class TestDictUpdate(ComprehensiveMetadataOpBase):
+class TestDictUpdate(ComprehensiveMetadataOpBase, SyncActionTestBase):
     covered_method = RedisDict.update
 
     def create_models(self):
@@ -14,6 +15,10 @@ class TestDictUpdate(ComprehensiveMetadataOpBase):
     async def perform_action(self, piped):
         piped.metadata.update({"key1": "value1", "key2": "value2"})
 
+    def apply_native_action(self, native: dict) -> dict:
+        native.update({"key1": "value1", "key2": "value2"})
+        return native
+
     def expected_before(self):
         return {}
 
@@ -21,7 +26,7 @@ class TestDictUpdate(ComprehensiveMetadataOpBase):
         return {"key1": "value1", "key2": "value2"}
 
 
-class TestDictSetitem(ComprehensiveMetadataOpBase):
+class TestDictSetitem(ComprehensiveMetadataOpBase, SyncActionTestBase):
     covered_method = RedisDict.__setitem__
 
     def create_models(self):
@@ -30,6 +35,10 @@ class TestDictSetitem(ComprehensiveMetadataOpBase):
     async def perform_action(self, piped):
         piped.metadata["direct_key"] = "direct_value"
 
+    def apply_native_action(self, native: dict) -> dict:
+        native["direct_key"] = "direct_value"
+        return native
+
     def expected_before(self):
         return {}
 
@@ -37,7 +46,7 @@ class TestDictSetitem(ComprehensiveMetadataOpBase):
         return {"direct_key": "direct_value"}
 
 
-class TestRedisDictClear(ComprehensiveMetadataOpBase):
+class TestRedisDictClear(ComprehensiveMetadataOpBase, SyncActionTestBase):
     covered_method = RedisDict.clear
 
     def create_models(self):
@@ -45,6 +54,10 @@ class TestRedisDictClear(ComprehensiveMetadataOpBase):
 
     async def perform_action(self, piped):
         piped.metadata.clear()
+
+    def apply_native_action(self, native: dict) -> dict:
+        native.clear()
+        return native
 
     def expected_before(self):
         return {"key1": "val1", "key2": "val2"}

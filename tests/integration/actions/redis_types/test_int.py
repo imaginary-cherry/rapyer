@@ -1,12 +1,13 @@
 from rapyer.types.integer import RedisInt
 from tests.integration.actions.base import BinaryOpCase
 from tests.integration.actions.comprehensive import ComprehensiveCounterOpBase
+from tests.integration.actions.sync_action import SyncActionTestBase
 from tests.integration.actions.ttl import TTLActionTestBase
 from tests.integration.actions.update import UpdateActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
 
 
-class TestIntegerAddition(UpdateActionTestBase):
+class TestIntegerAddition(UpdateActionTestBase, SyncActionTestBase):
     covered_method = RedisInt.__iadd__
 
     def create_models(self):
@@ -14,6 +15,9 @@ class TestIntegerAddition(UpdateActionTestBase):
 
     async def perform_action(self, piped):
         piped.counter += 25
+
+    def apply_native_action(self, native: int) -> int:
+        return native + 25
 
     async def load_data(self):
         loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
@@ -48,7 +52,7 @@ class TestRedisIntAincrease(ComprehensiveCounterOpBase, TTLActionTestBase):
         return 15
 
 
-class TestRedisIntIsub(ComprehensiveCounterOpBase):
+class TestRedisIntIsub(ComprehensiveCounterOpBase, SyncActionTestBase):
     covered_method = RedisInt.__isub__
     params = [
         BinaryOpCase(20, 5, 15),
@@ -59,8 +63,11 @@ class TestRedisIntIsub(ComprehensiveCounterOpBase):
     async def perform_action(self, piped):
         piped.counter -= self.test_input.operand
 
+    def apply_native_action(self, native: int) -> int:
+        return native - self.test_input.operand
 
-class TestRedisIntImul(ComprehensiveCounterOpBase):
+
+class TestRedisIntImul(ComprehensiveCounterOpBase, SyncActionTestBase):
     covered_method = RedisInt.__imul__
     params = [
         BinaryOpCase(5, 4, 20),
@@ -71,8 +78,11 @@ class TestRedisIntImul(ComprehensiveCounterOpBase):
     async def perform_action(self, piped):
         piped.counter *= self.test_input.operand
 
+    def apply_native_action(self, native: int) -> int:
+        return native * self.test_input.operand
 
-class TestRedisIntIfloordiv(ComprehensiveCounterOpBase):
+
+class TestRedisIntIfloordiv(ComprehensiveCounterOpBase, SyncActionTestBase):
     covered_method = RedisInt.__ifloordiv__
     params = [
         BinaryOpCase(17, 5, 3),
@@ -83,8 +93,11 @@ class TestRedisIntIfloordiv(ComprehensiveCounterOpBase):
     async def perform_action(self, piped):
         piped.counter //= self.test_input.operand
 
+    def apply_native_action(self, native: int) -> int:
+        return native // self.test_input.operand
 
-class TestRedisIntImod(ComprehensiveCounterOpBase):
+
+class TestRedisIntImod(ComprehensiveCounterOpBase, SyncActionTestBase):
     covered_method = RedisInt.__imod__
     params = [
         BinaryOpCase(17, 5, 2),
@@ -95,8 +108,11 @@ class TestRedisIntImod(ComprehensiveCounterOpBase):
     async def perform_action(self, piped):
         piped.counter %= self.test_input.operand
 
+    def apply_native_action(self, native: int) -> int:
+        return native % self.test_input.operand
 
-class TestRedisIntIpow(ComprehensiveCounterOpBase):
+
+class TestRedisIntIpow(ComprehensiveCounterOpBase, SyncActionTestBase):
     covered_method = RedisInt.__ipow__
     params = [
         BinaryOpCase(2, 3, 8),
@@ -106,3 +122,6 @@ class TestRedisIntIpow(ComprehensiveCounterOpBase):
 
     async def perform_action(self, piped):
         piped.counter **= self.test_input.operand
+
+    def apply_native_action(self, native: int) -> int:
+        return native ** self.test_input.operand
