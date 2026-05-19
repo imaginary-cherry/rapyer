@@ -6,16 +6,19 @@
 
 - **`RedisSet` Type**: New special field type backed by a Redis `SET`, providing unordered, unique-member collections stored under `__rapyer_special__:{model_key}:{field_name}`.
   - Supports generic value types: `tags: RedisSet[str]`, `users: RedisSet[float]`
-  - Sync set methods batched in pipeline: `add`, `discard`, `remove`, `pop`, `clear`, `update`, `difference_update`, `intersection_update`, `symmetric_difference_update`, plus in-place operators (`|=`, `&=`, `-=`, `^=`)
+  - Sync set methods batched in pipeline: `add`, `discard`, `remove`, `clear`, `update`, `difference_update`, `intersection_update`, `symmetric_difference_update`, plus in-place operators (`|=`, `&=`, `-=`, `^=`)
   - Async direct operations: `aadd`, `aadd_many`, `aremove`, `apop` (atomic `SPOP`), `aclear`
   - Async reads: `acontains`, `amembers`, `asize`
   - Multi-set algebra against other `RedisSet` instances: `aunion`, `aintersect`, `adifference`
+- **`RapyerSerializationError`**: New error raised when a Redis-aware field receives a value it cannot serialize. `RedisPriorityQueue` now raises it when initialized from an unsupported type instead of silently producing an empty queue.
 
 ### 🔄 Changed
 
 - **`mark_actions(version=...)` now takes `MarkVersion` enum**: The `version` parameter changed from string literals (`"v1"`/`"v2"`) to the new `MarkVersion` enum (`MarkVersion.V1`/`MarkVersion.V2`). Callers passing string values must migrate.
 - **`MarkVersion.V2` is now the default**: `mark_actions` previously defaulted to `v1` (re-check `Meta.refresh_ttl` against the action group at every call). It now defaults to `MarkVersion.V2` (defer the wrap decision to model class install time and refresh unconditionally at runtime). Built-in Redis types updated accordingly.
 - **`Field(exclude=True)` Fields Skip Redis Conversion**: Fields marked with `exclude=True` are no longer rewritten into Redis-aware annotations and are not registered as Redis fields. Use `exclude=True` to keep a field purely Pydantic-managed and out of the Redis JSON document.
+- **`AtomicRedisModel.adup()` Now copy with redis as source of truth, not local state.
+
 
 ### 🛠️ Technical Improvements
 
