@@ -54,18 +54,12 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
 
     @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     def remove(self, value: T):
+        # Mirror Redis SREM (idempotent, no error if missing). Local uses
+        # ``set.discard`` so a stale local mirror cannot raise after the
+        # SREM has already been queued.
         if self.pipeline:
             self.pipeline.srem(self.special_key, self._dump_member(value))
-        set.remove(self, value)
-
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ)
-    def pop(self) -> T:
-        # Returns a value chosen from the LOCAL set (Python's choice), not from
-        # Redis. Inside a pipeline, queues SREM of that local value.
-        value = set.pop(self)
-        if self.pipeline:
-            self.pipeline.srem(self.special_key, self._dump_member(value))
-        return value
+        set.discard(self, value)
 
     @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     def clear(self):
