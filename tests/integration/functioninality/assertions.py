@@ -33,10 +33,10 @@ async def assert_no_field_at_default(model_instance: AtomicRedisModel):
         if isinstance(value, SpecialFieldType):
             value_data = await extract_sf_data(value)
             default_data = await extract_sf_data(default_value)
-            assert value_data != default_data, (
-                f"SF field {field_name!r} extracted same data as default"
-            )
+            assert (
+                value_data != default_data
+            ), f"SF field {field_name!r} extracted same data as default"
         else:
-            assert value != default_value, (
-                f"Field {field_name!r} is at its default value"
-            )
+            assert (
+                value != default_value
+            ), f"Field {field_name!r} is at its default value"

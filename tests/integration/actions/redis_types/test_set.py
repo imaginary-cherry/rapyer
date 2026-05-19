@@ -306,5 +306,3 @@ class TestSetSymmetricDifferenceUpdate(RedisSetSyncActionBase):
 
     def expected_after(self):
         return (INITIAL_SERIALIZED - {'"alpha"'}) | {'"delta"'}
-
-

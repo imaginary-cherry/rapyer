@@ -105,9 +105,7 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
                 if members:
                     self.pipeline.sadd(temp_key, *members)
                 temp_keys.append(temp_key)
-            self.pipeline.sinterstore(
-                self.special_key, self.special_key, *temp_keys
-            )
+            self.pipeline.sinterstore(self.special_key, self.special_key, *temp_keys)
             self.pipeline.delete(*temp_keys)
         set.intersection_update(self, *materialized)
 

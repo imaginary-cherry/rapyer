@@ -37,7 +37,10 @@ class TwoPopulatedSetsBenchmark(AsyncBenchmarkTestWithTTL):
         await model_a.tags.aadd_many(_members(POPULATED_SET_SIZE))
         # Overlapping range so SINTER/SDIFF have non-trivial output.
         await model_b.tags.aadd_many(
-            [f"v_{i}" for i in range(POPULATED_SET_SIZE // 2, POPULATED_SET_SIZE * 3 // 2)]
+            [
+                f"v_{i}"
+                for i in range(POPULATED_SET_SIZE // 2, POPULATED_SET_SIZE * 3 // 2)
+            ]
         )
         return model_a, model_b
 
