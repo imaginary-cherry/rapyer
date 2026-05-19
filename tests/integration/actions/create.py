@@ -21,12 +21,14 @@ class CreateActionTestBase(TTLActionTestBase, ABC):
     @pytest.mark.asyncio
     async def test_no_ttl_set_when_ttl_not_configured(self):
         # Arrange
-        self.created_models = await self.setup_for_creation()
-        model_for_keys = self.created_models[0]
+        # Determine the model class without persisting anything so the
+        # patch can wrap any pre-inserts in ``setup_for_creation``.
+        model_cls = type(self.create_models()[0])
 
         # Act
-        with patch.object(type(model_for_keys).Meta, "ttl", None):
-            await self.perform_action(model_for_keys)
+        with patch.object(model_cls.Meta, "ttl", None):
+            self.created_models = await self.setup_for_creation()
+            await self.perform_action(self.created_models[0])
 
         # Assert
         keys = self.all_keys_to_check()

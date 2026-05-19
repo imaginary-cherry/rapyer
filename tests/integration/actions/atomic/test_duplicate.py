@@ -66,10 +66,12 @@ class TestRapyerAduplicateMany(UpdateActionTestBase, CreateActionTestBase):
     def create_models(self):
         return [ComprehensiveTestModel(name="original", counter=42, tags=["t1"])]
 
+    async def setup_for_creation(self):
+        models = self.create_models()
+        await rapyer.ainsert(*models)
+        return models
+
     async def perform_action(self, piped):
-        # aduplicate_many copies from Redis (via COPY); ensure the source exists.
-        if not await self.real_redis_client.exists(self.created_models[0].key):
-            await rapyer.ainsert(self.created_models[0])
         self.duplicates = await self.created_models[0].aduplicate_many(3)
 
     async def load_data(self):
