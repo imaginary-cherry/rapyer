@@ -125,8 +125,13 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         inner = args[0] if args else Any
 
         def _validate_wrap(v, handler_call, info):
-            if isinstance(v, RedisPriorityQueue):
+            if isinstance(v, cls):
                 return v
+            if isinstance(v, RedisPriorityQueue):
+                # Unconverted instance (e.g. from ``default_factory``). RedisPriorityQueue
+                # is a pure Redis proxy with no local state, so re-wrap as the
+                # per-field converted subclass so ``cls.field_name`` is available.
+                return cls()
             if isinstance(v, list):
                 if (info.context or {}).get(REDIS_DUMP_FLAG_NAME):
                     return handler_call(v)
@@ -134,7 +139,9 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
                     f"Cannot initialize {RedisPriorityQueue.__name__} from a list — "
                     "assign a RedisPriorityQueue instance instead."
                 )
-            raise RapyerSerializationError(f"PriorityQueue can serialize list or Prioirty queue object only, got {type(v)}")
+            raise RapyerSerializationError(
+                f"PriorityQueue can serialize list or Prioirty queue object only, got {type(v)}"
+            )
 
         def _serialize(v, serializer):
             if isinstance(v, list):
