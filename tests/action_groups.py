@@ -118,3 +118,36 @@ NON_ACTION_METHODS = _group(
     rapyer.aexists,
     rapyer.apipeline,  # TODO - this should change once we add update on each action in the ttl
 )
+
+
+# SYNC_NATIVE_EFFECT_GROUP — sync action methods that are pipeline-only by
+# design: outside an open pipeline they do not mutate the local mirror, so
+# they cannot satisfy the "same effect as native Python" contract checked by
+# COVER_SYNC_NATIVE_EFFECT. Subtracted from that coverage check's expected set.
+SYNC_NATIVE_EFFECT_GROUP = _group(RedisList.remove_range)
+
+
+# STALE_MIRROR_GROUP — async ERASE actions that cannot be corrupted because
+# they have no local mirror. RedisPriorityQueue is a pure Redis proxy with no
+# inherited Python container, so there is nothing to mutate locally.
+# Subtracted from the COVER_STALE_MIRROR_IN_PIPELINE expected set.
+STALE_MIRROR_GROUP = frozenset(
+    {
+        ("RedisPriorityQueue", "aclear"),
+        ("RedisPriorityQueue", "apop"),
+    }
+)
+
+
+# SYNC_NATIVE_RAISES_GROUP — sync ERASE methods whose native equivalent never
+# raises after local-mirror corruption (only ``set.remove`` raises KeyError;
+# discard, clear, and the bulk-update variants are tolerant by design).
+# Subtracted from the COVER_SYNC_NATIVE_RAISES_ON_CORRUPTION expected set.
+SYNC_NATIVE_RAISES_GROUP = SYNC_NATIVE_EFFECT_GROUP | _group(
+    RedisSet.discard,
+    RedisSet.clear,
+    RedisSet.difference_update,
+    RedisSet.intersection_update,
+    RedisList.clear,
+    RedisDict.clear,
+)
