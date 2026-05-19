@@ -39,7 +39,6 @@ PRIVATE_METHODS = _group(
     RedisSet._dump_member,
     RedisSet._load_members,
     RedisSet.queue_special_loads_in_pipeline,
-    RedisSet.special_field_key,
     RedisSet._tmp_key,
     # Generic
     GenericRedisType.contains_sf_field,
@@ -90,6 +89,7 @@ PRIVATE_INHERITED_METHODS = _group(
     RedisList.create_new_value,
     RedisList.create_new_values,
     SpecialFieldType.clone,
+    SpecialFieldType.special_field_key,
     SpecialFieldType.asave_special,
     SpecialFieldType.adelete_special,
     SpecialFieldType.aduplicate_special,
