@@ -50,7 +50,7 @@ class BaseRedisType(ABC):
 
     @classmethod
     def contains_sf_field(cls) -> bool:
-        """Check if this type contains speical field (in generic value - like list[RedisSet]"""
+        """Check if this type contains special field (in generic value - like list[RedisSet]"""
         return False
 
     @classmethod

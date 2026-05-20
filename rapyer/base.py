@@ -823,7 +823,7 @@ class AtomicRedisModel(BaseModel):
         targeted_keys = None
 
         if provided_keys or model_instances:
-            # Get all keys for the models, including detached speical field keys
+            # Get all keys for the models, including detached special field keys
             all_keys = [k for m in model_instances for k in m.all_keys]
             for key in provided_keys:
                 all_keys.extend(cls._all_keys_for_key(cls._resolve_key(key)))
