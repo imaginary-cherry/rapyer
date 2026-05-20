@@ -236,8 +236,11 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
             await self.client.sadd(target_special_key, *members)
 
     @classmethod
-    def queue_special_loads_in_pipeline(cls, pipe, key: str, plan: list):
-        pipe.smembers(cls.special_field_key(key))
+    def queue_special_loads_in_pipeline(
+        cls, pipe, key: str, plan: list, parent_path: str = ""
+    ):
+        field_path = f"{parent_path}{cls.field_name}"
+        pipe.smembers(cls.special_field_key(key, field_path))
         plan.append([cls.field_name.lstrip(".")])
 
     def clone(self):

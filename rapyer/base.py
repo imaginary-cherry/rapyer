@@ -530,11 +530,16 @@ class AtomicRedisModel(BaseModel):
         return self._all_keys_for_key(self.key)
 
     @classmethod
-    def _all_keys_for_key(cls, key: str) -> list[str]:
-        keys = [key]
+    def _all_keys_for_key(cls, key: str, parent_path: str = "") -> list[str]:
+        keys = [key] if not parent_path else []
         for fname in cls._special_field_names:
             field_cls = cls.model_fields[fname].annotation
-            keys.append(field_cls.special_field_key(key))
+            field_path = f"{parent_path}.{fname}"
+            keys.append(field_cls.special_field_key(key, field_path))
+        for fname in cls._contain_sf:
+            field_cls = cls.model_fields[fname].annotation
+            nested_path = f"{parent_path}.{fname}"
+            keys.extend(field_cls._all_keys_for_key(key, nested_path))
         return keys
 
     @classmethod
@@ -619,15 +624,18 @@ class AtomicRedisModel(BaseModel):
         return exclude
 
     @classmethod
-    def queue_special_loads_in_pipeline(cls, pipe, key: str, plan: list):
+    def queue_special_loads_in_pipeline(
+        cls, pipe, key: str, plan: list, parent_path: str = ""
+    ):
         """Queue load ops for every SF reachable from this model. both directly and nested (in a list or container model)"""
         for fname in cls._special_field_names:
             field_cls = cls.model_fields[fname].annotation
-            field_cls.queue_special_loads_in_pipeline(pipe, key, plan)
+            field_cls.queue_special_loads_in_pipeline(pipe, key, plan, parent_path)
         for fname in cls._contain_sf:
             field_cls = cls.model_fields[fname].annotation
+            nested_path = f"{parent_path}.{fname}"
             max_before_queueing = len(plan)
-            field_cls.queue_special_loads_in_pipeline(pipe, key, plan)
+            field_cls.queue_special_loads_in_pipeline(pipe, key, plan, nested_path)
             for i in range(max_before_queueing, len(plan)):
                 plan[i].insert(0, fname)
 
