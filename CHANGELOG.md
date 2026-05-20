@@ -18,11 +18,15 @@
 - **`MarkVersion.V2` is now the default**: `mark_actions` previously defaulted to `v1` (re-check `Meta.refresh_ttl` against the action group at every call). It now defaults to `MarkVersion.V2` (defer the wrap decision to model class install time and refresh unconditionally at runtime). Built-in Redis types updated accordingly.
 - **`Field(exclude=True)` Fields Skip Redis Conversion**: Fields marked with `exclude=True` are no longer rewritten into Redis-aware annotations and are not registered as Redis fields. Use `exclude=True` to keep a field purely Pydantic-managed and out of the Redis JSON document.
 - **`AtomicRedisModel.adup()` Now copy with redis as source of truth, not local state.
+- **BREAKING change key for speical fields**: We fixed the speical fields key, this means that models that used Priority Queue in nested model will create a fresh new queue in this version (The PQ is still in Beta)  
 
 
 ### 🛠️ Technical Improvements
 
 - **Special Fields Inside Generic Types**: `BaseRedisType` now exposes `contains_sf_field()` and `queue_special_loads_in_pipeline()` hooks so generic Redis containers (e.g., `RedisList[RedisSet[...]]`) participate in the same pipelined load path as top-level special fields. Loads for nested special fields are batched into the same `JSON.MGET` pipeline rather than being fetched separately.
+
+### 🐛 Fixed
+- **Fix multiple speical fields in a model**: Fixed a bug that cause key overlap of speical fields in the same model.
 
 
 ## [1.3.1]
