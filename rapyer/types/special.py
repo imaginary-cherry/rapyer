@@ -9,11 +9,6 @@ from rapyer.types.base import BaseRedisType
 SPECIAL_FIELD_KEY_PREFIX = "__rapyer_special__"
 
 
-def special_field_key(model_key: str, field_name: str) -> str:
-    clean_name = field_name.lstrip(".")
-    return f"{SPECIAL_FIELD_KEY_PREFIX}:{model_key}:{clean_name}"
-
-
 class SpecialFieldType(BaseRedisType, abc.ABC):
     """Base for field types stored separately from the model's JSON dump.
 
@@ -25,14 +20,21 @@ class SpecialFieldType(BaseRedisType, abc.ABC):
     an ``ensure_pipeline()`` context, operations are automatically batched.
     """
 
+    @classmethod
+    def special_field_key(cls, model_key: str, field_path: str) -> str:
+        path = field_path
+        clean_name = path.lstrip(".")
+        return f"{SPECIAL_FIELD_KEY_PREFIX}:{model_key}:{clean_name}"
+
     @property
     def special_key(self) -> str:
         """Redis key for this field's separate data structure.
 
-        Format: ``__rapyer_special__:{model_key}:{field_name_without_dot}``
-        e.g., ``__rapyer_special__:MyModel:abc123:tasks``
+        Format: ``__rapyer_special__:{model_key}:{dotted_field_path}``
+        e.g., ``__rapyer_special__:MyModel:abc123:tasks`` for a top-level field,
+        ``__rapyer_special__:MyModel:abc123:inner.tasks`` for a nested one.
         """
-        return special_field_key(self.key, self.field_name)
+        return self.special_field_key(self.key, self.field_path)
 
     @abc.abstractmethod
     async def asave_special(self):

@@ -2,6 +2,7 @@ from rapyer.actions import (
     ACTION_GROUPS_ATTR,
     MARK_ACTION_PARAMS_ATTR,
     ActionGroup,
+    MarkVersion,
     mark_actions,
 )
 
@@ -68,7 +69,7 @@ def test_async_without_ignore_refresh_decoration_shape(mark_version):
     assert getattr(decorated, ACTION_GROUPS_ATTR) == ActionGroup.UPDATE
     assert getattr(original, ACTION_GROUPS_ATTR) == ActionGroup.UPDATE
 
-    if mark_version == "v1":
+    if mark_version is MarkVersion.V1:
         # v1 wraps async methods immediately.
         assert decorated is not original
     else:

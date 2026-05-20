@@ -3,10 +3,12 @@ from typing import Callable
 import rapyer
 from rapyer import find_redis_models, init_rapyer, teardown_rapyer
 from rapyer.base import AtomicRedisModel
-from rapyer.types.base import BaseRedisType, GenericRedisType, RedisType
+from rapyer.types import RedisSet
+from rapyer.types.base import BaseRedisType, RedisType
 from rapyer.types.byte import RedisBytes
 from rapyer.types.datetime import RedisDatetimeTimestamp
 from rapyer.types.dct import RedisDict
+from rapyer.types.generic import GenericRedisType
 from rapyer.types.lst import RedisList
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.special import SpecialFieldType
@@ -29,8 +31,17 @@ PRIVATE_METHODS = _group(
     RedisDatetimeTimestamp._validate_timestamp,
     RedisDatetimeTimestamp._serialize_timestamp,
     # RedisPriorityQueue
-    RedisPriorityQueue._serialize_value,
-    RedisPriorityQueue._deserialize_value,
+    RedisPriorityQueue._dump_member,
+    RedisPriorityQueue._dump_members,
+    RedisPriorityQueue._load_member,
+    # Redis set
+    RedisSet._dump_members,
+    RedisSet._dump_member,
+    RedisSet._load_members,
+    RedisSet.queue_special_loads_in_pipeline,
+    RedisSet._tmp_key,
+    # Generic
+    GenericRedisType.contains_sf_field,
     # AtomicRedisModel
     AtomicRedisModel._search_keys_by_query,
     AtomicRedisModel.build_redis_model,
@@ -53,6 +64,9 @@ PRIVATE_METHODS = _group(
     AtomicRedisModel.iter_filter_batches,
     AtomicRedisModel.should_refresh,
     AtomicRedisModel.should_refresh_for_action,
+    AtomicRedisModel.build_redis_dump_exclude,
+    AtomicRedisModel.contains_sf_field,
+    AtomicRedisModel.queue_special_loads_in_pipeline,
 )
 
 # PRIVATE_INHERITED_METHODS — MRO-aware. Any subclass that inherits OR
@@ -75,10 +89,10 @@ PRIVATE_INHERITED_METHODS = _group(
     RedisList.create_new_value,
     RedisList.create_new_values,
     SpecialFieldType.clone,
+    SpecialFieldType.special_field_key,
     SpecialFieldType.asave_special,
     SpecialFieldType.adelete_special,
     SpecialFieldType.aduplicate_special,
-    RedisPriorityQueue.find_inner_type,
     RedisPriorityQueue.aremove,
     AtomicRedisModel.redis_schema,
 )
@@ -103,4 +117,37 @@ NON_ACTION_METHODS = _group(
     AtomicRedisModel.aexists,
     rapyer.aexists,
     rapyer.apipeline,  # TODO - this should change once we add update on each action in the ttl
+)
+
+
+# SYNC_NATIVE_EFFECT_GROUP — sync action methods that are pipeline-only by
+# design: outside an open pipeline they do not mutate the local mirror, so
+# they cannot satisfy the "same effect as native Python" contract checked by
+# COVER_SYNC_NATIVE_EFFECT. Subtracted from that coverage check's expected set.
+SYNC_NATIVE_EFFECT_GROUP = _group(RedisList.remove_range)
+
+
+# STALE_MIRROR_GROUP — async ERASE actions that cannot be corrupted because
+# they have no local mirror. RedisPriorityQueue is a pure Redis proxy with no
+# inherited Python container, so there is nothing to mutate locally.
+# Subtracted from the COVER_STALE_MIRROR_IN_PIPELINE expected set.
+STALE_MIRROR_GROUP = frozenset(
+    {
+        ("RedisPriorityQueue", "aclear"),
+        ("RedisPriorityQueue", "apop"),
+    }
+)
+
+
+# SYNC_NATIVE_RAISES_GROUP — sync ERASE methods whose native equivalent never
+# raises after local-mirror corruption (only ``set.remove`` raises KeyError;
+# discard, clear, and the bulk-update variants are tolerant by design).
+# Subtracted from the COVER_SYNC_NATIVE_RAISES_ON_CORRUPTION expected set.
+SYNC_NATIVE_RAISES_GROUP = SYNC_NATIVE_EFFECT_GROUP | _group(
+    RedisSet.discard,
+    RedisSet.clear,
+    RedisSet.difference_update,
+    RedisSet.intersection_update,
+    RedisList.clear,
+    RedisDict.clear,
 )

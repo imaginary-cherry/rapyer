@@ -251,8 +251,10 @@ async def test_contained_model_pq_has_correct_key_and_actions_work():
     model = PQContainerModel(outer_name="outer_test")
     await model.asave()
 
-    # Assert - key format uses outer model's key
-    expected_key = f"{SPECIAL_FIELD_KEY_PREFIX}:PQContainerModel:{model.pk}:tasks"
+    # Assert - key format uses outer model's key plus the nested field path
+    expected_key = (
+        f"{SPECIAL_FIELD_KEY_PREFIX}:PQContainerModel:{model.pk}:inner_pq.tasks"
+    )
     assert model.inner_pq.tasks.special_key == expected_key
 
     # Act - push items via the contained model's PQ

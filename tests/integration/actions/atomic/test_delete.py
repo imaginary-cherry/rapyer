@@ -1,7 +1,7 @@
 import rapyer
 from rapyer import DeleteResult
 from rapyer.base import AtomicRedisModel
-from tests.integration.actions.base import ActionTestBase
+from tests.integration.actions.async_action import AsyncActionTestBase
 from tests.integration.actions.two_model_delete import TwoModelDeleteBase
 from tests.models.collection_types import ComprehensiveTestModel
 
@@ -26,8 +26,11 @@ class TestRapyerDeleteByKey(TwoModelDeleteBase):
         await type(model1).adelete_by_key(model1.key)
 
 
-class TestModelAdeleteMany(ActionTestBase):
+class TestModelAdeleteMany(AsyncActionTestBase):
     covered_method = AtomicRedisModel.adelete_many
+    skip_stale_mirror_in_pipeline = (
+        "atomic delete_many; no field-level local mirror to corrupt"
+    )
 
     def create_models(self):
         return [
@@ -54,8 +57,11 @@ class TestModelAdeleteMany(ActionTestBase):
         return 0, 0
 
 
-class TestRapyerAdeleteMany(ActionTestBase):
+class TestRapyerAdeleteMany(AsyncActionTestBase):
     covered_method = AtomicRedisModel.adelete_many
+    skip_stale_mirror_in_pipeline = (
+        "atomic delete_many; no field-level local mirror to corrupt"
+    )
 
     result: DeleteResult | None = None
 
@@ -88,8 +94,11 @@ class TestRapyerAdeleteMany(ActionTestBase):
         assert self.result.models_deleted == 2
 
 
-class TestRapyerFunctionAdeleteMany(ActionTestBase):
+class TestRapyerFunctionAdeleteMany(AsyncActionTestBase):
     covered_method = rapyer.adelete_many
+    skip_stale_mirror_in_pipeline = (
+        "module-level rapyer.adelete_many; no field-level local mirror to corrupt"
+    )
 
     def create_models(self):
         return [

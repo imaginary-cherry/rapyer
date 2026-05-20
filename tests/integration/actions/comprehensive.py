@@ -43,6 +43,13 @@ class ComprehensiveBinaryOpBase(ComprehensiveOpBase[T], ABC, Generic[T]):
 class ComprehensiveAmountOpBase(ComprehensiveBinaryOpBase[float]):
     """RedisFloat binary ops on ``ComprehensiveTestModel.amount``."""
 
+    skip_stale_mirror_in_pipeline = (
+        "scalar value is its own mirror; no stale-mirror failure mode"
+    )
+    skip_sync_native_raises_on_corruption = (
+        "scalar arithmetic never raises on a stale value"
+    )
+
     @staticmethod
     def field_getter(m: ComprehensiveTestModel) -> float:
         return m.amount
@@ -51,9 +58,22 @@ class ComprehensiveAmountOpBase(ComprehensiveBinaryOpBase[float]):
     def make_model(v: float) -> ComprehensiveTestModel:
         return ComprehensiveTestModel(amount=v)
 
+    def local_mutate_target_field(self, m: ComprehensiveTestModel):
+        m.amount += 1.2345e-5
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> float:
+        return float(m.amount)
+
 
 class ComprehensiveCounterOpBase(ComprehensiveBinaryOpBase[int]):
     """RedisInt binary ops on ``ComprehensiveTestModel.counter``. Sync / pipeline-only."""
+
+    skip_stale_mirror_in_pipeline = (
+        "scalar value is its own mirror; no stale-mirror failure mode"
+    )
+    skip_sync_native_raises_on_corruption = (
+        "scalar arithmetic never raises on a stale value"
+    )
 
     @staticmethod
     def field_getter(m: ComprehensiveTestModel) -> int:
@@ -63,29 +83,11 @@ class ComprehensiveCounterOpBase(ComprehensiveBinaryOpBase[int]):
     def make_model(v: int) -> ComprehensiveTestModel:
         return ComprehensiveTestModel(counter=v)
 
+    def local_mutate_target_field(self, m: ComprehensiveTestModel):
+        m.counter += 7919
 
-class ComprehensiveDataOpBase(ComprehensiveOpBase[bytes]):
-    """RedisBytes ops on ``ComprehensiveTestModel.data``."""
-
-    @staticmethod
-    def field_getter(m: ComprehensiveTestModel) -> bytes:
-        return m.data
-
-
-class ComprehensiveEventTimeOpBase(ComprehensiveOpBase):
-    """RedisDatetime ops on ``ComprehensiveTestModel.event_time``."""
-
-    @staticmethod
-    def field_getter(m: ComprehensiveTestModel):
-        return m.event_time
-
-
-class ComprehensiveEventTimestampOpBase(ComprehensiveOpBase):
-    """RedisDatetimeTimestamp ops on ``ComprehensiveTestModel.event_timestamp``."""
-
-    @staticmethod
-    def field_getter(m: ComprehensiveTestModel):
-        return m.event_timestamp
+    def get_target_field(self, m: ComprehensiveTestModel) -> int:
+        return int(m.counter)
 
 
 class ComprehensiveMetadataOpBase(ComprehensiveOpBase[dict]):
@@ -95,13 +97,32 @@ class ComprehensiveMetadataOpBase(ComprehensiveOpBase[dict]):
     def field_getter(m: ComprehensiveTestModel) -> dict:
         return m.metadata
 
+    def local_mutate_target_field(self, m: ComprehensiveTestModel):
+        m.metadata["__local_marker__"] = "__local_value__"
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> dict:
+        return dict(m.metadata)
+
 
 class ComprehensiveNameOpBase(ComprehensiveOpBase[str]):
     """RedisStr ops on ``ComprehensiveTestModel.name``."""
 
+    skip_stale_mirror_in_pipeline = (
+        "scalar value is its own mirror; no stale-mirror failure mode"
+    )
+    skip_sync_native_raises_on_corruption = (
+        "scalar arithmetic never raises on a stale value"
+    )
+
     @staticmethod
     def field_getter(m: ComprehensiveTestModel) -> str:
         return m.name
+
+    def local_mutate_target_field(self, m: ComprehensiveTestModel):
+        m.name += "_local_marker"
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> str:
+        return str(m.name)
 
 
 class ComprehensiveTagsOpBase(ComprehensiveOpBase[list]):
@@ -111,10 +132,8 @@ class ComprehensiveTagsOpBase(ComprehensiveOpBase[list]):
     def field_getter(m: ComprehensiveTestModel) -> list:
         return m.tags
 
+    def local_mutate_target_field(self, m: ComprehensiveTestModel):
+        m.tags.append("__local_marker__")
 
-class ComprehensiveTasksOpBase(ComprehensiveOpBase):
-    """RedisPriorityQueue ops on ``ComprehensiveTestModel.tasks``."""
-
-    @staticmethod
-    def field_getter(m: ComprehensiveTestModel):
-        return m.tasks
+    def get_target_field(self, m: ComprehensiveTestModel) -> list:
+        return list(m.tags)

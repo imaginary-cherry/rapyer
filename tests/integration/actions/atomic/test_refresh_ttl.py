@@ -8,6 +8,9 @@ from tests.models.collection_types import (
 
 class TestRapyerRefreshTtl(ActionTestBase):
     covered_method = AtomicRedisModel.refresh_ttl_if_needed
+    skip_stale_mirror_in_pipeline = (
+        "TTL primitive; no field-level local mirror to corrupt"
+    )
     reduced_ttl: int = 10
 
     def create_models(self):

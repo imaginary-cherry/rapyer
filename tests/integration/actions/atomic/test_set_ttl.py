@@ -7,6 +7,9 @@ TTL_SECONDS = 300
 
 class TestRapyerAsetTtl(ActionTestBase):
     covered_method = AtomicRedisModel.aset_ttl
+    skip_stale_mirror_in_pipeline = (
+        "TTL primitive; no field-level local mirror to corrupt"
+    )
 
     def create_models(self):
         return [
@@ -39,6 +42,9 @@ class TestAsetTtl(ActionTestBase):
     """Verify ``aset_ttl`` applied in a pipeline is not flushed until exit."""
 
     covered_method = AtomicRedisModel.aset_ttl
+    skip_stale_mirror_in_pipeline = (
+        "TTL primitive; no field-level local mirror to corrupt"
+    )
 
     def create_models(self):
         return [

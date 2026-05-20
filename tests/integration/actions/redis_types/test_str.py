@@ -2,12 +2,13 @@ from rapyer.types.base import RedisType
 from rapyer.types.string import RedisStr
 from tests.integration.actions.base import BinaryOpCase
 from tests.integration.actions.comprehensive import ComprehensiveNameOpBase
+from tests.integration.actions.sync_action import SyncActionTestBase
 from tests.integration.actions.ttl import TTLActionTestBase
 from tests.integration.actions.update import UpdateActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
 
 
-class TestRedisStrAllOperationsCombined(ComprehensiveNameOpBase):
+class TestRedisStrAllOperationsCombined(ComprehensiveNameOpBase, SyncActionTestBase):
     covered_method = RedisStr.__iadd__
 
     def create_models(self):
@@ -17,6 +18,11 @@ class TestRedisStrAllOperationsCombined(ComprehensiveNameOpBase):
         piped.name += "_world"
         piped.name += "_test"
 
+    def apply_native_action(self, native: str) -> str:
+        native += "_world"
+        native += "_test"
+        return native
+
     def expected_before(self):
         return "hello"
 
@@ -24,7 +30,7 @@ class TestRedisStrAllOperationsCombined(ComprehensiveNameOpBase):
         return "hello_world_test"
 
 
-class TestRedisStrImul(ComprehensiveNameOpBase):
+class TestRedisStrImul(ComprehensiveNameOpBase, SyncActionTestBase):
     covered_method = RedisStr.__imul__
     params = [BinaryOpCase("test", 0, "")]
 
@@ -33,6 +39,9 @@ class TestRedisStrImul(ComprehensiveNameOpBase):
 
     async def perform_action(self, piped):
         piped.name *= self.test_input.operand
+
+    def apply_native_action(self, native: str) -> str:
+        return native * self.test_input.operand
 
     def expected_before(self):
         return self.test_input.initial
@@ -43,6 +52,9 @@ class TestRedisStrImul(ComprehensiveNameOpBase):
 
 class TestStringSet(UpdateActionTestBase, TTLActionTestBase):
     covered_method = RedisType.asave
+    skip_stale_mirror_in_pipeline = (
+        "scalar value is its own mirror; no stale-mirror failure mode"
+    )
 
     def create_models(self):
         return [ComprehensiveTestModel(name="original")]
@@ -60,3 +72,9 @@ class TestStringSet(UpdateActionTestBase, TTLActionTestBase):
 
     def expected_after(self):
         return "updated"
+
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        m.name += "_local_marker"
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> str:
+        return str(m.name)

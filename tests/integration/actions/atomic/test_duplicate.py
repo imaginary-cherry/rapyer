@@ -1,3 +1,4 @@
+import rapyer
 from rapyer.base import AtomicRedisModel
 from tests.integration.actions.create import CreateActionTestBase
 from tests.integration.actions.update import UpdateActionTestBase
@@ -7,6 +8,9 @@ from tests.models.collection_types import ComprehensiveTestModel
 class TestRapyerAduplicate(UpdateActionTestBase, CreateActionTestBase):
     covered_method = AtomicRedisModel.aduplicate
     model_exists_before_action = False
+    skip_stale_mirror_in_pipeline = (
+        "atomic aduplicate; no field-level local mirror to corrupt"
+    )
 
     duplicate: ComprehensiveTestModel | None = None
 
@@ -17,6 +21,11 @@ class TestRapyerAduplicate(UpdateActionTestBase, CreateActionTestBase):
 
     def create_models(self):
         return [ComprehensiveTestModel(name="original", counter=42, tags=["t1"])]
+
+    async def setup_for_creation(self):
+        models = self.create_models()
+        await rapyer.ainsert(*models)
+        return models
 
     async def perform_action(self, piped):
         self.duplicate = await self.created_models[0].aduplicate()
@@ -38,10 +47,19 @@ class TestRapyerAduplicate(UpdateActionTestBase, CreateActionTestBase):
         super().assert_after_pipeline(loaded)
         assert self.duplicate.key != self.created_models[0].key
 
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        m.counter += 7919
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> int:
+        return int(m.counter)
+
 
 class TestRapyerAduplicateMany(UpdateActionTestBase, CreateActionTestBase):
     covered_method = AtomicRedisModel.aduplicate_many
     model_exists_before_action = False
+    skip_stale_mirror_in_pipeline = (
+        "atomic aduplicate_many; no field-level local mirror to corrupt"
+    )
 
     duplicates: list[ComprehensiveTestModel] | None = None
 
@@ -53,6 +71,11 @@ class TestRapyerAduplicateMany(UpdateActionTestBase, CreateActionTestBase):
 
     def create_models(self):
         return [ComprehensiveTestModel(name="original", counter=42, tags=["t1"])]
+
+    async def setup_for_creation(self):
+        models = self.create_models()
+        await rapyer.ainsert(*models)
+        return models
 
     async def perform_action(self, piped):
         self.duplicates = await self.created_models[0].aduplicate_many(3)
@@ -78,3 +101,9 @@ class TestRapyerAduplicateMany(UpdateActionTestBase, CreateActionTestBase):
         super().assert_after_pipeline(loaded)
         all_pks = [self.created_models[0].pk] + [d.pk for d in self.duplicates_lst()]
         assert len(set(all_pks)) == 4
+
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        m.counter += 7919
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> int:
+        return int(m.counter)

@@ -5,11 +5,11 @@ from unittest.mock import AsyncMock
 import pytest
 
 import rapyer.actions
-from rapyer.actions import ActionGroup, install_action_for_meta
+from rapyer.actions import ActionGroup, MarkVersion, install_action_for_meta
 from tests.models.simple_types import TTLRefreshTestModel
 
 
-@pytest.fixture(params=["v1", "v2"])
+@pytest.fixture(params=[MarkVersion.V1, MarkVersion.V2])
 def mark_version(request):
     """Run each test against both ``mark_actions`` versions.
 
@@ -33,7 +33,7 @@ def maybe_install_v2(mark_version, *funcs):
 
     Returns a single func or a tuple matching the input arity.
     """
-    if mark_version == "v1":
+    if mark_version is MarkVersion.V1:
         result = funcs
     else:
         result = tuple(install_action_for_meta(f, RefreshAllMeta) for f in funcs)
@@ -48,11 +48,11 @@ class RefreshCall:
 
 
 def assert_action(
-    refresh_call: "RefreshCall", expected: ActionGroup, mark_version: str
+    refresh_call: "RefreshCall", expected: ActionGroup, mark_version: MarkVersion
 ):
     """v2's refresh path doesn't pass ``action`` (the wrap decision is made at
     install time), so the recorder always sees ``None``. Only assert on v1."""
-    if mark_version == "v1":
+    if mark_version is MarkVersion.V1:
         assert refresh_call.action == expected
 
 

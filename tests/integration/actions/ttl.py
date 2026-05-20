@@ -20,7 +20,7 @@ from tests.coverage_helpers import (
     is_action_for_refresh_sf,
     special_field_cover_marker,
 )
-from tests.integration.actions.base import ActionTestBase
+from tests.integration.actions.async_action import AsyncActionTestBase
 from tests.integration.conftest import REDUCED_TTL_SECONDS
 from tests.integration.special_types.adapters import (
     SPECIAL_FIELD_ADAPTERS,
@@ -28,7 +28,7 @@ from tests.integration.special_types.adapters import (
 )
 
 
-class TTLActionTestBase(ActionTestBase, ABC):
+class TTLActionTestBase(AsyncActionTestBase, ABC):
     """
     Extension of :class:`ActionTestBase` that also exercises TTL refresh
     behavior for async actions decorated with ``@mark_actions``.

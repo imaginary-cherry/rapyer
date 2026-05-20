@@ -1,20 +1,30 @@
+import copy
 from abc import ABC
 from datetime import datetime, timedelta
 
 from rapyer.types.datetime import RedisDatetime, RedisDatetimeTimestamp
 from tests.integration.actions.base import BinaryOpCase
+from tests.integration.actions.sync_action import SyncActionTestBase
 from tests.integration.actions.update import UpdateActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
 
 
-class DatetimeBothModelsOpBase(UpdateActionTestBase, ABC):
-    """Datetime iadd/isub tests that mutate both storage flavors at once.
+class DatetimeBothModelsOpBase(UpdateActionTestBase, SyncActionTestBase, ABC):
+    """
+    Datetime iadd/isub tests that mutate both storage flavors at once.
 
     Setup creates a single :class:`ComprehensiveTestModel` whose ``event_time``
     is a regular datetime (RedisDatetime — ISO storage) and ``event_timestamp``
     is a :class:`RedisDatetimeTimestamp` (numeric storage). Both fields share
     the same initial value.
     """
+
+    skip_stale_mirror_in_pipeline = (
+        "scalar value is its own mirror; no stale-mirror failure mode"
+    )
+    skip_sync_native_raises_on_corruption = (
+        "datetime arithmetic never raises on a stale local mirror"
+    )
 
     def create_models(self):
         initial = self.test_input.initial
@@ -29,6 +39,14 @@ class DatetimeBothModelsOpBase(UpdateActionTestBase, ABC):
 
     def expected_after(self):
         return self.test_input.expected, self.test_input.expected
+
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        offset = timedelta(days=999)
+        m.event_time += offset
+        m.event_timestamp += offset
+
+    def get_target_field(self, m: ComprehensiveTestModel):
+        return copy.deepcopy((m.event_time, m.event_timestamp))
 
 
 class TestRedisDatetimeIadd(DatetimeBothModelsOpBase):
@@ -55,6 +73,10 @@ class TestRedisDatetimeIadd(DatetimeBothModelsOpBase):
         piped.event_time += self.test_input.operand
         piped.event_timestamp += self.test_input.operand
 
+    def apply_native_action(self, native):
+        dt, ts = native
+        return dt + self.test_input.operand, ts + self.test_input.operand
+
 
 class TestRedisDatetimeIsub(DatetimeBothModelsOpBase):
     covered_method = [RedisDatetime.__isub__, RedisDatetimeTimestamp.__isub__]
@@ -79,3 +101,7 @@ class TestRedisDatetimeIsub(DatetimeBothModelsOpBase):
     async def perform_action(self, piped):
         piped.event_time -= self.test_input.operand
         piped.event_timestamp -= self.test_input.operand
+
+    def apply_native_action(self, native):
+        dt, ts = native
+        return dt - self.test_input.operand, ts - self.test_input.operand

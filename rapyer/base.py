@@ -17,6 +17,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+from pydantic.fields import FieldInfo
 from pydantic_core.core_schema import FieldSerializationInfo, ValidationInfo
 from redis.asyncio.client import Pipeline
 from redis.commands.search.aggregation import AggregateRequest
@@ -26,6 +27,7 @@ from redis.exceptions import NoScriptError, ResponseError
 
 from rapyer.actions import (
     ActionGroup,
+    MarkVersion,
     TargetSource,
     install_marked_action_methods,
     mark_actions,
@@ -41,7 +43,9 @@ from rapyer.context import (
     with_pipe_context,
 )
 from rapyer.errors import (
+    BadDeleteActionError,
     CantSerializeRedisValueError,
+    CorruptedModelError,
     DuplicateModelNameError,
     KeyNotFound,
     MissingParameterError,
@@ -52,7 +56,6 @@ from rapyer.errors import (
     UnsupportedIndexedFieldError,
     UpdateAtomicModelError,
 )
-from rapyer.errors.delete import BadDeleteActionError
 from rapyer.fields.expression import AtomicField, Expression, ExpressionField
 from rapyer.fields.index import IndexAnnotation
 from rapyer.fields.key import KeyAnnotation, RapyerKey
@@ -67,7 +70,7 @@ from rapyer.types.base import (
     RedisType,
 )
 from rapyer.types.convert import RedisConverter
-from rapyer.types.special import SpecialFieldType, special_field_key
+from rapyer.types.special import SpecialFieldType
 from rapyer.typing_support import Self, Unpack
 from rapyer.utils.annotation import (
     DYNAMIC_CLASS_DOC,
@@ -80,11 +83,14 @@ from rapyer.utils.fields import (
     is_redis_field,
     is_type_json_serializable,
 )
-from rapyer.utils.pythonic import safe_issubclass
+from rapyer.utils.pythonic import inject_at_paths, safe_issubclass
 from rapyer.utils.redis import (
     acquire_lock,
     batched,
+    build_models_from_dumps,
     delete_in_batches,
+    execute_load_pipeline,
+    fetch_models_with_sf_loads,
     scan_keys,
     update_keys_in_pipeline,
 )
@@ -145,6 +151,7 @@ class AtomicRedisModel(BaseModel):
     _safe_load_fields: ClassVar[set[str]] = set()
     _special_field_names: ClassVar[set[str]] = set()
     _redis_link_field_names: ClassVar[set[str]] = set()
+    _contain_sf: ClassVar[set[str]] = set()
     _field_name: str = PrivateAttr(default="")
     model_config = ConfigDict(validate_assignment=True, validate_default=True)
 
@@ -319,6 +326,13 @@ class AtomicRedisModel(BaseModel):
         }
         original_annotations = cls.__annotations__.copy()
         original_annotations.update(new_annotation)
+
+        def _check_is_excluded(name_of_field: str) -> bool:
+            info = pydantic_annotation.get(name_of_field) or cls.__dict__.get(
+                name_of_field
+            )
+            return isinstance(info, FieldInfo) and info.exclude is True
+
         new_annotations = {
             field_name: replace_to_redis_types_in_annotation(
                 annotation,
@@ -332,6 +346,7 @@ class AtomicRedisModel(BaseModel):
             )
             for field_name, annotation in original_annotations.items()
             if is_redis_field(field_name, annotation)
+            if not _check_is_excluded(field_name)
         }
         cls.__annotations__ = {**cls.__annotations__, **new_annotations}
         for field_name, field in pydantic_annotation.items():
@@ -342,6 +357,7 @@ class AtomicRedisModel(BaseModel):
         cls._redis_link_field_names = set(
             getattr(cls, "_redis_link_field_names", set())
         )
+        cls._contain_sf = set(getattr(cls, "_contain_sf", set()))
         for field_name, annotation in cls.__annotations__.items():
             unwrapped = annotation
             while get_origin(unwrapped) is Annotated:
@@ -350,13 +366,16 @@ class AtomicRedisModel(BaseModel):
             if safe_issubclass(origin, SpecialFieldType):
                 cls._special_field_names.add(field_name)
             if safe_issubclass(origin, (BaseRedisType, AtomicRedisModel)):
+                origin: BaseRedisType | AtomicRedisModel
                 cls._redis_link_field_names.add(field_name)
+                if origin.contains_sf_field():
+                    cls._contain_sf.add(field_name)
 
         super().__init_subclass__(**kwargs)
 
         # Set new default values if needed
         for attr_name, attr_type in cls.__annotations__.items():
-            if not is_redis_field(attr_name, attr_type):
+            if attr_name not in new_annotations:
                 continue
             if safe_issubclass(attr_type, RapyerKey):
                 continue
@@ -416,7 +435,7 @@ class AtomicRedisModel(BaseModel):
     def is_inner_model(self) -> bool:
         return bool(self.field_name)
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.CREATE, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.CREATE)
     async def asave(self) -> Self:
         model_dump = self.redis_dump()
         async with ensure_pipeline(self.Meta):
@@ -432,28 +451,29 @@ class AtomicRedisModel(BaseModel):
         return self.model_dump(
             mode="json",
             context={REDIS_DUMP_FLAG_NAME: True},
-            exclude=self._special_field_names or None,
+            exclude=self.build_redis_dump_exclude() or None,
         )
 
     def redis_dump_json(self):
         return self.model_dump_json(
             context={REDIS_DUMP_FLAG_NAME: True},
-            exclude=self._special_field_names or None,
+            exclude=self.build_redis_dump_exclude() or None,
         )
 
-    @mark_actions(ActionGroup.CREATE, target=TargetSource.RESULT, version="v2")
+    @mark_actions(ActionGroup.CREATE, target=TargetSource.RESULT)
     async def aduplicate(self) -> Self:
         duplicates = await self.aduplicate_many(1)
         return duplicates[0]
 
-    @mark_actions(ActionGroup.CREATE, target=TargetSource.RESULT, version="v2")
+    @mark_actions(ActionGroup.CREATE, target=TargetSource.RESULT)
     async def aduplicate_many(self, num: int) -> list[Self]:
         if self.is_inner_model():
             raise RuntimeError("Can only duplicate from top level model")
 
         duplicated_models = [self.__class__(**self.model_dump()) for _ in range(num)]
-        async with ensure_pipeline(self.Meta):
-            await self.ainsert(*duplicated_models)
+        async with ensure_pipeline(self.Meta) as pipe:
+            for dup in duplicated_models:
+                pipe.copy(self.key, dup.key)
             for fname in self._special_field_names:
                 source_field = getattr(self, fname)
                 if isinstance(source_field, SpecialFieldType):
@@ -466,7 +486,7 @@ class AtomicRedisModel(BaseModel):
         for field_name, value in kwargs.items():
             setattr(self, field_name, value)
 
-    @mark_actions(ActionGroup.UPDATE, version="v2")
+    @mark_actions(ActionGroup.UPDATE)
     async def aupdate(self, **kwargs):
         # Special fields (e.g. RedisPriorityQueue) manage their own separate
         # Redis storage and cannot be serialized as JSON path updates.
@@ -494,7 +514,7 @@ class AtomicRedisModel(BaseModel):
             pipe_json = get_pipe_json()
             update_keys_in_pipeline(pipe_json, self.key, **json_path_kwargs)
 
-    @mark_actions(ActionGroup.UPDATE, ignore_refresh=True, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ignore_refresh=True)
     async def aset_ttl(self, ttl: int) -> None:
         if self.is_inner_model():
             raise RuntimeError("Can only set TTL from top level model")
@@ -510,10 +530,16 @@ class AtomicRedisModel(BaseModel):
         return self._all_keys_for_key(self.key)
 
     @classmethod
-    def _all_keys_for_key(cls, key: str) -> list[str]:
-        keys = [key]
+    def _all_keys_for_key(cls, key: str, parent_path: str = "") -> list[str]:
+        keys = [key] if not parent_path else []
         for fname in cls._special_field_names:
-            keys.append(special_field_key(key, fname))
+            field_cls = cls.model_fields[fname].annotation
+            field_path = f"{parent_path}.{fname}"
+            keys.append(field_cls.special_field_key(key, field_path))
+        for fname in cls._contain_sf:
+            field_cls = cls.model_fields[fname].annotation
+            nested_path = f"{parent_path}.{fname}"
+            keys.extend(field_cls._all_keys_for_key(key, nested_path))
         return keys
 
     @classmethod
@@ -525,34 +551,93 @@ class AtomicRedisModel(BaseModel):
         return key
 
     @classmethod
-    @mark_actions(
-        ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT, version="v2"
-    )
+    @mark_actions(ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT)
     async def aget(cls, key: str) -> Self:
         key = cls._resolve_key(key)
-        model_dump = await cls.Meta.redis_json.get(key, "$")  # type: ignore[misc]
+        plan = []
+        sf_raw = []
+        if not cls.contains_sf_field():
+            model_dump = await cls.Meta.redis_json.get(key, "$")  # type: ignore[misc]
+        else:
+            models_dump, plans_per_key, sf_raw = await execute_load_pipeline(
+                cls.Meta, [cls], [key]
+            )
+            model_dump = models_dump[0]
+            plan = plans_per_key[0]
         if not model_dump:
             raise KeyNotFound(f"{key} is missing in redis")
-        model_dump = model_dump[0]
+        # Under real redis with JSONPath "$" mget returns [<dict>] per key;
+        # under fakeredis the per-key result is already the dict.
+        model_dump = model_dump[0] if isinstance(model_dump, list) else model_dump
+        inject_at_paths(model_dump, plan, sf_raw)
+        model = cls.create_redis_model(model_dump, key)
+        if model is None:
+            raise CorruptedModelError(f"Cant validate model {model}")
+        return model
 
-        context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
-        instance = cls.model_validate(model_dump, context=context)
-        instance.key = key
-        instance._failed_fields = context.get(FAILED_FIELDS_KEY, set())
-        return instance
-
-    @mark_actions(ActionGroup.READ, version="v2")
+    @mark_actions(ActionGroup.READ)
     async def aload(self) -> Self:
-        model_dump = await self.Meta.redis_json.get(self.key, self.json_path)  # type: ignore[misc]
+        cls = self.__class__
+        plan: list[list[str]] = []
+        sf_raw = []
+        if not cls.contains_sf_field():
+            model_dump = await self.Meta.redis_json.get(self.key, self.json_path)  # type: ignore[misc]
+            if not model_dump:
+                raise KeyNotFound(f"{self.key} is missing in redis")
+            model_dump = model_dump[0]
+        else:
+            models_dump, plans_per_key, sf_raw = await execute_load_pipeline(
+                cls.Meta, [cls], [self.key]
+            )
+            model_dump = models_dump[0]
+            plan = plans_per_key[0]
         if not model_dump:
             raise KeyNotFound(f"{self.key} is missing in redis")
-        model_dump = model_dump[0]
+        model_dump = model_dump[0] if isinstance(model_dump, list) else model_dump
+        inject_at_paths(model_dump, plan, sf_raw)
         context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
-        instance = self.__class__.model_validate(model_dump, context=context)
+        instance = cls.model_validate(model_dump, context=context)
         instance._pk = self._pk
         instance._base_model_link = self._base_model_link
         instance._failed_fields = context.get(FAILED_FIELDS_KEY, set())
         return instance
+
+    @classmethod
+    def contains_sf_field(cls) -> bool:
+        return bool(cls._contain_sf) or bool(cls._special_field_names)
+
+    @classmethod
+    @functools.cache
+    def build_redis_dump_exclude(cls) -> dict:
+        exclude: dict = {}
+        for fname in cls._special_field_names:
+            exclude[fname] = True
+        for fname in cls._contain_sf:
+            if fname in exclude:
+                continue
+            annotation = cls.model_fields[fname].annotation
+            inner = get_origin(annotation) or annotation
+            if isinstance(inner, type) and issubclass(inner, AtomicRedisModel):
+                nested = inner.build_redis_dump_exclude()
+                if nested:
+                    exclude[fname] = nested
+        return exclude
+
+    @classmethod
+    def queue_special_loads_in_pipeline(
+        cls, pipe, key: str, plan: list, parent_path: str = ""
+    ):
+        """Queue load ops for every SF reachable from this model. both directly and nested (in a list or container model)"""
+        for fname in cls._special_field_names:
+            field_cls = cls.model_fields[fname].annotation
+            field_cls.queue_special_loads_in_pipeline(pipe, key, plan, parent_path)
+        for fname in cls._contain_sf:
+            field_cls = cls.model_fields[fname].annotation
+            nested_path = f"{parent_path}.{fname}"
+            max_before_queueing = len(plan)
+            field_cls.queue_special_loads_in_pipeline(pipe, key, plan, nested_path)
+            for i in range(max_before_queueing, len(plan)):
+                plan[i].insert(0, fname)
 
     @classmethod
     def create_redis_model(cls, model_dump: dict, key: str) -> Optional[Self]:
@@ -572,9 +657,7 @@ class AtomicRedisModel(BaseModel):
         return model
 
     @classmethod
-    @mark_actions(
-        ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT, version="v2"
-    )
+    @mark_actions(ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT)
     async def afind(cls, *args, max_results: Optional[int] = None) -> list[Self]:
         if max_results is not None and max_results < 0:
             raise UnsupportedArgumentValueError(
@@ -610,28 +693,16 @@ class AtomicRedisModel(BaseModel):
         if not targeted_keys:
             return []
 
-        # Fetch the actual documents
-        models = await cls.Meta.redis_json.mget(keys=targeted_keys, path="$")  # type: ignore[misc]
-
-        instances = []
-        for model, key in zip(models, targeted_keys):
-            if model is None:
-                if raise_on_missing:
-                    raise KeyNotFound(f"{key} is missing in redis")
-                continue
-            if not cls.Meta.is_fake_redis:
-                model = model[0]
-            model = cls.create_redis_model(model, key)
-            if model is None:
-                continue
-            instances.append(model)
-
-        return instances
+        classes = [cls] * len(targeted_keys)
+        models, plans_per_key, sf_raw = await fetch_models_with_sf_loads(
+            cls.Meta, classes, targeted_keys
+        )
+        return build_models_from_dumps(
+            models, classes, targeted_keys, plans_per_key, sf_raw, raise_on_missing
+        )
 
     @classmethod
-    @mark_actions(
-        ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT, version="v2"
-    )
+    @mark_actions(ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT)
     async def afind_one(cls, *args) -> Optional[Self]:
         try:
             results = await cls.afind(*args, max_results=1)
@@ -640,7 +711,7 @@ class AtomicRedisModel(BaseModel):
         return results[0] if results else None
 
     @classmethod
-    @mark_actions(ActionGroup.READ, ignore_refresh=True, version="v2")
+    @mark_actions(ActionGroup.READ, ignore_refresh=True)
     async def afind_keys(cls, max_results: Optional[int] = None) -> list[RapyerKey]:
         pattern = f"{cls.class_key_initials()}:*"
         if max_results is None:
@@ -650,7 +721,7 @@ class AtomicRedisModel(BaseModel):
         return [RapyerKey(k) for k in keys]
 
     @classmethod
-    @mark_actions(ActionGroup.CREATE, target=TargetSource.RESULT, version="v2")
+    @mark_actions(ActionGroup.CREATE, target=TargetSource.RESULT)
     async def ainsert(cls, *models: Unpack[Self]):
         async with ensure_pipeline(cls.Meta):
             pipe_json = get_pipe_json()
@@ -663,7 +734,7 @@ class AtomicRedisModel(BaseModel):
             return models
 
     @classmethod
-    @mark_actions(ActionGroup.DELETE, ignore_refresh=True, version="v2")
+    @mark_actions(ActionGroup.DELETE, ignore_refresh=True)
     async def adelete_by_key(cls, key: str) -> bool:
         key = cls._resolve_key(key)
         keys_to_delete = cls._all_keys_for_key(key)
@@ -676,14 +747,14 @@ class AtomicRedisModel(BaseModel):
             results = await pipe.execute()
         return sum(results) > 0
 
-    @mark_actions(ActionGroup.DELETE, ignore_refresh=True, version="v2")
+    @mark_actions(ActionGroup.DELETE, ignore_refresh=True)
     async def adelete(self):
         if self.is_inner_model():
             raise BadDeleteActionError("Can't delete from inner model")
         return await self.adelete_by_key(self.key)
 
     @classmethod
-    @mark_actions(ActionGroup.READ, ignore_refresh=True, version="v2")
+    @mark_actions(ActionGroup.READ, ignore_refresh=True)
     async def aexists(cls, key: str | Self) -> bool:
         key = cls._resolve_key(key)
         client = _context_pipe.get() or cls.Meta.redis
@@ -728,7 +799,7 @@ class AtomicRedisModel(BaseModel):
             yield [k for key in batch for k in cls._all_keys_for_key(key)]
 
     @classmethod
-    @mark_actions(ActionGroup.DELETE, ignore_refresh=True, version="v2")
+    @mark_actions(ActionGroup.DELETE, ignore_refresh=True)
     async def adelete_many(
         cls, *args: Self | RapyerKey | str | Expression
     ) -> DeleteResult:
@@ -752,7 +823,7 @@ class AtomicRedisModel(BaseModel):
         targeted_keys = None
 
         if provided_keys or model_instances:
-            # Get all keys for the models, including detached speical field keys
+            # Get all keys for the models, including detached special field keys
             all_keys = [k for m in model_instances for k in m.all_keys]
             for key in provided_keys:
                 all_keys.extend(cls._all_keys_for_key(cls._resolve_key(key)))
@@ -923,7 +994,12 @@ def _resolve_model_class(redis_key: str) -> type[AtomicRedisModel] | None:
     return redis_model_mapping.get(class_name)
 
 
-@mark_actions(ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT)
+@mark_actions(
+    ActionGroup.READ,
+    ActionGroup.FETCH,
+    target=TargetSource.RESULT,
+    version=MarkVersion.V1,
+)
 async def aget(redis_key: str) -> AtomicRedisModel:
     klass = _resolve_model_class(redis_key)
     if klass is None:
@@ -931,7 +1007,12 @@ async def aget(redis_key: str) -> AtomicRedisModel:
     return await klass.aget(redis_key)
 
 
-@mark_actions(ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT)
+@mark_actions(
+    ActionGroup.READ,
+    ActionGroup.FETCH,
+    target=TargetSource.RESULT,
+    version=MarkVersion.V1,
+)
 async def afind_one(redis_key: str) -> Optional[AtomicRedisModel]:
     try:
         return await aget(redis_key)
@@ -939,7 +1020,7 @@ async def afind_one(redis_key: str) -> Optional[AtomicRedisModel]:
         return None
 
 
-@mark_actions(ActionGroup.READ, ignore_refresh=True)
+@mark_actions(ActionGroup.READ, ignore_refresh=True, version=MarkVersion.V1)
 async def aexists(redis_key: str | AtomicRedisModel) -> bool:
     if isinstance(redis_key, AtomicRedisModel):
         redis_key = redis_key.key
@@ -949,7 +1030,12 @@ async def aexists(redis_key: str | AtomicRedisModel) -> bool:
     return await klass.aexists(redis_key)
 
 
-@mark_actions(ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT)
+@mark_actions(
+    ActionGroup.READ,
+    ActionGroup.FETCH,
+    target=TargetSource.RESULT,
+    version=MarkVersion.V1,
+)
 async def afind(*redis_keys: str, skip_missing: bool = False) -> list[AtomicRedisModel]:
     if not redis_keys:
         return []
@@ -964,33 +1050,26 @@ async def afind(*redis_keys: str, skip_missing: bool = False) -> list[AtomicRedi
             )
         key_to_class[key] = klass
 
-    models_data = await AtomicRedisModel.Meta.redis_json.mget(  # type: ignore[misc]
-        keys=redis_keys, path="$"
+    classes = [key_to_class[k] for k in redis_keys]
+    keys_list = list(redis_keys)
+    models_data, plans_per_key, sf_raw = await fetch_models_with_sf_loads(
+        AtomicRedisModel.Meta, classes, keys_list
     )
-
-    instances = []
-
-    for data, key in zip(models_data, redis_keys):
-        if data is None:
-            if not skip_missing:
-                raise KeyNotFound(f"{key} is missing in redis")
-            continue
-        klass = key_to_class[key]
-        if not klass.Meta.is_fake_redis:
-            data = data[0]
-        model = klass.create_redis_model(data, key)
-        if model is None:
-            continue
-        instances.append(model)
-
-    return instances
+    return build_models_from_dumps(
+        models_data,
+        classes,
+        keys_list,
+        plans_per_key,
+        sf_raw,
+        raise_on_missing=not skip_missing,
+    )
 
 
 def find_redis_models() -> list[type[AtomicRedisModel]]:
     return REDIS_MODELS
 
 
-@mark_actions(ActionGroup.CREATE, target=TargetSource.MANUAL)
+@mark_actions(ActionGroup.CREATE, target=TargetSource.MANUAL, version=MarkVersion.V1)
 async def ainsert(*models: Unpack[AtomicRedisModel]) -> list[AtomicRedisModel]:
     async with ensure_pipeline(AtomicRedisModel.Meta):
         pipe_json = get_pipe_json()
@@ -1004,7 +1083,7 @@ async def ainsert(*models: Unpack[AtomicRedisModel]) -> list[AtomicRedisModel]:
     return models
 
 
-@mark_actions(ActionGroup.DELETE, ignore_refresh=True)
+@mark_actions(ActionGroup.DELETE, ignore_refresh=True, version=MarkVersion.V1)
 async def adelete_many(*args: RapyerKey | str | AtomicRedisModel) -> RapyerDeleteResult:
     if not args:
         raise MissingParameterError("adelete_many requires at least one argument")

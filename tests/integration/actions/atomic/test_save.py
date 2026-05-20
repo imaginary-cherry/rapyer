@@ -9,6 +9,9 @@ from tests.models.collection_types import ComprehensiveTestModel
 
 class TestModelAsave(UpdateActionTestBase, CreateActionTestBase):
     covered_method = AtomicRedisModel.asave
+    skip_stale_mirror_in_pipeline = (
+        "atomic asave writes the whole model; no field-level local mirror to corrupt"
+    )
 
     def create_models(self):
         return [ComprehensiveTestModel(name="original", counter=10)]
@@ -37,6 +40,9 @@ class TestModelAsave(UpdateActionTestBase, CreateActionTestBase):
 
 class TestRapyerAsaveBatching(ActionTestBase):
     covered_method = AtomicRedisModel.asave
+    skip_stale_mirror_in_pipeline = (
+        "atomic asave writes the whole model; no field-level local mirror to corrupt"
+    )
 
     def create_models(self):
         return [

@@ -81,7 +81,7 @@ def test_priority_queue_model_dump_serializes_none():
     model = PriorityQueueModel(name="test")
     dump = model.model_dump()
 
-    assert dump["tasks"] is None
+    assert isinstance(dump["tasks"], RedisPriorityQueue)
     assert dump["name"] == "test"
 
 

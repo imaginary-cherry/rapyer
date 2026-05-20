@@ -25,6 +25,12 @@ INITIAL_CONTENTS: list[tuple[str, float]] = [
 
 class PQActionBase(UpdateActionTestBase, TTLActionTestBase, ABC):
     initial_items: ClassVar[list[tuple[str, float]]] = INITIAL_ITEMS
+    skip_target_field_clobber_check = (
+        "RedisPriorityQueue is a pure Redis proxy; no local state to mutate"
+    )
+    skip_stale_mirror_in_pipeline = (
+        "RedisPriorityQueue is a pure Redis proxy; no local mirror to corrupt"
+    )
 
     def create_models(self):
         return [ComprehensiveTestModel(name="pq_test")]

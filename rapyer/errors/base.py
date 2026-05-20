@@ -10,6 +10,12 @@ class KeyNotFound(RapyerError):
     pass
 
 
+class CorruptedModelError(RapyerError):
+    """Raised when a model is corrupted."""
+
+    pass
+
+
 class RapyerModelDoesntExistError(RapyerError):
     """Raised when a model doesn't exist."""
 
@@ -40,3 +46,7 @@ class DuplicateModelNameError(RapyerError):
     def __init__(self, model_name: str, *args):
         super().__init__(*args)
         self.model_name = model_name
+
+
+class RapyerSerializationError(RapyerError):
+    pass
