@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.3.2]
+
+### ✨ Added
+
+- **`RedisSet` Type**: New special field type backed by a Redis `SET`, providing unordered, unique-member collections stored under `__rapyer_special__:{model_key}:{field_name}`.
+  - Supports generic value types: `tags: RedisSet[str]`, `users: RedisSet[float]`
+  - Sync set methods batched in pipeline: `add`, `discard`, `remove`, `clear`, `update`, `difference_update`, `intersection_update`, `symmetric_difference_update`, plus in-place operators (`|=`, `&=`, `-=`, `^=`)
+  - Async direct operations: `aadd`, `aadd_many`, `aremove`, `apop` (atomic `SPOP`), `aclear`
+  - Async reads: `acontains`, `amembers`, `asize`
+  - Multi-set algebra against other `RedisSet` instances: `aunion`, `aintersect`, `adifference`
+- **`RapyerSerializationError`**: New error raised when a Redis-aware field receives a value it cannot serialize. `RedisPriorityQueue` now raises it when initialized from an unsupported type instead of silently producing an empty queue.
+
+### 🔄 Changed
+
+- **`mark_actions(version=...)` now takes `MarkVersion` enum**: The `version` parameter changed from string literals (`"v1"`/`"v2"`) to the new `MarkVersion` enum (`MarkVersion.V1`/`MarkVersion.V2`). Callers passing string values must migrate.
+- **`MarkVersion.V2` is now the default**: `mark_actions` previously defaulted to `v1` (re-check `Meta.refresh_ttl` against the action group at every call). It now defaults to `MarkVersion.V2` (defer the wrap decision to model class install time and refresh unconditionally at runtime). Built-in Redis types updated accordingly.
+- **`Field(exclude=True)` Fields Skip Redis Conversion**: Fields marked with `exclude=True` are no longer rewritten into Redis-aware annotations and are not registered as Redis fields. Use `exclude=True` to keep a field purely Pydantic-managed and out of the Redis JSON document.
+- **`AtomicRedisModel.adup()` Now copy with redis as source of truth, not local state.
+- **BREAKING change key for special fields**: We fixed the special fields key, this means that models that used Priority Queue in nested model will create a fresh new queue in this version (The PQ is still in Beta)  
+
+
+### 🛠️ Technical Improvements
+
+- **Special Fields Inside Generic Types**: `BaseRedisType` now exposes `contains_sf_field()` and `queue_special_loads_in_pipeline()` hooks so generic Redis containers (e.g., `RedisList[RedisSet[...]]`) participate in the same pipelined load path as top-level special fields. Loads for nested special fields are batched into the same `JSON.MGET` pipeline rather than being fetched separately.
+
+### 🐛 Fixed
+- **Fix multiple special fields in a model**: Fixed a bug that cause key overlap of special fields in the same model.
+
+
 ## [1.3.1]
 
 ### 🐛 Fixed

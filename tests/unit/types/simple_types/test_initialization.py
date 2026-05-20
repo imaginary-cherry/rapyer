@@ -1,7 +1,10 @@
 import pytest
+from pydantic import Field
 
+from rapyer.base import AtomicRedisModel
 from rapyer.types.byte import RedisBytes
 from rapyer.types.datetime import RedisDatetime
+from rapyer.types.float import RedisFloat
 from rapyer.types.integer import RedisInt
 from rapyer.types.string import RedisStr
 from tests.models.simple_types import DatetimeModel, IntModel, StrModel
@@ -146,3 +149,60 @@ async def test_redis_str_model_creation_functionality_sanity():
     assert model.name.key == model.key
     assert model.name.field_path == ".name"
     assert model.name.json_path == "$.name"
+
+
+def test_excluded_numeric_fields_not_converted_to_redis_types_sanity():
+    # Arrange
+    class ModelWithExcludedNumericFields(AtomicRedisModel):
+        name: str = "test"
+        count: int = Field(default=0, exclude=True)
+        ratio: float = Field(default=0.0, exclude=True)
+
+    # Act
+    model = ModelWithExcludedNumericFields(name="my_model", count=42, ratio=3.14)
+
+    # Assert
+    assert not isinstance(model.count, RedisInt)
+    assert not isinstance(model.ratio, RedisFloat)
+    assert type(model.count) is int
+    assert type(model.ratio) is float
+
+
+def test_excluded_int_field_inherited_from_parent_not_converted_to_redis_type_sanity():
+    # Arrange
+    class ParentWithExcludedNumericField(AtomicRedisModel):
+        name: str = "test"
+        count: int = Field(default=0, exclude=True)
+
+    class ChildInheritingExcludedField(ParentWithExcludedNumericField):
+        extra: str = "extra_default"
+
+    # Act
+    model = ChildInheritingExcludedField(name="my_model", count=42, extra="extra_value")
+
+    # Assert
+    assert not isinstance(model.count, RedisInt)
+    assert type(model.count) is int
+
+
+def test_excluded_int_field_in_nested_atomic_redis_model_not_converted_sanity():
+    # Arrange
+    class InnerModelWithExcludedNumericField(AtomicRedisModel):
+        visible: str = "inner_visible"
+        ignored: int = Field(default=0, exclude=True)
+
+    class OuterModelContainingInner(AtomicRedisModel):
+        name: str = "outer"
+        inner: InnerModelWithExcludedNumericField = Field(
+            default_factory=InnerModelWithExcludedNumericField
+        )
+
+    # Act
+    model = OuterModelContainingInner(
+        name="outer_name",
+        inner=InnerModelWithExcludedNumericField(visible="seen", ignored=99),
+    )
+
+    # Assert
+    assert not isinstance(model.inner.ignored, RedisInt)
+    assert type(model.inner.ignored) is int

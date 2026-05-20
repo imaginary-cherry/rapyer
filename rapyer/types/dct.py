@@ -4,12 +4,8 @@ from pydantic_core import core_schema
 
 from rapyer.actions import ActionGroup, mark_actions
 from rapyer.scripts import DICT_POP_SCRIPT_NAME, DICT_POPITEM_SCRIPT_NAME, arun_sha
-from rapyer.types.base import (
-    REDIS_DUMP_FLAG_NAME,
-    SKIP_SENTINEL,
-    GenericRedisType,
-    RedisType,
-)
+from rapyer.types.base import REDIS_DUMP_FLAG_NAME, RedisType
+from rapyer.types.generic import SKIP_SENTINEL, GenericRedisType
 from rapyer.utils.redis import update_keys_in_pipeline
 
 T = TypeVar("T")
@@ -44,7 +40,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
                 self.init_redis_field(f".{key}", value)
         return new_dct
 
-    @mark_actions(ActionGroup.UPDATE, version="v2")
+    @mark_actions(ActionGroup.UPDATE)
     def update(self, m=None, /, **kwargs):
         if self.pipeline:
             m_redis_val = (
@@ -66,13 +62,13 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         kwargs_new_val = self.validate_dict(kwargs)
         return super().update(m_new_val, **kwargs_new_val)
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     def clear(self):
         if self.pipeline:
             self.pipeline_json.set(self.key, self.json_path, {})
         return super().clear()
 
-    @mark_actions(ActionGroup.UPDATE, version="v2")
+    @mark_actions(ActionGroup.UPDATE)
     def __setitem__(self, key, value):
         if self.pipeline:
             serialized = self._adapter.dump_python(
@@ -82,7 +78,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         new_val = self.validate_dict({key: value})[key]
         super().__setitem__(key, new_val)
 
-    @mark_actions(ActionGroup.UPDATE, version="v2")
+    @mark_actions(ActionGroup.UPDATE)
     async def aset_item(self, key, value):
         self.__setitem__(key, value)
 
@@ -95,13 +91,15 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         )
         return result
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     async def adel_item(self, key):
-        super().__delitem__(key)
+        # Tolerant local pop so a stale mirror (key already missing locally)
+        # cannot raise after the Redis delete has been queued / issued.
+        super().pop(key, None)
         result = await self.client_json.delete(self.key, self.json_field_path(key))  # type: ignore[misc]
         return result
 
-    @mark_actions(ActionGroup.UPDATE, version="v2")
+    @mark_actions(ActionGroup.UPDATE)
     async def aupdate(self, **kwargs):
         self.update(**kwargs)
 
@@ -116,7 +114,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
                 update_keys_in_pipeline(pipeline.json(), self.key, **redis_params)
                 await pipeline.execute()
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ)
     async def apop(self, key, default=None):
         result = await arun_sha(
             self.redis,
@@ -136,7 +134,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
             {key: result}, context={REDIS_DUMP_FLAG_NAME: True}
         )[key]
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, ActionGroup.READ)
     async def apopitem(self):
         result = await arun_sha(
             self.redis,
@@ -149,10 +147,9 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
 
         if result is not None:
             redis_key, redis_value = result
-            # Pop the same key from the local dict
-            super().pop(
-                redis_key.decode() if isinstance(redis_key, bytes) else redis_key
-            )
+            # Pop the same key from the local dict — tolerant of a stale
+            key = redis_key.decode() if isinstance(redis_key, bytes) else redis_key
+            super().pop(key, None)
             return self._adapter.validate_python(
                 {redis_key: redis_value}, context={REDIS_DUMP_FLAG_NAME: True}
             )[redis_key]
@@ -160,7 +157,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
             # If Redis is empty but local dict has items, raise an error for consistency
             raise KeyError("popitem(): dictionary is empty")
 
-    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE, version="v2")
+    @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     async def aclear(self):
         self.clear()
         # Clear Redis dict

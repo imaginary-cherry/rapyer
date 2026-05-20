@@ -4,8 +4,7 @@ from typing import TYPE_CHECKING, Optional, get_origin
 from pydantic import BaseModel, PrivateAttr, TypeAdapter
 
 from rapyer.fields.key import RapyerKey
-from rapyer.types.base import BaseRedisType, RedisType
-from rapyer.types.special import SpecialFieldType
+from rapyer.types.base import BaseRedisType
 from rapyer.utils.annotation import DYNAMIC_CLASS_DOC, TypeConverter
 from rapyer.utils.pythonic import safe_issubclass
 
@@ -29,9 +28,11 @@ class RedisConverter(TypeConverter):
     def _build_redis_subclass(self, name: str, base: type, namespace: dict) -> type:
         """Create a per-field BaseRedisType subclass and pass owner_meta into __init_subclass__."""
         kwds = {"owner_meta": self.owner_meta} if self.owner_meta is not None else {}
+        params = getattr(base, "__parameters__", None)
+        gen_base = base[params] if params else base
         return _python_types.new_class(
             name,
-            bases=(base,),
+            bases=(gen_base,),
             kwds=kwds,
             exec_body=lambda ns: ns.update(namespace),
         )
@@ -93,8 +94,7 @@ class RedisConverter(TypeConverter):
             ),
         )
 
-        if not safe_issubclass(redis_type, SpecialFieldType):
-            new_type._adapter = TypeAdapter(new_type)
+        new_type._adapter = TypeAdapter(new_type)
         return new_type
 
     def covert_generic_type(
@@ -119,17 +119,7 @@ class RedisConverter(TypeConverter):
             ),
         )
 
-        if safe_issubclass(redis_type, SpecialFieldType):
-            # Special fields don't store data inline; create a value adapter
-            # for serializing individual items, not the field itself.
-            inner = generic_values[0]
-            original_inner = (
-                inner.original_type if safe_issubclass(inner, BaseRedisType) else inner
-            )
-            new_type._value_adapter = TypeAdapter(original_inner)
-            return new_type
-
         adapter_type = new_type[generic_values]
-        if issubclass(redis_type, RedisType):
+        if issubclass(redis_type, BaseRedisType):
             new_type._adapter = TypeAdapter(adapter_type)
         return new_type[generic_values]

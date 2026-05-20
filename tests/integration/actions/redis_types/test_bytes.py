@@ -1,16 +1,22 @@
 from rapyer.types.byte import RedisBytes
+from tests.integration.actions.sync_action import SyncActionTestBase
 from tests.integration.actions.update import UpdateActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
 
 
-class TestRedisBytesIadd(UpdateActionTestBase):
+class TestRedisBytesIadd(UpdateActionTestBase, SyncActionTestBase):
     covered_method = RedisBytes.__iadd__
+    skip_stale_mirror_in_pipeline = "scalar value is its own mirror; bytes concatenation has no stale-mirror failure mode"
+    skip_sync_native_raises_on_corruption = "bytes concatenation never raises"
 
     def create_models(self):
         return [ComprehensiveTestModel(data=b"hello")]
 
     async def perform_action(self, piped):
         piped.data += b" world"
+
+    def apply_native_action(self, native: bytes) -> bytes:
+        return native + b" world"
 
     async def load_data(self):
         loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
@@ -21,3 +27,9 @@ class TestRedisBytesIadd(UpdateActionTestBase):
 
     def expected_after(self):
         return b"hello world"
+
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        m.data += b"_local_marker"
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> bytes:
+        return bytes(m.data)

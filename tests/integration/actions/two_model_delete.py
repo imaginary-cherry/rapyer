@@ -7,6 +7,10 @@ from tests.models.collection_types import ComprehensiveTestModel
 class TwoModelDeleteBase(TTLActionTestBase, ABC):
     """Two-model delete atomicity: model1 deleted, model2 preserved."""
 
+    skip_stale_mirror_in_pipeline = (
+        "atomic delete; no field-level local mirror to corrupt"
+    )
+
     def create_models(self):
         return [
             ComprehensiveTestModel(tags=["tag1"], name="model1"),

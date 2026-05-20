@@ -17,12 +17,19 @@ from tests.action_groups import (
     NON_ACTION_METHODS,
     PRIVATE_INHERITED_METHODS,
     PRIVATE_METHODS,
+    STALE_MIRROR_GROUP,
+    SYNC_NATIVE_EFFECT_GROUP,
+    SYNC_NATIVE_RAISES_GROUP,
 )
 from tests.coverage_helpers import (
+    COVER_ACTION_EFFECT,
     COVER_NO_CLOBBER,
     COVER_NO_TTL_WHEN_NOT_CONFIGURED,
     COVER_PIPELINE_ATOM,
     COVER_READ_IN_PIPELINE,
+    COVER_STALE_MIRROR_IN_PIPELINE,
+    COVER_SYNC_NATIVE_EFFECT,
+    COVER_SYNC_NATIVE_RAISES_ON_CORRUPTION,
     COVER_TTL_NO_REFRESH,
     COVER_TTL_REFRESH,
     COVER_TTL_UPDATE_ONCE,
@@ -115,21 +122,23 @@ COVERAGE_CHECKS: list[CoverageCheck] = [
         name=COVER_TTL_REFRESH,
         help_text="TTL refresh",
         expected=lambda: _collect_methods(
-            only_async=True, ignore_groups=ActionGroup.DELETE
+            include_sync=False, ignore_groups=ActionGroup.DELETE
         ),
     ),
     CoverageCheck(
         name=COVER_TTL_NO_REFRESH,
         help_text="TTL no-refresh",
         expected=lambda: _collect_methods(
-            only_async=True, ignore_groups=ActionGroup.DELETE | ActionGroup.CREATE
+            include_sync=False,
+            ignore_groups=ActionGroup.DELETE | ActionGroup.CREATE,
         ),
     ),
     CoverageCheck(
         name=COVER_TTL_UPDATE_ONCE,
         help_text="TTL Update once",
         expected=lambda: _collect_methods(
-            only_async=True, ignore_groups=ActionGroup.DELETE | ActionGroup.CREATE
+            include_sync=False,
+            ignore_groups=ActionGroup.DELETE | ActionGroup.CREATE,
         ),
     ),
     CoverageCheck(
@@ -137,15 +146,51 @@ COVERAGE_CHECKS: list[CoverageCheck] = [
         help_text="no-clobber behavior",
         expected=lambda: _collect_methods(
             # Delete and create effect the entire model
-            ignore_groups=(ActionGroup.DELETE | ActionGroup.CREATE)
+            ignore_groups=(ActionGroup.DELETE | ActionGroup.CREATE),
+            require_groups=ActionGroup.UPDATE,
         ),
+    ),
+    CoverageCheck(
+        name=COVER_ACTION_EFFECT,
+        help_text="async action effect on the model in Redis",
+        expected=lambda: _collect_methods(include_sync=False),
     ),
     CoverageCheck(
         name=COVER_NO_TTL_WHEN_NOT_CONFIGURED,
         help_text="No TTL set when ttl is not configured",
         expected=lambda: _collect_methods(
-            only_async=True, require_groups=ActionGroup.CREATE
+            include_sync=False, require_groups=ActionGroup.CREATE
         ),
+    ),
+    CoverageCheck(
+        name=COVER_SYNC_NATIVE_EFFECT,
+        help_text="sync action local effect matches native Python equivalent",
+        expected=lambda: _collect_methods(
+            include_async=False,
+            require_groups=ActionGroup.UPDATE,
+            ignore_groups=ActionGroup.DELETE | ActionGroup.CREATE,
+        )
+        - SYNC_NATIVE_EFFECT_GROUP,
+    ),
+    CoverageCheck(
+        name=COVER_STALE_MIRROR_IN_PIPELINE,
+        help_text="action in pipeline tolerates stale local mirror",
+        expected=lambda: _collect_methods(
+            include_sync=False,
+            include_non_redis_types=False,
+            require_groups=ActionGroup.ERASE,
+        )
+        - STALE_MIRROR_GROUP,
+    ),
+    CoverageCheck(
+        name=COVER_SYNC_NATIVE_RAISES_ON_CORRUPTION,
+        help_text="sync action native raises on corrupted local mirror",
+        expected=lambda: _collect_methods(
+            include_async=False,
+            include_non_redis_types=False,
+            require_groups=ActionGroup.ERASE,
+        )
+        - SYNC_NATIVE_RAISES_GROUP,
     ),
 ]
 
@@ -157,7 +202,7 @@ for sf_class in all_subclasses(SpecialFieldType):
                 name=special_field_cover_marker(sf_class, SPECIAL_FIELD_LIFECYCLE),
                 help_text=f"{sf_class.__name__} special field lifecycle",
                 expected=lambda: _collect_methods(
-                    only_async=True,
+                    include_sync=False,
                     require_groups=ActionGroup.CREATE | ActionGroup.DELETE,
                 ),
             ),
@@ -204,18 +249,26 @@ def pytest_runtest_makereport(item, call):
                 check.covered.update(marker.args)
 
 
-def _iter_class_methods(cls, async_only: bool):
-    members = (
-        inspect.getmembers(cls, predicate=_is_async_callable)
-        if async_only
-        else vars(cls).items()
-    )
+def _iter_class_methods(cls, include_async: bool = True, include_sync: bool = True):
+    # When the caller wants only async methods, use ``inspect.getmembers`` so
+    # inherited async methods are picked up (e.g. RedisStr inheriting asave
+    # from RedisType). For sync-only or mixed, ``vars(cls).items()`` keeps the
+    # iteration to methods defined directly on cls.
+    if include_async and not include_sync:
+        members = inspect.getmembers(cls, predicate=_is_async_callable)
+    else:
+        members = vars(cls).items()
     for name, method in members:
         if isinstance(method, (classmethod, staticmethod)):
             method = method.__func__
         if name.startswith("__") or not callable(method):
             continue
         if cover_tuple(method)[0] != cls.__name__:
+            continue
+        is_async = _is_async_callable(method)
+        if is_async and not include_async:
+            continue
+        if not is_async and not include_sync:
             continue
         yield cls, name, method
 
@@ -249,22 +302,45 @@ def _collect_methods(
     ignore_groups: ActionGroup | None = None,
     require_groups: ActionGroup | None = None,
     ignore_private: bool = True,
-    only_async: bool = False,
+    include_async: bool = True,
+    include_sync: bool = True,
     include_redis_types: bool = True,
+    include_non_redis_types: bool = True,
 ):
-    """Callable methods on BaseRedisType subclasses + async methods on AtomicRedisModel.
+    """Collect (class_name, method_name) tuples for methods that should be
+    subject to a coverage check.
 
-    When only_async=True, BaseRedisType subclasses are also restricted to async.
-    AtomicRedisModel is always async-only since non-async members aren't Redis ops.
-    When require_groups is set, only methods tagged with at least one of those
-    action groups are included.
+    Inclusion flags default to ``True``; set the relevant ones to ``False`` to
+    scope the collection. ``require_groups`` / ``ignore_groups`` work the same
+    way as before — methods that don't carry at least one of the required
+    groups, or carry any ignored group, are filtered out.
+
+    - ``include_async`` / ``include_sync``: include async / sync methods
+      (module-level rapyer functions are treated as async).
+    - ``include_redis_types``: include methods on ``BaseRedisType`` subclasses.
+    - ``include_non_redis_types``: include ``AtomicRedisModel`` methods and
+      module-level rapyer functions.
     """
     candidates = []
     if include_redis_types:
         for cls in all_subclasses(BaseRedisType):
-            candidates.extend(_iter_class_methods(cls, async_only=only_async))
-    candidates.extend(_iter_class_methods(AtomicRedisModel, async_only=only_async))
-    candidates.extend(_iter_module_functions(rapyer))
+            candidates.extend(
+                _iter_class_methods(
+                    cls, include_async=include_async, include_sync=include_sync
+                )
+            )
+    if include_non_redis_types:
+        candidates.extend(
+            _iter_class_methods(
+                AtomicRedisModel,
+                include_async=include_async,
+                include_sync=include_sync,
+            )
+        )
+        # Module-level rapyer functions (afind, ainsert, etc.) are async-only
+        # by convention.
+        if include_async:
+            candidates.extend(_iter_module_functions(rapyer))
 
     result = set()
     for holder, name, method in candidates:

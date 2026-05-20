@@ -5,7 +5,7 @@ import enum
 import functools
 import inspect
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Awaitable, Callable, Iterable, Literal, Optional
+from typing import TYPE_CHECKING, Awaitable, Callable, Iterable, Optional
 
 from rapyer.context import _context_pipe, ensure_pipeline
 
@@ -21,7 +21,7 @@ ACTION_WRAPPER_SENTINEL = "_rapyer_action_wrapper"
 
 @dataclass(frozen=True, slots=True)
 class MarkActionParams:
-    """Params recorded by ``mark_actions(version="v2")`` for later install-time use."""
+    """Params recorded by ``mark_actions(version=MarkVersion.V2)`` for later install-time use."""
 
     combined: "ActionGroup"
     target: "TargetSource"
@@ -58,6 +58,11 @@ class ActionGroup(enum.Flag):
                 continue
             result |= member
         return result
+
+
+class MarkVersion(enum.Enum):
+    V1 = "v1"
+    V2 = "v2"
 
 
 class TargetSource(enum.Enum):
@@ -232,7 +237,7 @@ def mark_actions(
     *groups: ActionGroup,
     target: TargetSource = TargetSource.SELF,
     ignore_refresh: bool = False,
-    version: Literal["v1", "v2"] = "v1",
+    version: MarkVersion = MarkVersion.V2,
 ):
     """Tag a method with action groups for TTL refresh.
 
@@ -251,12 +256,13 @@ def mark_actions(
 
     ``version`` selects when the wrap/no-wrap decision happens:
 
-    - ``"v1"`` (default): wrap at decoration time and re-check ``Meta.refresh_ttl``
-      against the action group at every call (in ``flush_action_targets_v1``).
-    - ``"v2"``: defer the wrap decision to model class install time. If the
-      method is wrapped, runtime refreshes unconditionally (no per-call check).
-      To opt creates into refresh while skipping other actions, set
-      ``Meta.refresh_ttl=ActionGroup.CREATE``.
+    - ``MarkVersion.V1``: wrap at decoration time and re-check
+      ``Meta.refresh_ttl`` against the action group at every call (in
+      ``flush_action_targets_v1``).
+    - ``MarkVersion.V2`` (default): defer the wrap decision to model class
+      install time. If the method is wrapped, runtime refreshes unconditionally
+      (no per-call check). To opt creates into refresh while skipping other
+      actions, set ``Meta.refresh_ttl=ActionGroup.CREATE``.
     """
     combined = ActionGroup(0)
     for g in groups:
@@ -265,7 +271,7 @@ def mark_actions(
     def decorator(method):
         setattr(method, ACTION_GROUPS_ATTR, combined)
 
-        if version == "v2":
+        if version is MarkVersion.V2:
             setattr(
                 method,
                 MARK_ACTION_PARAMS_ATTR,

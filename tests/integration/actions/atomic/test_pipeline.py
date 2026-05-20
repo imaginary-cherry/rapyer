@@ -7,6 +7,7 @@ from tests.models.collection_types import ComprehensiveTestModel
 
 class TestModelApipeline(TTLActionTestBase, UpdateActionTestBase):
     covered_method = AtomicRedisModel.apipeline
+    skip_stale_mirror_in_pipeline = "apipeline is the pipeline mechanism itself; no field-level local mirror to corrupt"
 
     def create_models(self):
         return [ComprehensiveTestModel(name="original")]
@@ -25,11 +26,18 @@ class TestModelApipeline(TTLActionTestBase, UpdateActionTestBase):
     def expected_after(self):
         return "updated"
 
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        m.name += "_local_marker"
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> str:
+        return str(m.name)
+
 
 class TestRapyerFunctionApipeline(TTLActionTestBase, UpdateActionTestBase):
     covered_method = rapyer.apipeline
     skip_ttl_refresh = "Apipeline doesn't refresh ttl on its own as an action"
     skip_special_field_ttl = "Apipeline doesn't refresh ttl on its own as an action"
+    skip_stale_mirror_in_pipeline = "apipeline is the pipeline mechanism itself; no field-level local mirror to corrupt"
 
     def create_models(self):
         return [ComprehensiveTestModel(name="original")]
@@ -47,3 +55,9 @@ class TestRapyerFunctionApipeline(TTLActionTestBase, UpdateActionTestBase):
 
     def expected_after(self):
         return "updated"
+
+    def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
+        m.name += "_local_marker"
+
+    def get_target_field(self, m: ComprehensiveTestModel) -> str:
+        return str(m.name)

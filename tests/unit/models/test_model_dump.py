@@ -2,7 +2,9 @@ from datetime import datetime
 
 import pytest
 import pytest_asyncio
+from pydantic import Field
 
+from rapyer.base import AtomicRedisModel
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME
 from tests.models.collection_types import (
     MixedTypesModel,
@@ -250,7 +252,7 @@ async def test_redis_dump_all_types_with_json_sanity(model_instance, expected_ty
 
 def test_model_dump_with_unsupported_redis_types_sanity():
     # Arrange
-    model = NonRedisDumpableModel(set_field={"1"})
+    model = NonRedisDumpableModel(set_field=frozenset("1"))
 
     # Act
     result = model.model_dump(mode="json")
@@ -494,3 +496,19 @@ async def test_redis_dump_with_per_model_prefer_json_dump_config_sanity():
     assert redis_data["status"] == "inactive"
     assert redis_data["name"] == "my_model"
     assert loaded_model == model
+
+
+def test_redis_dump_skips_field_marked_exclude_true_sanity():
+    # Arrange
+    class ModelWithExcludedField(AtomicRedisModel):
+        name: str = "test"
+        secret: str = Field(default="hidden", exclude=True)
+
+    model = ModelWithExcludedField(name="my_model", secret="should_not_appear")
+
+    # Act
+    redis_data = model.redis_dump()
+
+    # Assert
+    assert "secret" not in redis_data
+    assert redis_data["name"] == "my_model"
