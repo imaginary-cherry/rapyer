@@ -47,7 +47,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "redis[async]>=6.0.0, <7.1.0",
+    "redis>=6.0.0, <7.1.0",
     "pydantic>=2.11.0, <2.13.0",
 ]
 
