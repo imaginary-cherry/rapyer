@@ -48,6 +48,17 @@ class PQContainerModel(AtomicRedisModel):
     outer_name: str = "container"
 
 
+class InnerSameNamePQModel(AtomicRedisModel):
+    label: str = "inner"
+    tasks: RedisPriorityQueue[str] = Field(default_factory=RedisPriorityQueue)
+
+
+class NestedSameNamePQModel(AtomicRedisModel):
+    name: str = "outer"
+    tasks: RedisPriorityQueue[str] = Field(default_factory=RedisPriorityQueue)
+    inner: InnerSameNamePQModel = Field(default_factory=InnerSameNamePQModel)
+
+
 class GenericRedisSetModel(AtomicRedisModel, Generic[T]):
     name: str = "default"
     count: int = 0

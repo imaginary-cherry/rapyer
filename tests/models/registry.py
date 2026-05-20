@@ -82,7 +82,9 @@ from tests.models.special_types import (
     AutoMappedSetModel,
     GenericPriorityQueueModel,
     GenericRedisSetModel,
+    InnerSameNamePQModel,
     MixedSpecialModel,
+    NestedSameNamePQModel,
     OptionalPriorityQueueModel,
     OptionalRedisSetModel,
     PQContainerModel,
@@ -193,6 +195,8 @@ TESTED_REDIS_MODELS = [
     OptionalPriorityQueueModel,
     SubSubPriorityQueueModel,
     PQContainerModel,
+    InnerSameNamePQModel,
+    NestedSameNamePQModel,
     # Special types (redis set)
     GenericRedisSetModel,
     OptionalRedisSetModel,
