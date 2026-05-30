@@ -235,6 +235,15 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
         if members:
             await self.client.sadd(target_special_key, *members)
 
+    def lua_save_commands(self) -> list[list]:
+        cmds: list[list] = [["DEL", self.special_key]]
+        if self:
+            cmds.append(["SADD", self.special_key, *self._dump_members(self)])
+        return cmds
+
+    def lua_load_commands(self) -> list[list]:
+        return [["SMEMBERS", self.special_key]]
+
     @classmethod
     def queue_special_loads_in_pipeline(
         cls, pipe, key: str, plan: list, parent_path: str = ""

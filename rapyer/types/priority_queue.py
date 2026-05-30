@@ -110,6 +110,14 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
             mapping = {member: score for member, score in items}
             await self.client.zadd(target_special_key, mapping)
 
+    def lua_save_commands(self) -> list[list]:
+        return []
+
+    def lua_load_commands(self) -> list[list]:
+        # Queue items are fetched on demand (aitems/apeek/...); no eager load
+        # to match the existing aget/aload behaviour for priority queues.
+        return []
+
     def __eq__(self, other):
         if not isinstance(other, RedisPriorityQueue):
             return False
