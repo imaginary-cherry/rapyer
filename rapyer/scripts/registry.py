@@ -4,6 +4,7 @@ from redis.exceptions import NoScriptError
 
 from rapyer.errors import PersistentNoScriptError, ScriptsNotInitializedError
 from rapyer.scripts.constants import (
+    ATOMIC_GET_OR_CREATE_SCRIPT_NAME,
     DATETIME_ADD_SCRIPT_NAME,
     DICT_POP_SCRIPT_NAME,
     DICT_POPITEM_SCRIPT_NAME,
@@ -37,6 +38,7 @@ SCRIPT_REGISTRY: list[tuple[str, str, str]] = [
     ("datetime", "add", DATETIME_ADD_SCRIPT_NAME),
     ("dict", "pop", DICT_POP_SCRIPT_NAME),
     ("dict", "popitem", DICT_POPITEM_SCRIPT_NAME),
+    ("atomic", "get_or_create", ATOMIC_GET_OR_CREATE_SCRIPT_NAME),
 ]
 
 _REGISTERED_SCRIPT_SHAS: dict[str, str] = {}

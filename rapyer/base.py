@@ -1,6 +1,7 @@
 import base64
 import contextlib
 import functools
+import json
 import logging
 import pickle
 import uuid
@@ -61,8 +62,14 @@ from rapyer.fields.index import IndexAnnotation
 from rapyer.fields.key import KeyAnnotation, RapyerKey
 from rapyer.fields.safe_load import SafeLoadAnnotation
 from rapyer.links import ATOMIC_MODEL_API_REF_LINK, REDIS_SUPPORTED_LINK
-from rapyer.result import DeleteResult, RapyerDeleteResult
+from rapyer.result import (
+    DeleteResult,
+    GetOrCreateResult,
+    GetOrCreateStatus,
+    RapyerDeleteResult,
+)
 from rapyer.scripts import registry as scripts_registry
+from rapyer.scripts.constants import ATOMIC_GET_OR_CREATE_SCRIPT_NAME
 from rapyer.types.base import (
     FAILED_FIELDS_KEY,
     REDIS_DUMP_FLAG_NAME,
@@ -734,6 +741,68 @@ class AtomicRedisModel(BaseModel):
             return models
 
     @classmethod
+    @mark_actions(ActionGroup.CREATE, ActionGroup.READ, target=TargetSource.MANUAL)
+    async def aget_or_create(cls, model: Self) -> "GetOrCreateResult[Self]":
+        if model.is_inner_model():
+            raise RuntimeError("Can only aget_or_create from top level model")
+
+        save_cmds: list[list] = []
+        load_cmds: list[list] = []
+        sf_plan_fnames: list[str] = []
+        for fname in cls._special_field_names:
+            field = getattr(model, fname)
+            if not isinstance(field, SpecialFieldType):
+                continue
+            save_cmds.extend(field.lua_save_commands())
+            field_loads = field.lua_load_commands()
+            if field_loads:
+                # Current SF types contribute at most one load command. If a
+                # future SF type needs multiple, this site must learn how to
+                # group raw results into one value before injection.
+                if len(field_loads) != 1:
+                    raise NotImplementedError(
+                        "aget_or_create does not yet support SF types with "
+                        "multiple lua_load_commands."
+                    )
+                load_cmds.extend(field_loads)
+                sf_plan_fnames.append(fname)
+
+        raw = await scripts_registry.arun_sha(
+            cls.Meta.redis,
+            cls.Meta,
+            ATOMIC_GET_OR_CREATE_SCRIPT_NAME,
+            1,
+            model.key,
+            model.json_path,
+            model.redis_dump_json(),
+            json.dumps(save_cmds),
+            json.dumps(load_cmds),
+        )
+
+        flag = int(raw[0])
+        payload = raw[1]
+        if flag == 1:
+            register_action_target(model, ActionGroup.CREATE)
+            return GetOrCreateResult(value=model, status=GetOrCreateStatus.CREATED)
+
+        if isinstance(payload, bytes):
+            payload = payload.decode()
+        data = json.loads(payload)
+        data = data[0] if isinstance(data, list) else data
+        sf_raw: list = []
+        for item in raw[2:]:
+            if isinstance(item, bytes):
+                item = item.decode()
+            sf_raw.append(json.loads(item))
+        plan = [[fname] for fname in sf_plan_fnames]
+        inject_at_paths(data, plan, sf_raw)
+        existing = cls.create_redis_model(data, model.key)
+        if existing is None:
+            raise CorruptedModelError(f"Cant validate model at {model.key}")
+        register_action_target(existing, ActionGroup.READ)
+        return GetOrCreateResult(value=existing, status=GetOrCreateStatus.FOUND)
+
+    @classmethod
     @mark_actions(ActionGroup.DELETE, ignore_refresh=True)
     async def adelete_by_key(cls, key: str) -> bool:
         key = cls._resolve_key(key)
@@ -1081,6 +1150,16 @@ async def ainsert(*models: Unpack[AtomicRedisModel]) -> list[AtomicRedisModel]:
                 if isinstance(field, SpecialFieldType):
                     await field.asave_special()
     return models
+
+
+@mark_actions(
+    ActionGroup.CREATE,
+    ActionGroup.READ,
+    target=TargetSource.MANUAL,
+    version=MarkVersion.V1,
+)
+async def aget_or_create(model: AtomicRedisModel) -> GetOrCreateResult:
+    return await type(model).aget_or_create(model)
 
 
 @mark_actions(ActionGroup.DELETE, ignore_refresh=True, version=MarkVersion.V1)

@@ -59,6 +59,22 @@ class SpecialFieldType(BaseRedisType, abc.ABC):
         participates in any active pipeline.
         """
 
+    def lua_save_commands(self) -> list[list]:
+        """Return [[CMD, arg1, ...], ...] persisting this field's data.
+
+        Data-form mirror of ``asave_special`` for use inside a single Lua
+        script (e.g. ``aget_or_create``). The script ``unpack``s each entry
+        into ``redis.call``.
+        """
+        raise NotImplementedError
+
+    def lua_load_commands(self) -> list[list]:
+        """Return [[CMD, arg1, ...], ...] reading this field's data.
+
+        Data-form mirror of ``queue_special_loads_in_pipeline``.
+        """
+        raise NotImplementedError
+
     def clone(self):
         return self.__class__()
 
