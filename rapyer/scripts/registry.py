@@ -42,7 +42,6 @@ SCRIPT_REGISTRY: list[tuple[str, str, str]] = [
 ]
 
 _REGISTERED_SCRIPT_SHAS: dict[str, str] = {}
-_LAST_REGISTERED_SCRIPT_SOURCES: dict[str, str] = {}
 
 SF_DISPATCH_PLACEHOLDER = "--[[SF_DISPATCH_TABLE]]"
 
@@ -92,13 +91,14 @@ async def register_scripts(redis_client, is_fakeredis: bool = False) -> None:
 
     variant = FAKEREDIS_VARIANT if is_fakeredis else REDIS_VARIANT
     scripts = _build_scripts(variant)
-    scripts[ATOMIC_GET_OR_CREATE_SCRIPT_NAME] = _inject_sf_dispatch(
-        scripts[ATOMIC_GET_OR_CREATE_SCRIPT_NAME], SpecialFieldType
-    )
+    # Any script in the registry may opt into SF dispatch by including the
+    # ``--[[SF_DISPATCH_TABLE]]`` placeholder; templates without it pass through
+    # unchanged (the helper short-circuits).
+    for name, script_text in scripts.items():
+        scripts[name] = _inject_sf_dispatch(script_text, SpecialFieldType)
     for name, script_text in scripts.items():
         sha = await redis_client.script_load(script_text)
         _REGISTERED_SCRIPT_SHAS[name] = sha
-        _LAST_REGISTERED_SCRIPT_SOURCES[name] = script_text
 
 
 def get_script(script_name: str):
