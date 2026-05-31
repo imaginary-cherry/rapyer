@@ -19,6 +19,7 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
     """
 
     original_type: type = set
+    LUA_SNIPPET_DIR = "redis_set"
 
     def __init__(self, *args, **kwargs):
         set.__init__(self, *args, **kwargs)
@@ -235,14 +236,10 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
         if members:
             await self.client.sadd(target_special_key, *members)
 
-    def lua_save_commands(self) -> list[list]:
-        cmds: list[list] = [["DEL", self.special_key]]
-        if self:
-            cmds.append(["SADD", self.special_key, *self._dump_members(self)])
-        return cmds
-
-    def lua_load_commands(self) -> list[list]:
-        return [["SMEMBERS", self.special_key]]
+    def lua_save_payload(self) -> str:
+        if not self:
+            return ""
+        return json.dumps(self._dump_members(self))
 
     @classmethod
     def queue_special_loads_in_pipeline(

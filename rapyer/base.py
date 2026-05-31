@@ -746,26 +746,22 @@ class AtomicRedisModel(BaseModel):
         if model.is_inner_model():
             raise RuntimeError("Can only aget_or_create from top level model")
 
-        save_cmds: list[list] = []
-        load_cmds: list[list] = []
-        sf_plan_fnames: list[str] = []
+        # Build (type_name, special_key, save_payload) triples for each SF
+        # field. The registered atomic_get_or_create script dispatches on
+        # type_name into the SF_SAVE / SF_LOAD tables that were baked in at
+        # register_scripts() time.
+        sf_args: list[str] = []
+        sf_load_fnames: list[str] = []
         for fname in cls._special_field_names:
             field = getattr(model, fname)
             if not isinstance(field, SpecialFieldType):
                 continue
-            save_cmds.extend(field.lua_save_commands())
-            field_loads = field.lua_load_commands()
-            if field_loads:
-                # Current SF types contribute at most one load command. If a
-                # future SF type needs multiple, this site must learn how to
-                # group raw results into one value before injection.
-                if len(field_loads) != 1:
-                    raise NotImplementedError(
-                        "aget_or_create does not yet support SF types with "
-                        "multiple lua_load_commands."
-                    )
-                load_cmds.extend(field_loads)
-                sf_plan_fnames.append(fname)
+            field_cls = type(field)
+            sf_args.append(field_cls.lua_type_name())
+            sf_args.append(field.special_key)
+            sf_args.append(field.lua_save_payload())
+            if field_cls.has_lua_load_output():
+                sf_load_fnames.append(fname)
 
         raw = await scripts_registry.arun_sha(
             cls.Meta.redis,
@@ -775,8 +771,7 @@ class AtomicRedisModel(BaseModel):
             model.key,
             model.json_path,
             model.redis_dump_json(),
-            json.dumps(save_cmds),
-            json.dumps(load_cmds),
+            *sf_args,
         )
 
         flag = int(raw[0])
@@ -794,7 +789,7 @@ class AtomicRedisModel(BaseModel):
             if isinstance(item, bytes):
                 item = item.decode()
             sf_raw.append(json.loads(item))
-        plan = [[fname] for fname in sf_plan_fnames]
+        plan = [[fname] for fname in sf_load_fnames]
         inject_at_paths(data, plan, sf_raw)
         existing = cls.create_redis_model(data, model.key)
         if existing is None:
