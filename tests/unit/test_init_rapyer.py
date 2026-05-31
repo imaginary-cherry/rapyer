@@ -226,11 +226,7 @@ async def test_init_rapyer_loads_all_scripts_sanity(
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ["script_name", "raw_template"],
-    [
-        [name, text]
-        for name, text in SCRIPTS.items()
-        if SF_DISPATCH_PLACEHOLDER in text
-    ],
+    [[name, text] for name, text in SCRIPTS.items() if SF_DISPATCH_PLACEHOLDER in text],
 )
 async def test_init_rapyer_loads_sf_injected_scripts_sanity(
     mock_redis_client, script_name, raw_template
@@ -243,9 +239,7 @@ async def test_init_rapyer_loads_sf_injected_scripts_sanity(
 
     # Assert
     mock_redis_client.script_load.assert_any_call(expected)
-    loaded_sources = [
-        c.args[0] for c in mock_redis_client.script_load.await_args_list
-    ]
+    loaded_sources = [c.args[0] for c in mock_redis_client.script_load.await_args_list]
     assert raw_template not in loaded_sources
 
 

@@ -4,13 +4,9 @@ import pytest
 
 import rapyer
 from rapyer import GetOrCreateStatus
-from rapyer.scripts.loader import load_script
-from rapyer.scripts.registry import _inject_sf_dispatch
-from rapyer.types.special import SpecialFieldType
 from tests.models.common import UserWithKeyModel
 from tests.models.simple_types import StrModel
 from tests.models.special_types import GenericRedisSetModel, PriorityQueueModel
-
 
 # --- Sanity: no special-field models ---
 

@@ -41,6 +41,7 @@ LUA_SCRIPT_LOCATION = "rapyer.scripts.lua"
 SF_SAVE_FILENAME = "save.lua"
 SF_LOAD_FILENAME = "load.lua"
 
+
 @lru_cache(maxsize=None)
 def _load_template(category: str, name: str) -> str:
     package = f"{LUA_SCRIPT_LOCATION}.{category}"
@@ -55,9 +56,6 @@ def load_script(category: str, name: str, variant: str = REDIS_VARIANT) -> str:
     for placeholder, value in replacements.items():
         result = result.replace(f"--[[{placeholder}]]", value)
     return result
-
-
-
 
 
 @lru_cache(maxsize=None)
