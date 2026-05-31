@@ -38,7 +38,8 @@ end""",
     },
 }
 LUA_SCRIPT_LOCATION = "rapyer.scripts.lua"
-
+SF_SAVE_FILENAME = "save.lua"
+SF_LOAD_FILENAME = "load.lua"
 
 @lru_cache(maxsize=None)
 def _load_template(category: str, name: str) -> str:
@@ -56,8 +57,7 @@ def load_script(category: str, name: str, variant: str = REDIS_VARIANT) -> str:
     return result
 
 
-SF_SAVE_FILENAME = "save.lua"
-SF_LOAD_FILENAME = "load.lua"
+
 
 
 @lru_cache(maxsize=None)
