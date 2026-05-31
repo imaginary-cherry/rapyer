@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.3.3]
+
+### ✨ Added
+
+- **`aget_or_create`**: New atomic "get-or-create" primitive exposed both as a module-level helper (`rapyer.aget_or_create(model)`) and as a classmethod (`MyModel.aget_or_create(model)`). The existence check, write, and any special-field save/load happen inside a single registered Lua script — one server-side round-trip, no TOCTOU race between `aexists` and `asave`.
+  - Returns `GetOrCreateResult(value, status)` where `status` is `GetOrCreateStatus.CREATED` or `GetOrCreateStatus.FOUND`.
+  - Supports models with special fields. Each `SpecialFieldType` now contributes its persistence as data via `lua_save_commands()` / `lua_load_commands()`, which the script dispatches conditionally based on the existence check.
+  - Example:
+    ```python
+    user = UserModel(user_id="abc", name="Alice", email="a@b")
+    result = await rapyer.aget_or_create(user)
+    if result.status == GetOrCreateStatus.CREATED:
+        ...  # newly written
+    else:
+        existing = result.value  # hydrated from Redis
+    ```
+
+### 🛠️ Technical Improvements
+
+- **Forward refs resolved at import time**: `rapyer/__init__.py` now calls `resolve_forward_refs()` after `AtomicRedisModel` is imported, so `RapyerDeleteResult` and `GetOrCreateResult` are usable without first calling `init_rapyer()`.
+
+
 ## [1.3.2]
 
 ### ✨ Added
