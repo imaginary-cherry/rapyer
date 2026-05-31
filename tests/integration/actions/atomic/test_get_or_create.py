@@ -3,6 +3,7 @@ from rapyer import GetOrCreateStatus
 from rapyer.base import AtomicRedisModel
 from tests.integration.actions.create import CreateActionTestBase
 from tests.integration.actions.read import ReadActionTestBase
+from tests.integration.special_types.adapters import SPECIAL_FIELD_ADAPTERS
 from tests.models.collection_types import ComprehensiveTestModel
 
 # ``aget_or_create`` has a dual nature: it CREATEs the model when the key is
@@ -19,6 +20,21 @@ _SKIP_PIPELINE_ATOMICITY = (
 )
 _SKIP_STALE_MIRROR = "atomic aget_or_create; no field-level local mirror to corrupt"
 _SKIP_TTL_NO_REFRESH = "create branch is initial, so TTL is always set"
+
+
+def assert_special_fields_loaded(loaded, expected):
+    """Compare every special field on ``loaded`` against ``expected``.
+
+    Iterates the model's full set of SF fields (asserting there is at least
+    one) so the check covers all special fields the model declares.
+    """
+    sf_fields = type(loaded)._special_field_names
+    assert sf_fields, "model under test should declare special fields"
+    for fname in sf_fields:
+        assert getattr(loaded, fname) == getattr(expected, fname), (
+            f"special field {fname!r} did not load as expected: "
+            f"{getattr(loaded, fname)!r} != {getattr(expected, fname)!r}"
+        )
 
 
 class TestModelAgetOrCreateCreates(CreateActionTestBase):
@@ -38,8 +54,12 @@ class TestModelAgetOrCreateCreates(CreateActionTestBase):
 
     async def setup_data(self):
         # Don't insert: the create branch is the subject, so the key must be
-        # absent when ``perform_action`` runs.
-        return self.create_models()
+        # absent when ``perform_action`` runs. Populate the SF fields BEFORE the
+        # call so each one flows through ``aget_or_create``'s atomic save path.
+        models = self.create_models()
+        for adapter in SPECIAL_FIELD_ADAPTERS:
+            await adapter.populate(models[0])
+        return models
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         return await type(piped).aget_or_create(piped)
@@ -57,6 +77,7 @@ class TestModelAgetOrCreateCreates(CreateActionTestBase):
         assert action_result.status == GetOrCreateStatus.CREATED
         assert action_result.value is self.created_models[0]
         assert loaded == self.expected_after()
+        assert_special_fields_loaded(loaded, action_result.value)
 
 
 class TestModelAgetOrCreateFinds(ReadActionTestBase):
@@ -72,9 +93,23 @@ class TestModelAgetOrCreateFinds(ReadActionTestBase):
     def create_models(self):
         return [ComprehensiveTestModel(name="kept", counter=99)]
 
+    async def setup_data(self):
+        # Insert the key and populate its SF fields so the found model carries
+        # special-field data when ``perform_action`` reads it back.
+        models = self.create_models()
+        async with rapyer.apipeline():
+            await rapyer.ainsert(*models)
+            for adapter in SPECIAL_FIELD_ADAPTERS:
+                await adapter.populate(models[0])
+        return models
+
     async def perform_action(self, piped: ComprehensiveTestModel):
         # ``setup_data`` already inserted the key, so this hits the found branch.
         return await type(piped).aget_or_create(piped)
+
+    async def load_data(self):
+        # A plain get reloads the found model, including its SF fields.
+        return await rapyer.afind_one(self.created_models[0].key)
 
     def expected_before(self):
         return self.created_models[0]
@@ -83,6 +118,7 @@ class TestModelAgetOrCreateFinds(ReadActionTestBase):
         assert action_result.status == GetOrCreateStatus.FOUND
         assert action_result.value.name == self.created_models[0].name
         assert action_result.value.counter == self.created_models[0].counter
+        assert_special_fields_loaded(loaded, action_result.value)
 
 
 class TestRapyerAgetOrCreateCreates(CreateActionTestBase):
@@ -98,7 +134,10 @@ class TestRapyerAgetOrCreateCreates(CreateActionTestBase):
         return [ComprehensiveTestModel(name="mod-fresh", counter=11)]
 
     async def setup_data(self):
-        return self.create_models()
+        models = self.create_models()
+        for adapter in SPECIAL_FIELD_ADAPTERS:
+            await adapter.populate(models[0])
+        return models
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         return await rapyer.aget_or_create(piped)
@@ -116,6 +155,7 @@ class TestRapyerAgetOrCreateCreates(CreateActionTestBase):
         assert action_result.status == GetOrCreateStatus.CREATED
         assert action_result.value is self.created_models[0]
         assert loaded == self.expected_after()
+        assert_special_fields_loaded(loaded, action_result.value)
 
 
 class TestRapyerAgetOrCreateFinds(ReadActionTestBase):
@@ -128,8 +168,22 @@ class TestRapyerAgetOrCreateFinds(ReadActionTestBase):
     def create_models(self):
         return [ComprehensiveTestModel(name="mod-kept", counter=42)]
 
+    async def setup_data(self):
+        # Insert the key and populate its SF fields so the found model carries
+        # special-field data when ``perform_action`` reads it back.
+        models = self.create_models()
+        async with rapyer.apipeline():
+            await rapyer.ainsert(*models)
+            for adapter in SPECIAL_FIELD_ADAPTERS:
+                await adapter.populate(models[0])
+        return models
+
     async def perform_action(self, piped: ComprehensiveTestModel):
         return await rapyer.aget_or_create(piped)
+
+    async def load_data(self):
+        # A plain get reloads the found model, including its SF fields.
+        return await rapyer.afind_one(self.created_models[0].key)
 
     def expected_before(self):
         return self.created_models[0]
@@ -138,3 +192,4 @@ class TestRapyerAgetOrCreateFinds(ReadActionTestBase):
         assert action_result.status == GetOrCreateStatus.FOUND
         assert action_result.value.name == self.created_models[0].name
         assert action_result.value.counter == self.created_models[0].counter
+        assert_special_fields_loaded(loaded, action_result.value)
