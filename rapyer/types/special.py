@@ -67,7 +67,7 @@ class SpecialFieldType(BaseRedisType, abc.ABC):
         """
         The type of scripts for this class for our lua scripts
         """
-        return cls.__name__
+        return cls.LUA_SNIPPET_DIR or cls.__name__
 
     @classmethod
     def lua_save_snippet(cls) -> str:
