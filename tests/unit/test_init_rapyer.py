@@ -8,6 +8,11 @@ from redis.asyncio.client import Redis
 from rapyer.init import init_rapyer, teardown_rapyer
 from rapyer.result import RapyerDeleteResult
 from rapyer.scripts import SCRIPTS
+from rapyer.scripts.registry import (
+    SF_DISPATCH_PLACEHOLDER,
+    _inject_sf_dispatch,
+)
+from rapyer.types.special import SpecialFieldType
 from tests.models.collection_types import IntListModel, ProductListModel, StrListModel
 from tests.models.index_types import IndexTestModel
 from tests.models.simple_types import (
@@ -198,7 +203,15 @@ async def test_init_rapyer_without_prefer_normal_json_dump_keeps_preconfigured_v
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ["script_name", "script_text"],
-    [[name, text] for name, text in SCRIPTS.items()],
+    # Scripts carrying the SF dispatch placeholder are substituted by
+    # `register_scripts` before being uploaded, so their loaded text won't match
+    # the raw template verbatim. They are covered separately by
+    # `test_init_rapyer_loads_sf_injected_scripts_sanity`.
+    [
+        [name, text]
+        for name, text in SCRIPTS.items()
+        if SF_DISPATCH_PLACEHOLDER not in text
+    ],
 )
 async def test_init_rapyer_loads_all_scripts_sanity(
     mock_redis_client, script_name, script_text
@@ -208,6 +221,32 @@ async def test_init_rapyer_loads_all_scripts_sanity(
 
     # Assert
     mock_redis_client.script_load.assert_any_call(script_text)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ["script_name", "raw_template"],
+    [
+        [name, text]
+        for name, text in SCRIPTS.items()
+        if SF_DISPATCH_PLACEHOLDER in text
+    ],
+)
+async def test_init_rapyer_loads_sf_injected_scripts_sanity(
+    mock_redis_client, script_name, raw_template
+):
+    # Arrange
+    expected = _inject_sf_dispatch(raw_template, SpecialFieldType)
+
+    # Act
+    await init_rapyer(mock_redis_client)
+
+    # Assert
+    mock_redis_client.script_load.assert_any_call(expected)
+    loaded_sources = [
+        c.args[0] for c in mock_redis_client.script_load.await_args_list
+    ]
+    assert raw_template not in loaded_sources
 
 
 @pytest.mark.asyncio
