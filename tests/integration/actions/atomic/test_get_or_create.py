@@ -28,12 +28,14 @@ def assert_special_fields_loaded(loaded, expected):
     Iterates the model's full set of SF fields (asserting there is at least
     one) so the check covers all special fields the model declares.
     """
-    sf_fields = type(loaded)._special_field_names
+    sf_fields = SPECIAL_FIELD_ADAPTERS
     assert sf_fields, "model under test should declare special fields"
-    for fname in sf_fields:
-        assert getattr(loaded, fname) == getattr(expected, fname), (
-            f"special field {fname!r} did not load as expected: "
-            f"{getattr(loaded, fname)!r} != {getattr(expected, fname)!r}"
+    for adapter in sf_fields:
+        loaded_val = adapter.get_value(loaded)
+        expected_val = adapter.get_value(expected)
+        assert loaded_val == expected_val, (
+            f"special field {adapter.sf_class.__name__!r} did not load as expected: "
+            f"{loaded_val!r} != {expected_val!r}"
         )
 
 

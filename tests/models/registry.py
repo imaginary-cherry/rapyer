@@ -13,6 +13,7 @@ from tests.models.collection_types import (
     EnumDictModel,
     IntDictModel,
     IntListModel,
+    LabelsContainer,
     ListDictModel,
     ListModel,
     MixedTypesModel,
@@ -129,6 +130,7 @@ TESTED_REDIS_MODELS = [
     MixedTypesModel,
     PipelineTestModel,
     ComprehensiveTestModel,
+    LabelsContainer,
     # Simple types
     IntModel,
     FloatModel,

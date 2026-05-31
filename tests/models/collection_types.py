@@ -127,6 +127,10 @@ class ProductListModel(AtomicRedisModel):
     products: list[Product] = Field(default_factory=list)
 
 
+class LabelsContainer(AtomicRedisModel):
+    labels: RedisSet[str] = Field(default_factory=RedisSet[str])
+
+
 class ComprehensiveTestModel(PipelineActionModel):
     tags: list[str] = Field(default_factory=list)
     metadata: dict[str, str] = Field(default_factory=dict)
@@ -137,7 +141,7 @@ class ComprehensiveTestModel(PipelineActionModel):
     event_time: datetime = Field(default_factory=datetime.now)
     event_timestamp: RedisDatetimeTimestamp = Field(default_factory=datetime.now)
     tasks: RedisPriorityQueue[str] = Field(default_factory=RedisPriorityQueue[str])
-    labels: RedisSet[str] = Field(default_factory=RedisSet[str])
+    container: LabelsContainer = Field(default_factory=LabelsContainer)
 
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=TTL_REFRESH_TEST_SECONDS)
 

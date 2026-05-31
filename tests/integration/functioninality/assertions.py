@@ -36,6 +36,10 @@ async def assert_no_field_at_default(model_instance: AtomicRedisModel):
             assert (
                 value_data != default_data
             ), f"SF field {field_name!r} extracted same data as default"
+        elif isinstance(value, AtomicRedisModel):
+            # Nested container model: recurse so its (possibly special) fields
+            # are checked by value rather than by trivially-distinct identity.
+            await assert_no_field_at_default(value)
         else:
             assert (
                 value != default_value

@@ -26,7 +26,7 @@ async def test_comprehensive_model_asave_aget_roundtrip_all_fields_non_default()
     await model.asave()
     await model.tasks.apush("high", 1.0)
     await model.tasks.apush("medium", 2.0)
-    await model.labels.aadd_many({"red", "green", "blue"})
+    await model.container.labels.aadd_many({"red", "green", "blue"})
 
     # Act
     retrieved = await ComprehensiveTestModel.aget(model.key)
@@ -66,8 +66,8 @@ async def test_comprehensive_model_afind_multiple_keys_all_fields_non_default():
     await model_a.tasks.apush("high", 1.0)
     await model_a.tasks.apush("medium", 2.0)
     await model_b.tasks.apush("urgent", 0.1)
-    await model_a.labels.aadd_many({"red", "green", "blue"})
-    await model_b.labels.aadd_many({"yellow", "orange"})
+    await model_a.container.labels.aadd_many({"red", "green", "blue"})
+    await model_b.container.labels.aadd_many({"yellow", "orange"})
 
     # Act
     retrieved = await rapyer.afind(model_a.key, model_b.key)

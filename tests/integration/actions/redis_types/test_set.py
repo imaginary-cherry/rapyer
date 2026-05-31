@@ -20,18 +20,18 @@ class RedisSetActionBase(UpdateActionTestBase, TTLActionTestBase, ABC):
         return [ComprehensiveTestModel(name="set_test")]
 
     def ttl_keys(self, model: ComprehensiveTestModel):
-        return [model.key, model.labels.special_key]
+        return [model.key, model.container.labels.special_key]
 
     async def setup_data(self):
         models = await super().setup_data()
         for inst in models:
-            await inst.labels.aadd_many(self.initial_items)
+            await inst.container.labels.aadd_many(self.initial_items)
         return models
 
     async def load_data(self):
         return frozenset(
             await self.real_redis_client.smembers(
-                self.created_models[0].labels.special_key
+                self.created_models[0].container.labels.special_key
             )
         )
 
@@ -39,14 +39,14 @@ class RedisSetActionBase(UpdateActionTestBase, TTLActionTestBase, ABC):
         return INITIAL_SERIALIZED
 
     def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
-        m.labels.add("__local_marker__")
+        m.container.labels.add("__local_marker__")
 
     def get_target_field(self, m: ComprehensiveTestModel) -> set:
-        return set(m.labels)
+        return set(m.container.labels)
 
     def corrupt_local_mirror(self, m: ComprehensiveTestModel) -> None:
         # Drop the value most ERASE-style actions in this hierarchy target.
-        set.discard(m.labels, "beta")
+        set.discard(m.container.labels, "beta")
 
 
 class TestSetAadd(RedisSetActionBase):
@@ -54,7 +54,7 @@ class TestSetAadd(RedisSetActionBase):
     skip_stale_mirror_in_pipeline = "APPEND action; native set.add never raises"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        await piped.labels.aadd("delta")
+        await piped.container.labels.aadd("delta")
 
     def expected_after(self):
         return INITIAL_SERIALIZED | {'"delta"'}
@@ -65,7 +65,7 @@ class TestSetAaddMany(RedisSetActionBase):
     skip_stale_mirror_in_pipeline = "APPEND action; native set.update never raises"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        await piped.labels.aadd_many(["delta", "epsilon"])
+        await piped.container.labels.aadd_many(["delta", "epsilon"])
 
     def expected_after(self):
         return INITIAL_SERIALIZED | {'"delta"', '"epsilon"'}
@@ -75,7 +75,7 @@ class TestSetAremove(RedisSetActionBase):
     covered_method = RedisSet.aremove
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        await piped.labels.aremove("beta")
+        await piped.container.labels.aremove("beta")
 
     def expected_after(self):
         return INITIAL_SERIALIZED - {'"beta"'}
@@ -89,7 +89,7 @@ class TestSetAclear(RedisSetActionBase):
         return [model.key]
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        await piped.labels.aclear()
+        await piped.container.labels.aclear()
 
     def expected_after(self):
         return frozenset()
@@ -100,7 +100,7 @@ class TestSetApop(ReadActionTestBase, RedisSetActionBase):
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        return await self.created_models[0].labels.apop()
+        return await self.created_models[0].container.labels.apop()
 
     def expected_before(self):
         return set(INITIAL_ITEMS)
@@ -108,7 +108,7 @@ class TestSetApop(ReadActionTestBase, RedisSetActionBase):
     def corrupt_local_mirror(self, m: ComprehensiveTestModel) -> None:
         # Wipe the local mirror entirely — native set.pop() on an empty set
         # raises KeyError, but apop() still returns a value from Redis.
-        set.clear(m.labels)
+        set.clear(m.container.labels)
 
     def assert_after_pipeline(self, loaded):
         # apop's choice of value is non-deterministic, so just verify Redis
@@ -129,7 +129,7 @@ class TestSetAcontains(ReadActionTestBase, RedisSetActionBase):
     skip_stale_mirror_in_pipeline = "pure read; no local-mirror failure mode"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        return await self.created_models[0].labels.acontains("alpha")
+        return await self.created_models[0].container.labels.acontains("alpha")
 
     def expected_before(self):
         return True
@@ -141,7 +141,7 @@ class TestSetAmembers(ReadActionTestBase, RedisSetActionBase):
     skip_stale_mirror_in_pipeline = "pure read; no local-mirror failure mode"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        return await self.created_models[0].labels.amembers()
+        return await self.created_models[0].container.labels.amembers()
 
     def expected_before(self):
         return set(INITIAL_ITEMS)
@@ -153,7 +153,7 @@ class TestSetAsize(ReadActionTestBase, RedisSetActionBase):
     skip_stale_mirror_in_pipeline = "pure read; no local-mirror failure mode"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        return await self.created_models[0].labels.asize()
+        return await self.created_models[0].container.labels.asize()
 
     def expected_before(self):
         return len(INITIAL_ITEMS)
@@ -179,8 +179,8 @@ class _TwoSetActionBase(ReadActionTestBase, RedisSetActionBase, ABC):
     async def setup_data(self):
         models = self.create_models()
         await rapyer.ainsert(*models)
-        await models[0].labels.aadd_many(self.initial_items)
-        await models[1].labels.aadd_many(self.other_items)
+        await models[0].container.labels.aadd_many(self.initial_items)
+        await models[1].container.labels.aadd_many(self.other_items)
         return models
 
 
@@ -188,7 +188,7 @@ class TestSetAunion(_TwoSetActionBase):
     covered_method = RedisSet.aunion
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        return await self.created_models[0].labels.aunion(self.created_models[1].labels)
+        return await self.created_models[0].container.labels.aunion(self.created_models[1].container.labels)
 
     def expected_before(self):
         return set(self.initial_items) | set(self.other_items)
@@ -198,8 +198,8 @@ class TestSetAintersect(_TwoSetActionBase):
     covered_method = RedisSet.aintersect
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        return await self.created_models[0].labels.aintersect(
-            self.created_models[1].labels
+        return await self.created_models[0].container.labels.aintersect(
+            self.created_models[1].container.labels
         )
 
     def expected_before(self):
@@ -210,8 +210,8 @@ class TestSetAdifference(_TwoSetActionBase):
     covered_method = RedisSet.adifference
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        return await self.created_models[0].labels.adifference(
-            self.created_models[1].labels
+        return await self.created_models[0].container.labels.adifference(
+            self.created_models[1].container.labels
         )
 
     def expected_before(self):
@@ -232,13 +232,13 @@ class RedisSetSyncActionBase(UpdateActionTestBase, SyncActionTestBase, ABC):
     async def setup_data(self):
         models = await super().setup_data()
         for inst in models:
-            await inst.labels.aadd_many(self.initial_items)
+            await inst.container.labels.aadd_many(self.initial_items)
         return models
 
     async def load_data(self):
         return frozenset(
             await self.real_redis_client.smembers(
-                self.created_models[0].labels.special_key
+                self.created_models[0].container.labels.special_key
             )
         )
 
@@ -246,13 +246,13 @@ class RedisSetSyncActionBase(UpdateActionTestBase, SyncActionTestBase, ABC):
         return INITIAL_SERIALIZED
 
     def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
-        m.labels.add("__local_marker__")
+        m.container.labels.add("__local_marker__")
 
     def get_target_field(self, m: ComprehensiveTestModel) -> set:
-        return set(m.labels)
+        return set(m.container.labels)
 
     def corrupt_local_mirror(self, m: ComprehensiveTestModel) -> None:
-        set.discard(m.labels, "beta")
+        set.discard(m.container.labels, "beta")
 
 
 class TestSetAdd(RedisSetSyncActionBase):
@@ -261,7 +261,7 @@ class TestSetAdd(RedisSetSyncActionBase):
     skip_sync_native_raises_on_corruption = "native set.add never raises"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        piped.labels.add("delta")
+        piped.container.labels.add("delta")
 
     def apply_native_action(self, native: set) -> set:
         native.add("delta")
@@ -277,7 +277,7 @@ class TestSetUpdate(RedisSetSyncActionBase):
     skip_sync_native_raises_on_corruption = "native set.update never raises"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        piped.labels.update(["delta", "epsilon"])
+        piped.container.labels.update(["delta", "epsilon"])
 
     def apply_native_action(self, native: set) -> set:
         native.update(["delta", "epsilon"])
@@ -291,7 +291,7 @@ class TestSetRemove(RedisSetSyncActionBase):
     covered_method = RedisSet.remove
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        piped.labels.remove("beta")
+        piped.container.labels.remove("beta")
 
     def apply_native_action(self, native: set) -> set:
         native.remove("beta")
@@ -306,7 +306,7 @@ class TestSetDiscard(RedisSetSyncActionBase):
     skip_sync_native_raises_on_corruption = "native set.discard never raises"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        piped.labels.discard("beta")
+        piped.container.labels.discard("beta")
 
     def apply_native_action(self, native: set) -> set:
         native.discard("beta")
@@ -321,7 +321,7 @@ class TestSetClear(RedisSetSyncActionBase):
     skip_sync_native_raises_on_corruption = "native set.clear is idempotent"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        piped.labels.clear()
+        piped.container.labels.clear()
 
     def apply_native_action(self, native: set) -> set:
         native.clear()
@@ -336,7 +336,7 @@ class TestSetDifferenceUpdate(RedisSetSyncActionBase):
     skip_sync_native_raises_on_corruption = "native set.difference_update never raises"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        piped.labels.difference_update({"alpha"})
+        piped.container.labels.difference_update({"alpha"})
 
     def apply_native_action(self, native: set) -> set:
         native.difference_update({"alpha"})
@@ -353,7 +353,7 @@ class TestSetIntersectionUpdate(RedisSetSyncActionBase):
     )
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        piped.labels.intersection_update({"alpha", "delta"})
+        piped.container.labels.intersection_update({"alpha", "delta"})
 
     def apply_native_action(self, native: set) -> set:
         native.intersection_update({"alpha", "delta"})
@@ -371,7 +371,7 @@ class TestSetSymmetricDifferenceUpdate(RedisSetSyncActionBase):
     )
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        piped.labels.symmetric_difference_update({"alpha", "delta"})
+        piped.container.labels.symmetric_difference_update({"alpha", "delta"})
 
     def apply_native_action(self, native: set) -> set:
         native.symmetric_difference_update({"alpha", "delta"})

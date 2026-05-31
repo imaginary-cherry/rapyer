@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from redis import Redis
 
@@ -34,6 +34,9 @@ class SpecialFieldAdapter(ABC):
         return ttls
 
     @abstractmethod
+    def get_value(self, model: AtomicRedisModel) -> Any: ...
+
+    @abstractmethod
     def additional_ttl_keys(self, model: AtomicRedisModel) -> list[str]: ...
 
     @abstractmethod
@@ -49,6 +52,9 @@ class SpecialFieldAdapter(ABC):
 class PriorityQueueAdapter(SpecialFieldAdapter):
     sf_class = RedisPriorityQueue
     EXPECTED_SIZE = 3
+
+    def get_value(self, model: AtomicRedisModel):
+        return None
 
     def additional_ttl_keys(self, model: ComprehensiveTestModel) -> list[str]:
         return [model.tasks.special_key]
@@ -75,21 +81,24 @@ class RedisSetAdapter(SpecialFieldAdapter):
     sf_class = RedisSet
     EXPECTED_SIZE = 3
 
+    def get_value(self, model: ComprehensiveTestModel) -> set:
+        return model.container.labels
+
     def additional_ttl_keys(self, model: ComprehensiveTestModel) -> list[str]:
-        return [model.labels.special_key]
+        return [model.container.labels.special_key]
 
     async def populate(self, model: ComprehensiveTestModel) -> None:
-        await model.labels.aadd_many(["alpha", "beta", "gamma"])
+        await model.container.labels.aadd_many(["alpha", "beta", "gamma"])
 
     async def assert_data_present_by_key(self, model: ComprehensiveTestModel):
-        sp_key = model.labels.special_key
+        sp_key = model.container.labels.special_key
         size = await self.redis_client.scard(sp_key)
         assert (
             size == self.EXPECTED_SIZE
         ), f"Set key {sp_key} has {size} items; expected {self.EXPECTED_SIZE}"
 
     async def assert_data_absent_by_key(self, model: ComprehensiveTestModel):
-        sp_key = model.labels.special_key
+        sp_key = model.container.labels.special_key
         exists = await self.redis_client.exists(sp_key)
         assert not exists, f"Set key {sp_key} unexpectedly still exists"
 
