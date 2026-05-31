@@ -93,6 +93,15 @@ PRIVATE_INHERITED_METHODS = _group(
     SpecialFieldType.asave_special,
     SpecialFieldType.adelete_special,
     SpecialFieldType.aduplicate_special,
+    # Lua codegen / payload helpers for aget_or_create's server-side SF
+    # dispatch: they build script source and ARGV strings, not Redis round
+    # trips, so they aren't actions subject to pipeline/TTL coverage. Shared
+    # contract across the SF hierarchy (subclasses override several of them).
+    SpecialFieldType.lua_type_name,
+    SpecialFieldType.lua_save_snippet,
+    SpecialFieldType.lua_load_snippet,
+    SpecialFieldType.lua_save_payload,
+    SpecialFieldType.has_lua_load_output,
     RedisPriorityQueue.aremove,
     AtomicRedisModel.redis_schema,
 )
