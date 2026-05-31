@@ -4,7 +4,7 @@ from typing import Any, ClassVar, Optional
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
 
-from rapyer.scripts.loader import load_sf_snippet
+from rapyer.scripts.loader import load_sf_load_snippet, load_sf_save_snippet
 from rapyer.types.base import BaseRedisType
 
 SPECIAL_FIELD_KEY_PREFIX = "__rapyer_special__"
@@ -82,7 +82,7 @@ class SpecialFieldType(BaseRedisType, abc.ABC):
                 f"{cls.__name__} must set LUA_SNIPPET_DIR or override "
                 "lua_save_snippet to participate in aget_or_create."
             )
-        return load_sf_snippet(cls.LUA_SNIPPET_DIR, "save")
+        return load_sf_save_snippet(cls.LUA_SNIPPET_DIR)
 
     @classmethod
     def lua_load_snippet(cls) -> str:
@@ -97,7 +97,7 @@ class SpecialFieldType(BaseRedisType, abc.ABC):
                 f"{cls.__name__} must set LUA_SNIPPET_DIR or override "
                 "lua_load_snippet to participate in aget_or_create."
             )
-        return load_sf_snippet(cls.LUA_SNIPPET_DIR, "load")
+        return load_sf_load_snippet(cls.LUA_SNIPPET_DIR)
 
     def lua_save_payload(self) -> str:
         """Per-instance save data shipped in ``ARGV`` and passed to the

@@ -56,16 +56,19 @@ def load_script(category: str, name: str, variant: str = REDIS_VARIANT) -> str:
     return result
 
 
-@lru_cache(maxsize=None)
-def load_sf_snippet(type_dir: str, op: str) -> str:
-    """Read a SpecialFieldType Lua snippet from
-    ``rapyer/scripts/lua/sf/{type_dir}/{op}.lua``.
+SF_SAVE_FILENAME = "save.lua"
+SF_LOAD_FILENAME = "load.lua"
 
-    The file's contents are a Lua *function literal* like
-    ``function(special_key, payload) ... end`` — substituted into the
-    ``SF_SAVE`` / ``SF_LOAD`` dispatch table of the registered
-    ``atomic_get_or_create`` script at ``register_scripts()`` time. See
-    ``SpecialFieldType.LUA_SNIPPET_DIR``."""
+
+@lru_cache(maxsize=None)
+def _read_sf_file(type_dir: str, filename: str) -> str:
     package = f"{LUA_SCRIPT_LOCATION}.sf.{type_dir}"
-    filename = f"{op}.lua"
     return resources.files(package).joinpath(filename).read_text().rstrip("\n")
+
+
+def load_sf_save_snippet(type_dir: str) -> str:
+    return _read_sf_file(type_dir, SF_SAVE_FILENAME)
+
+
+def load_sf_load_snippet(type_dir: str) -> str:
+    return _read_sf_file(type_dir, SF_LOAD_FILENAME)
