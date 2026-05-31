@@ -39,7 +39,7 @@ class ReadActionTestBase(AsyncActionTestBase, ABC):
         # Act + Assert
         async with rapyer.apipeline():
             actual = await self.perform_action(self.created_models[0])
-            self.assert_action_effect(None, actual)
+            self.assert_action_effect(self.created_models[0], actual)
 
     def __init_subclass__(cls, **kwargs: Any):
         super().__init_subclass__(**kwargs)
