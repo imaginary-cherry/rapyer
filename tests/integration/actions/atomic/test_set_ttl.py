@@ -34,7 +34,7 @@ class TestRapyerAsetTtl(ActionTestBase):
     def expected_before(self):
         return [-1, -1, -1]
 
-    def assert_after_pipeline(self, loaded):
+    async def assert_after_pipeline(self, loaded):
         assert all(0 < ttl <= TTL_SECONDS for ttl in loaded), loaded
 
 
@@ -72,6 +72,6 @@ class TestAsetTtl(ActionTestBase):
         # All TTLs are still -1 (unset) while the pipeline is open.
         return [-1, -1, -1]
 
-    def assert_after_pipeline(self, loaded):
+    async def assert_after_pipeline(self, loaded):
         # After the pipeline commits, each TTL should be positive and bounded by TTL_SECONDS.
         assert all(0 < ttl <= TTL_SECONDS for ttl in loaded), loaded

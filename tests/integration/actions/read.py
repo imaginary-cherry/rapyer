@@ -19,7 +19,7 @@ class ReadActionTestBase(AsyncActionTestBase, ABC):
         differs from the pre-action server value (e.g., for pop semantics)."""
         return self.expected_before()
 
-    def assert_action_effect(self, loaded: Any, action_result: Any):
+    async def assert_action_effect(self, loaded: Any, action_result: Any):
         """
         For read actions, verify the action's return value matches
         ``expected_read_output``. The model state itself is unchanged for pure
@@ -39,7 +39,7 @@ class ReadActionTestBase(AsyncActionTestBase, ABC):
         # Act + Assert
         async with rapyer.apipeline():
             actual = await self.perform_action(self.created_models[0])
-            self.assert_action_effect(self.created_models[0], actual)
+            await self.assert_action_effect(self.created_models[0], actual)
 
     def __init_subclass__(cls, **kwargs: Any):
         super().__init_subclass__(**kwargs)

@@ -110,13 +110,13 @@ class TestSetApop(ReadActionTestBase, RedisSetActionBase):
         # raises KeyError, but apop() still returns a value from Redis.
         set.clear(m.container.labels)
 
-    def assert_after_pipeline(self, loaded):
+    async def assert_after_pipeline(self, loaded):
         # apop's choice of value is non-deterministic, so just verify Redis
         # state shrank by one and remains a subset of the initial items.
         assert len(loaded) == len(INITIAL_ITEMS) - 1
         assert loaded <= INITIAL_SERIALIZED
 
-    def assert_action_effect(self, loaded, action_result):
+    async def assert_action_effect(self, loaded, action_result):
         expected = self.expected_read_output()
         assert (
             action_result in expected

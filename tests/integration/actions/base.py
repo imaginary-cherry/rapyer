@@ -109,7 +109,7 @@ class ActionTestBase(ABC):
     def assert_during_pipeline(self, loaded: Any):
         assert loaded == self.expected_before()
 
-    def assert_after_pipeline(self, loaded: Any):
+    async def assert_after_pipeline(self, loaded: Any):
         expected_after = self.expected_after()
         assert loaded == expected_after, f"Expected {expected_after!r}, got {loaded!r}"
 
@@ -172,7 +172,7 @@ class ActionTestBase(ABC):
 
         # Assert (after pipeline)
         loaded_after = await self.load_data()
-        self.assert_after_pipeline(loaded_after)
+        await self.assert_after_pipeline(loaded_after)
 
     @pytest.mark.asyncio
     async def test_action_in_pipeline_tolerates_stale_local_mirror(self, test_input):
@@ -189,7 +189,7 @@ class ActionTestBase(ABC):
         # Assert — the action still produced the correct Redis state, despite
         # the stale local mirror.
         loaded_after = await self.load_data()
-        self.assert_after_pipeline(loaded_after)
+        await self.assert_after_pipeline(loaded_after)
 
     @classmethod
     def _prepare_action_test(

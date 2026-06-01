@@ -34,5 +34,5 @@ class TestRapyerRefreshTtl(ActionTestBase):
     def assert_during_pipeline(self, loaded):
         assert loaded <= self.reduced_ttl
 
-    def assert_after_pipeline(self, loaded):
+    async def assert_after_pipeline(self, loaded):
         assert self.reduced_ttl < loaded <= TTL_REFRESH_TEST_SECONDS

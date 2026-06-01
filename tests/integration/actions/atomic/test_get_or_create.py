@@ -75,7 +75,7 @@ class TestModelAgetOrCreateCreates(CreateActionTestBase):
     def expected_after(self):
         return self.created_models[0]
 
-    def assert_action_effect(self, loaded, action_result):
+    async def assert_action_effect(self, loaded, action_result):
         assert action_result.status == GetOrCreateStatus.CREATED
         assert action_result.value is self.created_models[0]
         assert loaded == self.expected_after()
@@ -116,7 +116,7 @@ class TestModelAgetOrCreateFinds(ReadActionTestBase):
     def expected_before(self):
         return self.created_models[0]
 
-    def assert_action_effect(self, loaded, action_result):
+    async def assert_action_effect(self, loaded, action_result):
         assert action_result.status == GetOrCreateStatus.FOUND
         assert action_result.value.name == self.created_models[0].name
         assert action_result.value.counter == self.created_models[0].counter
@@ -153,7 +153,7 @@ class TestRapyerAgetOrCreateCreates(CreateActionTestBase):
     def expected_after(self):
         return self.created_models[0]
 
-    def assert_action_effect(self, loaded, action_result):
+    async def assert_action_effect(self, loaded, action_result):
         assert action_result.status == GetOrCreateStatus.CREATED
         assert action_result.value is self.created_models[0]
         assert loaded == self.expected_after()
@@ -190,7 +190,7 @@ class TestRapyerAgetOrCreateFinds(ReadActionTestBase):
     def expected_before(self):
         return self.created_models[0]
 
-    def assert_action_effect(self, loaded, action_result):
+    async def assert_action_effect(self, loaded, action_result):
         assert action_result.status == GetOrCreateStatus.FOUND
         assert action_result.value.name == self.created_models[0].name
         assert action_result.value.counter == self.created_models[0].counter

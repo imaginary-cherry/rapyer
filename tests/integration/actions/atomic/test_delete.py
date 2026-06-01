@@ -88,8 +88,8 @@ class TestRapyerAdeleteMany(AsyncActionTestBase):
     def expected_after(self):
         return 0, 0
 
-    def assert_after_pipeline(self, loaded):
-        super().assert_after_pipeline(loaded)
+    async def assert_after_pipeline(self, loaded):
+        await super().assert_after_pipeline(loaded)
         assert isinstance(self.result, DeleteResult)
         assert self.result.models_deleted == 2
 
