@@ -46,6 +46,12 @@ class SpecialFieldAdapter(ABC):
     @abstractmethod
     async def assert_data_absent_by_key(self, model: AtomicRedisModel): ...
 
+    @abstractmethod
+    async def assert_field_equal(
+        self, actual: SpecialFieldType, expected: SpecialFieldType
+    ) -> None:
+        """Assert two instances of this adapter's special-field type hold equal content."""
+
 
 class PriorityQueueAdapter(SpecialFieldAdapter):
     sf_class = RedisPriorityQueue
@@ -84,6 +90,18 @@ class PriorityQueueAdapter(SpecialFieldAdapter):
             exists = await self.redis_client.exists(sp_key)
             assert not exists, f"PQ key {sp_key} unexpectedly still exists"
 
+    async def assert_field_equal(
+        self, actual: RedisPriorityQueue, expected: RedisPriorityQueue
+    ) -> None:
+        # The queue keeps no in-memory mirror, so compare the items stored in
+        # Redis under each field's special key.
+        actual_items = await actual.aitems()
+        expected_items = await expected.aitems()
+        assert actual_items == expected_items, (
+            f"PQ {actual.special_key} differs from {expected.special_key}: "
+            f"{actual_items!r} != {expected_items!r}"
+        )
+
 
 class RedisSetAdapter(SpecialFieldAdapter):
     sf_class = RedisSet
@@ -106,6 +124,18 @@ class RedisSetAdapter(SpecialFieldAdapter):
         sp_key = model.container.labels.special_key
         exists = await self.redis_client.exists(sp_key)
         assert not exists, f"Set key {sp_key} unexpectedly still exists"
+
+    async def assert_field_equal(
+        self, actual: RedisSet, expected: RedisSet
+    ) -> None:
+        # ``RedisSet`` is a ``set`` subclass with a faithful in-memory mirror,
+        # so compare members directly.
+        actual_members = set(actual)
+        expected_members = set(expected)
+        assert actual_members == expected_members, (
+            f"RedisSet {actual.special_key} differs: "
+            f"{actual_members!r} != {expected_members!r}"
+        )
 
 
 SPECIAL_FIELD_ADAPTERS = [PriorityQueueAdapter(), RedisSetAdapter()]

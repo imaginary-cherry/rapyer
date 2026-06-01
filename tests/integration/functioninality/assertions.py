@@ -2,6 +2,7 @@ from rapyer.base import AtomicRedisModel
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.redis_set import RedisSet
 from rapyer.types.special import SpecialFieldType
+from tests.integration.special_types.adapters import SPECIAL_FIELD_ADAPTERS
 
 
 async def _extract_redis_set(field: RedisSet):
@@ -25,47 +26,29 @@ async def extract_sf_data(field: SpecialFieldType):
     raise NotImplementedError(f"No extractor for SF type {type(field).__name__}")
 
 
-# Special-field types whose contents must be verified against Redis rather than
-# by their in-memory value: their ``__eq__`` is identity/key-scoped (so two
-# content-equal instances under different model keys compare unequal) and/or
-# they hold no local mirror. For now this is only the priority queue.
-REDIS_VERIFIED_SF_TYPES = (RedisPriorityQueue,)
-
-
-async def _assert_sf_equal(
-    path: str, actual: SpecialFieldType, expected: SpecialFieldType
-):
-    assert type(actual) is type(expected), (
-        f"special field {path!r} type differs: "
-        f"{type(actual).__name__} != {type(expected).__name__}"
-    )
-    if isinstance(actual, REDIS_VERIFIED_SF_TYPES):
-        # Compare the actual Redis structure, not the (key-scoped) instances.
-        actual_data = await extract_sf_data(actual)
-        expected_data = await extract_sf_data(expected)
-        assert actual_data == expected_data, (
-            f"redis-backed special field {path!r} differs: "
-            f"{actual_data!r} != {expected_data!r}"
-        )
-    else:
-        assert (
-            actual == expected
-        ), f"special field {path!r} differs: {actual!r} != {expected!r}"
+def _adapter_for_field(field: SpecialFieldType):
+    for adapter in SPECIAL_FIELD_ADAPTERS:
+        if isinstance(field, adapter.sf_class):
+            return adapter
+    raise NotImplementedError(f"No adapter for SF type {type(field).__name__}")
 
 
 async def _assert_special_fields_equal(
-    actual: AtomicRedisModel, expected: AtomicRedisModel, path: str
+    actual: AtomicRedisModel, expected: AtomicRedisModel
 ):
     for field_name in type(actual).model_fields:
         actual_value = getattr(actual, field_name)
         expected_value = getattr(expected, field_name)
-        field_path = f"{path}.{field_name}" if path else field_name
         if isinstance(actual_value, SpecialFieldType):
-            await _assert_sf_equal(field_path, actual_value, expected_value)
+            # Delegate the per-field comparison to its adapter (e.g. the
+            # priority queue checks the values stored in Redis).
+            await _adapter_for_field(actual_value).assert_field_equal(
+                actual_value, expected_value
+            )
         elif isinstance(actual_value, AtomicRedisModel):
             # Nested (contained-SF) model: recurse so its special fields are
             # compared too.
-            await _assert_special_fields_equal(actual_value, expected_value, field_path)
+            await _assert_special_fields_equal(actual_value, expected_value)
 
 
 async def assert_atomic_models_equal(
@@ -79,7 +62,7 @@ async def assert_atomic_models_equal(
         f"JSON payload differs:\n  actual={actual.redis_dump()}\n"
         f"  expected={expected.redis_dump()}"
     )
-    await _assert_special_fields_equal(actual, expected, "")
+    await _assert_special_fields_equal(actual, expected)
 
 
 async def assert_all_round_trip(loaded, originals):
