@@ -4,15 +4,9 @@ import rapyer
 from rapyer.base import AtomicRedisModel
 from tests.integration.actions.async_action import AsyncActionTestBase
 from tests.integration.actions.create import CreateActionTestBase
-from tests.integration.functioninality.assertions import assert_atomic_models_equal
+from tests.integration.functioninality.assertions import assert_all_round_trip
 from tests.integration.special_types.adapters import SPECIAL_FIELD_ADAPTERS
 from tests.models.collection_types import ComprehensiveTestModel
-
-
-async def _assert_all_round_trip(loaded, originals):
-    assert len(loaded) == len(originals)
-    for found, original in zip(loaded, originals):
-        await assert_atomic_models_equal(found, original)
 
 
 class TestModelAinsert(CreateActionTestBase):
@@ -50,10 +44,10 @@ class TestModelAinsert(CreateActionTestBase):
         return []
 
     async def assert_after_pipeline(self, loaded):
-        await _assert_all_round_trip(loaded, self.created_models)
+        await assert_all_round_trip(loaded, self.created_models)
 
     async def assert_action_effect(self, loaded, action_result):
-        await _assert_all_round_trip(loaded, self.created_models)
+        await assert_all_round_trip(loaded, self.created_models)
 
 
 class TestRapyerAinsert(AsyncActionTestBase):
@@ -122,7 +116,7 @@ class TestRapyerFunctionAinsert(CreateActionTestBase):
         return []
 
     async def assert_after_pipeline(self, loaded):
-        await _assert_all_round_trip(loaded, self.created_models)
+        await assert_all_round_trip(loaded, self.created_models)
 
     async def assert_action_effect(self, loaded, action_result):
-        await _assert_all_round_trip(loaded, self.created_models)
+        await assert_all_round_trip(loaded, self.created_models)

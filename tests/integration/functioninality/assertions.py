@@ -84,6 +84,14 @@ async def assert_atomic_models_equal(
     await _assert_special_fields_equal(actual, expected, "")
 
 
+async def assert_all_round_trip(loaded, originals):
+    """Assert ``loaded`` and ``originals`` are equal model-for-model via
+    :func:`assert_atomic_models_equal` (same length, pairwise content equal)."""
+    assert len(loaded) == len(originals)
+    for found, original in zip(loaded, originals):
+        await assert_atomic_models_equal(found, original)
+
+
 async def assert_no_field_at_default(model_instance: AtomicRedisModel):
     default_model = type(model_instance)()
     for field_name in type(model_instance).model_fields:

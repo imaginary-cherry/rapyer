@@ -5,7 +5,10 @@ from rapyer.base import AtomicRedisModel
 from rapyer.types.base import RedisType
 from tests.integration.actions.read import ReadActionTestBase
 from tests.integration.actions.ttl import TTLActionTestBase
-from tests.integration.functioninality.assertions import assert_atomic_models_equal
+from tests.integration.functioninality.assertions import (
+    assert_all_round_trip,
+    assert_atomic_models_equal,
+)
 from tests.integration.special_types.adapters import SPECIAL_FIELD_ADAPTERS
 from tests.models.collection_types import ComprehensiveTestModel
 
@@ -50,9 +53,7 @@ class FullModelFindManyBase(FullModelReadBase, ABC):
         return [self.created_models[0]]
 
     async def assert_action_effect(self, loaded, action_result):
-        assert len(action_result) == len(self.created_models)
-        for found, original in zip(action_result, self.created_models):
-            await assert_atomic_models_equal(found, original)
+        await assert_all_round_trip(action_result, self.created_models)
 
 
 class TestModelAget(FullModelReadBase):
