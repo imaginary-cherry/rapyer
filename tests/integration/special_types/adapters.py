@@ -138,9 +138,7 @@ class RedisSetAdapter(SpecialFieldAdapter):
         exists = await self.redis_client.exists(sp_key)
         assert not exists, f"Set key {sp_key} unexpectedly still exists"
 
-    async def assert_field_equal(
-        self, actual: RedisSet, expected: RedisSet
-    ) -> None:
+    async def assert_field_equal(self, actual: RedisSet, expected: RedisSet):
         # ``RedisSet`` is a ``set`` subclass with a faithful in-memory mirror,
         # so compare members directly.
         actual_members = set(actual)

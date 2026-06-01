@@ -129,9 +129,7 @@ class ProductListModel(AtomicRedisModel):
 
 class SpecialFieldsContainer(AtomicRedisModel):
     labels: RedisSet[str] = Field(default_factory=RedisSet[str])
-    tasks: RedisPriorityQueue[float] = Field(
-        default_factory=RedisPriorityQueue[float]
-    )
+    tasks: RedisPriorityQueue[float] = Field(default_factory=RedisPriorityQueue[float])
 
 
 class ComprehensiveTestModel(PipelineActionModel):
