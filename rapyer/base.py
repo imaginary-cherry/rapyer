@@ -765,7 +765,12 @@ class AtomicRedisModel(BaseModel):
         ]
 
     @classmethod
-    @mark_actions(ActionGroup.CREATE, ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.MANUAL)
+    @mark_actions(
+        ActionGroup.CREATE,
+        ActionGroup.READ,
+        ActionGroup.FETCH,
+        target=TargetSource.MANUAL,
+    )
     async def aget_or_create(cls, model: Self) -> "GetOrCreateResult[Self]":
         if model.is_inner_model():
             raise RuntimeError("Can only aget_or_create from top level model")

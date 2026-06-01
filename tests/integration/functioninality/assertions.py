@@ -48,9 +48,9 @@ async def _assert_sf_equal(
             f"{actual_data!r} != {expected_data!r}"
         )
     else:
-        assert actual == expected, (
-            f"special field {path!r} differs: {actual!r} != {expected!r}"
-        )
+        assert (
+            actual == expected
+        ), f"special field {path!r} differs: {actual!r} != {expected!r}"
 
 
 async def _assert_special_fields_equal(
@@ -65,18 +65,16 @@ async def _assert_special_fields_equal(
         elif isinstance(actual_value, AtomicRedisModel):
             # Nested (contained-SF) model: recurse so its special fields are
             # compared too.
-            await _assert_special_fields_equal(
-                actual_value, expected_value, field_path
-            )
+            await _assert_special_fields_equal(actual_value, expected_value, field_path)
 
 
 async def assert_atomic_models_equal(
     actual: AtomicRedisModel, expected: AtomicRedisModel
 ):
     """Assert two models hold the same content, ignoring identity (key/pk)."""
-    assert type(actual) is type(expected), (
-        f"model type differs: {type(actual).__name__} != {type(expected).__name__}"
-    )
+    assert type(actual) is type(
+        expected
+    ), f"model type differs: {type(actual).__name__} != {type(expected).__name__}"
     assert actual.redis_dump() == expected.redis_dump(), (
         f"JSON payload differs:\n  actual={actual.redis_dump()}\n"
         f"  expected={expected.redis_dump()}"

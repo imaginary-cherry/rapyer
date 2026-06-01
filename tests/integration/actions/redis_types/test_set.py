@@ -159,7 +159,7 @@ class TestSetAsize(ReadActionTestBase, RedisSetActionBase):
         return len(INITIAL_ITEMS)
 
 
-class _TwoSetActionBase(ReadActionTestBase, RedisSetActionBase, ABC):
+class TwoSetActionBase(ReadActionTestBase, RedisSetActionBase, ABC):
     skip_pipeline_atomicity = "action returns a value; can't be deferred in a pipeline"
     skip_stale_mirror_in_pipeline = (
         "multi-set read; server-side only, no local-mirror dependency"
@@ -184,17 +184,19 @@ class _TwoSetActionBase(ReadActionTestBase, RedisSetActionBase, ABC):
         return models
 
 
-class TestSetAunion(_TwoSetActionBase):
+class TestSetAunion(TwoSetActionBase):
     covered_method = RedisSet.aunion
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        return await self.created_models[0].container.labels.aunion(self.created_models[1].container.labels)
+        return await self.created_models[0].container.labels.aunion(
+            self.created_models[1].container.labels
+        )
 
     def expected_before(self):
         return set(self.initial_items) | set(self.other_items)
 
 
-class TestSetAintersect(_TwoSetActionBase):
+class TestSetAintersect(TwoSetActionBase):
     covered_method = RedisSet.aintersect
 
     async def perform_action(self, piped: ComprehensiveTestModel):
@@ -206,7 +208,7 @@ class TestSetAintersect(_TwoSetActionBase):
         return set(self.initial_items) & set(self.other_items)
 
 
-class TestSetAdifference(_TwoSetActionBase):
+class TestSetAdifference(TwoSetActionBase):
     covered_method = RedisSet.adifference
 
     async def perform_action(self, piped: ComprehensiveTestModel):
