@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from redis import Redis
 
+import rapyer
 from rapyer.base import AtomicRedisModel
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.redis_set import RedisSet
@@ -34,9 +35,6 @@ class SpecialFieldAdapter(ABC):
         return ttls
 
     @abstractmethod
-    def get_value(self, model: AtomicRedisModel) -> Any: ...
-
-    @abstractmethod
     def additional_ttl_keys(self, model: AtomicRedisModel) -> list[str]: ...
 
     @abstractmethod
@@ -53,36 +51,43 @@ class PriorityQueueAdapter(SpecialFieldAdapter):
     sf_class = RedisPriorityQueue
     EXPECTED_SIZE = 3
 
-    def get_value(self, model: AtomicRedisModel):
-        return None
+    def _queue_specs(self, model: ComprehensiveTestModel):
+        """Each queue with type-appropriate sample items: the top-level queue
+        holds ``int`` values, the nested one holds ``float`` values."""
+        return [
+            (model.tasks, [(10, 1.0), (20, 2.0), (30, 3.0)]),
+            (model.container.tasks, [(1.5, 1.0), (2.5, 2.0), (3.5, 3.0)]),
+        ]
 
     def additional_ttl_keys(self, model: ComprehensiveTestModel) -> list[str]:
-        return [model.tasks.special_key]
+        return [pq.special_key for pq, _ in self._queue_specs(model)]
 
     async def populate(self, model: ComprehensiveTestModel) -> None:
-        await model.tasks.apush("high", 1.0)
-        await model.tasks.apush("medium", 2.0)
-        await model.tasks.apush("low", 3.0)
+        # Batch the pushes: reuse an open pipeline if the caller already started
+        # one, otherwise open a fresh pipeline so all pushes go in one round-trip.
+        async with rapyer.apipeline(use_existing_pipe=True):
+            for pq, items in self._queue_specs(model):
+                for value, priority in items:
+                    await pq.apush(value, priority)
 
     async def assert_data_present_by_key(self, model: ComprehensiveTestModel):
-        sp_key = model.tasks.special_key
-        size = await self.redis_client.zcard(sp_key)
-        assert (
-            size == self.EXPECTED_SIZE
-        ), f"PQ key {sp_key} has {size} items; expected {self.EXPECTED_SIZE}"
+        for pq, _ in self._queue_specs(model):
+            sp_key = pq.special_key
+            size = await self.redis_client.zcard(sp_key)
+            assert (
+                size == self.EXPECTED_SIZE
+            ), f"PQ key {sp_key} has {size} items; expected {self.EXPECTED_SIZE}"
 
     async def assert_data_absent_by_key(self, model: ComprehensiveTestModel):
-        sp_key = model.tasks.special_key
-        exists = await self.redis_client.exists(sp_key)
-        assert not exists, f"PQ key {sp_key} unexpectedly still exists"
+        for pq, _ in self._queue_specs(model):
+            sp_key = pq.special_key
+            exists = await self.redis_client.exists(sp_key)
+            assert not exists, f"PQ key {sp_key} unexpectedly still exists"
 
 
 class RedisSetAdapter(SpecialFieldAdapter):
     sf_class = RedisSet
     EXPECTED_SIZE = 3
-
-    def get_value(self, model: ComprehensiveTestModel) -> set:
-        return model.container.labels
 
     def additional_ttl_keys(self, model: ComprehensiveTestModel) -> list[str]:
         return [model.container.labels.special_key]
