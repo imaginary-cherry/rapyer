@@ -480,12 +480,13 @@ class AtomicRedisModel(BaseModel):
         async with ensure_pipeline(self.Meta) as pipe:
             for dup in duplicated_models:
                 pipe.copy(self.key, dup.key)
-            for fname in self._special_field_names:
-                source_field = getattr(self, fname)
-                if isinstance(source_field, SpecialFieldType):
-                    for dup in duplicated_models:
-                        target_field = getattr(dup, fname)
-                        await source_field.aduplicate_special(target_field.special_key)
+            for source_field, _ in self._iter_special_fields():
+                field_cls = type(source_field)
+                for dup in duplicated_models:
+                    target_key = field_cls.special_field_key(
+                        dup.key, source_field.field_path
+                    )
+                    await source_field.aduplicate_special(target_key)
         return duplicated_models
 
     def update(self, **kwargs):
