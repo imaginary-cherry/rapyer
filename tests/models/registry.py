@@ -7,6 +7,7 @@ from tests.models.collection_types import (
     BoolDictModel,
     BytesDictModel,
     ComprehensiveTestModel,
+    ComprehensiveTestModelNoTTL,
     DictDictModel,
     DictListModel,
     DictModel,
@@ -130,6 +131,7 @@ TESTED_REDIS_MODELS = [
     MixedTypesModel,
     PipelineTestModel,
     ComprehensiveTestModel,
+    ComprehensiveTestModelNoTTL,
     LabelsContainer,
     # Simple types
     IntModel,
