@@ -6,8 +6,10 @@ from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX, SpecialFieldType
 from tests.models.special_types import (
     MixedSpecialModel,
+    OverriddenSpecialFieldModel,
     PriorityQueueIntModel,
     PriorityQueueModel,
+    SubSubPriorityQueueModel,
 )
 
 
@@ -45,6 +47,19 @@ def test_special_field_names_detected():
     assert "tasks" in PriorityQueueIntModel._special_field_names
     assert "name" not in PriorityQueueModel._special_field_names
     assert "count" not in MixedSpecialModel._special_field_names
+
+
+def test_overridden_special_field_not_special():
+    # override to non-special type must not leave a stale entry
+    assert "tasks" not in OverriddenSpecialFieldModel._special_field_names
+    assert "tasks" not in OverriddenSpecialFieldModel._contain_sf
+    # _all_keys_for_key no longer crashes on the stale name
+    assert OverriddenSpecialFieldModel._all_keys_for_key("X:1") == ["X:1"]
+
+
+def test_inherited_special_field_still_special():
+    # guards against an over-eager fix that prunes inherited fields
+    assert "tasks" in SubSubPriorityQueueModel._special_field_names
 
 
 def test_mixed_redis_dump_excludes_special_fields():

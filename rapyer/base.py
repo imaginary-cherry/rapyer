@@ -365,6 +365,10 @@ class AtomicRedisModel(BaseModel):
         )
         cls._contain_sf = set(getattr(cls, "_contain_sf", set()))
         for field_name, annotation in cls.__annotations__.items():
+            # If the field was redfined, we remove it from list
+            cls._special_field_names.discard(field_name)
+            cls._contain_sf.discard(field_name)
+
             unwrapped = annotation
             while get_origin(unwrapped) is Annotated:
                 unwrapped = get_args(unwrapped)[0]
