@@ -3,7 +3,7 @@ from rapyer import GetOrCreateStatus
 from rapyer.base import AtomicRedisModel
 from tests.integration.actions.create import CreateActionTestBase
 from tests.integration.actions.read import ReadActionTestBase
-from tests.integration.special_types.adapters import SPECIAL_FIELD_ADAPTERS
+from tests.integration.functioninality.assertions import assert_atomic_models_equal
 from tests.models.collection_types import ComprehensiveTestModel
 
 # ``aget_or_create`` has a dual nature: it CREATEs the model when the key is
@@ -20,23 +20,6 @@ _SKIP_PIPELINE_ATOMICITY = (
 )
 _SKIP_STALE_MIRROR = "atomic aget_or_create; no field-level local mirror to corrupt"
 _SKIP_TTL_NO_REFRESH = "create branch is initial, so TTL is always set"
-
-
-def assert_special_fields_loaded(loaded, expected):
-    """Compare every special field on ``loaded`` against ``expected``.
-
-    Iterates the model's full set of SF fields (asserting there is at least
-    one) so the check covers all special fields the model declares.
-    """
-    sf_fields = SPECIAL_FIELD_ADAPTERS
-    assert sf_fields, "model under test should declare special fields"
-    for adapter in sf_fields:
-        loaded_val = adapter.get_value(loaded)
-        expected_val = adapter.get_value(expected)
-        assert loaded_val == expected_val, (
-            f"special field {adapter.sf_class.__name__!r} did not load as expected: "
-            f"{loaded_val!r} != {expected_val!r}"
-        )
 
 
 class TestModelAgetOrCreateCreates(CreateActionTestBase):
@@ -77,7 +60,7 @@ class TestModelAgetOrCreateCreates(CreateActionTestBase):
         assert action_result.status == GetOrCreateStatus.CREATED
         assert action_result.value is self.created_models[0]
         assert loaded == self.expected_after()
-        assert_special_fields_loaded(loaded, action_result.value)
+        await assert_atomic_models_equal(loaded, action_result.value)
 
 
 class TestModelAgetOrCreateFinds(ReadActionTestBase):
@@ -108,7 +91,7 @@ class TestModelAgetOrCreateFinds(ReadActionTestBase):
         assert action_result.status == GetOrCreateStatus.FOUND
         assert action_result.value.name == self.created_models[0].name
         assert action_result.value.counter == self.created_models[0].counter
-        assert_special_fields_loaded(loaded, action_result.value)
+        await assert_atomic_models_equal(loaded, action_result.value)
 
 
 class TestRapyerAgetOrCreateCreates(CreateActionTestBase):
@@ -143,7 +126,7 @@ class TestRapyerAgetOrCreateCreates(CreateActionTestBase):
         assert action_result.status == GetOrCreateStatus.CREATED
         assert action_result.value is self.created_models[0]
         assert loaded == self.expected_after()
-        assert_special_fields_loaded(loaded, action_result.value)
+        await assert_atomic_models_equal(loaded, action_result.value)
 
 
 class TestRapyerAgetOrCreateFinds(ReadActionTestBase):
@@ -170,4 +153,4 @@ class TestRapyerAgetOrCreateFinds(ReadActionTestBase):
         assert action_result.status == GetOrCreateStatus.FOUND
         assert action_result.value.name == self.created_models[0].name
         assert action_result.value.counter == self.created_models[0].counter
-        assert_special_fields_loaded(loaded, action_result.value)
+        await assert_atomic_models_equal(loaded, action_result.value)
