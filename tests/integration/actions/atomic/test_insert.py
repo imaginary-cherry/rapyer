@@ -17,10 +17,10 @@ class TestModelAinsert(CreateActionTestBase):
     )
 
     def create_models(self):
-        # Only the existing model is inserted; the new model is the test subject.
+        # The ``ainsert`` call is the test subject; the SF is assigned in-memory.
         return [
-            ComprehensiveTestModel(name="existing", counter=1, tags=["a"]),
-            ComprehensiveTestModel(name="existing2", counter=2, tags=["b"]),
+            self.build_model(name="existing", counter=1, tags=["a"]),
+            self.build_model(name="existing2", counter=2, tags=["b"]),
         ]
 
     async def setup_data(self):
@@ -88,8 +88,8 @@ class TestRapyerFunctionAinsert(CreateActionTestBase):
 
     def create_models(self):
         return [
-            ComprehensiveTestModel(name="to_insert1", counter=1, tags=["a"]),
-            ComprehensiveTestModel(name="to_insert2", counter=2, tags=["b"]),
+            self.build_model(name="to_insert1", counter=1, tags=["a"]),
+            self.build_model(name="to_insert2", counter=2, tags=["b"]),
         ]
 
     async def setup_data(self):

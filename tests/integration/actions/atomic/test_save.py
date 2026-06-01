@@ -16,7 +16,7 @@ class TestModelAsave(UpdateActionTestBase, CreateActionTestBase):
 
     def create_models(self):
         return [
-            ComprehensiveTestModel(
+            self.build_model(
                 name="original", counter=10, tags=["t1"], metadata={"k": "v"}
             )
         ]

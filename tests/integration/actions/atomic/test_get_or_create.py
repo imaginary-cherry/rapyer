@@ -35,7 +35,7 @@ class TestModelAgetOrCreateCreates(CreateActionTestBase):
     skip_ttl_no_refresh = _SKIP_TTL_NO_REFRESH
 
     def create_models(self):
-        return [ComprehensiveTestModel(name="fresh", counter=7)]
+        return [self.build_model(name="fresh", counter=7)]
 
     async def setup_data(self):
         # Don't insert: the create branch is the subject, so the key must be
@@ -104,7 +104,7 @@ class TestRapyerAgetOrCreateCreates(CreateActionTestBase):
     skip_ttl_no_refresh = _SKIP_TTL_NO_REFRESH
 
     def create_models(self):
-        return [ComprehensiveTestModel(name="mod-fresh", counter=11)]
+        return [self.build_model(name="mod-fresh", counter=11)]
 
     async def setup_data(self):
         models = self.create_models()

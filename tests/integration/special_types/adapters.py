@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from redis import Redis
 
@@ -9,6 +9,8 @@ from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.redis_set import RedisSet
 from rapyer.types.special import SpecialFieldType
 from tests.models.collection_types import ComprehensiveTestModel
+
+SAMPLE_LABELS = {"alpha", "beta", "gamma"}
 
 
 class SpecialFieldAdapter(ABC):
@@ -51,6 +53,14 @@ class SpecialFieldAdapter(ABC):
         self, actual: SpecialFieldType, expected: SpecialFieldType
     ) -> None:
         """Assert two instances of this adapter's special-field type hold equal content."""
+
+    def in_memory_assignments(self) -> list[tuple[tuple[str, ...], Any]]:
+        """``(field-path segments, value)`` pairs to assign on a freshly built
+        model so this special field carries data at construction.
+
+        Empty for SF types that hold no in-memory state (e.g. the pure-proxy
+        priority queue, which can only be populated through Redis)."""
+        return []
 
 
 class PriorityQueueAdapter(SpecialFieldAdapter):
@@ -110,8 +120,11 @@ class RedisSetAdapter(SpecialFieldAdapter):
     def additional_ttl_keys(self, model: ComprehensiveTestModel) -> list[str]:
         return [model.container.labels.special_key]
 
+    def in_memory_assignments(self) -> list[tuple[tuple[str, ...], Any]]:
+        return [(("container", "labels"), set(SAMPLE_LABELS))]
+
     async def populate(self, model: ComprehensiveTestModel) -> None:
-        await model.container.labels.aadd_many(["alpha", "beta", "gamma"])
+        await model.container.labels.aadd_many(SAMPLE_LABELS)
 
     async def assert_data_present_by_key(self, model: ComprehensiveTestModel):
         sp_key = model.container.labels.special_key

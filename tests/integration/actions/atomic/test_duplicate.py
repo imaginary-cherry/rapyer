@@ -20,7 +20,7 @@ class TestRapyerAduplicate(UpdateActionTestBase, CreateActionTestBase):
         return [self.duplicate]
 
     def create_models(self):
-        return [ComprehensiveTestModel(name="original", counter=42, tags=["t1"])]
+        return [self.build_model(name="original", counter=42, tags=["t1"])]
 
     async def setup_for_creation(self):
         return await self.setup_data()
@@ -70,7 +70,7 @@ class TestRapyerAduplicateMany(UpdateActionTestBase, CreateActionTestBase):
         return self.duplicates_lst()
 
     def create_models(self):
-        return [ComprehensiveTestModel(name="original", counter=42, tags=["t1"])]
+        return [self.build_model(name="original", counter=42, tags=["t1"])]
 
     async def setup_for_creation(self):
         return await self.setup_data()
