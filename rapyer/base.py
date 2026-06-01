@@ -453,8 +453,7 @@ class AtomicRedisModel(BaseModel):
             pipeline_json.set(self.key, self.json_path, model_dump)
             for fname in self._special_field_names:
                 field = getattr(self, fname)
-                if isinstance(field, SpecialFieldType):
-                    await field.asave_special()
+                await field.asave_special()
         return self
 
     def redis_dump(self):
@@ -737,8 +736,7 @@ class AtomicRedisModel(BaseModel):
                 pipe_json.set(model.key, model.json_path, model.redis_dump())
                 for fname in cls._special_field_names:
                     field = getattr(model, fname)
-                    if isinstance(field, SpecialFieldType):
-                        await field.asave_special()
+                    await field.asave_special()
             return models
 
     def _iter_special_fields(
@@ -751,8 +749,7 @@ class AtomicRedisModel(BaseModel):
         """
         for fname in self._special_field_names:
             field = getattr(self, fname)
-            if isinstance(field, SpecialFieldType):
-                yield field, (*prefix, fname)
+            yield field, (*prefix, fname)
         for fname in self._contain_sf:
             child = getattr(self, fname)
             if isinstance(child, AtomicRedisModel):
@@ -1173,8 +1170,7 @@ async def ainsert(*models: Unpack[AtomicRedisModel]) -> list[AtomicRedisModel]:
             pipe_json.set(model.key, model.json_path, model.redis_dump())
             for fname in model.__class__._special_field_names:
                 field = getattr(model, fname)
-                if isinstance(field, SpecialFieldType):
-                    await field.asave_special()
+                await field.asave_special()
     return models
 
 
