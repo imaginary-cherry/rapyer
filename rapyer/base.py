@@ -223,20 +223,19 @@ class AtomicRedisModel(BaseModel):
     ):
         # ``should_refresh_for_action`` already short-circuits when Meta.ttl is None.
         if not self.should_refresh_for_action(action):
-            return
+            return None
         await self.refresh_ttl(can_use_pipeline=can_use_pipeline)
+        return None
 
     async def refresh_ttl(self, can_use_pipeline: bool = False):
         """Refresh TTL unconditionally."""
         if self.Meta.ttl is None:
-            return
+            return None
         pipe_context = ensure_pipeline if can_use_pipeline else pipeline_with_execution
         async with pipe_context(self.Meta) as pipe:
-            pipe.expire(self.key, self.Meta.ttl)
-            for fname in self._special_field_names:
-                field = getattr(self, fname)
-                if isinstance(field, SpecialFieldType):
-                    pipe.expire(field.special_key, self.Meta.ttl)
+            for key in self._ttl_keys():
+                pipe.expire(key, self.Meta.ttl)
+            return None
 
     @classmethod
     def redis_schema(cls, redis_name: str = ""):
@@ -526,11 +525,8 @@ class AtomicRedisModel(BaseModel):
         if self.is_inner_model():
             raise RuntimeError("Can only set TTL from top level model")
         async with ensure_pipeline(self.Meta) as pipe:
-            pipe.expire(self.key, ttl)
-            for fname in self._special_field_names:
-                field = getattr(self, fname)
-                if isinstance(field, SpecialFieldType):
-                    pipe.expire(field.special_key, ttl)
+            for key in self._ttl_keys():
+                pipe.expire(key, ttl)
 
     @functools.cached_property
     def all_keys(self) -> list[str]:
@@ -743,12 +739,10 @@ class AtomicRedisModel(BaseModel):
     def _iter_special_fields(
         self, prefix: tuple[str, ...] = ()
     ) -> Iterator[tuple["SpecialFieldType", tuple[str, ...]]]:
-        """Yield ``(sf_instance, path_segments)`` for every special field
+        """
+        Yield ``(sf_instance, path_segments)`` for every special field
         reachable from this model — both directly declared and nested inside
         child models — depth-first.
-
-        The path segments are the dotted field path (e.g.
-        ``("container", "labels")``) used to locate the value in the model dump.
         """
         for fname in self._special_field_names:
             field = getattr(self, fname)
@@ -758,6 +752,16 @@ class AtomicRedisModel(BaseModel):
             child = getattr(self, fname)
             if isinstance(child, AtomicRedisModel):
                 yield from child._iter_special_fields((*prefix, fname))
+
+    def _ttl_keys(self) -> list[str]:
+        """
+        Every Redis key whose TTL tracks this model: the main key plus each
+        special-field key (direct and nested).
+        """
+        return [
+            self.key,
+            *(field.special_key for field, _ in self._iter_special_fields()),
+        ]
 
     @classmethod
     @mark_actions(ActionGroup.CREATE, ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.MANUAL)
