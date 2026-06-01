@@ -2,6 +2,8 @@ import rapyer
 from rapyer.base import AtomicRedisModel
 from tests.integration.actions.create import CreateActionTestBase
 from tests.integration.actions.update import UpdateActionTestBase
+from tests.integration.functioninality.assertions import assert_atomic_models_equal
+from tests.integration.special_types.adapters import SPECIAL_FIELD_ADAPTERS
 from tests.models.collection_types import ComprehensiveTestModel
 
 
@@ -25,7 +27,12 @@ class TestRapyerAduplicate(UpdateActionTestBase, CreateActionTestBase):
     async def setup_for_creation(self):
         models = self.create_models()
         await rapyer.ainsert(*models)
+        for adapter in SPECIAL_FIELD_ADAPTERS:
+            await adapter.populate(models[0])
         return models
+
+    async def setup_data(self):
+        return await self.setup_for_creation()
 
     async def perform_action(self, piped):
         self.duplicate = await self.created_models[0].aduplicate()
@@ -33,19 +40,21 @@ class TestRapyerAduplicate(UpdateActionTestBase, CreateActionTestBase):
     async def load_data(self):
         exists = await self.real_redis_client.exists(self.duplicate.key)
         if not exists:
-            return 0, None, None, None
-        loaded = await ComprehensiveTestModel.aget(self.duplicate.key)
-        return 1, loaded.name, loaded.counter, loaded.tags
+            return None
+        return await ComprehensiveTestModel.aget(self.duplicate.key)
 
     def expected_before(self):
-        return 0, None, None, None
+        return None
 
-    def expected_after(self):
-        return 1, "original", 42, ["t1"]
-
-    def assert_after_pipeline(self, loaded):
-        super().assert_after_pipeline(loaded)
+    async def _assert_is_duplicate(self, loaded):
+        await assert_atomic_models_equal(loaded, self.created_models[0])
         assert self.duplicate.key != self.created_models[0].key
+
+    async def assert_after_pipeline(self, loaded):
+        await self._assert_is_duplicate(loaded)
+
+    async def assert_action_effect(self, loaded, action_result):
+        await self._assert_is_duplicate(loaded)
 
     def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
         m.counter += 7919
@@ -75,7 +84,12 @@ class TestRapyerAduplicateMany(UpdateActionTestBase, CreateActionTestBase):
     async def setup_for_creation(self):
         models = self.create_models()
         await rapyer.ainsert(*models)
+        for adapter in SPECIAL_FIELD_ADAPTERS:
+            await adapter.populate(models[0])
         return models
+
+    async def setup_data(self):
+        return await self.setup_for_creation()
 
     async def perform_action(self, piped):
         self.duplicates = await self.created_models[0].aduplicate_many(3)
@@ -85,22 +99,25 @@ class TestRapyerAduplicateMany(UpdateActionTestBase, CreateActionTestBase):
         for dup in self.duplicates_lst():
             exists = await self.real_redis_client.exists(dup.key)
             if not exists:
-                results.append((0, None, None, None))
+                results.append(None)
                 continue
-            loaded = await ComprehensiveTestModel.aget(dup.key)
-            results.append((1, loaded.name, loaded.counter, loaded.tags))
+            results.append(await ComprehensiveTestModel.aget(dup.key))
         return results
 
     def expected_before(self):
-        return [(0, None, None, None)] * 3
+        return [None] * 3
 
-    def expected_after(self):
-        return [(1, "original", 42, ["t1"])] * 3
-
-    def assert_after_pipeline(self, loaded):
-        super().assert_after_pipeline(loaded)
+    async def _assert_are_duplicates(self, loaded):
+        for model in loaded:
+            await assert_atomic_models_equal(model, self.created_models[0])
         all_pks = [self.created_models[0].pk] + [d.pk for d in self.duplicates_lst()]
         assert len(set(all_pks)) == 4
+
+    async def assert_after_pipeline(self, loaded):
+        await self._assert_are_duplicates(loaded)
+
+    async def assert_action_effect(self, loaded, action_result):
+        await self._assert_are_duplicates(loaded)
 
     def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
         m.counter += 7919
