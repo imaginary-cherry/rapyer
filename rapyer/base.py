@@ -5,7 +5,7 @@ import json
 import logging
 import pickle
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from contextlib import AbstractAsyncContextManager
 from typing import Annotated, Any, ClassVar, Optional, get_args, get_origin
 
@@ -740,28 +740,46 @@ class AtomicRedisModel(BaseModel):
                         await field.asave_special()
             return models
 
+    def _iter_special_fields(
+        self, prefix: tuple[str, ...] = ()
+    ) -> Iterator[tuple["SpecialFieldType", tuple[str, ...]]]:
+        """Yield ``(sf_instance, path_segments)`` for every special field
+        reachable from this model — both directly declared and nested inside
+        child models — depth-first.
+
+        The path segments are the dotted field path (e.g.
+        ``("container", "labels")``) used to locate the value in the model dump.
+        """
+        for fname in self._special_field_names:
+            field = getattr(self, fname)
+            if isinstance(field, SpecialFieldType):
+                yield field, (*prefix, fname)
+        for fname in self._contain_sf:
+            child = getattr(self, fname)
+            if isinstance(child, AtomicRedisModel):
+                yield from child._iter_special_fields((*prefix, fname))
+
     @classmethod
     @mark_actions(ActionGroup.CREATE, ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.MANUAL)
     async def aget_or_create(cls, model: Self) -> "GetOrCreateResult[Self]":
         if model.is_inner_model():
             raise RuntimeError("Can only aget_or_create from top level model")
 
-        # Build (type_name, special_key, save_payload) triples for each SF
-        # field. The registered atomic_get_or_create script dispatches on
-        # type_name into the SF_SAVE / SF_LOAD tables that were baked in at
+        # Build (type_name, special_key, save_payload) triples for every SF
+        # field — direct and nested — in a single pass so the ARGV order and
+        # the load plan stay aligned (the script appends load results
+        # positionally). The registered atomic_get_or_create script dispatches
+        # on type_name into the SF_SAVE / SF_LOAD tables that were baked in at
         # register_scripts() time.
         sf_args: list[str] = []
-        sf_load_fnames: list[str] = []
-        for fname in cls._special_field_names:
-            field = getattr(model, fname)
-            if not isinstance(field, SpecialFieldType):
-                continue
+        load_plan: list[list[str]] = []
+        for field, path in model._iter_special_fields():
             field_cls = type(field)
             sf_args.append(field_cls.lua_type_name())
             sf_args.append(field.special_key)
             sf_args.append(field.lua_save_payload())
             if field_cls.has_lua_load_output():
-                sf_load_fnames.append(fname)
+                load_plan.append(list(path))
 
         raw = await scripts_registry.arun_sha(
             cls.Meta.redis,
@@ -789,8 +807,7 @@ class AtomicRedisModel(BaseModel):
             if isinstance(item, bytes):
                 item = item.decode()
             sf_raw.append(json.loads(item))
-        plan = [[fname] for fname in sf_load_fnames]
-        inject_at_paths(data, plan, sf_raw)
+        inject_at_paths(data, load_plan, sf_raw)
         existing = cls.create_redis_model(data, model.key)
         if existing is None:
             raise CorruptedModelError(f"Cant validate model at {model.key}")
