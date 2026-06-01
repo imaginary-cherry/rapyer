@@ -4,7 +4,15 @@ import rapyer
 from rapyer.base import AtomicRedisModel
 from tests.integration.actions.async_action import AsyncActionTestBase
 from tests.integration.actions.create import CreateActionTestBase
+from tests.integration.functioninality.assertions import assert_atomic_models_equal
+from tests.integration.special_types.adapters import SPECIAL_FIELD_ADAPTERS
 from tests.models.collection_types import ComprehensiveTestModel
+
+
+async def _assert_all_round_trip(loaded, originals):
+    assert len(loaded) == len(originals)
+    for found, original in zip(loaded, originals):
+        await assert_atomic_models_equal(found, original)
 
 
 class TestModelAinsert(CreateActionTestBase):
@@ -18,12 +26,16 @@ class TestModelAinsert(CreateActionTestBase):
     def create_models(self):
         # Only the existing model is inserted; the new model is the test subject.
         return [
-            ComprehensiveTestModel(name="existing"),
-            ComprehensiveTestModel(name="existing2"),
+            ComprehensiveTestModel(name="existing", counter=1, tags=["a"]),
+            ComprehensiveTestModel(name="existing2", counter=2, tags=["b"]),
         ]
 
     async def setup_data(self):
-        return self.create_models()
+        models = self.create_models()
+        for model in models:
+            for adapter in SPECIAL_FIELD_ADAPTERS:
+                await adapter.populate(model)
+        return models
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         await type(self.created_models[0]).ainsert(*self.created_models)
@@ -37,8 +49,11 @@ class TestModelAinsert(CreateActionTestBase):
     def expected_before(self):
         return []
 
-    def expected_after(self):
-        return self.created_models
+    async def assert_after_pipeline(self, loaded):
+        await _assert_all_round_trip(loaded, self.created_models)
+
+    async def assert_action_effect(self, loaded, action_result):
+        await _assert_all_round_trip(loaded, self.created_models)
 
 
 class TestRapyerAinsert(AsyncActionTestBase):
@@ -83,12 +98,16 @@ class TestRapyerFunctionAinsert(CreateActionTestBase):
 
     def create_models(self):
         return [
-            ComprehensiveTestModel(name="to_insert1"),
-            ComprehensiveTestModel(name="to_insert2"),
+            ComprehensiveTestModel(name="to_insert1", counter=1, tags=["a"]),
+            ComprehensiveTestModel(name="to_insert2", counter=2, tags=["b"]),
         ]
 
     async def setup_data(self):
-        return self.create_models()
+        models = self.create_models()
+        for model in models:
+            for adapter in SPECIAL_FIELD_ADAPTERS:
+                await adapter.populate(model)
+        return models
 
     async def perform_action(self, piped):
         await rapyer.ainsert(*self.created_models)
@@ -102,5 +121,8 @@ class TestRapyerFunctionAinsert(CreateActionTestBase):
     def expected_before(self):
         return []
 
-    def expected_after(self):
-        return self.created_models
+    async def assert_after_pipeline(self, loaded):
+        await _assert_all_round_trip(loaded, self.created_models)
+
+    async def assert_action_effect(self, loaded, action_result):
+        await _assert_all_round_trip(loaded, self.created_models)

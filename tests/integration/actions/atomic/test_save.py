@@ -1,9 +1,12 @@
 import pytest
 
+import rapyer
 from rapyer.base import AtomicRedisModel
 from tests.integration.actions.base import ActionTestBase
 from tests.integration.actions.create import CreateActionTestBase
 from tests.integration.actions.update import UpdateActionTestBase
+from tests.integration.functioninality.assertions import assert_atomic_models_equal
+from tests.integration.special_types.adapters import SPECIAL_FIELD_ADAPTERS
 from tests.models.collection_types import ComprehensiveTestModel
 
 
@@ -14,7 +17,18 @@ class TestModelAsave(UpdateActionTestBase, CreateActionTestBase):
     )
 
     def create_models(self):
-        return [ComprehensiveTestModel(name="original", counter=10)]
+        return [
+            ComprehensiveTestModel(
+                name="original", counter=10, tags=["t1"], metadata={"k": "v"}
+            )
+        ]
+
+    async def setup_data(self):
+        models = self.create_models()
+        await rapyer.ainsert(*models)
+        for adapter in SPECIAL_FIELD_ADAPTERS:
+            await adapter.populate(models[0])
+        return models
 
     async def perform_action(self, piped: ComprehensiveTestModel) -> None:
         piped.name = "updated"
@@ -22,14 +36,19 @@ class TestModelAsave(UpdateActionTestBase, CreateActionTestBase):
         await piped.asave()
 
     async def load_data(self):
-        loaded = await ComprehensiveTestModel.aget(self.created_models[0].key)
-        return loaded.name, loaded.counter
+        return await ComprehensiveTestModel.aget(self.created_models[0].key)
 
-    def expected_before(self):
-        return "original", 10
+    def assert_during_pipeline(self, loaded):
+        # asave is deferred inside the pipeline: the persisted model is still
+        # at its pre-action values.
+        assert loaded.name == "original" and loaded.counter == 10
 
-    def expected_after(self):
-        return "updated", 99
+    async def assert_after_pipeline(self, loaded):
+        # The whole model (every field, special fields included) round-trips.
+        await assert_atomic_models_equal(loaded, self.created_models[0])
+
+    async def assert_action_effect(self, loaded, action_result):
+        await assert_atomic_models_equal(loaded, self.created_models[0])
 
     @pytest.mark.asyncio
     async def test_no_clobber_effect_when_outside_of_pipeline(self, test_input):
