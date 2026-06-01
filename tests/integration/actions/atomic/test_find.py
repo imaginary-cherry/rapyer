@@ -9,7 +9,6 @@ from tests.integration.functioninality.assertions import (
     assert_all_round_trip,
     assert_atomic_models_equal,
 )
-from tests.integration.special_types.adapters import SPECIAL_FIELD_ADAPTERS
 from tests.models.collection_types import ComprehensiveTestModel
 
 
@@ -31,13 +30,6 @@ class FullModelReadBase(ReadActionTestBase, TTLActionTestBase, ABC):
                 name="test", counter=1, tags=["t1"], metadata={"k": "v"}
             )
         ]
-
-    async def setup_data(self):
-        models = self.create_models()
-        await rapyer.ainsert(*models)
-        for adapter in SPECIAL_FIELD_ADAPTERS:
-            await adapter.populate(models[0])
-        return models
 
     def expected_before(self):
         return self.created_models[0]

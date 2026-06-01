@@ -74,9 +74,13 @@ class ActionTestBase(ABC):
         """
 
     async def setup_data(self) -> list[PipelineActionModel]:
-        """Default: build models via :meth:`create_models` and insert them."""
+        """
+        Default: build models via :meth:`create_models`, insert them, and populate their special fields.
+        """
         models = self.create_models()
-        await rapyer.ainsert(*models)
+        async with rapyer.apipeline():
+            await rapyer.ainsert(*models)
+            await self.populate_special_fields(*models)
         return models
 
     @abstractmethod
@@ -112,6 +116,12 @@ class ActionTestBase(ABC):
     async def assert_after_pipeline(self, loaded: Any):
         expected_after = self.expected_after()
         assert loaded == expected_after, f"Expected {expected_after!r}, got {loaded!r}"
+
+    async def populate_special_fields(self, *models: AtomicRedisModel) -> None:
+        """Populate every special field (via each adapter) on each model."""
+        for model in models:
+            for adapter in SPECIAL_FIELD_ADAPTERS:
+                await adapter.populate(model)
 
     async def create_sp_models(
         self, adapter: SpecialFieldAdapter

@@ -1,12 +1,10 @@
 import pytest
 
-import rapyer
 from rapyer.base import AtomicRedisModel
 from tests.integration.actions.base import ActionTestBase
 from tests.integration.actions.create import CreateActionTestBase
 from tests.integration.actions.update import UpdateActionTestBase
 from tests.integration.functioninality.assertions import assert_atomic_models_equal
-from tests.integration.special_types.adapters import SPECIAL_FIELD_ADAPTERS
 from tests.models.collection_types import ComprehensiveTestModel
 
 
@@ -22,13 +20,6 @@ class TestModelAsave(UpdateActionTestBase, CreateActionTestBase):
                 name="original", counter=10, tags=["t1"], metadata={"k": "v"}
             )
         ]
-
-    async def setup_data(self):
-        models = self.create_models()
-        await rapyer.ainsert(*models)
-        for adapter in SPECIAL_FIELD_ADAPTERS:
-            await adapter.populate(models[0])
-        return models
 
     async def perform_action(self, piped: ComprehensiveTestModel) -> None:
         piped.name = "updated"

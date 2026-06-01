@@ -5,7 +5,6 @@ from rapyer.base import AtomicRedisModel
 from tests.integration.actions.async_action import AsyncActionTestBase
 from tests.integration.actions.create import CreateActionTestBase
 from tests.integration.functioninality.assertions import assert_all_round_trip
-from tests.integration.special_types.adapters import SPECIAL_FIELD_ADAPTERS
 from tests.models.collection_types import ComprehensiveTestModel
 
 
@@ -26,9 +25,6 @@ class TestModelAinsert(CreateActionTestBase):
 
     async def setup_data(self):
         models = self.create_models()
-        for model in models:
-            for adapter in SPECIAL_FIELD_ADAPTERS:
-                await adapter.populate(model)
         return models
 
     async def perform_action(self, piped: ComprehensiveTestModel):
@@ -98,9 +94,6 @@ class TestRapyerFunctionAinsert(CreateActionTestBase):
 
     async def setup_data(self):
         models = self.create_models()
-        for model in models:
-            for adapter in SPECIAL_FIELD_ADAPTERS:
-                await adapter.populate(model)
         return models
 
     async def perform_action(self, piped):

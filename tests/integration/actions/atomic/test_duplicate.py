@@ -1,9 +1,7 @@
-import rapyer
 from rapyer.base import AtomicRedisModel
 from tests.integration.actions.create import CreateActionTestBase
 from tests.integration.actions.update import UpdateActionTestBase
 from tests.integration.functioninality.assertions import assert_atomic_models_equal
-from tests.integration.special_types.adapters import SPECIAL_FIELD_ADAPTERS
 from tests.models.collection_types import ComprehensiveTestModel
 
 
@@ -25,14 +23,7 @@ class TestRapyerAduplicate(UpdateActionTestBase, CreateActionTestBase):
         return [ComprehensiveTestModel(name="original", counter=42, tags=["t1"])]
 
     async def setup_for_creation(self):
-        models = self.create_models()
-        await rapyer.ainsert(*models)
-        for adapter in SPECIAL_FIELD_ADAPTERS:
-            await adapter.populate(models[0])
-        return models
-
-    async def setup_data(self):
-        return await self.setup_for_creation()
+        return await self.setup_data()
 
     async def perform_action(self, piped):
         self.duplicate = await self.created_models[0].aduplicate()
@@ -82,14 +73,7 @@ class TestRapyerAduplicateMany(UpdateActionTestBase, CreateActionTestBase):
         return [ComprehensiveTestModel(name="original", counter=42, tags=["t1"])]
 
     async def setup_for_creation(self):
-        models = self.create_models()
-        await rapyer.ainsert(*models)
-        for adapter in SPECIAL_FIELD_ADAPTERS:
-            await adapter.populate(models[0])
-        return models
-
-    async def setup_data(self):
-        return await self.setup_for_creation()
+        return await self.setup_data()
 
     async def perform_action(self, piped):
         self.duplicates = await self.created_models[0].aduplicate_many(3)

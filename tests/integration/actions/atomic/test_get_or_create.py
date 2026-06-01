@@ -59,8 +59,6 @@ class TestModelAgetOrCreateCreates(CreateActionTestBase):
         # absent when ``perform_action`` runs. Populate the SF fields BEFORE the
         # call so each one flows through ``aget_or_create``'s atomic save path.
         models = self.create_models()
-        for adapter in SPECIAL_FIELD_ADAPTERS:
-            await adapter.populate(models[0])
         return models
 
     async def perform_action(self, piped: ComprehensiveTestModel):
@@ -95,16 +93,6 @@ class TestModelAgetOrCreateFinds(ReadActionTestBase):
     def create_models(self):
         return [ComprehensiveTestModel(name="kept", counter=99)]
 
-    async def setup_data(self):
-        # Insert the key and populate its SF fields so the found model carries
-        # special-field data when ``perform_action`` reads it back.
-        models = self.create_models()
-        async with rapyer.apipeline():
-            await rapyer.ainsert(*models)
-            for adapter in SPECIAL_FIELD_ADAPTERS:
-                await adapter.populate(models[0])
-        return models
-
     async def perform_action(self, piped: ComprehensiveTestModel):
         # ``setup_data`` already inserted the key, so this hits the found branch.
         return await type(piped).aget_or_create(piped)
@@ -137,8 +125,6 @@ class TestRapyerAgetOrCreateCreates(CreateActionTestBase):
 
     async def setup_data(self):
         models = self.create_models()
-        for adapter in SPECIAL_FIELD_ADAPTERS:
-            await adapter.populate(models[0])
         return models
 
     async def perform_action(self, piped: ComprehensiveTestModel):
@@ -169,16 +155,6 @@ class TestRapyerAgetOrCreateFinds(ReadActionTestBase):
 
     def create_models(self):
         return [ComprehensiveTestModel(name="mod-kept", counter=42)]
-
-    async def setup_data(self):
-        # Insert the key and populate its SF fields so the found model carries
-        # special-field data when ``perform_action`` reads it back.
-        models = self.create_models()
-        async with rapyer.apipeline():
-            await rapyer.ainsert(*models)
-            for adapter in SPECIAL_FIELD_ADAPTERS:
-                await adapter.populate(models[0])
-        return models
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         return await rapyer.aget_or_create(piped)
