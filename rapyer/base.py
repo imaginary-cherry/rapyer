@@ -451,8 +451,7 @@ class AtomicRedisModel(BaseModel):
         async with ensure_pipeline(self.Meta):
             pipeline_json = get_pipe_json()
             pipeline_json.set(self.key, self.json_path, model_dump)
-            for fname in self._special_field_names:
-                field = getattr(self, fname)
+            for field, _ in self._iter_special_fields():
                 await field.asave_special()
         return self
 
@@ -734,8 +733,7 @@ class AtomicRedisModel(BaseModel):
             pipe_json = get_pipe_json()
             for model in models:
                 pipe_json.set(model.key, model.json_path, model.redis_dump())
-                for fname in cls._special_field_names:
-                    field = getattr(model, fname)
+                for field, _ in model._iter_special_fields():
                     await field.asave_special()
             return models
 
@@ -1168,8 +1166,7 @@ async def ainsert(*models: Unpack[AtomicRedisModel]) -> list[AtomicRedisModel]:
         for model in models:
             register_action_target(model, ActionGroup.UPDATE)
             pipe_json.set(model.key, model.json_path, model.redis_dump())
-            for fname in model.__class__._special_field_names:
-                field = getattr(model, fname)
+            for field, _ in model._iter_special_fields():
                 await field.asave_special()
     return models
 
