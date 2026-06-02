@@ -11,7 +11,7 @@
 - **Nested special fields persisted across all actions**: `asave`, `aduplicate`, `ainsert`, batch creation, and `aget_or_create` now recurse into child models and persist their special fields. Previously only special fields declared directly on the top-level model were saved/copied; special fields nested inside a sub-model were silently dropped.
 - **TTL tracks nested special-field keys**: `refresh_ttl`, `refresh_ttl_if_needed`, and `aset_ttl` now expire every special-field key reachable from the model — including those on nested sub-models — instead of only top-level ones.
 - **TTL refresh resolves to the root model**: Actions triggered through a nested model or special field now walk back to the root aggregate that owns the Redis key and `Meta.ttl`, so TTL is refreshed on the correct key.
-- **Inherited speical class field override**: Fixed a bug that cause a field to be classifed as speical field even when it was overriden in a subclas
+- **Inherited special class field override**: Fixed a bug that caused a field to be classified as a special field even when it was overridden in a subclass
 
 ### 🛠️ Technical Improvements
 
