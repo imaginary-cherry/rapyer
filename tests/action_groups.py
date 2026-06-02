@@ -56,6 +56,10 @@ PRIVATE_METHODS = _group(
     AtomicRedisModel._all_keys_for_key,
     AtomicRedisModel._iter_expanded_filter_batches,
     AtomicRedisModel._resolve_key,
+    # Pure in-memory traversal / key enumeration for special fields — no
+    # Redis round trips, so pipeline/TTL coverage doesn't apply.
+    AtomicRedisModel._iter_special_fields,
+    AtomicRedisModel._ttl_keys,
     AtomicRedisModel.class_key_initials,
     AtomicRedisModel.index_name,
     AtomicRedisModel.create_expressions,
