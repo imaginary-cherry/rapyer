@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.3.3]
+
+### ✨ Added
+
+- **`aget_or_create`**: New atomic "get-or-create" primitive exposed both as a module-level helper (`rapyer.aget_or_create(model)`) and as a classmethod (`MyModel.aget_or_create(model)`). The existence check, write, and any special-field save/load happen inside a single registered Lua script — one server-side round-trip, no TOCTOU race between `aexists` and `asave`. Special fields nested inside child models are handled in the same atomic dispatch, and the found branch now also refreshes TTL (the call participates in the `FETCH` action group).
+
+### 🐛 Fixed
+
+- **Nested special fields persisted across all actions**: `asave`, `aduplicate`, `ainsert`, batch creation, and `aget_or_create` now recurse into child models and persist their special fields. Previously only special fields declared directly on the top-level model were saved/copied; special fields nested inside a sub-model were silently dropped.
+- **TTL tracks nested special-field keys**: `refresh_ttl`, `refresh_ttl_if_needed`, and `aset_ttl` now expire every special-field key reachable from the model — including those on nested sub-models — instead of only top-level ones.
+- **TTL refresh resolves to the root model**: Actions triggered through a nested model or special field now walk back to the root aggregate that owns the Redis key and `Meta.ttl`, so TTL is refreshed on the correct key.
+- **Inherited special class field override**: Fixed a bug that caused a field to be classified as a special field even when it was overridden in a subclass
+
+### 🛠️ Technical Improvements
+
+- **Forward refs resolved at import time**: `rapyer/__init__.py` now calls `resolve_forward_refs()` after `AtomicRedisModel` is imported, so `RapyerDeleteResult` and `GetOrCreateResult` are usable without first calling `init_rapyer()`.
+
+
 ## [1.3.2]
 
 ### ✨ Added

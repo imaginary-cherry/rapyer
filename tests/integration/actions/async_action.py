@@ -18,7 +18,7 @@ class AsyncActionTestBase(ActionTestBase, ABC):
 
     skip_action_effect: ClassVar[str | None] = None
 
-    def assert_action_effect(self, loaded: Any, action_result: Any):
+    async def assert_action_effect(self, loaded: Any, action_result: Any):
         expected_after = self.expected_after()
         assert loaded == expected_after, f"Expected {expected_after!r}, got {loaded!r}"
 
@@ -33,7 +33,7 @@ class AsyncActionTestBase(ActionTestBase, ABC):
 
         # Assert
         loaded = await self.load_data()
-        self.assert_action_effect(loaded, action_result)
+        await self.assert_action_effect(loaded, action_result)
 
     def __init_subclass__(cls, **kwargs: Any):
         super().__init_subclass__(**kwargs)

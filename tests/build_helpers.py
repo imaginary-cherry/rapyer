@@ -20,12 +20,15 @@ def _iter_annotation_types(annotation):
 def recursive_build_redis_model(
     cls: type[AtomicRedisModel],
     _seen: set[int] | None = None,
+    _root_meta=None,
 ):
     """Rebuild ``cls``, its per-field ``BaseRedisType`` subclasses, and any
     nested ``AtomicRedisModel`` fields (each rebuilt against its own ``Meta``).
     """
     if _seen is None:
         _seen = set()
+    if _root_meta is None:
+        _root_meta = cls.Meta
     if id(cls) in _seen:
         return
     _seen.add(id(cls))
@@ -37,9 +40,10 @@ def recursive_build_redis_model(
                 continue
             if issubclass(t, BaseRedisType):
                 _seen.add(id(t))
-                t.build_redis_model(cls.Meta)
+                t.build_redis_model(_root_meta)
             elif issubclass(t, AtomicRedisModel):
-                # Nested model — recurse with its own Meta. Don't mark it
-                # ``_seen`` here; the recursive call does that to also block
-                # re-entry from inside the nested walk.
-                recursive_build_redis_model(t, _seen)
+                # Nested model — recurse, keeping the root model's meta as the
+                # TTL authority for its special fields. Don't mark it ``_seen``
+                # here; the recursive call does that to also block re-entry from
+                # inside the nested walk.
+                recursive_build_redis_model(t, _seen, _root_meta)

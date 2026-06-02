@@ -219,6 +219,59 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+## aget_or_create()
+
+```python
+async def aget_or_create(model: AtomicRedisModel) -> GetOrCreateResult
+```
+
+Atomically returns the stored model for the instance's key, or stores the instance if no model exists at that key yet. The existence check and write run inside a single Redis Lua script — no race between checking and creating.
+
+### Parameters
+
+- **model** (`AtomicRedisModel`): The model instance to look up or store. Its key determines what is fetched or created.
+
+### Returns
+
+- **GetOrCreateResult**: Contains:
+    - `value` (`AtomicRedisModel`): The created instance, or the existing one loaded from Redis
+    - `status` (`GetOrCreateStatus`): `CREATED` if the model was stored, `FOUND` if it already existed
+
+### Raises
+
+- **RuntimeError**: If called with an inner (nested) model rather than a top-level one
+
+### Example
+
+```python
+import asyncio
+import rapyer
+from rapyer import AtomicRedisModel, GetOrCreateStatus
+
+
+class User(AtomicRedisModel):
+    name: str
+    age: int
+
+
+async def main():
+    user = User(name="Alice", age=25)
+
+    result = await rapyer.aget_or_create(user)
+    print(result.status)  # GetOrCreateStatus.CREATED
+
+    # Second call finds the stored model
+    result = await rapyer.aget_or_create(user)
+    print(result.status)        # GetOrCreateStatus.FOUND
+    print(result.value.name)    # Alice
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+The same method is available on the model class as `User.aget_or_create(user)`.
+
 ## aexists()
 
 ```python
