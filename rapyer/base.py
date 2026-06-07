@@ -70,6 +70,7 @@ from rapyer.types.base import (
     RedisType,
 )
 from rapyer.types.convert import RedisConverter
+from rapyer.types.relational import RelationalFieldType
 from rapyer.types.special import SpecialFieldType
 from rapyer.typing_support import Self, Unpack
 from rapyer.utils.annotation import (
@@ -150,6 +151,7 @@ class AtomicRedisModel(BaseModel):
     _key_field_name: ClassVar[str | None] = None
     _safe_load_fields: ClassVar[set[str]] = set()
     _special_field_names: ClassVar[set[str]] = set()
+    _relational_field_names: ClassVar[set[str]] = set()
     _redis_link_field_names: ClassVar[set[str]] = set()
     _contain_sf: ClassVar[set[str]] = set()
     _field_name: str = PrivateAttr(default="")
@@ -354,6 +356,9 @@ class AtomicRedisModel(BaseModel):
 
         # Detect special field types
         cls._special_field_names = set(getattr(cls, "_special_field_names", set()))
+        cls._relational_field_names = set(
+            getattr(cls, "_relational_field_names", set())
+        )
         cls._redis_link_field_names = set(
             getattr(cls, "_redis_link_field_names", set())
         )
@@ -365,6 +370,8 @@ class AtomicRedisModel(BaseModel):
             origin = get_origin(unwrapped) or unwrapped
             if safe_issubclass(origin, SpecialFieldType):
                 cls._special_field_names.add(field_name)
+            if safe_issubclass(origin, RelationalFieldType):
+                cls._relational_field_names.add(field_name)
             if safe_issubclass(origin, (BaseRedisType, AtomicRedisModel)):
                 origin: BaseRedisType | AtomicRedisModel
                 cls._redis_link_field_names.add(field_name)
