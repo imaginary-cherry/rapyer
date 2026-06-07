@@ -1,0 +1,139 @@
+# Foreign Keys
+
+<div style="background: linear-gradient(135deg, #7c4dff 0%, #b388ff 100%); color: white; padding: 16px 20px; border-radius: 8px; margin-bottom: 20px;">
+  <strong style="font-size: 1.1em;">🧪 Beta Feature</strong><br>
+  <span style="opacity: 0.95;">Foreign keys are currently experimental. Cascade behavior (save / delete / duplicate / TTL) and eager loading with depth control land in follow-up releases. The API may change based on feedback.</span>
+</div>
+
+`ForeignKey[T]` is a typed, lazy reference from one model to another. Instead of embedding the target document, the parent stores just the target's Redis key string (e.g. `"FkAuthor:abc-123"`) inline in its own JSON. The referenced model is fetched on demand.
+
+```python
+from rapyer import AtomicRedisModel
+from rapyer.types import ForeignKey
+
+
+class Author(AtomicRedisModel):
+    name: str = "anon"
+
+
+class Book(AtomicRedisModel):
+    title: str = "untitled"
+    author: ForeignKey[Author]
+```
+
+## Assigning a Reference
+
+A `ForeignKey` field accepts several forms. Most often you assign a model instance directly:
+
+```python
+alice = Author(name="alice")
+await alice.asave()
+
+book = Book(title="Redis in Action", author=alice)
+await book.asave()
+```
+
+You can also assign a raw key string, another `ForeignKey`, or a `{"$ref": ..., "$id": ...}` reference dict:
+
+```python
+book = Book(title="x", author="Author:abc-123")
+book = Book(title="x", author={"$ref": "Author", "$id": "abc-123"})
+```
+
+## Lazy Resolution
+
+When you load a model, its foreign keys come back **unresolved** — the key is known, but the target is not yet fetched:
+
+```python
+loaded = await Book.aget(book.key)
+
+loaded.author.is_resolved   # False
+loaded.author.target_key    # "Author:abc-123"
+```
+
+Call `afetch()` to load the target from Redis and cache it in place. Once resolved, read the target's fields directly on the reference:
+
+```python
+await loaded.author.afetch()
+
+loaded.author.is_resolved   # True
+loaded.author.name          # "alice"  — read fields straight off the reference
+```
+
+`afetch()` is idempotent — a second call returns the cached instance without hitting Redis.
+
+Accessing a field before resolution raises `NotResolvedError` rather than triggering hidden I/O — attribute access cannot await, so resolution is always explicit:
+
+```python
+loaded.author.name          # ❌ raises NotResolvedError — call afetch() first
+```
+
+### Releasing a Target
+
+Drop the hydrated instance while keeping the key reference:
+
+```python
+await loaded.author.aunload()
+
+loaded.author.is_resolved   # False
+loaded.author.target_key    # "Author:abc-123"  — preserved
+```
+
+## Optional and List Fields
+
+Foreign keys work as optional fields and inside lists:
+
+```python
+from typing import Optional
+
+
+class Book(AtomicRedisModel):
+    title: str = "untitled"
+    author: ForeignKey[Author]
+    publisher: Optional[ForeignKey[Publisher]] = None
+    co_authors: list[ForeignKey[Author]] = []
+```
+
+Each reference in a list resolves independently — fetching one does not fetch the others:
+
+```python
+loaded = await Book.aget(book.key)
+
+await loaded.co_authors[0].afetch()
+loaded.co_authors[0].is_resolved   # True
+loaded.co_authors[1].is_resolved   # False
+```
+
+## Self-References and Forward Refs
+
+Use a string parameter to reference a model that isn't defined yet, including the model itself:
+
+```python
+class Tree(AtomicRedisModel):
+    name: str = "root"
+    parent: Optional[ForeignKey["Tree"]] = None
+```
+
+The name is resolved against the registered rapyer models at fetch time:
+
+```python
+child = await Tree.aget(child.key)
+await child.parent.afetch()
+child.parent.name           # "root"
+```
+
+## Missing Targets
+
+If the referenced key no longer exists in Redis, `afetch()` raises `KeyNotFound`:
+
+```python
+book = Book(title="x", author="Author:deleted")
+await book.asave()
+loaded = await Book.aget(book.key)
+
+await loaded.author.afetch()   # ❌ raises KeyNotFound
+```
+
+## How It Works
+
+Unlike [special fields](index.md), which store data under a separate Redis key, a foreign key is stored **inline** in the parent's JSON as the target's key string. The target model lives at its own top-level key and is fetched independently — so its nested and special fields read from their own paths, not through the parent.
