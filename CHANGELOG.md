@@ -4,6 +4,12 @@
 
 ### ✨ Added
 
+- **`ForeignKey[T]`**: New relational field type that stores a typed reference to another `AtomicRedisModel` as the target's Redis key string, inline in the parent's JSON.
+  - Construct from a key string, an `AtomicRedisModel` instance, another `ForeignKey`, or a `{"$ref": "...", "$id": "..."}` dict.
+  - Lazy resolution via `await fk.afetch()`; release with `await fk.aunload()`. State exposed through `fk.target_key`, `fk.is_resolved`, and `fk.value` (raises `NotResolvedError` when accessed before resolution).
+  - Once resolved, target fields are reachable directly through the wrapper (`book.author.name`); accessing them before resolution raises `NotResolvedError` rather than triggering hidden I/O.
+  - Self-references and out-of-order class definitions supported via forward refs: `ForeignKey["MyModel"]` resolves through `REDIS_MODELS`.
+  - Cascade behavior (save / delete / duplicate / TTL) and eager fetch with depth control land in follow-up PRs.
 - **`RedisSet` Type**: New special field type backed by a Redis `SET`, providing unordered, unique-member collections stored under `__rapyer_special__:{model_key}:{field_name}`.
   - Supports generic value types: `tags: RedisSet[str]`, `users: RedisSet[float]`
   - Sync set methods batched in pipeline: `add`, `discard`, `remove`, `clear`, `update`, `difference_update`, `intersection_update`, `symmetric_difference_update`, plus in-place operators (`|=`, `&=`, `-=`, `^=`)
