@@ -24,6 +24,12 @@ from tests.models.collection_types import (
     UserListModel,
 )
 from tests.models.common import EventWithDatetimeKeyModel, UserWithKeyModel
+from tests.models.foreign_key_types import (
+    FkAuthor,
+    FkBook,
+    FkPublisher,
+    FkTree,
+)
 from tests.models.complex_types import (
     InnerRedisModel,
     OuterModel,
@@ -203,4 +209,9 @@ TESTED_REDIS_MODELS = [
     AutoMappedSetModel,
     SubSubRedisSetModel,
     RedisSetContainerModel,
+    # Foreign key types
+    FkAuthor,
+    FkBook,
+    FkPublisher,
+    FkTree,
 ]
