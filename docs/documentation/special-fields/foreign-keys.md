@@ -5,11 +5,11 @@
   <span style="opacity: 0.95;">Foreign keys are currently experimental. Cascade behavior (save / delete / duplicate / TTL) and eager loading with depth control land in follow-up releases. The API may change based on feedback.</span>
 </div>
 
-`ForeignKey[T]` is a typed, lazy reference from one model to another. Instead of embedding the target document, the parent stores just the target's Redis key string (e.g. `"FkAuthor:abc-123"`) inline in its own JSON. The referenced model is fetched on demand.
+`Reference[T]` is a typed, lazy reference from one model to another. Instead of embedding the target document, the parent stores just the target's Redis key string (e.g. `"Author:abc-123"`) inline in its own JSON. The referenced model is fetched on demand.
 
 ```python
 from rapyer import AtomicRedisModel
-from rapyer.types import ForeignKey
+from rapyer.types import Reference
 
 
 class Author(AtomicRedisModel):
@@ -18,12 +18,12 @@ class Author(AtomicRedisModel):
 
 class Book(AtomicRedisModel):
     title: str = "untitled"
-    author: ForeignKey[Author]
+    author: Reference[Author]
 ```
 
 ## Assigning a Reference
 
-A `ForeignKey` field accepts several forms. Most often you assign a model instance directly:
+A reference field accepts several forms. Most often you assign a model instance directly:
 
 ```python
 alice = Author(name="alice")
@@ -33,7 +33,7 @@ book = Book(title="Redis in Action", author=alice)
 await book.asave()
 ```
 
-You can also assign a raw key string, another `ForeignKey`, or a `{"$ref": ..., "$id": ...}` reference dict:
+You can also assign a raw key string, another reference, or a `{"$ref": ..., "$id": ...}` reference dict:
 
 ```python
 book = Book(title="x", author="Author:abc-123")
@@ -42,7 +42,7 @@ book = Book(title="x", author={"$ref": "Author", "$id": "abc-123"})
 
 ## Lazy Resolution
 
-When you load a model, its foreign keys come back **unresolved** — the key is known, but the target is not yet fetched:
+When you load a model, its references come back **unresolved** — the key is known, but the target is not yet fetched:
 
 ```python
 loaded = await Book.aget(book.key)
@@ -81,7 +81,7 @@ loaded.author.target_key    # "Author:abc-123"  — preserved
 
 ## Optional and List Fields
 
-Foreign keys work as optional fields and inside lists:
+References work as optional fields and inside lists:
 
 ```python
 from typing import Optional
@@ -89,9 +89,9 @@ from typing import Optional
 
 class Book(AtomicRedisModel):
     title: str = "untitled"
-    author: ForeignKey[Author]
-    publisher: Optional[ForeignKey[Publisher]] = None
-    co_authors: list[ForeignKey[Author]] = []
+    author: Reference[Author]
+    publisher: Optional[Reference[Publisher]] = None
+    co_authors: list[Reference[Author]] = []
 ```
 
 Each reference in a list resolves independently — fetching one does not fetch the others:
@@ -111,7 +111,7 @@ Use a string parameter to reference a model that isn't defined yet, including th
 ```python
 class Tree(AtomicRedisModel):
     name: str = "root"
-    parent: Optional[ForeignKey["Tree"]] = None
+    parent: Optional[Reference["Tree"]] = None
 ```
 
 The name is resolved against the registered rapyer models at fetch time:
@@ -136,4 +136,4 @@ await loaded.author.afetch()   # ❌ raises KeyNotFound
 
 ## How It Works
 
-Unlike [special fields](index.md), which store data under a separate Redis key, a foreign key is stored **inline** in the parent's JSON as the target's key string. The target model lives at its own top-level key and is fetched independently — so its nested and special fields read from their own paths, not through the parent.
+Unlike [special fields](index.md), which store data under a separate Redis key, a reference is stored **inline** in the parent's JSON as the target's key string. The target model lives at its own top-level key and is fetched independently — so its nested and special fields read from their own paths, not through the parent.

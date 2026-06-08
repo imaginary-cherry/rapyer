@@ -64,7 +64,7 @@ nav:
     - Redis Types: api/redis-types.md
     - PriorityQueue: api/priority-queue.md
     - RedisSet: api/redis-set.md
-    - ForeignKey: api/foreign-key.md
+    - Reference: api/foreign-key.md
     - ActionGroup: api/action-group.md
     - Rapyer: api/rapyer-functions.md
   - Roadmap: roadmap.md

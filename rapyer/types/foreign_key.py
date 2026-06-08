@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, get_args
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union, get_args
 
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
@@ -176,3 +176,14 @@ class ForeignKey(RelationalFieldType, Generic[T]):
                 _serialize,
             ),
         )
+
+
+if TYPE_CHECKING:
+    # Field-declaration alias. To type checkers a reference field accepts the
+    # target model, its key string, or an already-built ForeignKey, so assigning
+    # any of them doesn't raise an annotation error. At runtime it is exactly
+    # ``ForeignKey``, so pydantic builds the unchanged ForeignKey schema and the
+    # stored value is always a ForeignKey (``isinstance(field, ForeignKey)``).
+    Reference = Union[ForeignKey[T], T, str]
+else:
+    Reference = ForeignKey

@@ -1,24 +1,22 @@
-# ForeignKey API Reference
+# Reference API Reference
 
-A typed, lazy reference to another `AtomicRedisModel`. Stored inline in the parent's JSON as the target's Redis key string; the target is fetched on demand.
+`Reference[T]` declares a typed, lazy reference to another `AtomicRedisModel`. Stored inline in the parent's JSON as the target's Redis key string; the target is fetched on demand.
 
 ```python
-from rapyer.types import ForeignKey
+from rapyer.types import Reference
 
 class Book(AtomicRedisModel):
-    author: ForeignKey[Author]
+    author: Reference[Author]
 ```
 
-### Inherits From
-- `RelationalFieldType` — references another model by key (inline storage, fetched on demand)
+## Accepted Values
 
-## `ForeignKey(target_key=None, value=None)`
+A reference field accepts any of the following, normalizing them to a reference:
 
-Construct a reference. During validation, a field value is also accepted as a key string, an `AtomicRedisModel` instance, another `ForeignKey`, or a `{"$ref": ..., "$id": ...}` dict.
-
-**Parameters:**
-- `target_key` (str | None): The target's Redis key. Defaults to `value.key` when `value` is given.
-- `value` (AtomicRedisModel | None): A pre-resolved target instance.
+- an `AtomicRedisModel` instance (the target itself)
+- a key string (the target's Redis key, e.g. `"Author:abc-123"`)
+- another reference
+- a `{"$ref": ..., "$id": ...}` dict
 
 ## Properties
 
@@ -46,7 +44,7 @@ Construct a reference. During validation, a field value is also accepted as a ke
 
 ## Attribute Delegation
 
-Once resolved, field access on the wrapper delegates to the target:
+Once resolved, field access on the reference delegates to the target:
 
 ```python
 await book.author.afetch()
