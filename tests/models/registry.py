@@ -26,6 +26,12 @@ from tests.models.collection_types import (
     UserListModel,
 )
 from tests.models.common import EventWithDatetimeKeyModel, UserWithKeyModel
+from tests.models.complex_types import (
+    InnerRedisModel,
+    OuterModel,
+    OuterModelWithRedisNested,
+    TestRedisModel,
+)
 from tests.models.foreign_key_types import (
     FkAuthor,
     FkBook,
@@ -34,12 +40,6 @@ from tests.models.foreign_key_types import (
     FkPublisher,
     FkRichAuthor,
     FkTree,
-)
-from tests.models.complex_types import (
-    InnerRedisModel,
-    OuterModel,
-    OuterModelWithRedisNested,
-    TestRedisModel,
 )
 from tests.models.functionality_types import (
     AllTypesModel,
