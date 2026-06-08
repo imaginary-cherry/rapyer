@@ -44,12 +44,6 @@ Construct a reference. During validation, a field value is also accepted as a ke
 **Type:** `async` method
 **Description:** Drops the hydrated target instance while preserving `target_key`.
 
-## Class Methods
-
-#### `get_target_type()`
-**Type:** classmethod
-**Description:** Returns the target model class, resolving forward-ref string parameters (`ForeignKey["Model"]`) against the registered rapyer models. Raises `TypeError` if no target type is set.
-
 ## Attribute Delegation
 
 Once resolved, field access on the wrapper delegates to the target:
