@@ -19,13 +19,33 @@ class TestForeignKeyAfetchSingle(AsyncBenchmarkTest):
         return await book.author.afetch()
 
 
-class TestForeignKeySaveWithFk(AsyncBenchmarkTest):
+class TestForeignKeySaveWithSavedFk(AsyncBenchmarkTest):
+    """Save a parent whose foreign-key target is already persisted."""
+
     models = {TTLMode.NO_TTL: FkBook}
 
     async def setup(self, mode):
         cls = self.models[mode]
         author = FkAuthor(name="author")
         await author.asave()
+        return cls(title="book", author=author)
+
+    async def action(self, book):
+        return await book.asave()
+
+
+class TestForeignKeySaveWithUnsavedFk(AsyncBenchmarkTest):
+    """Save a parent whose foreign-key target has not been persisted yet.
+
+    Identical to the saved-target case today (save serializes the FK to its key
+    only); once save cascades to the target this path will also persist it.
+    """
+
+    models = {TTLMode.NO_TTL: FkBook}
+
+    async def setup(self, mode):
+        cls = self.models[mode]
+        author = FkAuthor(name="author")
         return cls(title="book", author=author)
 
     async def action(self, book):
