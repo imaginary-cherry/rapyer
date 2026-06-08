@@ -36,7 +36,7 @@ class FkBook(AtomicRedisModel):
     title: str = "untitled"
     author: Reference[FkAuthor]
     publisher: Optional[Reference[FkPublisher]] = None
-    co_authors: list[Reference[FkAuthor]] = []
+    co_authors: list[Reference[FkAuthor]] = Field(default_factory=list)
 
 
 class FkTree(AtomicRedisModel):
