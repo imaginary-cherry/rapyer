@@ -12,26 +12,6 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="AtomicRedisModel")
 
 
-def _resolve_target_type(target_hint: Any) -> "type[AtomicRedisModel] | None":
-    """
-    Resolve a generic argument that may be a class or a forward-ref string.
-    """
-    if target_hint is None:
-        return None
-    if isinstance(target_hint, str):
-        from rapyer.base import REDIS_MODELS
-
-        for model in REDIS_MODELS:
-            if model.__name__ == target_hint:
-                return model
-        raise NameError(
-            f"ForeignKey target {target_hint!r} is not a registered rapyer model"
-        )
-    if isinstance(target_hint, TypeVar):
-        return None
-    return target_hint
-
-
 class ForeignKey(RelationalFieldType, Generic[T]):
     """
     Typed, lazy reference to another ``AtomicRedisModel``.
@@ -78,23 +58,19 @@ class ForeignKey(RelationalFieldType, Generic[T]):
             )
         return self._value
 
-    @classmethod
-    def get_target_type(cls) -> "type[AtomicRedisModel]":
-        resolved = _resolve_target_type(cls._target_type_hint)
-        if resolved is None:
-            raise TypeError(
-                f"{cls.__name__} has no resolved target type; "
-                "use ForeignKey[ModelName] or ForeignKey['ModelName']."
-            )
-        return resolved
-
     async def afetch(self) -> "AtomicRedisModel":
         """Resolve the target instance from Redis and cache it in-place."""
         if self._value is not None:
             return self._value
         if self._target_key is None:
             raise NotResolvedError("ForeignKey has no target key to fetch.")
-        target_cls = self.get_target_type()
+        target_cls = self._relational_target
+        if target_cls is None:
+            raise TypeError(
+                f"{type(self).__name__} target type is unresolved; "
+                "initialize rapyer (init_rapyer / resolve_forward_refs) and "
+                "ensure the target is a registered AtomicRedisModel."
+            )
         self._value = await target_cls.aget(self._target_key)
         return self._value
 
@@ -165,9 +141,10 @@ class ForeignKey(RelationalFieldType, Generic[T]):
                 return None
             return value._target_key
 
-        # Keep target_hint accessible for diagnostics / forward-ref resolution at
-        # afetch time. Doesn't affect schema, but pins the generic parameter on
-        # the dynamic subclass created by RedisConverter.
+        # TODO: this name-normalization exists only because the metaclass converts a
+        # Pin the generic parameter on the per-field subclass so the init-stage
+        # resolver (resolve_relational_targets) can map it to the canonical
+        # target model. Doesn't affect the schema itself.
         cls._target_type_hint = target_hint
 
         return core_schema.no_info_plain_validator_function(

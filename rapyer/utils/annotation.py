@@ -76,6 +76,15 @@ def replace_to_redis_types_in_annotation(
     return annotation  # pragma: no cover - There is no way to reach this line
 
 
+def strip_optional(annotation: Any) -> Any:
+    """Peel a ``Union[X, None]`` / ``X | None`` wrapper down to ``X``."""
+    if get_origin(annotation) in (Union, UnionType):
+        non_none = [arg for arg in get_args(annotation) if arg is not type(None)]
+        if len(non_none) == 1:
+            return non_none[0]
+    return annotation
+
+
 def has_annotation(field: Any, annotation_type: Any) -> bool:
     origin = get_origin(field)
     if origin is Annotated:
