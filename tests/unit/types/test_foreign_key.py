@@ -3,7 +3,7 @@ import json
 import pytest
 
 from rapyer.errors import NotResolvedError
-from rapyer.types.foreign_key import ForeignKey
+from rapyer.types import Reference
 from rapyer.types.relational import RelationalFieldType
 from tests.models.foreign_key_types import FkAuthor, FkBook
 
@@ -16,7 +16,7 @@ def test_book_class_collects_top_level_relational_fields():
 
     # Assert
     # `_relational_field_names` mirrors `_special_field_names`: only direct FK
-    # fields are tracked. Generic containers (e.g. `list[ForeignKey[...]]`) are
+    # fields are tracked. Generic containers (e.g. `list[Reference[...]]`) are
     # excluded — the same convention as for `list[RedisSet]`.
     assert relational_fields == {"author"}
 
@@ -31,9 +31,9 @@ def test_relational_fields_are_also_redis_link_fields():
     assert "author" in link_fields
 
 
-def test_foreign_key_is_relational_field_type():
+def test_reference_is_relational_field_type():
     # Arrange / Act / Assert
-    assert issubclass(ForeignKey, RelationalFieldType)
+    assert issubclass(Reference, RelationalFieldType)
 
 
 # --- Pydantic validator: accepts multiple shapes ---

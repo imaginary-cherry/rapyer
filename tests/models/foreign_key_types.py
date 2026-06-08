@@ -3,7 +3,7 @@ from typing import Optional
 from pydantic import Field
 
 from rapyer.base import AtomicRedisModel
-from rapyer.types.foreign_key import ForeignKey
+from rapyer.types.foreign_key import Reference
 from rapyer.types.redis_set import RedisSet
 
 
@@ -24,7 +24,7 @@ class FkRichAuthor(AtomicRedisModel):
 
 class FkLibrary(AtomicRedisModel):
     name: str = "lib"
-    head_author: ForeignKey[FkRichAuthor]
+    head_author: Reference[FkRichAuthor]
 
 
 class FkPublisher(AtomicRedisModel):
@@ -34,11 +34,11 @@ class FkPublisher(AtomicRedisModel):
 
 class FkBook(AtomicRedisModel):
     title: str = "untitled"
-    author: ForeignKey[FkAuthor]
-    publisher: Optional[ForeignKey[FkPublisher]] = None
-    co_authors: list[ForeignKey[FkAuthor]] = []
+    author: Reference[FkAuthor]
+    publisher: Optional[Reference[FkPublisher]] = None
+    co_authors: list[Reference[FkAuthor]] = []
 
 
 class FkTree(AtomicRedisModel):
     name: str = "root"
-    parent: Optional[ForeignKey["FkTree"]] = None
+    parent: Optional[Reference["FkTree"]] = None
