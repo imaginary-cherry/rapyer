@@ -10,15 +10,15 @@ from tests.models.foreign_key_types import FkAuthor, FkBook
 # --- Class-build introspection ---
 
 
-def test_book_class_collects_top_level_relational_fields():
-    # Arrange / Act
-    relational_fields = FkBook._relational_field_names
+def test_book_class_classifies_relational_fields():
+    # Arrange / Act / Assert
+    assert FkBook._relational_field_names == {"author", "publisher"}
+    assert FkBook._contain_fk == {"co_authors"}
 
-    # Assert
-    # `_relational_field_names` mirrors `_special_field_names`: only direct FK
-    # fields are tracked. Generic containers (e.g. `list[Reference[...]]`) are
-    # excluded — the same convention as for `list[RedisSet]`.
-    assert relational_fields == {"author"}
+
+def test_model_contains_fk_field_reflects_relational_fields():
+    # Arrange / Act / Assert
+    assert FkBook.contains_fk_field() is True
 
 
 def test_relational_fields_are_also_redis_link_fields():
