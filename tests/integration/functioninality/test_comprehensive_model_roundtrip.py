@@ -24,9 +24,11 @@ async def test_comprehensive_model_asave_aget_roundtrip_all_fields_non_default()
         event_timestamp=event_timestamp,
     )
     await model.asave()
-    await model.tasks.apush("high", 1.0)
-    await model.tasks.apush("medium", 2.0)
-    await model.labels.aadd_many({"red", "green", "blue"})
+    await model.tasks.apush(10, 1.0)
+    await model.tasks.apush(20, 2.0)
+    await model.container.labels.aadd_many({"red", "green", "blue"})
+    await model.container.tasks.apush(1.5, 1.0)
+    await model.container.tasks.apush(2.5, 2.0)
 
     # Act
     retrieved = await ComprehensiveTestModel.aget(model.key)
@@ -63,11 +65,13 @@ async def test_comprehensive_model_afind_multiple_keys_all_fields_non_default():
     )
     await model_a.asave()
     await model_b.asave()
-    await model_a.tasks.apush("high", 1.0)
-    await model_a.tasks.apush("medium", 2.0)
-    await model_b.tasks.apush("urgent", 0.1)
-    await model_a.labels.aadd_many({"red", "green", "blue"})
-    await model_b.labels.aadd_many({"yellow", "orange"})
+    await model_a.tasks.apush(10, 1.0)
+    await model_a.tasks.apush(20, 2.0)
+    await model_b.tasks.apush(30, 0.1)
+    await model_a.container.labels.aadd_many({"red", "green", "blue"})
+    await model_b.container.labels.aadd_many({"yellow", "orange"})
+    await model_a.container.tasks.apush(1.5, 1.0)
+    await model_b.container.tasks.apush(2.5, 0.1)
 
     # Act
     retrieved = await rapyer.afind(model_a.key, model_b.key)

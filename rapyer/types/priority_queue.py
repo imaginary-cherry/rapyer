@@ -25,6 +25,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
     """
 
     original_type: type = type(None)
+    LUA_SNIPPET_DIR = "redis_priority_queue"
 
     # --- Serialization helpers ---
 
@@ -109,6 +110,10 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         if items:
             mapping = {member: score for member, score in items}
             await self.client.zadd(target_special_key, mapping)
+
+    @classmethod
+    def has_lua_load_output(cls) -> bool:
+        return False
 
     def __eq__(self, other):
         if not isinstance(other, RedisPriorityQueue):

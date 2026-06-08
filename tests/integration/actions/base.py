@@ -74,9 +74,13 @@ class ActionTestBase(ABC):
         """
 
     async def setup_data(self) -> list[PipelineActionModel]:
-        """Default: build models via :meth:`create_models` and insert them."""
+        """
+        Default: build models via :meth:`create_models`, insert them, and populate their special fields.
+        """
         models = self.create_models()
-        await rapyer.ainsert(*models)
+        async with rapyer.apipeline():
+            await rapyer.ainsert(*models)
+            await self.populate_special_fields(*models)
         return models
 
     @abstractmethod
@@ -109,9 +113,15 @@ class ActionTestBase(ABC):
     def assert_during_pipeline(self, loaded: Any):
         assert loaded == self.expected_before()
 
-    def assert_after_pipeline(self, loaded: Any):
+    async def assert_after_pipeline(self, loaded: Any):
         expected_after = self.expected_after()
         assert loaded == expected_after, f"Expected {expected_after!r}, got {loaded!r}"
+
+    async def populate_special_fields(self, *models: AtomicRedisModel) -> None:
+        """Populate every special field (via each adapter) on each model."""
+        for model in models:
+            for adapter in SPECIAL_FIELD_ADAPTERS:
+                await adapter.populate(model)
 
     async def create_sp_models(
         self, adapter: SpecialFieldAdapter
@@ -172,7 +182,7 @@ class ActionTestBase(ABC):
 
         # Assert (after pipeline)
         loaded_after = await self.load_data()
-        self.assert_after_pipeline(loaded_after)
+        await self.assert_after_pipeline(loaded_after)
 
     @pytest.mark.asyncio
     async def test_action_in_pipeline_tolerates_stale_local_mirror(self, test_input):
@@ -189,7 +199,7 @@ class ActionTestBase(ABC):
         # Assert — the action still produced the correct Redis state, despite
         # the stale local mirror.
         loaded_after = await self.load_data()
-        self.assert_after_pipeline(loaded_after)
+        await self.assert_after_pipeline(loaded_after)
 
     @classmethod
     def _prepare_action_test(

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING
+from enum import Enum
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
@@ -30,9 +31,27 @@ class RapyerDeleteResult(DeleteResult):
     by_model: dict[type[AtomicRedisModel], int]
 
 
+class GetOrCreateStatus(str, Enum):
+    CREATED = "created"
+    FOUND = "found"
+
+
+T = TypeVar("T", bound="AtomicRedisModel")
+
+
+class GetOrCreateResult(BaseModel, Generic[T]):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    value: T
+    status: GetOrCreateStatus
+
+
 def resolve_forward_refs():
     from rapyer.base import AtomicRedisModel
 
     RapyerDeleteResult.model_rebuild(
+        _types_namespace={"AtomicRedisModel": AtomicRedisModel}
+    )
+    GetOrCreateResult.model_rebuild(
         _types_namespace={"AtomicRedisModel": AtomicRedisModel}
     )

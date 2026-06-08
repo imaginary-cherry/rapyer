@@ -37,11 +37,14 @@ else
 end""",
     },
 }
+LUA_SCRIPT_LOCATION = "rapyer.scripts.lua"
+SF_SAVE_FILENAME = "save.lua"
+SF_LOAD_FILENAME = "load.lua"
 
 
 @lru_cache(maxsize=None)
 def _load_template(category: str, name: str) -> str:
-    package = f"rapyer.scripts.lua.{category}"
+    package = f"{LUA_SCRIPT_LOCATION}.{category}"
     filename = f"{name}.lua"
     return resources.files(package).joinpath(filename).read_text()
 
@@ -53,3 +56,17 @@ def load_script(category: str, name: str, variant: str = REDIS_VARIANT) -> str:
     for placeholder, value in replacements.items():
         result = result.replace(f"--[[{placeholder}]]", value)
     return result
+
+
+@lru_cache(maxsize=None)
+def _read_sf_file(type_dir: str, filename: str) -> str:
+    package = f"{LUA_SCRIPT_LOCATION}.sf.{type_dir}"
+    return resources.files(package).joinpath(filename).read_text().rstrip("\n")
+
+
+def load_sf_save_snippet(type_dir: str) -> str:
+    return _read_sf_file(type_dir, SF_SAVE_FILENAME)
+
+
+def load_sf_load_snippet(type_dir: str) -> str:
+    return _read_sf_file(type_dir, SF_LOAD_FILENAME)

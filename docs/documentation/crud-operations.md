@@ -188,6 +188,64 @@ if __name__ == "__main__":
 
 This is useful when you need a lightweight check before performing more expensive operations like `aget()` or `aload()`.
 
+## Get or Create
+
+Use `aget_or_create()` to fetch a model if it already exists, or create it if it doesn't — in a single atomic step. The existence check and the write happen inside one Redis Lua script, so there is no race between checking and creating: two concurrent callers will never both create the same key.
+
+```python
+from rapyer import AtomicRedisModel, GetOrCreateStatus
+
+
+class User(AtomicRedisModel):
+    name: str
+    age: int
+
+
+async def main():
+    user = User(name="Alice", age=25)
+
+    result = await User.aget_or_create(user)
+
+    print(result.value.name)  # Alice
+    print(result.status)      # GetOrCreateStatus.CREATED
+
+    # Call again with a model that maps to the same key — the stored value wins
+    result = await User.aget_or_create(user)
+    print(result.status)      # GetOrCreateStatus.FOUND
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+The returned `GetOrCreateResult` has two fields:
+
+- `value`: the model instance — the one you passed in when it was created, or the existing instance loaded from Redis when it was found.
+- `status`: a `GetOrCreateStatus` enum, either `CREATED` or `FOUND`.
+
+```python
+result = await User.aget_or_create(user)
+
+if result.status == GetOrCreateStatus.CREATED:
+    print("New user stored")
+else:
+    print(f"Already existed: {result.value.name}")
+```
+
+!!! note "Which key is used"
+    The key comes from the model you pass in. Build the instance with the key (or key field) you want to look up, then let `aget_or_create()` decide whether to store it or return what's already there.
+
+### Global aget_or_create()
+
+The global `rapyer.aget_or_create()` works the same way and infers the model class from the instance:
+
+```python
+import rapyer
+
+result = await rapyer.aget_or_create(user)
+print(result.status)
+```
+
 ## Finding All Model Instances
 
 Use the `afind()` class method to retrieve all instances of a specific model class from Redis:

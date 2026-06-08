@@ -86,6 +86,21 @@ _action_context: contextvars.ContextVar[Optional[list[ActionContextEntryType]]] 
 )
 
 
+def resolve_root_model(model):
+    """Walk ``_base_model_link`` to the top-level model that owns the Redis key
+    and TTL config.
+
+    TTL is a property of the root aggregate: a special field or a nested model
+    points back at its parent, and only the root carries ``Meta.ttl`` and the
+    full set of (nested) special-field keys. Resolving here, at the action
+    boundary, keeps that rule in one place so the refresh methods can assume
+    they always run on the root.
+    """
+    while getattr(model, "_base_model_link", None) is not None:
+        model = model._base_model_link
+    return model
+
+
 def register_action_target(model: "AtomicRedisModel", action: "ActionGroup"):
     """
     Register a model for TTL refresh at the outer decorator boundary.
@@ -93,7 +108,7 @@ def register_action_target(model: "AtomicRedisModel", action: "ActionGroup"):
     ctx = _action_context.get()
     if ctx is None:
         return
-    ctx.append((model, action))
+    ctx.append((resolve_root_model(model), action))
 
 
 def register_from_result(result, action: "ActionGroup"):

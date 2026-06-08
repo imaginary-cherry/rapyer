@@ -77,7 +77,8 @@ def build_models_from_dumps(
         slice_end = cursor + len(key_plan)
         raw_slice = sf_raw[cursor:slice_end]
         cursor = slice_end
-        if data is None:
+        # Real redis returns None for a missing key; fakeredis returns [].
+        if not data:
             if raise_on_missing:
                 raise KeyNotFound(f"{key} is missing in redis")
             continue

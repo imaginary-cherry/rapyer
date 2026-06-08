@@ -56,6 +56,10 @@ PRIVATE_METHODS = _group(
     AtomicRedisModel._all_keys_for_key,
     AtomicRedisModel._iter_expanded_filter_batches,
     AtomicRedisModel._resolve_key,
+    # Pure in-memory traversal / key enumeration for special fields — no
+    # Redis round trips, so pipeline/TTL coverage doesn't apply.
+    AtomicRedisModel._iter_special_fields,
+    AtomicRedisModel._ttl_keys,
     AtomicRedisModel.class_key_initials,
     AtomicRedisModel.index_name,
     AtomicRedisModel.create_expressions,
@@ -93,6 +97,15 @@ PRIVATE_INHERITED_METHODS = _group(
     SpecialFieldType.asave_special,
     SpecialFieldType.adelete_special,
     SpecialFieldType.aduplicate_special,
+    # Lua codegen / payload helpers for aget_or_create's server-side SF
+    # dispatch: they build script source and ARGV strings, not Redis round
+    # trips, so they aren't actions subject to pipeline/TTL coverage. Shared
+    # contract across the SF hierarchy (subclasses override several of them).
+    SpecialFieldType.lua_type_name,
+    SpecialFieldType.lua_save_snippet,
+    SpecialFieldType.lua_load_snippet,
+    SpecialFieldType.lua_save_payload,
+    SpecialFieldType.has_lua_load_output,
     RedisPriorityQueue.aremove,
     AtomicRedisModel.redis_schema,
 )
