@@ -1,16 +1,8 @@
 from rapyer.types.foreign_key import ForeignKey
 from tests.integration.actions.read import ReadActionTestBase
 from tests.integration.actions.ttl import TTLActionTestBase
-from tests.models.foreign_key_types import FkAfetchOwner, FkAfetchTarget
-
-# ForeignKey.afetch is a READ|FETCH action (target=RESULT): it resolves the
-# referenced model and refreshes that *target's* TTL. It returns a value, so
-# pipeline deferral doesn't apply.
-#
-# Under V2 the refresh is OWNER-gated: the wrap decision uses the owner's
-# TTL-refresh config at install time. So the owner is created_models[0] (the
-# model the TTL harness patches), while the checked key is the target's
-# (models_to_check_ttl).
+from tests.integration.special_types.adapters import SPECIAL_FIELD_ADAPTERS
+from tests.models.collection_types import ComprehensiveRefOwner, ComprehensiveTestModel
 
 
 class TestForeignKeyAfetch(ReadActionTestBase, TTLActionTestBase):
@@ -23,16 +15,18 @@ class TestForeignKeyAfetch(ReadActionTestBase, TTLActionTestBase):
     )
 
     def create_models(self):
-        target = FkAfetchTarget(name="resolved", age=7)
-        return [FkAfetchOwner(ref=target), target]
+        target = ComprehensiveTestModel(name="resolved", counter=7)
+        return [ComprehensiveRefOwner(ref=target), target]
 
     def ttl_keys(self, model):
-        return [model.key]
+        return list(model.all_keys)
 
     async def populate_special_fields(self, *models):
-        return
+        target = models[1]
+        for adapter in SPECIAL_FIELD_ADAPTERS:
+            await adapter.populate(target)
 
-    async def perform_action(self, piped: FkAfetchOwner):
+    async def perform_action(self, piped: ComprehensiveRefOwner):
         return await self.created_models[0].ref.afetch()
 
     def models_to_check_ttl(self):
@@ -40,5 +34,5 @@ class TestForeignKeyAfetch(ReadActionTestBase, TTLActionTestBase):
         return [self.created_models[1]]
 
     def expected_before(self):
-        # afetch returns the hydrated target; equality is by field content.
-        return FkAfetchTarget(name="resolved", age=7)
+        # afetch returns the hydrated target (the same cached instance).
+        return self.created_models[1]
