@@ -29,8 +29,6 @@ jobs:
   coverage:
     runs-on: ubuntu-22.04
     needs: [mirror-redis]
-    environment:
-      name: coverage
     permissions:
       contents: read
       packages: read
@@ -65,9 +63,45 @@ jobs:
       - name: Run coverage
         env:
           REDIS_DB: 0
-        run: tox -e coverage
+        run: tox -e coverage | tee coverage_output.txt
+
+      - name: Report coverage to job summary
+        if: always()
+        run: |
+          {
+            echo "## Coverage report"
+            echo '```'
+            sed -n '/^Name\s/,/^TOTAL/p' coverage_output.txt || tail -n 40 coverage_output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: error
+
+  codecov:
+    runs-on: ubuntu-22.04
+    needs: [coverage]
+    # Codecov upload uses the `coverage` environment, which is restricted to main.
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: coverage
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download coverage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
