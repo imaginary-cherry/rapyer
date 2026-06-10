@@ -1,7 +1,7 @@
 import abc
 import logging
 from abc import ABC
-from typing import Any, Generic, TypeVar, get_args
+from typing import Any, Generic, TypeVar, get_args, get_origin
 
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
@@ -42,6 +42,26 @@ class GenericRedisType(RedisType, Generic[T], ABC):
         if safe_issubclass(inner, SpecialFieldType):
             return True
         contains = getattr(inner, "contains_sf_field", None)
+        if contains is None:
+            return False
+        return contains()
+
+    @classmethod
+    def contains_fk_field(cls) -> bool:
+        if cls.original_type is None:
+            return False
+        inner = cls.find_inner_type(cls.original_type)
+        if inner is Any:
+            return False
+
+        from rapyer.types.relational import RelationalFieldType
+
+        # inner may be a parameterized alias (e.g. ForeignKey[Author]); reduce
+        # it to its origin class before the subclass check.
+        inner = get_origin(inner) or inner
+        if safe_issubclass(inner, RelationalFieldType):
+            return True
+        contains = getattr(inner, "contains_fk_field", None)
         if contains is None:
             return False
         return contains()

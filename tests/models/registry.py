@@ -6,6 +6,7 @@ from tests.models.collection_types import (
     BaseModelListModel,
     BoolDictModel,
     BytesDictModel,
+    ComprehensiveRefOwner,
     ComprehensiveTestModel,
     ComprehensiveTestModelNoTTL,
     DictDictModel,
@@ -31,6 +32,15 @@ from tests.models.complex_types import (
     OuterModel,
     OuterModelWithRedisNested,
     TestRedisModel,
+)
+from tests.models.foreign_key_types import (
+    FkAuthor,
+    FkBook,
+    FkLibrary,
+    FkProfile,
+    FkPublisher,
+    FkRichAuthor,
+    FkTree,
 )
 from tests.models.functionality_types import (
     AllTypesModel,
@@ -132,6 +142,7 @@ TESTED_REDIS_MODELS = [
     PipelineTestModel,
     ComprehensiveTestModel,
     ComprehensiveTestModelNoTTL,
+    ComprehensiveRefOwner,
     SpecialFieldsContainer,
     # Simple types
     IntModel,
@@ -207,4 +218,12 @@ TESTED_REDIS_MODELS = [
     AutoMappedSetModel,
     SubSubRedisSetModel,
     RedisSetContainerModel,
+    # Foreign key types
+    FkAuthor,
+    FkBook,
+    FkPublisher,
+    FkTree,
+    FkProfile,
+    FkRichAuthor,
+    FkLibrary,
 ]

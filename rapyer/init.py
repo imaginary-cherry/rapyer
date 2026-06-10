@@ -7,6 +7,7 @@ from redis.asyncio.client import Redis
 from rapyer.base import REDIS_MODELS
 from rapyer.result import resolve_forward_refs
 from rapyer.scripts import register_scripts
+from rapyer.types.relational import resolve_relational_targets
 
 
 def is_fakeredis(client) -> bool:
@@ -28,6 +29,7 @@ async def init_rapyer(
             rapyer_logger.addHandler(handler)
 
     resolve_forward_refs()
+    resolve_relational_targets(REDIS_MODELS)
 
     if isinstance(redis, str):
         redis = redis_async.from_url(redis, decode_responses=True, max_connections=20)

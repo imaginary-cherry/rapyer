@@ -6,6 +6,7 @@ from rapyer.errors.base import (
     InvalidRefreshTtlError,
     KeyNotFound,
     MissingParameterError,
+    NotResolvedError,
     RapyerError,
     RapyerModelDoesntExistError,
     RapyerSerializationError,
@@ -54,4 +55,5 @@ __all__ = [
     "BadDeleteActionError",
     "CorruptedModelError",
     "RapyerSerializationError",
+    "NotResolvedError",
 ]

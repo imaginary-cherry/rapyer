@@ -54,6 +54,11 @@ class BaseRedisType(ABC):
         return False
 
     @classmethod
+    def contains_fk_field(cls) -> bool:
+        """Check if this type contains a foreign-key field (e.g. list[ForeignKey])."""
+        return False
+
+    @classmethod
     def queue_special_loads_in_pipeline(
         cls, pipe, key: str, plan: list, parent_path: str = ""
     ):

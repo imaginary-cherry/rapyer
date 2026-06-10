@@ -6,6 +6,10 @@
 
 - **`aget_or_create`**: New atomic "get-or-create" primitive exposed both as a module-level helper (`rapyer.aget_or_create(model)`) and as a classmethod (`MyModel.aget_or_create(model)`). The existence check, write, and any special-field save/load happen inside a single registered Lua script — one server-side round-trip, no TOCTOU race between `aexists` and `asave`. Special fields nested inside child models are handled in the same atomic dispatch, and the found branch now also refreshes TTL (the call participates in the `FETCH` action group).
 
+### 🔄 Changed
+
+- **Wider dependency ranges**: Supported version ranges have been widened to `redis>=6.0.0,<7.5.0` (previously `<7.1.0`) and `pydantic>=2.11.0,<2.14.0` (previously `<2.13.0`). The test matrix now exercises redis 7.0–7.4 and pydantic 2.13 in addition to the previously covered versions.
+
 ### 🐛 Fixed
 
 - **Nested special fields persisted across all actions**: `asave`, `aduplicate`, `ainsert`, batch creation, and `aget_or_create` now recurse into child models and persist their special fields. Previously only special fields declared directly on the top-level model were saved/copied; special fields nested inside a sub-model were silently dropped.
@@ -23,6 +27,12 @@
 
 ### ✨ Added
 
+- **`Reference[T]`**: New relational field type that stores a typed reference to another `AtomicRedisModel` as the target's Redis key string, inline in the parent's JSON.
+  - Assign a key string, an `AtomicRedisModel` instance, another reference, or a `{"$ref": "...", "$id": "..."}` dict. Declaring fields with `Reference[T]` keeps these assignments clean under static type checkers (mypy, pyright).
+  - Lazy resolution via `await ref.afetch()`; release with `await ref.aunload()`. State exposed through `ref.target_key`, `ref.is_resolved`, and `ref.value` (raises `NotResolvedError` when accessed before resolution).
+  - Once resolved, target fields are reachable directly through the reference (`book.author.name`); accessing them before resolution raises `NotResolvedError` rather than triggering hidden I/O.
+  - Self-references and out-of-order class definitions supported via forward refs: `Reference["MyModel"]` resolves through `REDIS_MODELS`.
+  - Cascade behavior (save / delete / duplicate / TTL) and eager fetch with depth control land in follow-up PRs.
 - **`RedisSet` Type**: New special field type backed by a Redis `SET`, providing unordered, unique-member collections stored under `__rapyer_special__:{model_key}:{field_name}`.
   - Supports generic value types: `tags: RedisSet[str]`, `users: RedisSet[float]`
   - Sync set methods batched in pipeline: `add`, `discard`, `remove`, `clear`, `update`, `difference_update`, `intersection_update`, `symmetric_difference_update`, plus in-place operators (`|=`, `&=`, `-=`, `^=`)

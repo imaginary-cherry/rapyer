@@ -77,6 +77,7 @@ from rapyer.types.base import (
     RedisType,
 )
 from rapyer.types.convert import RedisConverter
+from rapyer.types.relational import RelationalFieldType
 from rapyer.types.special import SpecialFieldType
 from rapyer.typing_support import Self, Unpack
 from rapyer.utils.annotation import (
@@ -84,6 +85,7 @@ from rapyer.utils.annotation import (
     field_with_flag,
     has_annotation,
     replace_to_redis_types_in_annotation,
+    strip_optional,
 )
 from rapyer.utils.fields import (
     get_all_pydantic_annotation,
@@ -157,8 +159,10 @@ class AtomicRedisModel(BaseModel):
     _key_field_name: ClassVar[str | None] = None
     _safe_load_fields: ClassVar[set[str]] = set()
     _special_field_names: ClassVar[set[str]] = set()
+    _relational_field_names: ClassVar[set[str]] = set()
     _redis_link_field_names: ClassVar[set[str]] = set()
     _contain_sf: ClassVar[set[str]] = set()
+    _contain_fk: ClassVar[set[str]] = set()
     _field_name: str = PrivateAttr(default="")
     model_config = ConfigDict(validate_assignment=True, validate_default=True)
 
@@ -360,10 +364,14 @@ class AtomicRedisModel(BaseModel):
 
         # Detect special field types
         cls._special_field_names = set(getattr(cls, "_special_field_names", set()))
+        cls._relational_field_names = set(
+            getattr(cls, "_relational_field_names", set())
+        )
         cls._redis_link_field_names = set(
             getattr(cls, "_redis_link_field_names", set())
         )
         cls._contain_sf = set(getattr(cls, "_contain_sf", set()))
+        cls._contain_fk = set(getattr(cls, "_contain_fk", set()))
         for field_name, annotation in cls.__annotations__.items():
             # If the field was redfined, we remove it from list
             cls._special_field_names.discard(field_name)
@@ -375,6 +383,17 @@ class AtomicRedisModel(BaseModel):
             origin = get_origin(unwrapped) or unwrapped
             if safe_issubclass(origin, SpecialFieldType):
                 cls._special_field_names.add(field_name)
+
+            # Foreign keys: Check if field is a foreign key or has a FK
+            fk_origin = strip_optional(unwrapped)
+            fk_origin = get_origin(fk_origin) or fk_origin
+            if safe_issubclass(fk_origin, RelationalFieldType):
+                cls._relational_field_names.add(field_name)
+            elif (
+                safe_issubclass(fk_origin, (BaseRedisType, AtomicRedisModel))
+                and fk_origin.contains_fk_field()
+            ):
+                cls._contain_fk.add(field_name)
             if safe_issubclass(origin, (BaseRedisType, AtomicRedisModel)):
                 origin: BaseRedisType | AtomicRedisModel
                 cls._redis_link_field_names.add(field_name)
@@ -611,6 +630,10 @@ class AtomicRedisModel(BaseModel):
     @classmethod
     def contains_sf_field(cls) -> bool:
         return bool(cls._contain_sf) or bool(cls._special_field_names)
+
+    @classmethod
+    def contains_fk_field(cls) -> bool:
+        return bool(cls._contain_fk) or bool(cls._relational_field_names)
 
     @classmethod
     @functools.cache
