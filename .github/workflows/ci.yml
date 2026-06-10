@@ -91,8 +91,8 @@ jobs:
       fail-fast: ${{ github.event_name == 'pull_request' }}
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
-        redis-version: ["6.0", "6.1", "6.2", "6.3", "6.4"]
-        pydantic-version: ["2.11", "2.12"]
+        redis-version: ["6.0", "6.1", "6.2", "6.3", "6.4", "7.0", "7.1", "7.2", "7.3", "7.4"]
+        pydantic-version: ["2.11", "2.12", "2.13"]
 
     services:
       redis:
