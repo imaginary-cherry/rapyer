@@ -6,6 +6,10 @@
 
 - **`aget_or_create`**: New atomic "get-or-create" primitive exposed both as a module-level helper (`rapyer.aget_or_create(model)`) and as a classmethod (`MyModel.aget_or_create(model)`). The existence check, write, and any special-field save/load happen inside a single registered Lua script — one server-side round-trip, no TOCTOU race between `aexists` and `asave`. Special fields nested inside child models are handled in the same atomic dispatch, and the found branch now also refreshes TTL (the call participates in the `FETCH` action group).
 
+### 🔄 Changed
+
+- **Wider dependency ranges**: Supported version ranges have been widened to `redis>=6.0.0,<7.5.0` (previously `<7.1.0`) and `pydantic>=2.11.0,<2.14.0` (previously `<2.13.0`). The test matrix now exercises redis 7.0–7.4 and pydantic 2.13 in addition to the previously covered versions.
+
 ### 🐛 Fixed
 
 - **Nested special fields persisted across all actions**: `asave`, `aduplicate`, `ainsert`, batch creation, and `aget_or_create` now recurse into child models and persist their special fields. Previously only special fields declared directly on the top-level model were saved/copied; special fields nested inside a sub-model were silently dropped.

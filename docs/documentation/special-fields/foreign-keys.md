@@ -40,6 +40,9 @@ book = Book(title="x", author="Author:abc-123")
 book = Book(title="x", author={"$ref": "Author", "$id": "abc-123"})
 ```
 
+!!! note "Existence is not validated on save"
+    Saving a model does **not** check that the referenced key actually exists in Redis. A reference is stored as a plain key string, so you can save a `Book` pointing at an `Author` that has never been created (or has since been deleted). The missing target only surfaces later, when you call `afetch()` and get a `KeyNotFound`. Referential-integrity enforcement may land in a follow-up release.
+
 ## Lazy Resolution
 
 When you load a model, its references come back **unresolved** — the key is known, but the target is not yet fetched:
