@@ -10,6 +10,7 @@ on:
 
 jobs:
   publish:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     environment:
       name: publish-pip
     runs-on: ubuntu-22.04
