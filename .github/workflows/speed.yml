@@ -9,35 +9,17 @@ on:
   workflow_dispatch:
 
 jobs:
-  mirror-redis:
-    runs-on: ubuntu-22.04
-    permissions:
-      packages: write
-    outputs:
-      image: ${{ steps.mirror.outputs.image }}
-    steps:
-    - uses: actions/checkout@v5
-    - id: mirror
-      uses: ./.github/actions/mirror-redis
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-
   benchmarks:
-    needs: [mirror-redis]
     permissions:
       contents: read
       id-token: write
-      packages: read
     environment:
       name: benchmark
     name: Run benchmarks
     runs-on: codspeed-macro
     services:
       redis:
-        image: ${{ needs.mirror-redis.outputs.image }}
-        credentials:
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+        image: redis/redis-stack-server:latest
         ports:
           - 6370:6379
         options: >-
