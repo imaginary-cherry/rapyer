@@ -33,6 +33,21 @@ jobs:
         
         echo "✅ Branch targeting rules validated successfully"
 
+  # Mirror the Redis server image into GHCR once; the test job pulls the service
+  # container from there (no Docker Hub rate limit). See .github/actions/mirror-redis.
+  mirror-redis:
+    runs-on: ubuntu-22.04
+    permissions:
+      packages: write
+    outputs:
+      image: ${{ steps.mirror.outputs.image }}
+    steps:
+    - uses: actions/checkout@v5
+    - id: mirror
+      uses: ./.github/actions/mirror-redis
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
   lint:
     runs-on: ubuntu-22.04
     needs: [validate-branch-target]
@@ -85,8 +100,11 @@ jobs:
 
   test:
     runs-on: ubuntu-22.04
-    needs: [validate-branch-target]
-    if: always() && (needs.validate-branch-target.result == 'success' || needs.validate-branch-target.result == 'skipped')
+    needs: [validate-branch-target, mirror-redis]
+    if: always() && (needs.validate-branch-target.result == 'success' || needs.validate-branch-target.result == 'skipped') && needs.mirror-redis.result == 'success'
+    permissions:
+      contents: read
+      packages: read
     strategy:
       fail-fast: ${{ github.event_name == 'pull_request' }}
       matrix:
@@ -96,7 +114,10 @@ jobs:
 
     services:
       redis:
-        image: redis/redis-stack-server:latest
+        image: ${{ needs.mirror-redis.outputs.image }}
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         ports:
           - 6370:6379
         options: >-

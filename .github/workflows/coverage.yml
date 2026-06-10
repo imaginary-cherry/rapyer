@@ -13,12 +13,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  mirror-redis:
+    runs-on: ubuntu-22.04
+    permissions:
+      packages: write
+    outputs:
+      image: ${{ steps.mirror.outputs.image }}
+    steps:
+    - uses: actions/checkout@v5
+    - id: mirror
+      uses: ./.github/actions/mirror-redis
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
   coverage:
     runs-on: ubuntu-22.04
+    needs: [mirror-redis]
+    permissions:
+      contents: read
+      packages: read
 
     services:
       redis:
-        image: redis/redis-stack-server:latest
+        image: ${{ needs.mirror-redis.outputs.image }}
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         ports:
           - 6370:6379
         options: >-

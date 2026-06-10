@@ -1,0 +1,47 @@
+name: Mirror Redis image to GHCR
+description: >-
+  Pull redis-stack-server from Docker Hub once and mirror it into this repo's
+  GHCR namespace, then output the GHCR image reference. Lets matrix jobs pull the
+  Redis service container from GHCR (authenticated, no Docker Hub rate limit)
+  instead of hammering Docker Hub once per job.
+
+inputs:
+  token:
+    description: Token with packages:write — pass secrets.GITHUB_TOKEN.
+    required: true
+  tag:
+    description: redis-stack-server tag to mirror.
+    required: false
+    default: "7.4.0-v8"
+
+outputs:
+  image:
+    description: GHCR image reference for the mirrored Redis server.
+    value: ${{ steps.ref.outputs.image }}
+
+runs:
+  using: composite
+  steps:
+    - name: Compute lowercase GHCR image ref
+      id: ref
+      shell: bash
+      run: echo "image=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')/redis-stack-server:${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+
+    - name: Log in to GHCR
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.token }}
+
+    - name: Mirror redis-stack-server to GHCR (only on cache miss)
+      shell: bash
+      run: |
+        IMAGE='${{ steps.ref.outputs.image }}'
+        if docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
+          echo "Already mirrored: $IMAGE"
+        else
+          docker pull redis/redis-stack-server:${{ inputs.tag }}
+          docker tag redis/redis-stack-server:${{ inputs.tag }} "$IMAGE"
+          docker push "$IMAGE"
+        fi
