@@ -33,6 +33,8 @@ from tests.models.complex_types import (
     TestRedisModel,
 )
 from tests.models.foreign_key_types import (
+    FkAfetchOwner,
+    FkAfetchTarget,
     FkAuthor,
     FkBook,
     FkLibrary,
@@ -224,4 +226,6 @@ TESTED_REDIS_MODELS = [
     FkProfile,
     FkRichAuthor,
     FkLibrary,
+    FkAfetchTarget,
+    FkAfetchOwner,
 ]

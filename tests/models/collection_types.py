@@ -1,11 +1,12 @@
 from datetime import datetime
-from typing import Any, ClassVar, Dict, List
+from typing import Any, ClassVar, Dict, List, Optional
 
 from pydantic import Field
 
 from rapyer.base import AtomicRedisModel
 from rapyer.config import RedisConfig
 from rapyer.types import RedisDatetimeTimestamp, RedisPriorityQueue, RedisSet
+from rapyer.types.foreign_key import Reference
 from tests.models.common import (
     Address,
     Company,
@@ -17,6 +18,7 @@ from tests.models.common import (
     User,
     UserProfile,
 )
+from tests.models.foreign_key_types import FkAuthor
 from tests.models.pipeline_base import PipelineActionModel
 
 TTL_REFRESH_TEST_SECONDS = 24
@@ -143,6 +145,7 @@ class ComprehensiveTestModel(PipelineActionModel):
     event_timestamp: RedisDatetimeTimestamp = Field(default_factory=datetime.now)
     tasks: RedisPriorityQueue[int] = Field(default_factory=RedisPriorityQueue[int])
     container: SpecialFieldsContainer = Field(default_factory=SpecialFieldsContainer)
+    author: Optional[Reference[FkAuthor]] = None
 
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=TTL_REFRESH_TEST_SECONDS)
 
