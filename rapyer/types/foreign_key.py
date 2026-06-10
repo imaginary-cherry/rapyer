@@ -144,9 +144,10 @@ class ForeignKey(RelationalFieldType, Generic[T]):
             return value._target_key
 
         # TODO: this name-normalization exists only because the metaclass converts a
-        # Pin the generic parameter on the per-field subclass so the init-stage
-        # resolver (resolve_relational_targets) can map it to the canonical
-        # target model. Doesn't affect the schema itself.
+        #       ForeignKey's target into a dynamic per-field subclass. Once reference
+        #       targets are kept as static types, this can be removed (or reduced to a thin
+        #       forward-ref-string fallback).
+        #       https://github.com/imaginary-cherry/rapyer/issues/247
         cls._target_type_hint = target_hint
 
         return core_schema.no_info_plain_validator_function(

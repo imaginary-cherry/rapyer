@@ -57,10 +57,10 @@ def _resolve_target_model(target_hint: Any) -> "type[AtomicRedisModel] | None":
     detached model. Returns ``None`` for an unbound ``TypeVar``.
     """
     # TODO: this name-normalization exists only because the metaclass converts a
-    # ForeignKey's target into a dynamic per-field subclass. Once reference
-    # targets are kept as static types, this can be removed (or reduced to a thin
-    # forward-ref-string fallback).
-    # https://github.com/imaginary-cherry/rapyer/issues/247
+    #       ForeignKey's target into a dynamic per-field subclass. Once reference
+    #       targets are kept as static types, this can be removed (or reduced to a thin
+    #       forward-ref-string fallback).
+    #       https://github.com/imaginary-cherry/rapyer/issues/247
     from rapyer.base import REDIS_MODELS
 
     name = (
