@@ -48,18 +48,16 @@ class FkTree(AtomicRedisModel):
 
 
 class FkAfetchTarget(AtomicRedisModel):
-    # TTL on, refresh off — so the inner ``aget`` that ``afetch`` delegates to
-    # won't refresh this key on its own. That isolates ``ForeignKey.afetch``'s
-    # own action wrapper as the sole refresher, which is what the afetch action
-    # test asserts.
-    Meta: ClassVar[RedisConfig] = RedisConfig(
-        ttl=FK_AFETCH_TTL_SECONDS, refresh_ttl=False
-    )
+    # The model afetch resolves and refreshes (target=RESULT). It carries TTL so
+    # the refresh is observable; the afetch action test checks this key.
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=FK_AFETCH_TTL_SECONDS)
     name: str = "anon"
     age: int = 0
 
 
 class FkAfetchOwner(AtomicRedisModel):
-    # TTL on so the per-field ForeignKey gets its afetch action installed.
+    # The owner gates afetch's refresh under V2 (the wrap decision uses this
+    # model's TTL-refresh config at install time), so it carries TTL and is the
+    # model the afetch action test toggles.
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=FK_AFETCH_TTL_SECONDS)
     ref: Reference[FkAfetchTarget]
