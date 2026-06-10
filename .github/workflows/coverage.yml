@@ -29,6 +29,8 @@ jobs:
   coverage:
     runs-on: ubuntu-22.04
     needs: [mirror-redis]
+    environment:
+      name: coverage
     permissions:
       contents: read
       packages: read
