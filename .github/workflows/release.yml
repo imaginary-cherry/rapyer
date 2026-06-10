@@ -16,7 +16,7 @@ jobs:
       contents: write  # Required for creating releases
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         fetch-depth: 0  # Need full history for tag lookup
 
@@ -70,12 +70,12 @@ jobs:
         } >> $GITHUB_OUTPUT
     
     - name: Create GitHub Release
-      uses: actions/create-release@v1
+      uses: softprops/action-gh-release@v2
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ steps.version.outputs.tag }}
-        release_name: ${{ steps.version.outputs.version }} - ${{ steps.version.outputs.release_date }}
-        body: ${{ steps.release_notes.outputs.notes }}
+        name: ${{ steps.version.outputs.version }} - ${{ steps.version.outputs.release_date }}
+        body_path: release_notes.md
         draft: false
         prerelease: false
