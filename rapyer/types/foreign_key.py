@@ -24,18 +24,16 @@ class ForeignKey(RelationalFieldType, Generic[T]):
     original_type: type = str
     _target_type_hint: Any = None
 
-    def __init__(
-        self,
-        target_key: str | None = None,
-        value: "AtomicRedisModel | None" = None,
-    ):
+    def __init__(self, ref: "str | AtomicRedisModel"):
         super().__init__()
-        if value is not None:
-            self._value = value
-            self._target_key = target_key if target_key is not None else value.key
-        else:
+        if isinstance(ref, str):
+            # A Redis key string — the reference stays unresolved until afetch.
             self._value = None
-            self._target_key = target_key
+            self._target_key = ref
+        else:
+            # Anything else is assumed to be the target AtomicRedisModel.
+            self._value = ref
+            self._target_key = ref.key
 
     def __class_getitem__(cls, item):
         parameterized = super().__class_getitem__(item)
@@ -64,8 +62,6 @@ class ForeignKey(RelationalFieldType, Generic[T]):
         """Resolve the target instance from Redis and cache it in-place."""
         if self._value is not None:
             return self._value
-        if self._target_key is None:
-            raise NotResolvedError("ForeignKey has no target key to fetch.")
         target_cls = self._relational_target
         if target_cls is None:
             raise TypeError(
@@ -124,16 +120,15 @@ class ForeignKey(RelationalFieldType, Generic[T]):
 
             if isinstance(value, ForeignKey):
                 return value
-            if isinstance(value, AtomicRedisModel):
-                return cls(value=value)
-            if isinstance(value, str):
-                return cls(target_key=value)
+            if isinstance(value, (AtomicRedisModel, str)):
+                # __init__ dispatches: a str is a key, a model is the target.
+                return cls(value)
             if isinstance(value, dict):
                 # Beanie-style DBRef: {"$ref": "Author", "$id": "abc-123"}
                 ref = value.get("$ref")
                 pk = value.get("$id")
                 if ref is not None and pk is not None:
-                    return cls(target_key=f"{ref}:{pk}")
+                    return cls(f"{ref}:{pk}")
             raise TypeError(
                 f"Cannot validate ForeignKey from {type(value).__name__}: {value!r}"
             )
