@@ -32,6 +32,7 @@ jobs:
     permissions:
       contents: read
       packages: read
+      pull-requests: write
 
     services:
       redis:
@@ -74,6 +75,15 @@ jobs:
             sed -n '/^Name\s/,/^TOTAL/p' coverage_output.txt || tail -n 40 coverage_output.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment coverage on PR
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          COVERAGE_TXT: coverage_output.txt
+        run: ./.github/scripts/comment_coverage.sh
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
