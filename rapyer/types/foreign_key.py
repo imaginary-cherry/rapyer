@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union, get_args
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
 
+from rapyer.actions import ActionGroup, TargetSource, mark_actions
 from rapyer.errors import NotResolvedError
 from rapyer.types.relational import RelationalFieldType
 
@@ -58,6 +59,7 @@ class ForeignKey(RelationalFieldType, Generic[T]):
             )
         return self._value
 
+    @mark_actions(ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT)
     async def afetch(self) -> "AtomicRedisModel":
         """Resolve the target instance from Redis and cache it in-place."""
         if self._value is not None:
