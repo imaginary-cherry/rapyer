@@ -114,7 +114,7 @@ class Tree(AtomicRedisModel):
     parent: Optional[Reference["Tree"]] = None
 ```
 
-The name is resolved against the registered rapyer models at fetch time:
+The name is resolved against the registered rapyer models at initialization time (by `resolve_relational_targets`); `afetch()` then uses that cached target class to load by key:
 
 ```python
 child = await Tree.aget(child.key)
