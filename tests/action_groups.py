@@ -8,9 +8,11 @@ from rapyer.types.base import BaseRedisType, RedisType
 from rapyer.types.byte import RedisBytes
 from rapyer.types.datetime import RedisDatetimeTimestamp
 from rapyer.types.dct import RedisDict
+from rapyer.types.foreign_key import ForeignKey
 from rapyer.types.generic import GenericRedisType
 from rapyer.types.lst import RedisList
 from rapyer.types.priority_queue import RedisPriorityQueue
+from rapyer.types.relational import RelationalFieldType
 from rapyer.types.special import SpecialFieldType
 from tests.coverage_helpers import cover_tuple
 
@@ -42,6 +44,7 @@ PRIVATE_METHODS = _group(
     RedisSet._tmp_key,
     # Generic
     GenericRedisType.contains_sf_field,
+    GenericRedisType.contains_fk_field,
     # AtomicRedisModel
     AtomicRedisModel._search_keys_by_query,
     AtomicRedisModel.build_redis_model,
@@ -70,7 +73,14 @@ PRIVATE_METHODS = _group(
     AtomicRedisModel.should_refresh_for_action,
     AtomicRedisModel.build_redis_dump_exclude,
     AtomicRedisModel.contains_sf_field,
+    AtomicRedisModel.contains_fk_field,
     AtomicRedisModel.queue_special_loads_in_pipeline,
+    # Abstract relational stub — never executed; the concrete ForeignKey.afetch
+    # override is the real READ|FETCH action and is covered as one.
+    RelationalFieldType.afetch,
+    # Pure in-memory cache drop (sets self._value = None); no Redis round trip,
+    # so the pipeline/TTL/effect action matrix doesn't apply.
+    ForeignKey.aunload,
 )
 
 # PRIVATE_INHERITED_METHODS — MRO-aware. Any subclass that inherits OR
