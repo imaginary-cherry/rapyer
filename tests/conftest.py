@@ -261,7 +261,7 @@ def _iter_class_methods(cls, include_async: bool = True, include_sync: bool = Tr
     for name, method in members:
         if isinstance(method, (classmethod, staticmethod)):
             method = method.__func__
-        if name.startswith("__") or not callable(method):
+        if not callable(method):
             continue
         if cover_tuple(method)[0] != cls.__name__:
             continue
