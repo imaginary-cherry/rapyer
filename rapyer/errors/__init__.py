@@ -25,6 +25,7 @@ from rapyer.errors.find import (
 )
 
 
+# TODO - we should remove this in the 1.4.0 - this backward compatiability code
 def __getattr__(name):
     if name == "UnsupportArgumentTypeError":
         warnings.warn(
