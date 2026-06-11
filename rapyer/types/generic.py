@@ -34,8 +34,6 @@ class GenericRedisType(RedisType, Generic[T], ABC):
 
     @classmethod
     def contains_sf_field(cls) -> bool:
-        if cls.original_type is None:
-            return False
         inner = cls.find_inner_type(cls.original_type)
         if inner is Any:
             return False
@@ -48,8 +46,6 @@ class GenericRedisType(RedisType, Generic[T], ABC):
 
     @classmethod
     def contains_fk_field(cls) -> bool:
-        if cls.original_type is None:
-            return False
         inner = cls.find_inner_type(cls.original_type)
         if inner is Any:
             return False

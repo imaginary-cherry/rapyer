@@ -1,8 +1,5 @@
 import abc
-from typing import Any, ClassVar, Optional
-
-from pydantic import GetCoreSchemaHandler
-from pydantic_core import core_schema
+from typing import ClassVar, Optional
 
 from rapyer.scripts.loader import load_sf_load_snippet, load_sf_save_snippet
 from rapyer.types.base import BaseRedisType
@@ -121,14 +118,3 @@ class SpecialFieldType(BaseRedisType, abc.ABC):
 
     def clone(self):
         return self.__class__()
-
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls, source_type: Any, handler: GetCoreSchemaHandler
-    ) -> core_schema.CoreSchema:
-        return core_schema.no_info_plain_validator_function(
-            lambda v: v if isinstance(v, cls) else cls(),
-            serialization=core_schema.plain_serializer_function_ser_schema(
-                lambda v: None,
-            ),
-        )

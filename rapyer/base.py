@@ -642,8 +642,6 @@ class AtomicRedisModel(BaseModel):
         for fname in cls._special_field_names:
             exclude[fname] = True
         for fname in cls._contain_sf:
-            if fname in exclude:
-                continue
             annotation = cls.model_fields[fname].annotation
             inner = get_origin(annotation) or annotation
             if isinstance(inner, type) and issubclass(inner, AtomicRedisModel):
