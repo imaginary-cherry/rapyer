@@ -8,9 +8,6 @@ from tests.models.collection_types import ComprehensiveTestModel
 
 class TestDictUpdate(ComprehensiveMetadataOpBase, SyncActionTestBase):
     covered_method = RedisDict.update
-    skip_stale_mirror_in_pipeline = (
-        "UPDATE action (no ERASE); native dict.update never raises"
-    )
     skip_sync_native_raises_on_corruption = "native dict.update never raises"
 
     def create_models(self):
@@ -32,9 +29,6 @@ class TestDictUpdate(ComprehensiveMetadataOpBase, SyncActionTestBase):
 
 class TestDictSetitem(ComprehensiveMetadataOpBase, SyncActionTestBase):
     covered_method = RedisDict.__setitem__
-    skip_stale_mirror_in_pipeline = (
-        "UPDATE action (no ERASE); native d[k]=v never raises"
-    )
     skip_sync_native_raises_on_corruption = "native d[k]=v never raises"
 
     def create_models(self):
@@ -80,9 +74,6 @@ class TestRedisDictClear(ComprehensiveMetadataOpBase, SyncActionTestBase):
 
 class TestDictAsetItem(ComprehensiveMetadataOpBase, TTLActionTestBase):
     covered_method = RedisDict.aset_item
-    skip_stale_mirror_in_pipeline = (
-        "UPDATE action (no ERASE); native d[k]=v never raises"
-    )
 
     def create_models(self):
         return [ComprehensiveTestModel(metadata={"existing": "value"})]
@@ -118,9 +109,6 @@ class TestDictAdelItem(ComprehensiveMetadataOpBase, TTLActionTestBase):
 
 class TestDictAupdate(ComprehensiveMetadataOpBase, TTLActionTestBase):
     covered_method = RedisDict.aupdate
-    skip_stale_mirror_in_pipeline = (
-        "UPDATE action (no ERASE); native dict.update never raises"
-    )
 
     def create_models(self):
         return [ComprehensiveTestModel(metadata={"existing": "value"})]

@@ -51,7 +51,6 @@ class RedisSetActionBase(UpdateActionTestBase, TTLActionTestBase, ABC):
 
 class TestSetAadd(RedisSetActionBase):
     covered_method = RedisSet.aadd
-    skip_stale_mirror_in_pipeline = "APPEND action; native set.add never raises"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.container.labels.aadd("delta")
@@ -62,7 +61,6 @@ class TestSetAadd(RedisSetActionBase):
 
 class TestSetAaddMany(RedisSetActionBase):
     covered_method = RedisSet.aadd_many
-    skip_stale_mirror_in_pipeline = "APPEND action; native set.update never raises"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.container.labels.aadd_many(["delta", "epsilon"])
@@ -259,7 +257,6 @@ class RedisSetSyncActionBase(UpdateActionTestBase, SyncActionTestBase, ABC):
 
 class TestSetAdd(RedisSetSyncActionBase):
     covered_method = RedisSet.add
-    skip_stale_mirror_in_pipeline = "APPEND action; native set.add never raises"
     skip_sync_native_raises_on_corruption = "native set.add never raises"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
@@ -275,7 +272,6 @@ class TestSetAdd(RedisSetSyncActionBase):
 
 class TestSetUpdate(RedisSetSyncActionBase):
     covered_method = RedisSet.update
-    skip_stale_mirror_in_pipeline = "APPEND action; native set.update never raises"
     skip_sync_native_raises_on_corruption = "native set.update never raises"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
@@ -367,7 +363,6 @@ class TestSetIntersectionUpdate(RedisSetSyncActionBase):
 
 class TestSetSymmetricDifferenceUpdate(RedisSetSyncActionBase):
     covered_method = RedisSet.symmetric_difference_update
-    skip_stale_mirror_in_pipeline = "UPDATE-only action (no ERASE tag); native set.symmetric_difference_update never raises"
     skip_sync_native_raises_on_corruption = (
         "native set.symmetric_difference_update never raises"
     )
@@ -388,7 +383,6 @@ class TestSetSymmetricDifferenceUpdate(RedisSetSyncActionBase):
 
 class TestSetIor(RedisSetSyncActionBase):
     covered_method = RedisSet.__ior__
-    skip_stale_mirror_in_pipeline = "APPEND action; native set |= never raises"
     skip_sync_native_raises_on_corruption = "native set |= never raises"
 
     async def perform_action(self, piped: ComprehensiveTestModel):
@@ -434,7 +428,6 @@ class TestSetIsub(RedisSetSyncActionBase):
 
 class TestSetIxor(RedisSetSyncActionBase):
     covered_method = RedisSet.__ixor__
-    skip_stale_mirror_in_pipeline = "UPDATE-only action; native set ^= never raises"
     skip_sync_native_raises_on_corruption = "native set ^= never raises"
 
     async def perform_action(self, piped: ComprehensiveTestModel):

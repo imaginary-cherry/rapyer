@@ -8,7 +8,6 @@ from tests.models.collection_types import ComprehensiveTestModel
 
 class TestListAppend(ComprehensiveTagsOpBase, SyncActionTestBase):
     covered_method = RedisList.append
-    skip_stale_mirror_in_pipeline = "APPEND action; native list.append never raises"
     skip_sync_native_raises_on_corruption = "native list.append never raises"
 
     def create_models(self):
@@ -30,7 +29,6 @@ class TestListAppend(ComprehensiveTagsOpBase, SyncActionTestBase):
 
 class TestListExtend(ComprehensiveTagsOpBase, SyncActionTestBase):
     covered_method = RedisList.extend
-    skip_stale_mirror_in_pipeline = "APPEND action; native list.extend never raises"
     skip_sync_native_raises_on_corruption = "native list.extend never raises"
 
     def create_models(self):
@@ -52,7 +50,6 @@ class TestListExtend(ComprehensiveTagsOpBase, SyncActionTestBase):
 
 class TestRedisListInsert(ComprehensiveTagsOpBase, SyncActionTestBase):
     covered_method = RedisList.insert
-    skip_stale_mirror_in_pipeline = "APPEND action; native list.insert never raises"
     skip_sync_native_raises_on_corruption = "native list.insert never raises"
 
     def create_models(self):
@@ -119,9 +116,6 @@ class TestRedisListRemoveRange(ComprehensiveTagsOpBase):
 
 class TestRedisListSetitem(ComprehensiveTagsOpBase, SyncActionTestBase):
     covered_method = RedisList.__setitem__
-    skip_stale_mirror_in_pipeline = (
-        "UPDATE action (no ERASE); native list[i]=x never raises on a valid index"
-    )
     skip_sync_native_raises_on_corruption = "native list[i]=x never raises"
 
     def create_models(self):
@@ -143,7 +137,6 @@ class TestRedisListSetitem(ComprehensiveTagsOpBase, SyncActionTestBase):
 
 class TestRedisListIadd(ComprehensiveTagsOpBase, SyncActionTestBase):
     covered_method = RedisList.__iadd__
-    skip_stale_mirror_in_pipeline = "APPEND action; native list += never raises"
     skip_sync_native_raises_on_corruption = "native list += never raises"
 
     def create_models(self):
@@ -165,7 +158,6 @@ class TestRedisListIadd(ComprehensiveTagsOpBase, SyncActionTestBase):
 
 class TestListAappend(ComprehensiveTagsOpBase, TTLActionTestBase):
     covered_method = RedisList.aappend
-    skip_stale_mirror_in_pipeline = "APPEND action; native list.append never raises"
 
     def create_models(self):
         return [ComprehensiveTestModel(tags=["initial"])]
@@ -182,7 +174,6 @@ class TestListAappend(ComprehensiveTagsOpBase, TTLActionTestBase):
 
 class TestListAextend(ComprehensiveTagsOpBase, TTLActionTestBase):
     covered_method = RedisList.aextend
-    skip_stale_mirror_in_pipeline = "APPEND action; native list.extend never raises"
 
     def create_models(self):
         return [ComprehensiveTestModel(tags=["initial"])]
@@ -199,7 +190,6 @@ class TestListAextend(ComprehensiveTagsOpBase, TTLActionTestBase):
 
 class TestListAinsert(ComprehensiveTagsOpBase, TTLActionTestBase):
     covered_method = RedisList.ainsert
-    skip_stale_mirror_in_pipeline = "APPEND action; native list.insert never raises"
 
     def create_models(self):
         return [ComprehensiveTestModel(tags=["first", "last"])]
