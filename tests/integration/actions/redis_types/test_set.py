@@ -381,3 +381,68 @@ class TestSetSymmetricDifferenceUpdate(RedisSetSyncActionBase):
 
     def expected_after(self):
         return (INITIAL_SERIALIZED - {'"alpha"'}) | {'"delta"'}
+
+
+# --- In-place operators ---------------------------------------------------
+
+
+class TestSetIor(RedisSetSyncActionBase):
+    covered_method = RedisSet.__ior__
+    skip_stale_mirror_in_pipeline = "APPEND action; native set |= never raises"
+    skip_sync_native_raises_on_corruption = "native set |= never raises"
+
+    async def perform_action(self, piped: ComprehensiveTestModel):
+        piped.container.labels |= {"delta", "epsilon"}
+
+    def apply_native_action(self, native: set) -> set:
+        native |= {"delta", "epsilon"}
+        return native
+
+    def expected_after(self):
+        return INITIAL_SERIALIZED | {'"delta"', '"epsilon"'}
+
+
+class TestSetIand(RedisSetSyncActionBase):
+    covered_method = RedisSet.__iand__
+    skip_sync_native_raises_on_corruption = "native set &= never raises"
+
+    async def perform_action(self, piped: ComprehensiveTestModel):
+        piped.container.labels &= {"alpha", "delta"}
+
+    def apply_native_action(self, native: set) -> set:
+        native &= {"alpha", "delta"}
+        return native
+
+    def expected_after(self):
+        return frozenset({'"alpha"'})
+
+
+class TestSetIsub(RedisSetSyncActionBase):
+    covered_method = RedisSet.__isub__
+    skip_sync_native_raises_on_corruption = "native set -= never raises"
+
+    async def perform_action(self, piped: ComprehensiveTestModel):
+        piped.container.labels -= {"alpha"}
+
+    def apply_native_action(self, native: set) -> set:
+        native -= {"alpha"}
+        return native
+
+    def expected_after(self):
+        return INITIAL_SERIALIZED - {'"alpha"'}
+
+
+class TestSetIxor(RedisSetSyncActionBase):
+    covered_method = RedisSet.__ixor__
+    skip_stale_mirror_in_pipeline = "UPDATE-only action; native set ^= never raises"
+    skip_sync_native_raises_on_corruption = "native set ^= never raises"
+
+    async def perform_action(self, piped: ComprehensiveTestModel):
+        piped.container.labels ^= {"alpha", "delta"}
+
+    def apply_native_action(self, native: set) -> set:
+        native ^= {"alpha", "delta"}
+        return native
+
+    def expected_after(self):
+        return (INITIAL_SERIALIZED - {'"alpha"'}) | {'"delta"'}
