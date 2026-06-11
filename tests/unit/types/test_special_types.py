@@ -1,10 +1,12 @@
 import pytest
+from pydantic import TypeAdapter
 
-from rapyer.errors import UpdateAtomicModelError
+from rapyer.errors import RapyerSerializationError, UpdateAtomicModelError
 from rapyer.types.base import BaseRedisType
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX, SpecialFieldType
 from tests.models.special_types import (
+    GenericPriorityQueueModel,
     MixedSpecialModel,
     OverriddenSpecialFieldModel,
     PriorityQueueIntModel,
@@ -114,3 +116,52 @@ async def test_aupdate_raises_error_for_special_field_among_regular_fields():
 
     with pytest.raises(UpdateAtomicModelError):
         await model.aupdate(name="new_name", tasks=RedisPriorityQueue())
+
+
+def test_priority_queue_serializer_passes_through_non_collection_value():
+    # Coverage: the RedisPriorityQueue serializer's fallback `return v` for a
+    # value that is neither a list nor a queue. Only reachable by serializing
+    # such a value directly through the type adapter, hence a unit test.
+    # The wrap serializer falls back to returning the value unchanged for
+    # anything that is neither a list nor a RedisPriorityQueue.
+    sentinel = 123
+    assert TypeAdapter(RedisPriorityQueue).dump_python(sentinel) == sentinel
+
+
+# --- Validator / equality edge cases ---
+
+
+def test_eq_with_non_priority_queue_is_false():
+    # Coverage: RedisPriorityQueue.__eq__'s branch for a non-queue operand
+    # (returns False instead of comparing special keys).
+    model = GenericPriorityQueueModel[str]()
+
+    assert (model.tasks == "not-a-queue") is False
+    assert model.tasks != "not-a-queue"
+
+
+def test_init_from_existing_converted_queue_passes_through():
+    # Coverage: the validator's exact-subclass fast path (isinstance(v, cls) ->
+    # return v) when assigning an already-converted queue instance.
+    source = GenericPriorityQueueModel[str]()
+
+    # Building a model from an already-converted queue instance returns it
+    # unchanged (the exact-subclass fast path, not a re-wrap from a list).
+    model = GenericPriorityQueueModel[str](tasks=source.tasks)
+
+    assert isinstance(model.tasks, RedisPriorityQueue)
+
+
+def test_init_from_list_without_context_raises():
+    # Coverage: the validator's ValueError branch — a list is only accepted
+    # under the Redis-dump context; a plain assignment must be rejected.
+    # A bare list (no Redis dump context) is not a valid queue assignment.
+    with pytest.raises(ValueError):
+        GenericPriorityQueueModel[str](tasks=[("a", 1.0)])
+
+
+def test_init_from_invalid_type_raises():
+    # Coverage: the validator's RapyerSerializationError branch for an input
+    # that is neither a queue, a list, nor a dump-context value.
+    with pytest.raises(RapyerSerializationError):
+        GenericPriorityQueueModel[str](tasks=123)

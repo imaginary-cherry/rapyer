@@ -1,10 +1,12 @@
 import json
 
 import pytest
+from pydantic import TypeAdapter
 
 from rapyer.errors import NotResolvedError
 from rapyer.types import Reference
-from rapyer.types.relational import RelationalFieldType
+from rapyer.types.foreign_key import ForeignKey
+from rapyer.types.relational import RelationalFieldType, _resolve_target_model
 from tests.models.foreign_key_types import FkAuthor, FkBook
 
 # --- Class-build introspection ---
@@ -184,3 +186,96 @@ def test_optional_foreign_key_round_trips_as_null():
     # Assert
     assert book.publisher is None
     assert dump["publisher"] is None
+
+
+# --- ForeignKey wrapper edge cases ---
+
+
+@pytest.mark.asyncio
+async def test_afetch_unresolved_target_type_raises_type_error():
+    # Coverage: ForeignKey.afetch's guard that raises when the target type was
+    # never resolved (_relational_target is None).
+    # Arrange
+    # A bare ForeignKey (not a metaclass per-field subclass) never had its
+    # target type resolved, so ``_relational_target`` stays None.
+    fk = ForeignKey("FkAuthor:1")
+
+    # Act / Assert
+    with pytest.raises(TypeError):
+        await fk.afetch()
+
+
+@pytest.mark.asyncio
+async def test_getattr_private_name_raises_attribute_error():
+    # Coverage: ForeignKey.__getattr__ early branch for underscore-prefixed
+    # names (returns AttributeError instead of delegating).
+    # Arrange
+    fk = ForeignKey("FkAuthor:1")
+
+    # Act / Assert
+    # Underscore-prefixed misses must raise AttributeError, not NotResolvedError,
+    # to avoid masking real errors / recursion before _value is set.
+    with pytest.raises(AttributeError):
+        fk._not_a_real_attribute
+
+
+def test_foreign_key_is_hashable():
+    # Coverage: ForeignKey.__hash__ (so ForeignKeys work in sets / as dict keys).
+    # Arrange
+    fk_a = ForeignKey("FkAuthor:1")
+    fk_b = ForeignKey("FkAuthor:1")
+    fk_c = ForeignKey("FkAuthor:2")
+
+    # Act / Assert
+    # Equal keys hash equal and collapse in a set; a different key stays distinct.
+    assert hash(fk_a) == hash(fk_b)
+    assert {fk_a, fk_b, fk_c} == {fk_a, fk_c}
+
+
+def test_validate_passes_through_existing_foreign_key():
+    # Coverage: the validator branch that returns an input value unchanged when
+    # it is already a ForeignKey (rather than re-wrapping a key/model).
+    # Arrange
+    fk = ForeignKey("FkAuthor:99")
+
+    # Act
+    # Building a model from an already-built ForeignKey returns it unchanged.
+    book = FkBook(title="x", author=fk)
+
+    # Assert
+    assert book.author.target_key == "FkAuthor:99"
+
+
+def test_serializer_handles_none():
+    # Coverage: the ForeignKey serializer's None guard. Reachable only by
+    # serializing None directly through the type adapter, hence a unit test.
+    # Act / Assert
+    assert TypeAdapter(ForeignKey).dump_python(None) is None
+
+
+def test_resolve_target_model_returns_none_for_unnamed_hint():
+    # Coverage: _resolve_target_model's branch for a hint with no resolvable
+    # name (None) — returns None instead of looking it up.
+    # Act / Assert
+    assert _resolve_target_model(None) is None
+
+
+def test_resolve_target_model_returns_none_for_unregistered_non_string_hint():
+    # Coverage: _resolve_target_model's final `return None` for a non-string
+    # hint whose name matches no registered model.
+    # Arrange
+    class NotAModel:
+        pass
+
+    # Act / Assert
+    # A non-string hint whose name matches no registered model yields None
+    # (only string hints raise — they are explicit forward references).
+    assert _resolve_target_model(NotAModel) is None
+
+
+def test_resolve_target_model_unregistered_string_raises():
+    # Coverage: _resolve_target_model's NameError branch for a string forward
+    # reference that names no registered model.
+    # Act / Assert
+    with pytest.raises(NameError):
+        _resolve_target_model("NotARegisteredRapyerModel")

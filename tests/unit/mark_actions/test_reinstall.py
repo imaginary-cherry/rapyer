@@ -118,6 +118,8 @@ def test_recursive_model_recurses_into_nested_atomic_model():
 
 
 def test_install_action_for_meta_returns_unmarked_func_unchanged():
+    # Coverage: install_action_for_meta's `params is None` early return — the
+    # path taken for any function that was never decorated as an action.
     # A function with no MarkActionParams is not an action: install must return
     # it untouched (no wrapping), regardless of meta.
     def plain():

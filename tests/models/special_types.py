@@ -88,3 +88,9 @@ class RedisSetContainerModel(AtomicRedisModel):
         default_factory=GenericRedisSetModel[str]
     )
     outer_name: str = "container"
+
+
+class ListOfSetsModel(AtomicRedisModel):
+    # A plain list of bare special fields: the metaclass detects the nested
+    # special field via GenericRedisType.contains_sf_field.
+    buckets: list[RedisSet] = Field(default_factory=list)

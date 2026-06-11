@@ -5,6 +5,7 @@ from rapyer.types.redis_set import RedisSet
 from tests.models.special_types import (
     AutoMappedSetModel,
     GenericRedisSetModel,
+    ListOfSetsModel,
     OptionalRedisSetModel,
 )
 
@@ -271,3 +272,81 @@ async def test_auto_mapped_set_field_persists_through_redis_set(real_redis_clien
     assert await model.tags.asize() == 3
     assert await model.tags.acontains("python") is True
     assert await model.tags.amembers() == {"python", "redis", "async"}
+
+
+# --- In-place operators (pipeline-backed sync) ---
+
+
+@pytest.mark.asyncio
+async def test_inplace_operators_sync_to_redis(real_redis_client):
+    # Coverage: RedisSet.__ior__/__isub__/__iand__/__ixor__ — the augmented-
+    # assignment operators, verified to sync to Redis inside a pipeline.
+    # Arrange
+    model = GenericRedisSetModel[str]()
+    await model.asave()
+    await model.tags.aadd_many(["a", "b", "c"])
+
+    # Act
+    async with model.apipeline() as m:
+        m.tags |= {"d"}  # __ior__   -> {a, b, c, d}
+        m.tags -= {"a"}  # __isub__  -> {b, c, d}
+        m.tags &= {"b", "d", "z"}  # __iand__  -> {b, d}
+        m.tags ^= {"b", "q"}  # __ixor__  -> {d, q}
+
+    # Assert
+    reloaded = await GenericRedisSetModel[str].aget(model.key)
+    assert await reloaded.tags.amembers() == {"d", "q"}
+
+
+@pytest.mark.asyncio
+async def test_empty_update_difference_and_aadd_many_are_noops(real_redis_client):
+    # Coverage: the empty-input early returns in RedisSet.update /
+    # difference_update / aadd_many.
+    # Arrange
+    model = GenericRedisSetModel[str]()
+    await model.asave()
+    await model.tags.aadd_many(["a", "b"])
+
+    # Act
+    # Empty iterables must early-return without touching Redis.
+    model.tags.update()
+    model.tags.difference_update()
+    await model.tags.aadd_many([])
+
+    # Assert
+    assert await model.tags.amembers() == {"a", "b"}
+
+
+@pytest.mark.asyncio
+async def test_clone_returns_independent_local_copy(real_redis_client):
+    # Coverage: RedisSet.clone() — returns a detached local copy of the members.
+    # Arrange
+    model = GenericRedisSetModel[str]()
+    await model.asave()
+    await model.tags.aadd_many(["a", "b"])
+
+    # Act
+    clone = model.tags.clone()
+
+    # Assert
+    assert isinstance(clone, RedisSet)
+    assert clone is not model.tags
+    assert set(clone) == set(model.tags)
+
+
+@pytest.mark.asyncio
+async def test_list_of_bare_redis_sets_is_detected_as_special(real_redis_client):
+    # Coverage: GenericRedisType.contains_sf_field's branch that returns True
+    # when the generic's inner element is itself a SpecialFieldType. Reached via
+    # a plain ``list[RedisSet]`` field (the only construct that produces it).
+    # Arrange / Assert
+    annotation = ListOfSetsModel.model_fields["buckets"].annotation
+    assert annotation.contains_sf_field() is True
+
+    # Act
+    model = ListOfSetsModel()
+    await model.asave()
+    loaded = await ListOfSetsModel.aget(model.key)
+
+    # Assert
+    assert loaded.buckets == []

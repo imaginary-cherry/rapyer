@@ -95,6 +95,7 @@ from tests.models.special_types import (
     GenericPriorityQueueModel,
     GenericRedisSetModel,
     InnerSameNamePQModel,
+    ListOfSetsModel,
     MixedSpecialModel,
     NestedSameNamePQModel,
     OptionalPriorityQueueModel,
@@ -218,6 +219,7 @@ TESTED_REDIS_MODELS = [
     AutoMappedSetModel,
     SubSubRedisSetModel,
     RedisSetContainerModel,
+    ListOfSetsModel,
     # Foreign key types
     FkAuthor,
     FkBook,
