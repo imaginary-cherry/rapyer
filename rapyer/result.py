@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 from pydantic import BaseModel, ConfigDict
 
 if TYPE_CHECKING:
-    from rapyer.base import AtomicRedisModel  # pragma: no cover
+    from rapyer.base import AtomicRedisModel
 
 
 class DeleteResult(BaseModel):

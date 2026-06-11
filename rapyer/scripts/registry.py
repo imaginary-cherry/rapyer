@@ -22,7 +22,7 @@ from rapyer.scripts.constants import (
 )
 from rapyer.scripts.loader import load_script
 
-if TYPE_CHECKING:  # pragma: no cover
+if TYPE_CHECKING:
     from rapyer.config import RedisConfig
 
 SCRIPT_REGISTRY: list[tuple[str, str, str]] = [

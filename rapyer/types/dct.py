@@ -203,4 +203,4 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
 
 
 if TYPE_CHECKING:
-    RedisDict: TypeAlias = RedisDict[T] | dict[str, T]  # pragma: no cover
+    RedisDict: TypeAlias = RedisDict[T] | dict[str, T]
