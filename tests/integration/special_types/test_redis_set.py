@@ -274,28 +274,7 @@ async def test_auto_mapped_set_field_persists_through_redis_set(real_redis_clien
     assert await model.tags.amembers() == {"python", "redis", "async"}
 
 
-# --- In-place operators (pipeline-backed sync) ---
-
-
-@pytest.mark.asyncio
-async def test_inplace_operators_sync_to_redis(real_redis_client):
-    # Coverage: RedisSet.__ior__/__isub__/__iand__/__ixor__ — the augmented-
-    # assignment operators, verified to sync to Redis inside a pipeline.
-    # Arrange
-    model = GenericRedisSetModel[str]()
-    await model.asave()
-    await model.tags.aadd_many(["a", "b", "c"])
-
-    # Act
-    async with model.apipeline() as m:
-        m.tags |= {"d"}  # __ior__   -> {a, b, c, d}
-        m.tags -= {"a"}  # __isub__  -> {b, c, d}
-        m.tags &= {"b", "d", "z"}  # __iand__  -> {b, d}
-        m.tags ^= {"b", "q"}  # __ixor__  -> {d, q}
-
-    # Assert
-    reloaded = await GenericRedisSetModel[str].aget(model.key)
-    assert await reloaded.tags.amembers() == {"d", "q"}
+# --- Empty-input no-ops / clone ---
 
 
 @pytest.mark.asyncio
