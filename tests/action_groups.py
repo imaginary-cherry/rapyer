@@ -6,7 +6,7 @@ from rapyer.base import AtomicRedisModel
 from rapyer.types import RedisSet
 from rapyer.types.base import BaseRedisType, RedisType
 from rapyer.types.byte import RedisBytes
-from rapyer.types.datetime import RedisDatetimeTimestamp
+from rapyer.types.datetime import RedisDatetime, RedisDatetimeTimestamp
 from rapyer.types.dct import RedisDict
 from rapyer.types.foreign_key import ForeignKey
 from rapyer.types.generic import GenericRedisType
@@ -118,6 +118,15 @@ PRIVATE_INHERITED_METHODS = _group(
     SpecialFieldType.has_lua_load_output,
     RedisPriorityQueue.aremove,
     AtomicRedisModel.redis_schema,
+    # Pydantic schema hook — a fixed-contract pydantic method (build a core
+    # schema at class-definition time); structurally never a Redis action, so
+    # every override across the hierarchy is filtered. One entry per branch
+    # root: RedisType covers its whole branch (GenericRedisType, RedisBytes,
+    # RedisDatetimeTimestamp, ...) via MRO name-matching.
+    RedisType.__get_pydantic_core_schema__,
+    RedisSet.__get_pydantic_core_schema__,
+    RedisPriorityQueue.__get_pydantic_core_schema__,
+    ForeignKey.__get_pydantic_core_schema__,
 )
 
 # NON_ACTION_METHODS — module-level helpers that aren't Redis actions and
@@ -140,6 +149,31 @@ NON_ACTION_METHODS = _group(
     AtomicRedisModel.aexists,
     rapyer.aexists,
     rapyer.apipeline,  # TODO - this should change once we add update on each action in the ttl
+    # ── Python protocol dunders ───────────────────────────────────────────
+    # Construction, equality, hashing, repr, attribute access, generic
+    # parameterization, and class-build hooks. Language/pydantic protocol
+    # methods, not Redis actions. Listed by exact (class, name) so a NEW
+    # subclass that overrides one surfaces for a conscious decision rather than
+    # being silently skipped (unlike __get_pydantic_core_schema__, whose
+    # contract can never be an action — see PRIVATE_INHERITED_METHODS).
+    AtomicRedisModel.__eq__,
+    AtomicRedisModel.__init_subclass__,
+    # __setattr__ DOES queue pipeline writes on field assignment, but that
+    # behavior is covered by the dedicated pipeline field-assignment tests,
+    # not the per-method action matrix.
+    AtomicRedisModel.__setattr__,
+    ForeignKey.__init__,
+    ForeignKey.__eq__,
+    ForeignKey.__hash__,
+    ForeignKey.__repr__,
+    ForeignKey.__getattr__,
+    ForeignKey.__class_getitem__,
+    GenericRedisType.__init__,
+    RedisDict.__init__,
+    RedisList.__init__,
+    RedisSet.__init__,
+    RedisPriorityQueue.__eq__,
+    RedisDatetime.__new__,
 )
 
 
