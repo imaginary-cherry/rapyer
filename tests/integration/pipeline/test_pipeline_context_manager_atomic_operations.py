@@ -1,4 +1,5 @@
 import pytest
+from redis.asyncio.client import Pipeline
 
 from rapyer.context import _context_pipe
 from tests.models.collection_types import (
@@ -266,3 +267,31 @@ async def test_pipeline_multiple_deletes__check_atomicity_sanity(real_redis_clie
     assert key1_exists == 0
     assert key2_exists == 0
     assert key3_exists == 1
+
+
+@pytest.mark.asyncio
+async def test_client_and_client_json_fall_back_to_meta(real_redis_client):
+    # Coverage: the `or self.Meta.redis(_json)` fallback in the client /
+    # client_json properties when no pipeline is bound to the context.
+    # Arrange
+    model = ComprehensiveTestModel(name="client_props")
+    await model.asave()
+
+    # Act / Assert
+    # Outside a pipeline context both properties resolve to the configured
+    # Meta clients rather than a context-bound pipeline.
+    assert model.client is model.Meta.redis
+    assert model.client_json is model.Meta.redis_json
+
+
+@pytest.mark.asyncio
+async def test_client_returns_context_pipeline_inside_pipeline(real_redis_client):
+    # Coverage: the client property's other branch — returning the
+    # context-bound pipeline when one is active.
+    # Arrange
+    model = ComprehensiveTestModel(name="client_props")
+    await model.asave()
+
+    # Act / Assert
+    async with model.apipeline() as m:
+        assert isinstance(m.client, Pipeline)

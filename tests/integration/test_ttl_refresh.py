@@ -1,7 +1,7 @@
 import pytest
 
 from tests.integration.conftest import REDUCED_TTL_SECONDS
-from tests.models.simple_types import TTL_TEST_SECONDS
+from tests.models.simple_types import TTL_TEST_SECONDS, TTLRefreshTestModel
 
 
 @pytest.mark.asyncio
@@ -38,3 +38,20 @@ async def test_ttl_refresh_maintains_original_ttl_value__sanity(
     refreshed_ttl = await real_redis_client.ttl(model.key)
     assert refreshed_ttl > initial_ttl
     assert TTL_TEST_SECONDS - 2 < refreshed_ttl <= TTL_TEST_SECONDS
+
+
+@pytest.mark.asyncio
+async def test_refresh_ttl_without_pipeline_executes_real_pipeline(real_redis_client):
+    # Coverage: context.pipeline_with_execution — the standalone transactional
+    # pipeline used when refresh_ttl runs with can_use_pipeline=False (other
+    # tests mock it, so its real body was never executed otherwise).
+    # Arrange
+    model = TTLRefreshTestModel(name="x", age=1, score=1.0)
+    await model.asave()
+    await real_redis_client.expire(model.key, 5)
+
+    # Act
+    await model.refresh_ttl_if_needed()
+
+    # Assert
+    assert await real_redis_client.ttl(model.key) > 5

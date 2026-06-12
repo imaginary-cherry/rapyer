@@ -2,6 +2,7 @@ import pytest
 
 from rapyer.errors import KeyNotFound
 from tests.models.simple_types import UserModelWithTTL
+from tests.models.special_types import GenericRedisSetModel
 
 
 @pytest.mark.asyncio
@@ -34,5 +35,24 @@ async def test_aload_raises_key_not_found_edge_case(real_redis_client):
     model = UserModelWithTTL(name="Charlie", age=35)
 
     # Act & Assert - After deletion, aload should raise KeyNotFound
+    with pytest.raises(KeyNotFound):
+        await model.aload()
+
+
+@pytest.mark.asyncio
+async def test_aload_missing_special_field_model_raises_key_not_found(
+    real_redis_client,
+):
+    # Coverage: aload's KeyNotFound branch on the special-field path (the load
+    # pipeline returns an empty dump for a missing key).
+    # Arrange
+    model = GenericRedisSetModel[str]()
+    await model.asave()
+    assert GenericRedisSetModel[str].contains_sf_field() is True
+
+    # Act
+    await real_redis_client.delete(model.key)
+
+    # Assert
     with pytest.raises(KeyNotFound):
         await model.aload()
