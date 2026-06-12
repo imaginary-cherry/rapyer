@@ -28,7 +28,7 @@ runs:
       run: echo "image=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')/redis-stack-server:${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
 
     - name: Log in to GHCR
-      uses: docker/login-action@v3
+      uses: docker/login-action@v4
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
