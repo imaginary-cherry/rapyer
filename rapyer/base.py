@@ -828,14 +828,10 @@ class AtomicRedisModel(BaseModel):
             register_action_target(model, ActionGroup.CREATE)
             return GetOrCreateResult(value=model, status=GetOrCreateStatus.CREATED)
 
-        if isinstance(payload, bytes):
-            payload = payload.decode()
         data = json.loads(payload)
         data = data[0] if isinstance(data, list) else data
         sf_raw: list = []
         for item in raw[2:]:
-            if isinstance(item, bytes):
-                item = item.decode()
             sf_raw.append(json.loads(item))
         inject_at_paths(data, load_plan, sf_raw)
         existing = cls.create_redis_model(data, model.key)

@@ -268,7 +268,7 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
             is_redis = ctx.get(REDIS_DUMP_FLAG_NAME)
             not_redis_set_obj = not isinstance(v, cls)
             if is_redis and not_redis_set_obj:
-                v = {json.loads(m.decode() if isinstance(m, bytes) else m) for m in v}
+                v = {json.loads(m) for m in v}
             return cls(handler_call(v))
 
         def _serialize_wrap(v, serializer, info):

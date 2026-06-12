@@ -39,7 +39,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         return self._dump_members([value])[0]
 
     def _load_member(self, raw):
-        parsed = json.loads(raw.decode() if isinstance(raw, bytes) else raw)
+        parsed = json.loads(raw)
         return self._adapter.validate_python(
             [parsed], context={REDIS_DUMP_FLAG_NAME: True}
         )[0]
