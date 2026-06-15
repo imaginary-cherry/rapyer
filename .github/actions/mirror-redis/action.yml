@@ -25,7 +25,10 @@ runs:
     - name: Compute lowercase GHCR image ref
       id: ref
       shell: bash
-      run: echo "image=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')/redis-stack-server:${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+      env:
+        REPOSITORY: ${{ github.repository }}
+        TAG: ${{ inputs.tag }}
+      run: echo "image=ghcr.io/$(echo "$REPOSITORY" | tr '[:upper:]' '[:lower:]')/redis-stack-server:$TAG" >> "$GITHUB_OUTPUT"
 
     - name: Log in to GHCR
       uses: docker/login-action@v4
@@ -36,12 +39,14 @@ runs:
 
     - name: Mirror redis-stack-server to GHCR (only on cache miss)
       shell: bash
+      env:
+        IMAGE: ${{ steps.ref.outputs.image }}
+        TAG: ${{ inputs.tag }}
       run: |
-        IMAGE='${{ steps.ref.outputs.image }}'
         if docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
           echo "Already mirrored: $IMAGE"
         else
-          docker pull redis/redis-stack-server:${{ inputs.tag }}
-          docker tag redis/redis-stack-server:${{ inputs.tag }} "$IMAGE"
+          docker pull "redis/redis-stack-server:$TAG"
+          docker tag "redis/redis-stack-server:$TAG" "$IMAGE"
           docker push "$IMAGE"
         fi

@@ -1,5 +1,5 @@
 from functools import lru_cache
-from importlib import resources
+from importlib import resources  # nosemgrep  # py>=3.10, 3.7 compat rule N/A
 
 from rapyer.scripts.constants import FAKEREDIS_VARIANT, REDIS_VARIANT
 
