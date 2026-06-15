@@ -6,7 +6,9 @@ from tests.models.collection_types import (
     BaseModelListModel,
     BoolDictModel,
     BytesDictModel,
+    ComprehensiveRefOwner,
     ComprehensiveTestModel,
+    ComprehensiveTestModelNoTTL,
     DictDictModel,
     DictListModel,
     DictModel,
@@ -19,6 +21,7 @@ from tests.models.collection_types import (
     NestedMetadataDictModel,
     PipelineTestModel,
     ProductListModel,
+    SpecialFieldsContainer,
     StrDictModel,
     StrListModel,
     UserListModel,
@@ -29,6 +32,15 @@ from tests.models.complex_types import (
     OuterModel,
     OuterModelWithRedisNested,
     TestRedisModel,
+)
+from tests.models.foreign_key_types import (
+    FkAuthor,
+    FkBook,
+    FkLibrary,
+    FkProfile,
+    FkPublisher,
+    FkRichAuthor,
+    FkTree,
 )
 from tests.models.functionality_types import (
     AllTypesModel,
@@ -83,6 +95,7 @@ from tests.models.special_types import (
     GenericPriorityQueueModel,
     GenericRedisSetModel,
     InnerSameNamePQModel,
+    ListOfSetsModel,
     MixedSpecialModel,
     NestedSameNamePQModel,
     OptionalPriorityQueueModel,
@@ -129,6 +142,9 @@ TESTED_REDIS_MODELS = [
     MixedTypesModel,
     PipelineTestModel,
     ComprehensiveTestModel,
+    ComprehensiveTestModelNoTTL,
+    ComprehensiveRefOwner,
+    SpecialFieldsContainer,
     # Simple types
     IntModel,
     FloatModel,
@@ -203,4 +219,13 @@ TESTED_REDIS_MODELS = [
     AutoMappedSetModel,
     SubSubRedisSetModel,
     RedisSetContainerModel,
+    ListOfSetsModel,
+    # Foreign key types
+    FkAuthor,
+    FkBook,
+    FkPublisher,
+    FkTree,
+    FkProfile,
+    FkRichAuthor,
+    FkLibrary,
 ]

@@ -148,8 +148,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
         if result is not None:
             redis_key, redis_value = result
             # Pop the same key from the local dict — tolerant of a stale
-            key = redis_key.decode() if isinstance(redis_key, bytes) else redis_key
-            super().pop(key, None)
+            super().pop(redis_key, None)
             return self._adapter.validate_python(
                 {redis_key: redis_value}, context={REDIS_DUMP_FLAG_NAME: True}
             )[redis_key]
@@ -203,4 +202,4 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
 
 
 if TYPE_CHECKING:
-    RedisDict: TypeAlias = RedisDict[T] | dict[str, T]  # pragma: no cover
+    RedisDict: TypeAlias = RedisDict[T] | dict[str, T]

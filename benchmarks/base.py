@@ -21,7 +21,15 @@ class TTLMode(enum.Enum):
 
 class AsyncBenchmarkTest:
     pytestmark = [pytest.mark.benchmark]
-    rounds = 20
+    # ``warmup_rounds`` are run and discarded before measurement so the timed
+    # rounds never pay cold-connection / cold-Redis-cache cost. That cold
+    # component is the main source of run-to-run walltime drift on identical
+    # code; warming it out is what keeps the numbers stable. ``rounds`` is the
+    # measured sample size — more samples, tighter aggregate. ``iterations`` is
+    # intentionally left at 1: pytest-codspeed forbids it alongside ``setup``,
+    # which every benchmark here needs to get fresh per-round state.
+    rounds = 30
+    warmup_rounds = 5
     expected = None
 
     # Subclasses override. ``TTLMode.NO_TTL`` is required (used by
@@ -45,7 +53,12 @@ class AsyncBenchmarkTest:
         def sync_action(*args, **kwargs):
             return event_loop.run_until_complete(self.action(*args, **kwargs))
 
-        result = benchmark.pedantic(sync_action, setup=sync_setup, rounds=self.rounds)
+        result = benchmark.pedantic(
+            sync_action,
+            setup=sync_setup,
+            rounds=self.rounds,
+            warmup_rounds=self.warmup_rounds,
+        )
 
         if self.expected is not None:
             assert result == self.expected

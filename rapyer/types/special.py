@@ -1,9 +1,7 @@
 import abc
-from typing import Any
+from typing import ClassVar, Optional
 
-from pydantic import GetCoreSchemaHandler
-from pydantic_core import core_schema
-
+from rapyer.scripts.loader import load_sf_load_snippet, load_sf_save_snippet
 from rapyer.types.base import BaseRedisType
 
 SPECIAL_FIELD_KEY_PREFIX = "__rapyer_special__"
@@ -19,6 +17,8 @@ class SpecialFieldType(BaseRedisType, abc.ABC):
     Methods use ``self.client`` which is pipeline-aware: when called inside
     an ``ensure_pipeline()`` context, operations are automatically batched.
     """
+
+    LUA_SNIPPET_DIR: ClassVar[Optional[str]] = None
 
     @classmethod
     def special_field_key(cls, model_key: str, field_path: str) -> str:
@@ -59,16 +59,62 @@ class SpecialFieldType(BaseRedisType, abc.ABC):
         participates in any active pipeline.
         """
 
-    def clone(self):
-        return self.__class__()
+    @classmethod
+    def lua_type_name(cls) -> str:
+        """
+        The type of scripts for this class for our lua scripts
+        """
+        return cls.LUA_SNIPPET_DIR or cls.__name__
 
     @classmethod
-    def __get_pydantic_core_schema__(
-        cls, source_type: Any, handler: GetCoreSchemaHandler
-    ) -> core_schema.CoreSchema:
-        return core_schema.no_info_plain_validator_function(
-            lambda v: v if isinstance(v, cls) else cls(),
-            serialization=core_schema.plain_serializer_function_ser_schema(
-                lambda v: None,
-            ),
-        )
+    def lua_save_snippet(cls) -> str:
+        """
+        Return a Lua *function literal* ``function(special_key, payload) ... end``.
+
+        Default implementation reads ``rapyer/scripts/lua/sf/{LUA_SNIPPET_DIR}/save.lua``;
+        subclasses that prefer to inline the Lua can override directly.
+        """
+        if cls.LUA_SNIPPET_DIR is None:
+            raise NotImplementedError(
+                f"{cls.__name__} must set LUA_SNIPPET_DIR or override "
+                "lua_save_snippet to participate in aget_or_create."
+            )
+        return load_sf_save_snippet(cls.LUA_SNIPPET_DIR)
+
+    @classmethod
+    def lua_load_snippet(cls) -> str:
+        """
+        Return a Lua *function literal* ``function(special_key) ... end``.
+
+        Default implementation reads ``rapyer/scripts/lua/sf/{LUA_SNIPPET_DIR}/load.lua``;
+        subclasses that prefer to inline the Lua can override directly.
+        """
+        if cls.LUA_SNIPPET_DIR is None:
+            raise NotImplementedError(
+                f"{cls.__name__} must set LUA_SNIPPET_DIR or override "
+                "lua_load_snippet to participate in aget_or_create."
+            )
+        return load_sf_load_snippet(cls.LUA_SNIPPET_DIR)
+
+    def lua_save_payload(self) -> str:
+        """Per-instance save data shipped in ``ARGV`` and passed to the
+        ``lua_save_snippet`` function as ``payload``.
+
+        Must be a string (JSON-encoded by convention; the snippet decodes).
+        Defaults to ``""`` for SF types whose save is a no-op (e.g.
+        ``RedisPriorityQueue``). Override when save needs the in-memory value
+        (e.g. ``RedisSet`` ships its members)."""
+        return ""
+
+    @classmethod
+    def has_lua_load_output(cls) -> bool:
+        """Whether ``lua_load_snippet`` produces a value to inject into the
+        model dump on the found branch.
+
+        Defaults to ``True``. Override to ``False`` for SF types whose load
+        snippet always returns ``nil`` so the Python side knows not to expect
+        a slot in the script's return tuple for this field."""
+        return True
+
+    def clone(self):
+        return self.__class__()

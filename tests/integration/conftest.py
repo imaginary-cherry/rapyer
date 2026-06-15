@@ -7,8 +7,10 @@ import pytest
 import pytest_asyncio
 
 import rapyer
+from rapyer.base import REDIS_MODELS
 from rapyer.result import resolve_forward_refs
 from rapyer.scripts import register_scripts
+from rapyer.types.relational import resolve_relational_targets
 from tests.models.registry import TESTED_REDIS_MODELS
 from tests.models.simple_types import TTLRefreshDisabledModel, TTLRefreshTestModel
 
@@ -38,6 +40,7 @@ async def redis_client():
 @pytest_asyncio.fixture(autouse=True)
 async def real_redis_client(redis_client):
     resolve_forward_refs()
+    resolve_relational_targets(REDIS_MODELS)
 
     # Configure Redis client for all models
     for model in TESTED_REDIS_MODELS:

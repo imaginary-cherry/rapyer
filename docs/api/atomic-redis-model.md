@@ -185,6 +185,25 @@ if not exists:
     print("User not found")
 ```
 
+#### `aget_or_create(model)`
+**Type:** `async` class method
+**Parameters:**
+- `model` (Self): The model instance to look up or store. Its key determines what is fetched or created.
+**Returns:** `GetOrCreateResult[Self]`
+**Raises:**
+
+- `RuntimeError` if called with an inner (nested) model
+
+**Description:** Atomically returns the stored model for the instance's key, or stores the instance if nothing exists there yet. The existence check and write run inside a single Redis Lua script, so concurrent callers never both create the same key. The result's `status` is `GetOrCreateStatus.CREATED` or `GetOrCreateStatus.FOUND`, and `value` holds the resulting model.
+
+```python
+from rapyer import GetOrCreateStatus
+
+result = await User.aget_or_create(User(name="Alice", age=25))
+if result.status == GetOrCreateStatus.CREATED:
+    print("stored", result.value.key)
+```
+
 #### `afind(*args, max_results=None)`
 **Type:** `async` class method
 **Parameters:**

@@ -13,12 +13,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  mirror-redis:
+    runs-on: ubuntu-22.04
+    permissions:
+      packages: write
+    outputs:
+      image: ${{ steps.mirror.outputs.image }}
+    steps:
+    - uses: actions/checkout@v5
+    - id: mirror
+      uses: ./.github/actions/mirror-redis
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
   coverage:
     runs-on: ubuntu-22.04
+    needs: [mirror-redis]
+    permissions:
+      contents: read
+      packages: read
+      pull-requests: write
 
     services:
       redis:
-        image: redis/redis-stack-server:latest
+        image: ${{ needs.mirror-redis.outputs.image }}
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         ports:
           - 6370:6379
         options: >-
@@ -28,7 +49,7 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -43,9 +64,54 @@ jobs:
       - name: Run coverage
         env:
           REDIS_DB: 0
-        run: tox -e coverage
+        run: tox -e coverage | tee coverage_output.txt
+
+      - name: Report coverage to job summary
+        if: always()
+        run: |
+          {
+            echo "## Coverage report"
+            echo '```'
+            sed -n '/^Name\s/,/^TOTAL/p' coverage_output.txt || tail -n 40 coverage_output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment coverage on PR
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          COVERAGE_TXT: coverage_output.txt
+        run: ./.github/scripts/comment_coverage.sh
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: error
+
+  codecov:
+    runs-on: ubuntu-22.04
+    needs: [coverage]
+    # Codecov upload uses the `coverage` environment, which is restricted to main.
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: coverage
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download coverage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml

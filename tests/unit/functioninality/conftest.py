@@ -4,6 +4,7 @@ from rapyer import AtomicRedisModel
 from tests.models.common import UserWithKeyModel
 from tests.models.index_types import AddressModel, IndexTestModel, PersonModel
 from tests.models.simple_types import IntModel, StrModel
+from tests.models.special_types import GenericRedisSetModel, PriorityQueueModel
 
 
 @pytest.fixture
@@ -17,6 +18,8 @@ def setup_fake_redis_for_models(fake_redis_client):
         AddressModel,
         UserWithKeyModel,
         AtomicRedisModel,
+        GenericRedisSetModel,
+        PriorityQueueModel,
     ]
     for model in models:
         original_clients[model] = (model.Meta.redis, model.Meta.is_fake_redis)

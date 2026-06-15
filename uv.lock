@@ -750,7 +750,7 @@ wheels = [
 
 [[package]]
 name = "rapyer"
-version = "1.3.2"
+version = "1.3.3"
 source = { editable = "." }
 dependencies = [
     { name = "pydantic" },
@@ -780,11 +780,11 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fakeredis", extras = ["lua", "json"], marker = "extra == 'test'", specifier = ">=2.20.0" },
-    { name = "pydantic", specifier = ">=2.11.0,<2.13.0" },
+    { name = "pydantic", specifier = ">=2.11.0,<2.14.0" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.4.2" },
     { name = "pytest-asyncio", marker = "extra == 'test'", specifier = ">=0.25.0" },
     { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=6.0.0" },
-    { name = "redis", specifier = ">=6.0.0,<7.1.0" },
+    { name = "redis", specifier = ">=6.0.0,<7.5.0" },
 ]
 provides-extras = ["test"]
 

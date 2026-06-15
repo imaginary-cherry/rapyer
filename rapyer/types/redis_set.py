@@ -19,6 +19,7 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
     """
 
     original_type: type = set
+    LUA_SNIPPET_DIR = "redis_set"
 
     def __init__(self, *args, **kwargs):
         set.__init__(self, *args, **kwargs)
@@ -235,6 +236,11 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
         if members:
             await self.client.sadd(target_special_key, *members)
 
+    def lua_save_payload(self) -> str:
+        if not self:
+            return ""
+        return json.dumps(self._dump_members(self))
+
     @classmethod
     def queue_special_loads_in_pipeline(
         cls, pipe, key: str, plan: list, parent_path: str = ""
@@ -262,7 +268,7 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
             is_redis = ctx.get(REDIS_DUMP_FLAG_NAME)
             not_redis_set_obj = not isinstance(v, cls)
             if is_redis and not_redis_set_obj:
-                v = {json.loads(m.decode() if isinstance(m, bytes) else m) for m in v}
+                v = {json.loads(m) for m in v}
             return cls(handler_call(v))
 
         def _serialize_wrap(v, serializer, info):

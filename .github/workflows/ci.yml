@@ -16,10 +16,10 @@ jobs:
 
     steps:
     - name: Validate PR target branch
+      env:
+        SOURCE_BRANCH: ${{ github.head_ref }}
+        TARGET_BRANCH: ${{ github.base_ref }}
       run: |
-        SOURCE_BRANCH="${{ github.head_ref }}"
-        TARGET_BRANCH="${{ github.base_ref }}"
-        
         echo "Source branch: $SOURCE_BRANCH"
         echo "Target branch: $TARGET_BRANCH"
         
@@ -33,16 +33,31 @@ jobs:
         
         echo "✅ Branch targeting rules validated successfully"
 
+  # Mirror the Redis server image into GHCR once; the test job pulls the service
+  # container from there (no Docker Hub rate limit). See .github/actions/mirror-redis.
+  mirror-redis:
+    runs-on: ubuntu-22.04
+    permissions:
+      packages: write
+    outputs:
+      image: ${{ steps.mirror.outputs.image }}
+    steps:
+    - uses: actions/checkout@v5
+    - id: mirror
+      uses: ./.github/actions/mirror-redis
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
   lint:
     runs-on: ubuntu-22.04
     needs: [validate-branch-target]
     if: always() && (needs.validate-branch-target.result == 'success' || needs.validate-branch-target.result == 'skipped')
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v6
       with:
         python-version: "3.11"
 
@@ -67,10 +82,10 @@ jobs:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ matrix.python-version }}
     
@@ -85,18 +100,24 @@ jobs:
 
   test:
     runs-on: ubuntu-22.04
-    needs: [validate-branch-target]
-    if: always() && (needs.validate-branch-target.result == 'success' || needs.validate-branch-target.result == 'skipped')
+    needs: [validate-branch-target, mirror-redis]
+    if: always() && (needs.validate-branch-target.result == 'success' || needs.validate-branch-target.result == 'skipped') && needs.mirror-redis.result == 'success'
+    permissions:
+      contents: read
+      packages: read
     strategy:
       fail-fast: ${{ github.event_name == 'pull_request' }}
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
-        redis-version: ["6.0", "6.1", "6.2", "6.3", "6.4"]
-        pydantic-version: ["2.11", "2.12"]
+        redis-version: ["6.0", "6.1", "6.2", "6.3", "6.4", "7.0", "7.1", "7.2", "7.3", "7.4"]
+        pydantic-version: ["2.11", "2.12", "2.13"]
 
     services:
       redis:
-        image: redis/redis-stack-server:latest
+        image: ${{ needs.mirror-redis.outputs.image }}
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         ports:
           - 6370:6379
         options: >-
@@ -106,15 +127,15 @@ jobs:
           --health-retries 5
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ matrix.python-version }}
     
     - name: Cache pip packages
-      uses: actions/cache@v3
+      uses: actions/cache@v5
       with:
         path: ~/.cache/pip
         key: pip-test-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('**/pyproject.toml') }}
@@ -123,7 +144,7 @@ jobs:
           pip-test-${{ runner.os }}-
 
     - name: Cache tox environments
-      uses: actions/cache@v3
+      uses: actions/cache@v5
       with:
         path: .tox
         key: tox-${{ runner.os }}-py${{ matrix.python-version }}-redis${{ matrix.redis-version }}-pydantic${{ matrix.pydantic-version }}-${{ hashFiles('tox.ini', 'pyproject.toml') }}

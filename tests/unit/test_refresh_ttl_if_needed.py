@@ -114,3 +114,10 @@ async def test_refresh_ttl_if_needed_honors_action_groups(
         f"expected expire.called={expected_refresh}, "
         f"got call_count={mock_pipe.expire.call_count}"
     )
+
+
+def test_should_refresh_classmethod_returns_bool():
+    # Coverage: the should_refresh() classmethod (a thin wrapper over
+    # should_refresh_for_action that nothing else exercised).
+    # Act / Assert
+    assert isinstance(TTLRefreshTestModel.should_refresh(), bool)

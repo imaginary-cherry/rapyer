@@ -43,6 +43,10 @@ class SubSubPriorityQueueModel(PriorityQueueModel):
     extra: str = "sub_sub"
 
 
+class OverriddenSpecialFieldModel(PriorityQueueModelBase[str]):
+    tasks: int = 0  # redefine inherited special field as non-special
+
+
 class PQContainerModel(AtomicRedisModel):
     inner_pq: PriorityQueueModel = Field(default_factory=PriorityQueueModel)
     outer_name: str = "container"
@@ -84,3 +88,9 @@ class RedisSetContainerModel(AtomicRedisModel):
         default_factory=GenericRedisSetModel[str]
     )
     outer_name: str = "container"
+
+
+class ListOfSetsModel(AtomicRedisModel):
+    # A plain list of bare special fields: the metaclass detects the nested
+    # special field via GenericRedisType.contains_sf_field.
+    buckets: list[RedisSet] = Field(default_factory=list)

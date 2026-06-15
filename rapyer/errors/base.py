@@ -50,3 +50,7 @@ class DuplicateModelNameError(RapyerError):
 
 class RapyerSerializationError(RapyerError):
     pass
+
+
+class NotResolvedError(RapyerError):
+    """Raised when accessing the hydrated value of an unresolved relational field."""

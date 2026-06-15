@@ -1,5 +1,10 @@
 from rapyer import AtomicRedisModel
-from rapyer.actions import ACTION_WRAPPER_SENTINEL, MARK_ACTION_PARAMS_ATTR, ActionGroup
+from rapyer.actions import (
+    ACTION_WRAPPER_SENTINEL,
+    MARK_ACTION_PARAMS_ATTR,
+    ActionGroup,
+    install_action_for_meta,
+)
 from rapyer.config import RedisConfig
 from rapyer.types.integer import RedisInt
 
@@ -110,3 +115,14 @@ def test_recursive_model_recurses_into_nested_atomic_model():
 
     assert Outer.Meta.ttl is None
     assert _count_action_wrappers(vars(inner_counter_type)["asave"]) == 1
+
+
+def test_install_action_for_meta_returns_unmarked_func_unchanged():
+    # Coverage: install_action_for_meta's `params is None` early return — the
+    # path taken for any function that was never decorated as an action.
+    # A function with no MarkActionParams is not an action: install must return
+    # it untouched (no wrapping), regardless of meta.
+    def plain():
+        return 1
+
+    assert install_action_for_meta(plain, RedisConfig()) is plain

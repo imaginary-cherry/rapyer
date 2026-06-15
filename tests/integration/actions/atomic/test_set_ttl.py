@@ -1,8 +1,21 @@
 from rapyer.base import AtomicRedisModel
 from tests.integration.actions.base import ActionTestBase
+from tests.integration.special_types.adapters import SPECIAL_FIELD_ADAPTERS
 from tests.models.collection_types import ComprehensiveTestModelNoTTL
 
 TTL_SECONDS = 300
+
+
+def _all_ttl_keys(models) -> list[str]:
+    """Every key ``aset_ttl`` touches: each model's main key plus its
+    special-field keys, sourced from the special-field adapters (``tasks``,
+    ``container.labels``, ``container.tasks``)."""
+    keys: list[str] = []
+    for model in models:
+        keys.append(model.key)
+        for adapter in SPECIAL_FIELD_ADAPTERS:
+            keys.extend(adapter.additional_ttl_keys(model))
+    return keys
 
 
 class TestRapyerAsetTtl(ActionTestBase):
@@ -20,8 +33,11 @@ class TestRapyerAsetTtl(ActionTestBase):
 
     async def setup_data(self):
         models = await super().setup_data()
-        ttls_before = [await self.real_redis_client.ttl(m.key) for m in models]
-        assert all(ttl == -1 for ttl in ttls_before)
+        self.created_models = models
+        ttls_before = [
+            await self.real_redis_client.ttl(k) for k in _all_ttl_keys(models)
+        ]
+        assert all(ttl == -1 for ttl in ttls_before), ttls_before
         return models
 
     async def perform_action(self, piped):
@@ -29,12 +45,15 @@ class TestRapyerAsetTtl(ActionTestBase):
             await m.aset_ttl(TTL_SECONDS)
 
     async def load_data(self):
-        return [await self.real_redis_client.ttl(m.key) for m in self.created_models]
+        return [
+            await self.real_redis_client.ttl(k)
+            for k in _all_ttl_keys(self.created_models)
+        ]
 
     def expected_before(self):
-        return [-1, -1, -1]
+        return [-1] * len(_all_ttl_keys(self.created_models))
 
-    def assert_after_pipeline(self, loaded):
+    async def assert_after_pipeline(self, loaded):
         assert all(0 < ttl <= TTL_SECONDS for ttl in loaded), loaded
 
 
@@ -55,8 +74,11 @@ class TestAsetTtl(ActionTestBase):
 
     async def setup_data(self):
         models = await super().setup_data()
-        ttls_before = [await self.real_redis_client.ttl(model.key) for model in models]
-        assert all(ttl == -1 for ttl in ttls_before)
+        self.created_models = models
+        ttls_before = [
+            await self.real_redis_client.ttl(k) for k in _all_ttl_keys(models)
+        ]
+        assert all(ttl == -1 for ttl in ttls_before), ttls_before
         return models
 
     async def perform_action(self, piped):
@@ -65,13 +87,15 @@ class TestAsetTtl(ActionTestBase):
 
     async def load_data(self):
         return [
-            await self.real_redis_client.ttl(model.key) for model in self.created_models
+            await self.real_redis_client.ttl(k)
+            for k in _all_ttl_keys(self.created_models)
         ]
 
     def expected_before(self):
-        # All TTLs are still -1 (unset) while the pipeline is open.
-        return [-1, -1, -1]
+        # Every key (model + special fields) is still unset while the pipeline
+        # is open.
+        return [-1] * len(_all_ttl_keys(self.created_models))
 
-    def assert_after_pipeline(self, loaded):
-        # After the pipeline commits, each TTL should be positive and bounded by TTL_SECONDS.
+    async def assert_after_pipeline(self, loaded):
+        # After the pipeline commits, each TTL should be positive and bounded.
         assert all(0 < ttl <= TTL_SECONDS for ttl in loaded), loaded

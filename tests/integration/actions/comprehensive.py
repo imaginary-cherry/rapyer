@@ -103,6 +103,13 @@ class ComprehensiveMetadataOpBase(ComprehensiveOpBase[dict]):
     def get_target_field(self, m: ComprehensiveTestModel) -> dict:
         return dict(m.metadata)
 
+    def corrupt_local_mirror(self, m: ComprehensiveTestModel) -> None:
+        # Inject a ghost key into the local mirror only (via native
+        # dict.__setitem__ so no Redis op is queued). A pipelined op that
+        # rewrote the whole mirror to Redis would leak it; the incremental
+        # per-key JSON.SET ops must not, so Redis stays correct.
+        dict.__setitem__(m.metadata, "__ghost__", "__ghost__")
+
 
 class ComprehensiveNameOpBase(ComprehensiveOpBase[str]):
     """RedisStr ops on ``ComprehensiveTestModel.name``."""
@@ -137,3 +144,10 @@ class ComprehensiveTagsOpBase(ComprehensiveOpBase[list]):
 
     def get_target_field(self, m: ComprehensiveTestModel) -> list:
         return list(m.tags)
+
+    def corrupt_local_mirror(self, m: ComprehensiveTestModel) -> None:
+        # Inject a ghost into the local mirror only (via native list.append so
+        # no Redis op is queued). A pipelined op that rewrote the whole mirror
+        # to Redis would leak the ghost; the incremental server-side ops must
+        # not, so Redis stays correct despite the stale mirror.
+        list.append(m.tags, "__ghost__")

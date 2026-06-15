@@ -3,7 +3,7 @@ from datetime import datetime
 import pytest
 
 import rapyer
-from rapyer.errors import KeyNotFound
+from rapyer.errors import CorruptedModelError, KeyNotFound
 from rapyer.fields import RapyerKey
 from tests.models.collection_types import (
     BaseModelDictModel,
@@ -258,3 +258,18 @@ async def test_rapyer_aget_with_key_without_class_name_edge_case():
     # Act & Assert
     with pytest.raises(KeyNotFound) as exc_info:
         await rapyer.aget(key_without_class)
+
+
+@pytest.mark.asyncio
+async def test_aget_corrupted_payload_raises_corrupted_model(real_redis_client):
+    # Coverage: aget's CorruptedModelError branch when create_redis_model can't
+    # validate the stored payload.
+    # Arrange
+    model = IntModel()
+    await model.asave()
+    # Overwrite with a payload that cannot validate (count must be int).
+    await real_redis_client.json().set(model.key, "$", {"count": "nope", "score": 1})
+
+    # Act / Assert
+    with pytest.raises(CorruptedModelError):
+        await IntModel.aget(model.key)

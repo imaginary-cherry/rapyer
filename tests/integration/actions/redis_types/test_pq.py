@@ -10,21 +10,24 @@ from tests.models.collection_types import ComprehensiveTestModel
 # Initial items every PQ test class starts with. Kept in class-level constants
 # so test classes can assemble their ``expected_before`` / ``expected_after``
 # from them without re-declaring the serialized form inline.
-INITIAL_ITEMS: list[tuple[str, float]] = [
-    ("high", 1.0),
-    ("medium", 2.0),
-    ("low", 3.0),
+# ``ComprehensiveTestModel.tasks`` is a ``RedisPriorityQueue[int]``, so values
+# are integers (their serialized ZSET member is the bare JSON number, e.g.
+# ``json.dumps(10) == '10'`` — no quotes).
+INITIAL_ITEMS: list[tuple[int, float]] = [
+    (10, 1.0),
+    (20, 2.0),
+    (30, 3.0),
 ]
 # Serialized form returned by ZRANGE (JSON-encoded member + float score).
 INITIAL_CONTENTS: list[tuple[str, float]] = [
-    ('"high"', 1.0),
-    ('"medium"', 2.0),
-    ('"low"', 3.0),
+    ("10", 1.0),
+    ("20", 2.0),
+    ("30", 3.0),
 ]
 
 
 class PQActionBase(UpdateActionTestBase, TTLActionTestBase, ABC):
-    initial_items: ClassVar[list[tuple[str, float]]] = INITIAL_ITEMS
+    initial_items: ClassVar[list[tuple[int, float]]] = INITIAL_ITEMS
     skip_target_field_clobber_check = (
         "RedisPriorityQueue is a pure Redis proxy; no local state to mutate"
     )
@@ -60,11 +63,11 @@ class TestPQApush(PQActionBase):
     covered_method = RedisPriorityQueue.apush
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        await piped.tasks.apush("new_item", 0.5)
+        await piped.tasks.apush(40, 0.5)
 
     def expected_after(self):
         # priority 0.5 < 1.0, so the new item sorts in front of the initial trio.
-        return [('"new_item"', 0.5), *INITIAL_CONTENTS]
+        return [("40", 0.5), *INITIAL_CONTENTS]
 
 
 class TestPQApushMany(PQActionBase):
@@ -73,8 +76,8 @@ class TestPQApushMany(PQActionBase):
     async def perform_action(self, piped: ComprehensiveTestModel):
         await piped.tasks.apush_many(
             [
-                PriorityQueueItem(value="a", priority=0.1),
-                PriorityQueueItem(value="b", priority=0.2),
+                PriorityQueueItem(value=11, priority=0.1),
+                PriorityQueueItem(value=12, priority=0.2),
             ]
         )
 
@@ -82,7 +85,7 @@ class TestPQApushMany(PQActionBase):
         return INITIAL_CONTENTS
 
     def expected_after(self):
-        return [('"a"', 0.1), ('"b"', 0.2), *INITIAL_CONTENTS]
+        return [("11", 0.1), ("12", 0.2), *INITIAL_CONTENTS]
 
 
 class TestPQAclear(PQActionBase):
@@ -117,10 +120,10 @@ class TestPQAremove(PQActionBase):
     covered_method = RedisPriorityQueue.aremove
 
     async def perform_action(self, piped: ComprehensiveTestModel):
-        await self.created_models[0].tasks.aremove("medium")
+        await self.created_models[0].tasks.aremove(20)
 
     def expected_after(self):
-        return [('"high"', 1.0), ('"low"', 3.0)]
+        return [("10", 1.0), ("30", 3.0)]
 
 
 class TestPQApeek(ReadActionTestBase, PQActionBase):

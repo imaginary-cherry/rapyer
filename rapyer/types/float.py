@@ -112,4 +112,4 @@ class RedisFloat(float, RedisType):
 
 
 if TYPE_CHECKING:
-    RedisFloat: TypeAlias = RedisFloat | float  # pragma: no cover
+    RedisFloat: TypeAlias = RedisFloat | float

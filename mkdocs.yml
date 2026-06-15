@@ -54,6 +54,7 @@ nav:
       - documentation/special-fields/index.md
       - Priority Queue: documentation/special-fields/priority-queue.md
       - Redis Set: documentation/special-fields/redis-set.md
+      - Foreign Keys: documentation/special-fields/foreign-keys.md
     - Atomic Actions: documentation/atomic-actions.md
     - Key adjustment: documentation/setting-key-field.md
     - Indexing Fields: documentation/indexing-fields.md
@@ -63,6 +64,7 @@ nav:
     - Redis Types: api/redis-types.md
     - PriorityQueue: api/priority-queue.md
     - RedisSet: api/redis-set.md
+    - Reference: api/foreign-key.md
     - ActionGroup: api/action-group.md
     - Rapyer: api/rapyer-functions.md
   - Roadmap: roadmap.md

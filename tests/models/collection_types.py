@@ -1,11 +1,12 @@
 from datetime import datetime
-from typing import Any, ClassVar, Dict, List
+from typing import Any, ClassVar, Dict, List, Optional
 
 from pydantic import Field
 
 from rapyer.base import AtomicRedisModel
 from rapyer.config import RedisConfig
 from rapyer.types import RedisDatetimeTimestamp, RedisPriorityQueue, RedisSet
+from rapyer.types.foreign_key import Reference
 from tests.models.common import (
     Address,
     Company,
@@ -17,6 +18,7 @@ from tests.models.common import (
     User,
     UserProfile,
 )
+from tests.models.foreign_key_types import FkAuthor
 from tests.models.pipeline_base import PipelineActionModel
 
 TTL_REFRESH_TEST_SECONDS = 24
@@ -127,6 +129,11 @@ class ProductListModel(AtomicRedisModel):
     products: list[Product] = Field(default_factory=list)
 
 
+class SpecialFieldsContainer(AtomicRedisModel):
+    labels: RedisSet[str] = Field(default_factory=RedisSet[str])
+    tasks: RedisPriorityQueue[float] = Field(default_factory=RedisPriorityQueue[float])
+
+
 class ComprehensiveTestModel(PipelineActionModel):
     tags: list[str] = Field(default_factory=list)
     metadata: dict[str, str] = Field(default_factory=dict)
@@ -136,8 +143,9 @@ class ComprehensiveTestModel(PipelineActionModel):
     data: bytes = b""
     event_time: datetime = Field(default_factory=datetime.now)
     event_timestamp: RedisDatetimeTimestamp = Field(default_factory=datetime.now)
-    tasks: RedisPriorityQueue[str] = Field(default_factory=RedisPriorityQueue[str])
-    labels: RedisSet[str] = Field(default_factory=RedisSet[str])
+    tasks: RedisPriorityQueue[int] = Field(default_factory=RedisPriorityQueue[int])
+    container: SpecialFieldsContainer = Field(default_factory=SpecialFieldsContainer)
+    author: Optional[Reference[FkAuthor]] = None
 
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=TTL_REFRESH_TEST_SECONDS)
 
@@ -150,6 +158,15 @@ class ComprehensiveTestModelNoRefreshTTL(ComprehensiveTestModel):
     Meta: ClassVar[RedisConfig] = RedisConfig(
         ttl=TTL_REFRESH_TEST_SECONDS, refresh_ttl=False
     )
+
+
+class ComprehensiveRefOwner(AtomicRedisModel):
+    # Owner of a ForeignKey to the comprehensive model. afetch resolves and
+    # refreshes that comprehensive target (target=RESULT), so the afetch action
+    # test exercises the full comprehensive key set — main key + special fields.
+    # TTL on so afetch's owner-gated refresh is installed.
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=TTL_REFRESH_TEST_SECONDS)
+    ref: Reference[ComprehensiveTestModel]
 
 
 class PipelineTestModel(AtomicRedisModel):

@@ -36,4 +36,4 @@ Index = _IndexType
 
 
 if TYPE_CHECKING:
-    Index: TypeAlias = Annotated[T, IndexAnnotation()]  # pragma: no cover
+    Index: TypeAlias = Annotated[T, IndexAnnotation()]

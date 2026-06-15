@@ -6,11 +6,13 @@ from rapyer.base import AtomicRedisModel
 from rapyer.types import RedisSet
 from rapyer.types.base import BaseRedisType, RedisType
 from rapyer.types.byte import RedisBytes
-from rapyer.types.datetime import RedisDatetimeTimestamp
+from rapyer.types.datetime import RedisDatetime, RedisDatetimeTimestamp
 from rapyer.types.dct import RedisDict
+from rapyer.types.foreign_key import ForeignKey
 from rapyer.types.generic import GenericRedisType
 from rapyer.types.lst import RedisList
 from rapyer.types.priority_queue import RedisPriorityQueue
+from rapyer.types.relational import RelationalFieldType
 from rapyer.types.special import SpecialFieldType
 from tests.coverage_helpers import cover_tuple
 
@@ -42,6 +44,7 @@ PRIVATE_METHODS = _group(
     RedisSet._tmp_key,
     # Generic
     GenericRedisType.contains_sf_field,
+    GenericRedisType.contains_fk_field,
     # AtomicRedisModel
     AtomicRedisModel._search_keys_by_query,
     AtomicRedisModel.build_redis_model,
@@ -56,6 +59,10 @@ PRIVATE_METHODS = _group(
     AtomicRedisModel._all_keys_for_key,
     AtomicRedisModel._iter_expanded_filter_batches,
     AtomicRedisModel._resolve_key,
+    # Pure in-memory traversal / key enumeration for special fields — no
+    # Redis round trips, so pipeline/TTL coverage doesn't apply.
+    AtomicRedisModel._iter_special_fields,
+    AtomicRedisModel._ttl_keys,
     AtomicRedisModel.class_key_initials,
     AtomicRedisModel.index_name,
     AtomicRedisModel.create_expressions,
@@ -66,7 +73,14 @@ PRIVATE_METHODS = _group(
     AtomicRedisModel.should_refresh_for_action,
     AtomicRedisModel.build_redis_dump_exclude,
     AtomicRedisModel.contains_sf_field,
+    AtomicRedisModel.contains_fk_field,
     AtomicRedisModel.queue_special_loads_in_pipeline,
+    # Abstract relational stub — never executed; the concrete ForeignKey.afetch
+    # override is the real READ|FETCH action and is covered as one.
+    RelationalFieldType.afetch,
+    # Pure in-memory cache drop (sets self._value = None); no Redis round trip,
+    # so the pipeline/TTL/effect action matrix doesn't apply.
+    ForeignKey.aunload,
 )
 
 # PRIVATE_INHERITED_METHODS — MRO-aware. Any subclass that inherits OR
@@ -93,8 +107,26 @@ PRIVATE_INHERITED_METHODS = _group(
     SpecialFieldType.asave_special,
     SpecialFieldType.adelete_special,
     SpecialFieldType.aduplicate_special,
+    # Lua codegen / payload helpers for aget_or_create's server-side SF
+    # dispatch: they build script source and ARGV strings, not Redis round
+    # trips, so they aren't actions subject to pipeline/TTL coverage. Shared
+    # contract across the SF hierarchy (subclasses override several of them).
+    SpecialFieldType.lua_type_name,
+    SpecialFieldType.lua_save_snippet,
+    SpecialFieldType.lua_load_snippet,
+    SpecialFieldType.lua_save_payload,
+    SpecialFieldType.has_lua_load_output,
     RedisPriorityQueue.aremove,
     AtomicRedisModel.redis_schema,
+    # Pydantic schema hook — a fixed-contract pydantic method (build a core
+    # schema at class-definition time); structurally never a Redis action, so
+    # every override across the hierarchy is filtered. One entry per branch
+    # root: RedisType covers its whole branch (GenericRedisType, RedisBytes,
+    # RedisDatetimeTimestamp, ...) via MRO name-matching.
+    RedisType.__get_pydantic_core_schema__,
+    RedisSet.__get_pydantic_core_schema__,
+    RedisPriorityQueue.__get_pydantic_core_schema__,
+    ForeignKey.__get_pydantic_core_schema__,
 )
 
 # NON_ACTION_METHODS — module-level helpers that aren't Redis actions and
@@ -117,6 +149,31 @@ NON_ACTION_METHODS = _group(
     AtomicRedisModel.aexists,
     rapyer.aexists,
     rapyer.apipeline,  # TODO - this should change once we add update on each action in the ttl
+    # ── Python protocol dunders ───────────────────────────────────────────
+    # Construction, equality, hashing, repr, attribute access, generic
+    # parameterization, and class-build hooks. Language/pydantic protocol
+    # methods, not Redis actions. Listed by exact (class, name) so a NEW
+    # subclass that overrides one surfaces for a conscious decision rather than
+    # being silently skipped (unlike __get_pydantic_core_schema__, whose
+    # contract can never be an action — see PRIVATE_INHERITED_METHODS).
+    AtomicRedisModel.__eq__,
+    AtomicRedisModel.__init_subclass__,
+    # __setattr__ DOES queue pipeline writes on field assignment, but that
+    # behavior is covered by the dedicated pipeline field-assignment tests,
+    # not the per-method action matrix.
+    AtomicRedisModel.__setattr__,
+    ForeignKey.__init__,
+    ForeignKey.__eq__,
+    ForeignKey.__hash__,
+    ForeignKey.__repr__,
+    ForeignKey.__getattr__,
+    ForeignKey.__class_getitem__,
+    GenericRedisType.__init__,
+    RedisDict.__init__,
+    RedisList.__init__,
+    RedisSet.__init__,
+    RedisPriorityQueue.__eq__,
+    RedisDatetime.__new__,
 )
 
 

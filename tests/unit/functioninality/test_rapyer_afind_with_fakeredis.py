@@ -2,6 +2,7 @@ import pytest
 
 import rapyer
 from tests.models.simple_types import IntModel, StrModel
+from tests.models.special_types import SubSubRedisSetModel
 
 
 @pytest.mark.asyncio
@@ -81,3 +82,16 @@ async def test_model_afind_with_key_without_prefix_with_fakeredis_sanity(
     # Assert
     assert len(result) == 1
     assert result[0].name == "test_name"
+
+
+@pytest.mark.asyncio
+async def test_sf_model_afind_one_with_missing_key_returns_none_with_fakeredis(
+    setup_fake_redis_for_models,
+    fake_redis_client,
+):
+    # Act - fakeredis returns [] (not None) per missing JSON.MGET slot; this
+    # used to raise IndexError instead of returning None
+    result = await SubSubRedisSetModel.afind_one("does-not-exist")
+
+    # Assert
+    assert result is None

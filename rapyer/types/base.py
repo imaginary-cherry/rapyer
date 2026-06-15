@@ -54,6 +54,11 @@ class BaseRedisType(ABC):
         return False
 
     @classmethod
+    def contains_fk_field(cls) -> bool:
+        """Check if this type contains a foreign-key field (e.g. list[ForeignKey])."""
+        return False
+
+    @classmethod
     def queue_special_loads_in_pipeline(
         cls, pipe, key: str, plan: list, parent_path: str = ""
     ):
@@ -71,16 +76,6 @@ class BaseRedisType(ABC):
     @property
     def Meta(self):
         return self._base_model_link.Meta
-
-    async def refresh_ttl_if_needed(self, can_use_pipeline: bool = False, action=None):
-        return await self._base_model_link.refresh_ttl_if_needed(
-            can_use_pipeline=can_use_pipeline, action=action
-        )
-
-    async def refresh_ttl(self, can_use_pipeline: bool = False):
-        return await self._base_model_link.refresh_ttl(
-            can_use_pipeline=can_use_pipeline
-        )
 
     @property
     def field_path(self) -> str:

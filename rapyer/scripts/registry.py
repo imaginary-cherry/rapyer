@@ -4,6 +4,7 @@ from redis.exceptions import NoScriptError
 
 from rapyer.errors import PersistentNoScriptError, ScriptsNotInitializedError
 from rapyer.scripts.constants import (
+    ATOMIC_GET_OR_CREATE_SCRIPT_NAME,
     DATETIME_ADD_SCRIPT_NAME,
     DICT_POP_SCRIPT_NAME,
     DICT_POPITEM_SCRIPT_NAME,
@@ -21,7 +22,7 @@ from rapyer.scripts.constants import (
 )
 from rapyer.scripts.loader import load_script
 
-if TYPE_CHECKING:  # pragma: no cover
+if TYPE_CHECKING:
     from rapyer.config import RedisConfig
 
 SCRIPT_REGISTRY: list[tuple[str, str, str]] = [
@@ -37,9 +38,12 @@ SCRIPT_REGISTRY: list[tuple[str, str, str]] = [
     ("datetime", "add", DATETIME_ADD_SCRIPT_NAME),
     ("dict", "pop", DICT_POP_SCRIPT_NAME),
     ("dict", "popitem", DICT_POPITEM_SCRIPT_NAME),
+    ("atomic", "get_or_create", ATOMIC_GET_OR_CREATE_SCRIPT_NAME),
 ]
 
 _REGISTERED_SCRIPT_SHAS: dict[str, str] = {}
+
+SF_DISPATCH_PLACEHOLDER = "--[[SF_DISPATCH_TABLE]]"
 
 
 def _build_scripts(variant: str) -> dict[str, str]:
@@ -57,9 +61,41 @@ def get_scripts_fakeredis() -> dict[str, str]:
     return _build_scripts(FAKEREDIS_VARIANT)
 
 
+def _inject_sf_dispatch(template: str, sf_base) -> str:
+    """
+    Replace ``--[[SF_DISPATCH_TABLE]]`` in ``template`` with concrete
+    ``SF_SAVE`` / ``SF_LOAD`` assignments, one per direct subclass of
+    ``SpecialFieldType``. Each SF class contributes a ``lua_save_snippet``
+    and ``lua_load_snippet`` (function literals) keyed by ``lua_type_name``.
+
+    The result is the Lua source that gets ``SCRIPT LOAD``-ed once. Per-call
+    ``ARGV`` then only carries identifiers + payloads — the snippets live
+    inside the cached SHA.
+    """
+    if SF_DISPATCH_PLACEHOLDER not in template:
+        return template
+    lines: list[str] = []
+    for sf_cls in sf_base.__subclasses__():
+        name = sf_cls.lua_type_name()
+        lines.append(f"SF_SAVE[{name!r}] = {sf_cls.lua_save_snippet()}")
+        lines.append(f"SF_LOAD[{name!r}] = {sf_cls.lua_load_snippet()}")
+    return template.replace(SF_DISPATCH_PLACEHOLDER, "\n".join(lines))
+
+
 async def register_scripts(redis_client, is_fakeredis: bool = False) -> None:
+    # Late import: SpecialFieldType lives under rapyer.types, which depends on
+    # this module via the SCRIPT_REGISTRY constants. Importing it at call time
+    # avoids the circular import while still letting __subclasses__() see every
+    # SF type that was loaded before init_rapyer() ran.
+    from rapyer.types.special import SpecialFieldType
+
     variant = FAKEREDIS_VARIANT if is_fakeredis else REDIS_VARIANT
     scripts = _build_scripts(variant)
+    # Any script in the registry may opt into SF dispatch by including the
+    # ``--[[SF_DISPATCH_TABLE]]`` placeholder; templates without it pass through
+    # unchanged (the helper short-circuits).
+    for name, script_text in scripts.items():
+        scripts[name] = _inject_sf_dispatch(script_text, SpecialFieldType)
     for name, script_text in scripts.items():
         sha = await redis_client.script_load(script_text)
         _REGISTERED_SCRIPT_SHAS[name] = sha
