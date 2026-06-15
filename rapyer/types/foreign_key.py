@@ -57,7 +57,6 @@ class ForeignKey(RelationalFieldType, Generic[T]):
             )
         return self._value
 
-    @mark_actions(ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT)
     async def afetch(self) -> "AtomicRedisModel":
         """Resolve the target instance from Redis and cache it in-place."""
         if self._value is not None:
