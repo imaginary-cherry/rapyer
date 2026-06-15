@@ -13,7 +13,6 @@ concurrency:
 jobs:
   validate-branch-target:
     runs-on: ubuntu-22.04
-    if: github.event_name == 'pull_request'
 
     steps:
     - name: Validate PR target branch
@@ -23,7 +22,7 @@ jobs:
       run: |
         echo "Source branch: $SOURCE_BRANCH"
         echo "Target branch: $TARGET_BRANCH"
-        
+
         # Rule 1: Only develop branch can merge to main
         if [[ "$TARGET_BRANCH" == "main" && "$SOURCE_BRANCH" != "develop" ]]; then
           echo "❌ Error: Only 'develop' branch can merge to 'main'"
@@ -52,7 +51,6 @@ jobs:
   lint:
     runs-on: ubuntu-22.04
     needs: [validate-branch-target]
-    if: always() && (needs.validate-branch-target.result == 'success' || needs.validate-branch-target.result == 'skipped')
 
     steps:
     - uses: actions/checkout@v6
@@ -77,7 +75,6 @@ jobs:
   mypy:
     runs-on: ubuntu-22.04
     needs: [validate-branch-target]
-    if: always() && (needs.validate-branch-target.result == 'success' || needs.validate-branch-target.result == 'skipped')
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
