@@ -3,6 +3,9 @@ from abc import ABC
 from types import UnionType
 from typing import Annotated, Any, Union, get_args, get_origin
 
+from rapyer.types.relational import RelationalFieldType
+from rapyer.utils.pythonic import safe_issubclass
+
 DYNAMIC_CLASS_DOC = "___dynamic_class___"
 
 
@@ -29,6 +32,10 @@ def replace_to_redis_types_in_annotation(
     Recursively traverse a type annotation and replace types according to the mapping.
     Handles Union, Optional, Annotated, and other generic types.
     """
+    # Relational field is not dynamically created, it stays simple field
+    if safe_issubclass(get_origin(annotation) or annotation, RelationalFieldType):
+        return annotation
+
     # Direct type replacement
     if type_converter.is_type_support(annotation):
         new_type = type_converter.convert_flat_type(annotation)
