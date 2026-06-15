@@ -1,7 +1,7 @@
 import types as _python_types
 from typing import TYPE_CHECKING, Optional, get_origin
 
-from pydantic import BaseModel, PrivateAttr, TypeAdapter
+from pydantic import BaseModel, TypeAdapter
 
 from rapyer.fields.key import RapyerKey
 from rapyer.types.base import BaseRedisType
@@ -61,20 +61,14 @@ class RedisConverter(TypeConverter):
             return type(
                 type_to_convert.__name__,
                 (type_to_convert,),
-                dict(
-                    _field_name=PrivateAttr(default=self.field_name),
-                    __doc__=DYNAMIC_CLASS_DOC,
-                ),
+                dict(__doc__=DYNAMIC_CLASS_DOC),
             )
         if safe_issubclass(type_to_convert, BaseModel):
             origin: type[BaseModel]
             return type(
                 f"Redis{type_to_convert.__name__}",
                 (AtomicRedisModel, type_to_convert),
-                dict(
-                    _field_name=PrivateAttr(default=self.field_name),
-                    __doc__=DYNAMIC_CLASS_DOC,
-                ),
+                dict(__doc__=DYNAMIC_CLASS_DOC),
             )
         if safe_issubclass(type_to_convert, BaseRedisType):
             redis_type = type_to_convert
@@ -87,7 +81,6 @@ class RedisConverter(TypeConverter):
             redis_type.__name__,
             redis_type,
             dict(
-                field_name=self.field_name,
                 original_type=original_type,
                 safe_load=self.safe_load,
                 __doc__=DYNAMIC_CLASS_DOC,
@@ -112,7 +105,6 @@ class RedisConverter(TypeConverter):
             redis_type.__name__,
             redis_type,
             dict(
-                field_name=self.field_name,
                 original_type=original_type,
                 safe_load=self.safe_load,
                 __doc__=DYNAMIC_CLASS_DOC,

@@ -24,8 +24,8 @@ class BaseRedisType(ABC):
     """Common base for all Redis-aware field types (inline and special)."""
 
     original_type: type = None
-    field_name: str = None
     _adapter: TypeAdapter = None
+    field_name: str
 
     def __init_subclass__(cls, *, owner_meta: Optional["RedisConfig"] = None, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -60,7 +60,7 @@ class BaseRedisType(ABC):
 
     @classmethod
     def queue_special_loads_in_pipeline(
-        cls, pipe, key: str, plan: list, parent_path: str = ""
+        cls, pipe, key: str, plan: list, parent_path: str = "", field_name: str = ""
     ):
         """Queue any special-field loads this type contributes into ``pipe``., it will be used by the pipe creator"""
         return
@@ -105,6 +105,7 @@ class BaseRedisType(ABC):
     def __init__(self, *args, **kwargs):
         self._base_model_link = None
         self._redis_updated = False
+        self.field_name = ""
 
     def init_redis_field(self, key, val):
         if hasattr(val, "_base_model_link"):

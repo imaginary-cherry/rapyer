@@ -626,6 +626,7 @@ class AtomicRedisModel(BaseModel):
         instance = cls.model_validate(model_dump, context=context)
         instance._pk = self._pk
         instance._base_model_link = self._base_model_link
+        instance.field_name = self.field_name
         instance._failed_fields = context.get(FAILED_FIELDS_KEY, set())
         return instance
 
@@ -654,12 +655,14 @@ class AtomicRedisModel(BaseModel):
 
     @classmethod
     def queue_special_loads_in_pipeline(
-        cls, pipe, key: str, plan: list, parent_path: str = ""
+        cls, pipe, key: str, plan: list, parent_path: str = "", field_name: str = ""
     ):
         """Queue load ops for every SF reachable from this model. both directly and nested (in a list or container model)"""
         for fname in cls._special_field_names:
             field_cls = cls.model_fields[fname].annotation
-            field_cls.queue_special_loads_in_pipeline(pipe, key, plan, parent_path)
+            field_cls.queue_special_loads_in_pipeline(
+                pipe, key, plan, parent_path, field_name=f".{fname}"
+            )
         for fname in cls._contain_sf:
             field_cls = cls.model_fields[fname].annotation
             nested_path = f"{parent_path}.{fname}"
@@ -1027,6 +1030,7 @@ class AtomicRedisModel(BaseModel):
             attr = getattr(self, name)
             if isinstance(attr, BaseRedisType):
                 attr._base_model_link = self
+                attr.field_name = f".{name}"
 
         if skip_redis_set:
             return
@@ -1071,6 +1075,7 @@ class AtomicRedisModel(BaseModel):
             attr = instance_dict.get(name)
             if attr is not None:
                 attr._base_model_link = self
+                attr.field_name = f".{name}"
         return self
 
 
