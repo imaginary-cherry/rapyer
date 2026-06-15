@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union, get_args
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
 
-from rapyer.actions import ActionGroup, TargetSource, mark_actions
 from rapyer.errors import NotResolvedError
 from rapyer.types.relational import RelationalFieldType
 
@@ -22,7 +21,6 @@ class ForeignKey(RelationalFieldType, Generic[T]):
     """
 
     original_type: type = str
-    _target_type_hint: Any = None
 
     def __init__(self, ref: "str | AtomicRedisModel"):
         super().__init__()
@@ -34,11 +32,6 @@ class ForeignKey(RelationalFieldType, Generic[T]):
             # Anything else is assumed to be the target AtomicRedisModel.
             self._value = ref
             self._target_key = ref.key
-
-    def __class_getitem__(cls, item):
-        parameterized = super().__class_getitem__(item)
-        parameterized._target_type_hint = item
-        return parameterized
 
     @property
     def target_key(self) -> str | None:
@@ -112,37 +105,34 @@ class ForeignKey(RelationalFieldType, Generic[T]):
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
         args = get_args(source_type)
-        target_hint = args[0] if args else cls._target_type_hint
+        target = args[0] if args else None
 
         def _validate(value: Any) -> "ForeignKey":
             from rapyer.base import AtomicRedisModel
 
+            fk: "ForeignKey | None" = None
             if isinstance(value, ForeignKey):
-                return value
-            if isinstance(value, (AtomicRedisModel, str)):
+                fk = value
+            elif isinstance(value, (AtomicRedisModel, str)):
                 # __init__ dispatches: a str is a key, a model is the target.
-                return cls(value)
-            if isinstance(value, dict):
+                fk = cls(value)
+            elif isinstance(value, dict):
                 # Beanie-style DBRef: {"$ref": "Author", "$id": "abc-123"}
                 ref = value.get("$ref")
                 pk = value.get("$id")
                 if ref is not None and pk is not None:
-                    return cls(f"{ref}:{pk}")
-            raise TypeError(
-                f"Cannot validate ForeignKey from {type(value).__name__}: {value!r}"
-            )
+                    fk = cls(f"{ref}:{pk}")
+            if fk is None:
+                raise TypeError(
+                    f"Cannot validate ForeignKey from {type(value).__name__}: {value!r}"
+                )
+            fk._relational_target = target
+            return fk
 
         def _serialize(value: "ForeignKey") -> str | None:
             if value is None:
                 return None
             return value._target_key
-
-        # TODO: this name-normalization exists only because the metaclass converts a
-        #       ForeignKey's target into a dynamic per-field subclass. Once reference
-        #       targets are kept as static types, this can be removed (or reduced to a thin
-        #       forward-ref-string fallback).
-        #       https://github.com/imaginary-cherry/rapyer/issues/247
-        cls._target_type_hint = target_hint
 
         return core_schema.no_info_plain_validator_function(
             _validate,

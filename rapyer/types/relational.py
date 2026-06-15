@@ -1,8 +1,7 @@
 import abc
-from typing import TYPE_CHECKING, Any, get_args, get_origin
+from typing import TYPE_CHECKING, Any
 
 from rapyer.types.base import BaseRedisType
-from rapyer.utils.pythonic import safe_issubclass
 
 if TYPE_CHECKING:
     from rapyer.base import AtomicRedisModel
@@ -17,12 +16,7 @@ class RelationalFieldType(BaseRedisType, abc.ABC):
     separate key but is fetched on demand rather than stored separately.
     """
 
-    # The generic argument as captured at class-build time: a model class, a
-    # forward-ref string, or a metaclass-converted per-field subclass.
-    _target_type_hint: Any = None
-    # The canonical, registered target model. Populated once at init by
-    # ``resolve_relational_targets`` and read by ``afetch`` — never resolved
-    # per fetch.
+    # This tells us what is the type we refer to
     _relational_target: "type[AtomicRedisModel] | None" = None
 
     @property
@@ -48,62 +42,15 @@ class RelationalFieldType(BaseRedisType, abc.ABC):
         """Resolve the target from Redis and cache it in-place."""
 
 
-def _resolve_target_model(target_hint: Any) -> "type[AtomicRedisModel] | None":
-    """
-    Map a generic argument to the canonical, registered top-level model.
-
-    Resolves by ``__name__`` against ``REDIS_MODELS`` so a forward-ref string or
-    the metaclass-converted per-field subclass both collapse to the registered,
-    detached model. Returns ``None`` for an unbound ``TypeVar``.
-    """
-    # TODO: this name-normalization exists only because the metaclass converts a
-    #       ForeignKey's target into a dynamic per-field subclass. Once reference
-    #       targets are kept as static types, this can be removed (or reduced to a thin
-    #       forward-ref-string fallback).
-    #       https://github.com/imaginary-cherry/rapyer/issues/247
-    from rapyer.base import REDIS_MODELS
-
-    name = (
-        target_hint
-        if isinstance(target_hint, str)
-        else getattr(target_hint, "__name__", None)
-    )
-    if name is None:
-        return None
-    for model in REDIS_MODELS:
-        if model.__name__ == name:
-            return model
-    if isinstance(target_hint, str):
-        raise NameError(
-            f"ForeignKey target {target_hint!r} is not a registered rapyer model"
-        )
-    return None
-
-
-def _iter_relational_types(annotation: Any):
-    """Yield every ``RelationalFieldType`` subclass reachable in an annotation."""
-    origin = get_origin(annotation) or annotation
-    if safe_issubclass(origin, RelationalFieldType):
-        yield origin
-        return
-    for arg in get_args(annotation):
-        yield from _iter_relational_types(arg)
-
-
 def resolve_relational_targets(models) -> None:
     """
-    Resolve and cache every relational field's target model, once.
+    Rebuild every model that holds a reference so pydantic resolves forward-ref
+    targets to real classes.
 
-    Called at the init stage (``init_rapyer``) after all models are registered,
-    so forward references and self-references all resolve. Only the fields the
-    metaclass already flagged (``_relational_field_names`` + ``_contain_fk``) are
-    visited — no recursive scan of every field — and each target is cached on its
-    field type, so ``afetch`` never hits the registry.
+    A forward reference to a model defined later stays unresolved in the field
+    annotation otherwise. Each ``ForeignKey`` stamps its resolved target onto the
+    instance at validation time, so this only needs to force that rebuild.
     """
     for model in models:
-        for fname in model._relational_field_names | model._contain_fk:
-            annotation = model.model_fields[fname].annotation
-            for rel_type in _iter_relational_types(annotation):
-                rel_type._relational_target = _resolve_target_model(
-                    rel_type._target_type_hint
-                )
+        if model.contains_fk_field():
+            model.model_rebuild(force=True)
