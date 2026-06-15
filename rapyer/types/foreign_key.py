@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union, get_args
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union
 
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
@@ -88,6 +88,7 @@ class ForeignKey(RelationalFieldType, Generic[T]):
             )
         return getattr(value, name)
 
+    # TODO - support for atmoic model comparison
     def __eq__(self, other: object) -> bool:
         if isinstance(other, ForeignKey):
             return self._target_key == other._target_key
@@ -104,30 +105,24 @@ class ForeignKey(RelationalFieldType, Generic[T]):
     def __get_pydantic_core_schema__(
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
-        args = get_args(source_type)
-        target = args[0] if args else None
-
+        # We validate with the Foriegn key with generic
         def _validate(value: Any) -> "ForeignKey":
             from rapyer.base import AtomicRedisModel
 
-            fk: "ForeignKey | None" = None
             if isinstance(value, ForeignKey):
-                fk = value
-            elif isinstance(value, (AtomicRedisModel, str)):
+                return value
+            if isinstance(value, (AtomicRedisModel, str)):
                 # __init__ dispatches: a str is a key, a model is the target.
-                fk = cls(value)
-            elif isinstance(value, dict):
+                return source_type(value)
+            if isinstance(value, dict):
                 # Beanie-style DBRef: {"$ref": "Author", "$id": "abc-123"}
                 ref = value.get("$ref")
                 pk = value.get("$id")
                 if ref is not None and pk is not None:
-                    fk = cls(f"{ref}:{pk}")
-            if fk is None:
-                raise TypeError(
-                    f"Cannot validate ForeignKey from {type(value).__name__}: {value!r}"
-                )
-            fk._relational_target = target
-            return fk
+                    return source_type(f"{ref}:{pk}")
+            raise TypeError(
+                f"Cannot validate ForeignKey from {type(value).__name__}: {value!r}"
+            )
 
         def _serialize(value: "ForeignKey") -> str | None:
             if value is None:

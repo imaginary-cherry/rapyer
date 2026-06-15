@@ -1,5 +1,5 @@
 import abc
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, get_args
 
 from rapyer.types.base import BaseRedisType
 
@@ -16,8 +16,12 @@ class RelationalFieldType(BaseRedisType, abc.ABC):
     separate key but is fetched on demand rather than stored separately.
     """
 
-    # This tells us what is the type we refer to
-    _relational_target: "type[AtomicRedisModel] | None" = None
+    @property
+    def _relational_target(self) -> "type[AtomicRedisModel] | None":
+        """Find the refernced class"""
+        orig = getattr(self, "__orig_class__", None)
+        args = get_args(orig) if orig is not None else ()
+        return args[0] if args else None
 
     @property
     @abc.abstractmethod
