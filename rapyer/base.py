@@ -413,6 +413,10 @@ class AtomicRedisModel(BaseModel):
             # Skip special fields — they handle their own serialization
             if attr_name in cls._special_field_names:
                 continue
+            # Skip relational fields — ForeignKey is left unconverted and
+            # serializes itself to a key string via its own core schema.
+            if attr_name in cls._relational_field_names:
+                continue
             if original_annotations[attr_name] == attr_type:
                 default_value = cls.__dict__.get(attr_name, None)
                 can_json = is_type_json_serializable(attr_type, default_value)
