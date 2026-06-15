@@ -132,6 +132,8 @@ def test_priority_queue_serializer_passes_through_non_collection_value():
 
 
 def test_eq_with_non_priority_queue_is_false():
+    # TODO(#244): remove once SF field changes are prohibited on an unsaved
+#                 model — this exercises an SF field built on a never-persisted model.
     # Coverage: RedisPriorityQueue.__eq__'s branch for a non-queue operand
     # (returns False instead of comparing special keys).
     model = GenericPriorityQueueModel[str]()
@@ -141,6 +143,8 @@ def test_eq_with_non_priority_queue_is_false():
 
 
 def test_init_from_existing_converted_queue_passes_through():
+    # TODO(#244): remove once SF field changes are prohibited on an unsaved
+    #             model — this exercises an SF field built on a never-persisted model.
     # Coverage: the validator's exact-subclass fast path (isinstance(v, cls) ->
     # return v) when assigning an already-converted queue instance.
     source = GenericPriorityQueueModel[str]()

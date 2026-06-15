@@ -165,6 +165,48 @@ async def test_aget_or_create__priority_queue_smoke():
     assert [item.value for item in items] == ["ship-it", "review-it"]
 
 
+@pytest.mark.asyncio
+async def test_aget_or_create__create_co_persists_main_doc_and_sf_state(
+    real_redis_client,
+):
+    # Regression: the create branch runs special-field savers *before* writing
+    # the main document, so a successful create must leave both the main key and
+    # the SF state present together — never the main doc without its SF members.
+    # Arrange
+    model = GenericRedisSetModel[str](name="int-co-persist")
+    model.tags.update({"x", "y", "z"})
+
+    # Act
+    result = await GenericRedisSetModel[str].aget_or_create(model)
+
+    # Assert
+    assert result.status == GetOrCreateStatus.CREATED
+    assert await real_redis_client.exists(result.value.key) == 1
+    assert await result.value.tags.amembers() == {"x", "y", "z"}
+
+
+@pytest.mark.asyncio
+async def test_aget_or_create__create_overrides_stale_server_sf_state(
+    real_redis_client,
+):
+    # Arrange
+    model = GenericRedisSetModel[str](name="int-sf-override")
+    model.tags.update({"stale-a", "stale-b"})
+    await model.asave()
+    # Drop only the main JSON doc, leaving the orphaned SF key with stale members.
+    assert await real_redis_client.delete(model.key) == 1
+
+    # Act: mutate the same model's SF state locally, then re-create.
+    model.tags.clear()
+    model.tags.update({"fresh-x", "fresh-y"})
+    result = await GenericRedisSetModel[str].aget_or_create(model)
+
+    # Assert: local SF state overrides the stale server members.
+    assert result.status == GetOrCreateStatus.CREATED
+    assert await real_redis_client.exists(result.value.key) == 1
+    assert await result.value.tags.amembers() == {"fresh-x", "fresh-y"}
+
+
 # --- Guard rails ---
 
 

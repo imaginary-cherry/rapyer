@@ -24,7 +24,10 @@ if existed == 1 then
     return out
 end
 
-redis.call('JSON.SET', main_key, path, main_data)
+-- Apply special-field savers before writing the main document. Redis Lua does
+-- not roll back on error, so persisting main_key last keeps the existence
+-- sentinel unset on saver failure, letting a retry re-run cleanly instead of
+-- leaving a committed main doc with only partial special-field state.
 local i = 3
 while i <= #ARGV do
     local saver = SF_SAVE[ARGV[i]]
@@ -33,4 +36,5 @@ while i <= #ARGV do
     end
     i = i + 3
 end
+redis.call('JSON.SET', main_key, path, main_data)
 return {1, main_data}
