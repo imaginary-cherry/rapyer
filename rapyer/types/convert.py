@@ -25,11 +25,16 @@ class RedisConverter(TypeConverter):
         self.safe_load = safe_load
         self.owner_meta = owner_meta
 
-    def _build_redis_subclass(self, name: str, base: type, namespace: dict) -> type:
+    def _build_redis_subclass(
+        self, name: str, base: type, namespace: dict, generic_values=None
+    ) -> type:
         """Create a per-field BaseRedisType subclass and pass owner_meta into __init_subclass__."""
         kwds = {"owner_meta": self.owner_meta} if self.owner_meta is not None else {}
-        params = getattr(base, "__parameters__", None)
-        gen_base = base[params] if params else base
+        if generic_values is not None:
+            gen_base = base[generic_values]
+        else:
+            params = getattr(base, "__parameters__", None)
+            gen_base = base[params] if params else base
         return _python_types.new_class(
             name,
             bases=(gen_base,),
@@ -72,16 +77,13 @@ class RedisConverter(TypeConverter):
             )
         if safe_issubclass(type_to_convert, BaseRedisType):
             redis_type = type_to_convert
-            original_type = type_to_convert.original_type
         else:
             redis_type = self.supported_types[type_to_convert]
-            original_type = type_to_convert
 
         new_type = self._build_redis_subclass(
             redis_type.__name__,
             redis_type,
             dict(
-                original_type=original_type,
                 safe_load=self.safe_load,
                 __doc__=DYNAMIC_CLASS_DOC,
             ),
@@ -95,23 +97,18 @@ class RedisConverter(TypeConverter):
     ) -> type:
         if safe_issubclass(type_to_covert, BaseRedisType):
             redis_type = type_to_covert
-            original_type = type_to_covert.original_type
         else:
             redis_type = self.supported_types[type_to_covert]
-            original_type = type_to_covert
-            original_type = original_type[generic_values]
 
         new_type = self._build_redis_subclass(
             redis_type.__name__,
             redis_type,
             dict(
-                original_type=original_type,
                 safe_load=self.safe_load,
                 __doc__=DYNAMIC_CLASS_DOC,
             ),
+            generic_values=generic_values,
         )
 
-        adapter_type = new_type[generic_values]
-        if issubclass(redis_type, BaseRedisType):
-            new_type._adapter = TypeAdapter(adapter_type)
-        return new_type[generic_values]
+        new_type._adapter = TypeAdapter(new_type)
+        return new_type

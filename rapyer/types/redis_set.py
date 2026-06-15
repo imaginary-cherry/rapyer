@@ -1,6 +1,6 @@
 import json
 import uuid
-from typing import Any, Generic, Iterable, Optional, TypeVar, get_args
+from typing import Any, Generic, Iterable, Optional, TypeVar
 
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
@@ -8,6 +8,7 @@ from pydantic_core import core_schema
 from rapyer.actions import ActionGroup, mark_actions
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME
 from rapyer.types.special import SpecialFieldType
+from rapyer.utils.pythonic import resolve_generic_args
 
 T = TypeVar("T")
 
@@ -260,7 +261,7 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
     def __get_pydantic_core_schema__(
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
-        args = get_args(source_type)
+        args = resolve_generic_args(source_type)
         inner = args[0] if args else Any
 
         def _validate_wrap(v, handler_call, info):

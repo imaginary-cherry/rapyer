@@ -77,6 +77,7 @@ from rapyer.types.base import (
     RedisType,
 )
 from rapyer.types.convert import RedisConverter
+from rapyer.types.generic import GenericRedisType
 from rapyer.types.relational import RelationalFieldType
 from rapyer.types.special import SpecialFieldType
 from rapyer.typing_support import Self, Unpack
@@ -248,7 +249,12 @@ class AtomicRedisModel(BaseModel):
         for field_name, field_info in cls.model_fields.items():
             real_type = field_info.annotation
             # Check if real_type is a class before using issubclass
-            if get_origin(real_type) is not None or not isinstance(real_type, type):
+            if (
+                get_origin(real_type) is not None
+                or not isinstance(real_type, type)
+                or safe_issubclass(real_type, GenericRedisType)
+                or safe_issubclass(real_type, SpecialFieldType)
+            ):
                 if field_with_flag(field_info, IndexAnnotation):
                     raise UnsupportedIndexedFieldError(
                         f"Field {field_name} is type {real_type}, and not supported for indexing"
