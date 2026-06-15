@@ -10,8 +10,12 @@ set -euo pipefail
 
 MARKER="<!-- coverage-comment -->"
 
-pct=$(grep '^TOTAL' "$COVERAGE_TXT" | awk '{print $NF}')
-table=$(sed -n '/^Name\s/,/^TOTAL/p' "$COVERAGE_TXT" || tail -n 40 "$COVERAGE_TXT")
+pct=$(awk '$1=="TOTAL"{p=$NF} END{print p}' "$COVERAGE_TXT")
+
+table=$(sed -n '/^Name[[:space:]]/,/^TOTAL/p' "$COVERAGE_TXT")
+if [ -z "$table" ]; then
+  table=$(tail -n 40 "$COVERAGE_TXT")
+fi
 
 body=$(cat <<EOF
 ${MARKER}
