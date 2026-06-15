@@ -42,8 +42,13 @@ jobs:
       - uses: actions/checkout@v5
 
       # Scan code tokenless with the auto ruleset, emitting a SARIF report.
+      # Exclude the Python 3.7 importlib compat rule: this project targets
+      # Python >=3.10, so importlib.resources is always available.
       - name: Run Semgrep
-        run: semgrep ci --config=auto --sarif --output=semgrep.sarif
+        run: >-
+          semgrep ci --config=auto
+          --exclude-rule python.lang.compatibility.python37.python37-compatibility-importlib2
+          --sarif --output=semgrep.sarif
         continue-on-error: true
 
       # Upload SARIF file generated in previous step
