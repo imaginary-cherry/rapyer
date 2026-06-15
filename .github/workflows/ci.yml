@@ -48,6 +48,25 @@ jobs:
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
 
+  # Build the redis test matrix from .github/redis-matrix.json: all versions when
+  # the branch maps to 0, otherwise a random sample of that branch's count.
+  setup-matrix:
+    runs-on: ubuntu-22.04
+    needs: [validate-branch-target]
+    outputs:
+      redis-versions: ${{ steps.pick.outputs.redis }}
+    steps:
+    - uses: actions/checkout@v6
+    - id: pick
+      env:
+        TARGET: ${{ github.base_ref || github.ref_name }}
+      run: |
+        CFG=.github/redis-matrix.json
+        COUNT=$(jq -r --arg b "$TARGET" '.sample_per_branch[$b] // .sample_per_branch.default' "$CFG")
+        ALL=$(jq -r '.versions[]' "$CFG")
+        if [ "$COUNT" = "0" ]; then PICK="$ALL"; else PICK=$(shuf -n "$COUNT" <<< "$ALL"); fi
+        echo "redis=$(jq -R . <<< "$PICK" | jq -cs .)" >> "$GITHUB_OUTPUT"
+
   lint:
     runs-on: ubuntu-22.04
     needs: [validate-branch-target]
@@ -98,8 +117,7 @@ jobs:
 
   test:
     runs-on: ubuntu-22.04
-    needs: [validate-branch-target, mirror-redis]
-    if: always() && (needs.validate-branch-target.result == 'success' || needs.validate-branch-target.result == 'skipped') && needs.mirror-redis.result == 'success'
+    needs: [validate-branch-target, mirror-redis, setup-matrix]
     permissions:
       contents: read
       packages: read
@@ -107,7 +125,7 @@ jobs:
       fail-fast: ${{ github.event_name == 'pull_request' }}
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
-        redis-version: ["6.0", "6.1", "6.2", "6.3", "6.4", "7.0", "7.1", "7.2", "7.3", "7.4", "8.0"]
+        redis-version: ${{ fromJSON(needs.setup-matrix.outputs.redis-versions) }}
         pydantic-version: ["2.11", "2.12", "2.13"]
 
     services:
