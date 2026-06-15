@@ -376,6 +376,8 @@ class AtomicRedisModel(BaseModel):
             # If the field was redfined, we remove it from list
             cls._special_field_names.discard(field_name)
             cls._contain_sf.discard(field_name)
+            cls._relational_field_names.discard(field_name)
+            cls._contain_fk.discard(field_name)
 
             unwrapped = annotation
             while get_origin(unwrapped) is Annotated:
