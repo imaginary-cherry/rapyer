@@ -19,7 +19,6 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
     no local state.
     """
 
-    original_type: type = set
     LUA_SNIPPET_DIR = "redis_set"
 
     def __init__(self, *args, **kwargs):

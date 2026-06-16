@@ -20,8 +20,6 @@ class ForeignKey(RelationalFieldType, Generic[T]):
     (e.g. ``"Author:abc-123"``). Construct from any of:
     """
 
-    original_type: type = str
-
     def __init__(self, ref: "str | AtomicRedisModel"):
         super().__init__()
         if isinstance(ref, str):

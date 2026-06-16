@@ -13,8 +13,6 @@ T = TypeVar("T")
 
 
 class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
-    original_type = dict
-
     def __init__(self, *args, **kwargs):
         dict.__init__(self, *args, **kwargs)
         GenericRedisType.__init__(self, *args, **kwargs)

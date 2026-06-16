@@ -23,9 +23,21 @@ FAILED_FIELDS_KEY = "__rapyer_failed_fields__"
 class BaseRedisType(ABC):
     """Common base for all Redis-aware field types (inline and special)."""
 
-    original_type: type = None
     _adapter: TypeAdapter = None
     field_name: str
+
+    @classmethod
+    def wrapped_python_type(cls) -> type:
+        """The plain Python type this redis type wraps (e.g. ``int``, ``str``, ``list``).
+
+        Recovered from the MRO — the first base that is not one of rapyer's own
+        redis types — so it needs no stored attribute and stays correct for
+        subclasses (e.g. ``RedisDatetimeTimestamp`` -> ``datetime``).
+        """
+        for base in cls.__mro__:
+            if base is not object and not issubclass(base, BaseRedisType):
+                return base
+        return object
 
     def __init_subclass__(cls, *, owner_meta: Optional["RedisConfig"] = None, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -152,7 +164,7 @@ class RedisType(BaseRedisType):
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
         return core_schema.no_info_after_validator_function(
-            cls, handler(cls.original_type)
+            cls, handler(cls.wrapped_python_type())
         )
 
     @staticmethod

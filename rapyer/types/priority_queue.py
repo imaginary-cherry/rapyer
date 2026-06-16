@@ -25,7 +25,6 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
     Priority queue backed by a Redis Sorted Set. Pure Redis proxy — no local state.
     """
 
-    original_type: type = type(None)
     LUA_SNIPPET_DIR = "redis_priority_queue"
 
     # --- Serialization helpers ---

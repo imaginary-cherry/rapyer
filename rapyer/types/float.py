@@ -15,8 +15,6 @@ from rapyer.types.base import RedisType
 
 
 class RedisFloat(float, RedisType):
-    original_type = float
-
     @classmethod
     def redis_schema(cls, field_name: str):
         return NumericField(f"$.{field_name}", as_name=field_name)
