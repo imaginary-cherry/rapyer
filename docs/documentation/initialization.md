@@ -78,6 +78,34 @@ await init_rapyer(redis=redis_client, ttl=3600)
 **Important:** `init_rapyer` is crucial for initializing special fields like indexed fields and other advanced features.
 For simple usage, it is possible to simply set the redis client yourself.
 
+## Generic Models
+
+!!! warning "Generic origin models are skipped during initialization"
+    A **generic origin** — declared as
+    `class MyModel(AtomicRedisModel, Generic[T])` with unbound type
+    parameters — is automatically left out of `init_rapyer`. Register and use a
+    concrete parametrization instead:
+
+    ```python
+    T = TypeVar("T")
+
+    class Event(AtomicRedisModel, Generic[T]):  # origin: auto-skipped
+        payload: T
+
+    class StrEvent(Event[str]):
+        ...  # concrete subclass — registered, initialized, queryable
+    ```
+
+??? note "Why generic origins are skipped (mechanics)"
+    The query API exposes each field as a class attribute (so `User.age > 18`
+    works), and `init_rapyer` installs those attributes. Pydantic treats a
+    class attribute that matches a field name as that field's **default**, so on
+    a generic origin the installed attribute would shadow the real default —
+    and any concrete parametrization (`MyModel[str]`) built *afterwards* would
+    inherit that shadowed default and fail to construct. Rapyer avoids this by
+    not registering origins with unbound type parameters; their concrete
+    parametrizations are registered normally.
+
 ## teardown_rapyer Function
 
 The `teardown_rapyer` function properly closes Redis connections for all models, ensuring clean resource cleanup.

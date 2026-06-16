@@ -440,8 +440,14 @@ class AtomicRedisModel(BaseModel):
         cls.build_redis_model()
 
         # Update the redis model list for initialization
-        # Skip dynamically created classes from type conversion
-        if cls.__doc__ != DYNAMIC_CLASS_DOC and cls.Meta.init_with_rapyer:
+        # Skip dynamically created classes from type conversion.
+        # Skip generic origins
+        not_generic_origin = not bool(getattr(cls, "__parameters__", ()))
+        if (
+            cls.__doc__ != DYNAMIC_CLASS_DOC
+            and cls.Meta.init_with_rapyer
+            and not_generic_origin
+        ):
             existing = next(
                 (m for m in REDIS_MODELS if m.__name__ == cls.__name__), None
             )
