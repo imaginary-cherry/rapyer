@@ -41,7 +41,6 @@ def test_find_redis_models_returns_all_loaded_models_sanity(clean_redis_models):
         Model2,
         Model3,
         Model4,
-        GenericModel,
         GenericModel[type],
         GenericModel[Model],
     }
@@ -51,6 +50,8 @@ def test_find_redis_models_returns_all_loaded_models_sanity(clean_redis_models):
 
     # Assert
     assert set(models) == expected
+    # Generic model is not registered
+    assert GenericModel not in models
 
 
 def test_registering_two_models_with_same_class_name_raises(clean_redis_models):
