@@ -1,12 +1,15 @@
 import json
+from typing import Optional, get_origin
 
 import pytest
 from pydantic import TypeAdapter
 
+from rapyer.base import AtomicRedisModel
 from rapyer.errors import NotResolvedError
 from rapyer.types import Reference
 from rapyer.types.foreign_key import ForeignKey
-from rapyer.types.relational import RelationalFieldType, _resolve_target_model
+from rapyer.types.relational import RelationalFieldType, resolve_relational_targets
+from rapyer.utils.pythonic import resolve_generic_args
 from tests.models.foreign_key_types import FkAuthor, FkBook
 
 # --- Class-build introspection ---
@@ -36,6 +39,39 @@ def test_relational_fields_are_also_redis_link_fields():
 def test_reference_is_relational_field_type():
     # Arrange / Act / Assert
     assert issubclass(Reference, RelationalFieldType)
+
+
+def test_foreign_key_fields_are_not_dynamically_subclassed():
+    # The converter leaves relational types untouched, so every FK field uses the
+    # one shared ForeignKey class (parameterized or bare) — never a per-field
+    # dynamic subclass.
+    # Arrange
+    def fk_origin(annotation):
+        annotation_origin = get_origin(annotation) or annotation
+        if isinstance(annotation_origin, type) and issubclass(annotation_origin, ForeignKey):
+            return annotation_origin
+        # Converted containers (e.g. list[ForeignKey[X]]) are concrete subclasses
+        # that carry their args in __orig_bases__, not get_args — descend via the
+        # same helper the runtime uses.
+        for arg in resolve_generic_args(annotation):
+            found = fk_origin(arg)
+            if found is not None:
+                return found
+        return None
+
+    # ACT
+    class BareRefHolder(AtomicRedisModel):
+        ref: Optional[Reference] = None
+
+    # Assert
+    for model, field in [
+        (FkBook, "author"),
+        (FkBook, "publisher"),
+        (FkBook, "co_authors"),
+        (BareRefHolder, "ref"),
+    ]:
+        origin = fk_origin(model.model_fields[field].annotation)
+        assert origin is ForeignKey, f"{model.__name__}.{field} is {origin!r}"
 
 
 # --- Pydantic validator: accepts multiple shapes ---
