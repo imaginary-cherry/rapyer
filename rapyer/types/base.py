@@ -2,7 +2,7 @@ import abc
 import base64
 import pickle
 from abc import ABC
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, ClassVar, Optional
 
 from pydantic import GetCoreSchemaHandler, TypeAdapter
 from pydantic_core import core_schema
@@ -26,18 +26,8 @@ class BaseRedisType(ABC):
     _adapter: TypeAdapter = None
     field_name: str
 
-    @classmethod
-    def wrapped_python_type(cls) -> type:
-        """The plain Python type this redis type wraps (e.g. ``int``, ``str``, ``list``).
-
-        Recovered from the MRO — the first base that is not one of rapyer's own
-        redis types — so it needs no stored attribute and stays correct for
-        subclasses (e.g. ``RedisDatetimeTimestamp`` -> ``datetime``).
-        """
-        for base in cls.__mro__:
-            if base is not object and not issubclass(base, BaseRedisType):
-                return base
-        return object
+    # The plain Python type this redis type wraps (e.g. ``int``, ``str``, ``list``).
+    wrapped_python_type: ClassVar[type]
 
     def __init_subclass__(cls, *, owner_meta: Optional["RedisConfig"] = None, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -164,7 +154,7 @@ class RedisType(BaseRedisType):
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
         return core_schema.no_info_after_validator_function(
-            cls, handler(cls.wrapped_python_type())
+            cls, handler(cls.wrapped_python_type)
         )
 
     @staticmethod

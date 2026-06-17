@@ -112,7 +112,7 @@ class GenericRedisType(RedisType, Generic[T], ABC):
         if should_pickle:
             # Build schema with both validator and serializer
             python_schema = core_schema.with_info_before_validator_function(
-                cls.full_deserializer, handler(cls.wrapped_python_type())
+                cls.full_deserializer, handler(cls.wrapped_python_type)
             )
 
             return core_schema.with_info_after_validator_function(

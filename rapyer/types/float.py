@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, TypeAlias
+from typing import TYPE_CHECKING, ClassVar, TypeAlias
 
 from redis.commands.search.field import NumericField
 
@@ -15,6 +15,8 @@ from rapyer.types.base import RedisType
 
 
 class RedisFloat(float, RedisType):
+    wrapped_python_type: ClassVar[type] = float
+
     @classmethod
     def redis_schema(cls, field_name: str):
         return NumericField(f"$.{field_name}", as_name=field_name)

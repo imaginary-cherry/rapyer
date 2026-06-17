@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, TypeAlias
+from typing import TYPE_CHECKING, ClassVar, TypeAlias
 
 from rapyer.actions import ActionGroup, mark_actions, marks_redis_updated
 from rapyer.scripts import STR_APPEND_SCRIPT_NAME, STR_MUL_SCRIPT_NAME, run_sha
@@ -6,6 +6,8 @@ from rapyer.types.base import RedisType
 
 
 class RedisStr(str, RedisType):
+    wrapped_python_type: ClassVar[type] = str
+
     def clone(self):
         return str(self)
 

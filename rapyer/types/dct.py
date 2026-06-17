@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Generic, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeAlias, TypeVar
 
 from pydantic_core import core_schema
 
@@ -13,6 +13,8 @@ T = TypeVar("T")
 
 
 class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
+    wrapped_python_type: ClassVar[type] = dict
+
     def __init__(self, *args, **kwargs):
         dict.__init__(self, *args, **kwargs)
         GenericRedisType.__init__(self, *args, **kwargs)

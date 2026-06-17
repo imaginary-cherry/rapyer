@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, ClassVar, TypeVar
 
 from pydantic_core import core_schema
 from pydantic_core.core_schema import SerializationInfo, ValidationInfo
@@ -17,6 +17,8 @@ T = TypeVar("T")
 
 
 class RedisList(list, GenericRedisType[T]):
+    wrapped_python_type: ClassVar[type] = list
+
     def __init__(self, *args, **kwargs):
         list.__init__(self, *args, **kwargs)
         GenericRedisType.__init__(self, *args, **kwargs)

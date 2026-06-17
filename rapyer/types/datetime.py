@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from pydantic_core import core_schema
 from pydantic_core.core_schema import SerializationInfo, ValidationInfo
@@ -11,6 +11,8 @@ from rapyer.types.base import REDIS_DUMP_FLAG_NAME, RedisType
 
 
 class RedisDatetime(datetime, RedisType):
+    wrapped_python_type: ClassVar[type] = datetime
+
     def __new__(cls, value, *args, **kwargs):
         if isinstance(value, datetime):
             # Support init from a datetime, preserving microseconds and timezone
