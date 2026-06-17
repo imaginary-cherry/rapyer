@@ -54,7 +54,7 @@ PRIVATE_METHODS = _group(
     AtomicRedisModel.redis_dump_json,
     AtomicRedisModel.redis_dump,
     AtomicRedisModel.is_inner_model,
-    AtomicRedisModel.assign_fields_links,
+    AtomicRedisModel.model_post_init,
     AtomicRedisModel.validate_sub_model,
     AtomicRedisModel._all_keys_for_key,
     AtomicRedisModel._iter_expanded_filter_batches,
