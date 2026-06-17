@@ -57,6 +57,7 @@ test = [
     "pytest-asyncio>=0.25.0",
     "pytest-cov>=6.0.0",
     "fakeredis[lua,json]>=2.20.0",
+    "tox>=4.55.1",
 ]
 
 [project.urls]
