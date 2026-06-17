@@ -2,11 +2,12 @@ from datetime import datetime
 
 import pytest
 import pytest_asyncio
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from rapyer.base import AtomicRedisModel
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME
 from tests.models.collection_types import (
+    ComprehensiveTestModel,
     MixedTypesModel,
     SimpleDictModel,
     SimpleListModel,
@@ -512,3 +513,40 @@ def test_redis_dump_skips_field_marked_exclude_true_sanity():
     # Assert
     assert "secret" not in redis_data
     assert redis_data["name"] == "my_model"
+
+
+def test_atomic_and_plain_models_dump_identically_for_native_fields_sanity():
+    # Arrange
+    shared_values = dict(
+        tags=["alpha", "beta"],
+        metadata={"key": "value", "env": "prod"},
+        name="comprehensive",
+        counter=42,
+        amount=3.14,
+        data=b"raw-bytes",
+        event_time=datetime(2023, 6, 15, 10, 30, 45),
+    )
+
+    class PlainComprehensiveModel(BaseModel):
+        tags: list[str] = Field(default_factory=list)
+        metadata: dict[str, str] = Field(default_factory=dict)
+        name: str = ""
+        counter: int = 0
+        amount: float = 0.0
+        data: bytes = b""
+        event_time: datetime = Field(default_factory=datetime.now)
+
+    # Arrange — same values fed to the atomic model and its plain twin
+    atomic = ComprehensiveTestModel(**shared_values)
+    plain = PlainComprehensiveModel(**shared_values)
+
+    # Act & Assert — python mode
+    atomic_dump_json = atomic.model_dump(mode="json")
+    plain_dump_json = plain.model_dump(mode="json")
+
+    atomic_dump = atomic.model_dump()
+    plain_dump = plain.model_dump()
+
+    # Assert
+    assert atomic_dump == plain_dump
+    assert atomic_dump_json == plain_dump_json
