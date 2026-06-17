@@ -1033,6 +1033,11 @@ class AtomicRedisModel(BaseModel):
             yield redis_model
 
     def __setattr__(self, name: str, value: Any) -> None:
+        # Dont change private attr set beahvior
+        if name.startswith("_"):
+            super().__setattr__(name, value)
+            return
+
         skip_redis_set = False
         if isinstance(value, BaseRedisType):
             skip_redis_set = value._redis_updated
@@ -1044,7 +1049,7 @@ class AtomicRedisModel(BaseModel):
 
         if value is not None:
             attr = getattr(self, name)
-            if isinstance(attr, BaseRedisType):
+            if isinstance(attr, (BaseRedisType, AtomicRedisModel)):
                 attr._base_model_link = self
                 attr.field_name = f".{name}"
 
