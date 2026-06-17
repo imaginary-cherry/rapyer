@@ -208,3 +208,11 @@ SYNC_NATIVE_RAISES_GROUP = SYNC_NATIVE_EFFECT_GROUP | _group(
     RedisList.clear,
     RedisDict.clear,
 )
+
+
+# ADDITIONAL_READ_ACTIONS — read/fetch actions that are not marked with the
+# READ action group, so the group-based ``ignore_groups=READ`` exclusion misses
+# them. They resolve and return a value and cannot be deferred inside a pipeline,
+# so pipeline-atomicity does not apply. Excluded from COVER_PIPELINE_ATOM
+# alongside the marked READ actions.
+ADDITIONAL_READ_ACTIONS = _group(ForeignKey.afetch)

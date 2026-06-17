@@ -109,7 +109,8 @@ COVERAGE_CHECKS: list[CoverageCheck] = [
     CoverageCheck(
         name=COVER_PIPELINE_ATOM,
         help_text="pipeline atomicity",
-        expected=lambda: _collect_methods(ignore_groups=ActionGroup.READ),
+        expected=lambda: _collect_methods(ignore_groups=ActionGroup.READ)
+        - ADDITIONAL_READ_ACTIONS,
     ),
     CoverageCheck(
         name=COVER_READ_IN_PIPELINE,
