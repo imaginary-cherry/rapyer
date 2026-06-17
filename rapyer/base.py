@@ -384,6 +384,7 @@ class AtomicRedisModel(BaseModel):
         cls._contain_fk = set(getattr(cls, "_contain_fk", set()))
         for field_name, annotation in cls.__annotations__.items():
             # If the field was redfined, we remove it from list
+            cls._redis_link_field_names.discard(field_name)
             cls._special_field_names.discard(field_name)
             cls._contain_sf.discard(field_name)
             cls._relational_field_names.discard(field_name)
@@ -1102,7 +1103,7 @@ class AtomicRedisModel(BaseModel):
         instance_dict = self.__dict__
         for name in link_fields:
             attr = instance_dict.get(name)
-            if attr is not None:
+            if isinstance(attr, (BaseRedisType, AtomicRedisModel)):
                 attr._base_model_link = self
                 attr.field_name = f".{name}"
 
