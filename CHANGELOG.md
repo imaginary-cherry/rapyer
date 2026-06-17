@@ -8,6 +8,10 @@
 - **Generic origin models are skipped during initialization**: a generic origin declared as `class M(AtomicRedisModel, Generic[T])` (with unbound type parameters) is no longer registered or initialized by `init_rapyer`. Register and use a concrete parametrization (e.g. `class StrM(M[str])`) instead — see the *Generic Models* note in the initialization docs. This prevents the query-expression attributes installed at init from shadowing the field defaults of parametrizations built afterwards.
 - **`afetch` no longer triggers its own TTL refresh**: resolving a reference with `await ref.afetch()` reads the target through its own `aget`, so the referenced model's TTL is refreshed only when that model's settings refresh on read/fetch — the owner's key is never touched.
 
+### 🐛 Fixed
+
+- **Special fields are excluded from `model_dump`**: special-field types (`RedisPriorityQueue`, `RedisSet`, …) live in their own Redis keys and are never part of the model's JSON document, but only `redis_dump`/`redis_dump_json` excluded them. A plain `model_dump()` left them in — `model_dump(mode="json")` even raised `PydanticSerializationError: Unable to serialize unknown type` on the queue proxy. Special fields are now marked pydantic-excluded when the model class is built, so every dump path (`model_dump`, `model_dump_json`, `redis_dump`) omits them — the exclusion composes through nested models too.
+
 ### 🛠️ Technical Improvements
 
 - **Wider redis range**: supported redis range widened to `redis>=6.0.0,<8.1.0`.
