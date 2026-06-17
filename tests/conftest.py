@@ -14,6 +14,7 @@ from rapyer.base import AtomicRedisModel
 from rapyer.types.base import BaseRedisType
 from rapyer.types.special import SpecialFieldType
 from tests.action_groups import (
+    ADDITIONAL_READ_ACTIONS,
     NON_ACTION_METHODS,
     PRIVATE_INHERITED_METHODS,
     PRIVATE_METHODS,
