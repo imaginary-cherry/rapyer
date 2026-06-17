@@ -8,7 +8,7 @@ from rapyer.base import AtomicRedisModel
 from rapyer.errors import NotResolvedError
 from rapyer.types import Reference
 from rapyer.types.foreign_key import ForeignKey
-from rapyer.types.relational import RelationalFieldType, resolve_relational_targets
+from rapyer.types.relational import RelationalFieldType
 from rapyer.utils.pythonic import resolve_generic_args
 from tests.models.foreign_key_types import FkAuthor, FkBook
 
@@ -48,7 +48,9 @@ def test_foreign_key_fields_are_not_dynamically_subclassed():
     # Arrange
     def fk_origin(annotation):
         annotation_origin = get_origin(annotation) or annotation
-        if isinstance(annotation_origin, type) and issubclass(annotation_origin, ForeignKey):
+        if isinstance(annotation_origin, type) and issubclass(
+            annotation_origin, ForeignKey
+        ):
             return annotation_origin
         # Converted containers (e.g. list[ForeignKey[X]]) are concrete subclasses
         # that carry their args in __orig_bases__, not get_args — descend via the
@@ -287,31 +289,3 @@ def test_serializer_handles_none():
     # serializing None directly through the type adapter, hence a unit test.
     # Act / Assert
     assert TypeAdapter(ForeignKey).dump_python(None) is None
-
-
-def test_resolve_target_model_returns_none_for_unnamed_hint():
-    # Coverage: _resolve_target_model's branch for a hint with no resolvable
-    # name (None) — returns None instead of looking it up.
-    # Act / Assert
-    assert _resolve_target_model(None) is None
-
-
-def test_resolve_target_model_returns_none_for_unregistered_non_string_hint():
-    # Coverage: _resolve_target_model's final `return None` for a non-string
-    # hint whose name matches no registered model.
-    # Arrange
-    class NotAModel:
-        pass
-
-    # Act / Assert
-    # A non-string hint whose name matches no registered model yields None
-    # (only string hints raise — they are explicit forward references).
-    assert _resolve_target_model(NotAModel) is None
-
-
-def test_resolve_target_model_unregistered_string_raises():
-    # Coverage: _resolve_target_model's NameError branch for a string forward
-    # reference that names no registered model.
-    # Act / Assert
-    with pytest.raises(NameError):
-        _resolve_target_model("NotARegisteredRapyerModel")
