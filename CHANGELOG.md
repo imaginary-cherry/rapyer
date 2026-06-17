@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.4]
+
+### 🔄 Changed
+
+- **No runtime dynamic classes for typed fields**: rapyer no longer builds per-field dynamic subclasses of its redis types and references when a model is defined. It reuses the static generic classes (`RedisList[str]`, `RedisDict`, `Reference[T]`, …) and recovers the inner element type from the generic parameterization instead. Per-field state that used to be baked into those generated classes — `field_name` and `original_type` — is now stored per-instance or derived on demand. Existing models behave the same. (#247)
+- **Generic origin models are skipped during initialization**: a generic origin declared as `class M(AtomicRedisModel, Generic[T])` (with unbound type parameters) is no longer registered or initialized by `init_rapyer`. Register and use a concrete parametrization (e.g. `class StrM(M[str])`) instead — see the *Generic Models* note in the initialization docs. This prevents the query-expression attributes installed at init from shadowing the field defaults of parametrizations built afterwards.
+- **`afetch` no longer triggers its own TTL refresh**: resolving a reference with `await ref.afetch()` reads the target through its own `aget`, so the referenced model's TTL is refreshed only when that model's settings refresh on read/fetch — the owner's key is never touched.
+
+### 🛠️ Technical Improvements
+
+- **Wider redis range**: supported redis range widened to `redis>=6.0.0,<8.1.0`.
+
+
 ## [1.3.3]
 
 ### ✨ Added
