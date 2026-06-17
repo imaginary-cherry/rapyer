@@ -517,6 +517,22 @@ def test_redis_dump_skips_field_marked_exclude_true_sanity():
 
 def test_atomic_and_plain_models_dump_identically_for_native_fields_sanity():
     # Arrange
+    excluded = {"event_timestamp", "author"}
+
+    class PlainContainer(BaseModel):
+        labels: set[str] = Field(default_factory=set)
+
+    class PlainComprehensiveModel(BaseModel):
+        tags: list[str] = Field(default_factory=list)
+        metadata: dict[str, str] = Field(default_factory=dict)
+        name: str = ""
+        counter: int = 0
+        amount: float = 0.0
+        data: bytes = b""
+        event_time: datetime = Field(default_factory=datetime.now)
+        container: PlainContainer = Field(default_factory=PlainContainer)
+        pipeline_no_clobber_sentinel: str = "INIT_CLOBBER_SENTINEL"
+
     shared_values = dict(
         tags=["alpha", "beta"],
         metadata={"key": "value", "env": "prod"},
@@ -527,25 +543,16 @@ def test_atomic_and_plain_models_dump_identically_for_native_fields_sanity():
         event_time=datetime(2023, 6, 15, 10, 30, 45),
     )
 
-    class PlainComprehensiveModel(BaseModel):
-        tags: list[str] = Field(default_factory=list)
-        metadata: dict[str, str] = Field(default_factory=dict)
-        name: str = ""
-        counter: int = 0
-        amount: float = 0.0
-        data: bytes = b""
-        event_time: datetime = Field(default_factory=datetime.now)
-
     # Arrange — same values fed to the atomic model and its plain twin
     atomic = ComprehensiveTestModel(**shared_values)
     plain = PlainComprehensiveModel(**shared_values)
 
     # Act & Assert — python mode
-    atomic_dump_json = atomic.model_dump(mode="json")
-    plain_dump_json = plain.model_dump(mode="json")
+    atomic_dump_json = atomic.model_dump(mode="json", exclude=excluded)
+    plain_dump_json = plain.model_dump(mode="json", exclude=excluded)
 
-    atomic_dump = atomic.model_dump()
-    plain_dump = plain.model_dump()
+    atomic_dump = atomic.model_dump(exclude=excluded)
+    plain_dump = plain.model_dump(exclude=excluded)
 
     # Assert
     assert atomic_dump == plain_dump
