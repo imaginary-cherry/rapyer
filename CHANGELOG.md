@@ -10,7 +10,11 @@
 
 ### 🐛 Fixed
 
-- **Special fields are excluded from `model_dump`**: special-field types (`RedisPriorityQueue`, `RedisSet`, …) live in their own Redis keys and are never part of the model's JSON document, but only `redis_dump`/`redis_dump_json` excluded them. A plain `model_dump()` left them in — `model_dump(mode="json")` even raised `PydanticSerializationError: Unable to serialize unknown type` on the queue proxy. Special fields are now marked pydantic-excluded when the model class is built, so every dump path (`model_dump`, `model_dump_json`, `redis_dump`) omits them — the exclusion composes through nested models too.
+- **`aduplicate` no longer re-serializes per copy**: `aduplicate_many` dumped the source model once *per* duplicate. The dump is now taken a single time and reused across all copies (re-validation per copy is still what rebinds each duplicate's special fields to its own key).
+
+### 📝 Documentation
+
+- **`RedisPriorityQueue` fields must be declared with `Field(exclude=True)`**: a priority queue is a pure server-side proxy with no local data, so it has no place in the model's JSON document. Without `exclude=True`, `model_dump(mode="json")` raises when serializing the queue. This is now documented as required on the Priority Queue page. (`RedisSet`, which holds real local members, serializes normally and does not need this.)
 
 ### 🛠️ Technical Improvements
 

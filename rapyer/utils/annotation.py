@@ -92,6 +92,15 @@ def strip_optional(annotation: Any) -> Any:
     return annotation
 
 
+def annotation_origin(annotation: Any) -> Any:
+    """Peel ``Annotated`` and ``Optional`` wrappers and return the underlying origin type."""
+    unwrapped = annotation
+    while get_origin(unwrapped) is Annotated:
+        unwrapped = get_args(unwrapped)[0]
+    unwrapped = strip_optional(unwrapped)
+    return get_origin(unwrapped) or unwrapped
+
+
 def has_annotation(field: Any, annotation_type: Any) -> bool:
     origin = get_origin(field)
     if origin is Annotated:

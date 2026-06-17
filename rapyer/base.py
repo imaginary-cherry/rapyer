@@ -83,6 +83,7 @@ from rapyer.types.special import SpecialFieldType
 from rapyer.typing_support import Self, Unpack
 from rapyer.utils.annotation import (
     DYNAMIC_CLASS_DOC,
+    annotation_origin,
     field_with_flag,
     has_annotation,
     replace_to_redis_types_in_annotation,
@@ -343,11 +344,14 @@ class AtomicRedisModel(BaseModel):
         original_annotations = cls.__annotations__.copy()
         original_annotations.update(new_annotation)
 
-        def _check_is_excluded(name_of_field: str) -> bool:
+        def _check_is_excluded(name_of_field: str, annot) -> bool:
             info = pydantic_annotation.get(name_of_field) or cls.__dict__.get(
                 name_of_field
             )
-            return isinstance(info, FieldInfo) and info.exclude is True
+            if not (isinstance(info, FieldInfo) and info.exclude is True):
+                return False
+            # Redis types are converted even if exlcuded
+            return not safe_issubclass(annotation_origin(annot), BaseRedisType)
 
         new_annotations = {
             field_name: replace_to_redis_types_in_annotation(
@@ -362,7 +366,7 @@ class AtomicRedisModel(BaseModel):
             )
             for field_name, annotation in original_annotations.items()
             if is_redis_field(field_name, annotation)
-            if not _check_is_excluded(field_name)
+            if not _check_is_excluded(field_name, annotation)
         }
         cls.__annotations__ = {**cls.__annotations__, **new_annotations}
         for field_name, field in pydantic_annotation.items():

@@ -151,8 +151,6 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         def _serialize(v, serializer):
             if isinstance(v, list):
                 return serializer(v)  # ← let pydantic serialize as list[T]
-            if isinstance(v, RedisPriorityQueue):
-                return RedisPriorityQueue()
             return v
 
         schema = handler(list[inner])
