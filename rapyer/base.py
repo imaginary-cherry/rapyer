@@ -1081,18 +1081,20 @@ class AtomicRedisModel(BaseModel):
             return values.model_dump()
         return values
 
-    @model_validator(mode="after")
-    def assign_fields_links(self):
+    def model_post_init(self, __context: Any) -> None:
+        # Wire child redis types / nested models back to this model once, after
+        # construction or full validation. validate_assignment does NOT call this,
+        # so per-field reassignment is handled in __setattr__ instead — keeping
+        # repeated assignments from re-linking every sibling field every time.
         link_fields = self.__class__._redis_link_field_names
         if not link_fields:
-            return self
+            return
         instance_dict = self.__dict__
         for name in link_fields:
             attr = instance_dict.get(name)
             if attr is not None:
                 attr._base_model_link = self
                 attr.field_name = f".{name}"
-        return self
 
 
 REDIS_MODELS: list[type[AtomicRedisModel]] = []
