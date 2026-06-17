@@ -296,5 +296,3 @@ async def test_afetch_does_not_refresh_referenced_model_ttl(
     # The owner does refresh on read/fetch, proving the fetch path actually ran.
     owner_ttl = await real_redis_client.ttl(owner.key)
     assert FK_TTL_SECONDS - 2 < owner_ttl <= FK_TTL_SECONDS
-
-
