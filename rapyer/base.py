@@ -519,7 +519,8 @@ class AtomicRedisModel(BaseModel):
         if self.is_inner_model():
             raise RuntimeError("Can only duplicate from top level model")
 
-        duplicated_models = [self.__class__(**self.model_dump()) for _ in range(num)]
+        dump = self.model_dump()
+        duplicated_models = [self.__class__(**dump) for _ in range(num)]
         async with ensure_pipeline(self.Meta) as pipe:
             for dup in duplicated_models:
                 pipe.copy(self.key, dup.key)
