@@ -11,6 +11,7 @@ from tests.models.collection_types import (
     MixedTypesModel,
     SimpleDictModel,
     SimpleListModel,
+    SpecialFieldsContainer,
 )
 from tests.models.common import Priority, TaskStatus
 from tests.models.complex_types import (
@@ -519,9 +520,6 @@ def test_atomic_and_plain_models_dump_identically_for_native_fields_sanity():
     # Arrange
     excluded = {"event_timestamp", "author"}
 
-    class PlainContainer(BaseModel):
-        labels: set[str] = Field(default_factory=set)
-
     class PlainComprehensiveModel(BaseModel):
         tags: list[str] = Field(default_factory=list)
         metadata: dict[str, str] = Field(default_factory=dict)
@@ -530,7 +528,9 @@ def test_atomic_and_plain_models_dump_identically_for_native_fields_sanity():
         amount: float = 0.0
         data: bytes = b""
         event_time: datetime = Field(default_factory=datetime.now)
-        container: PlainContainer = Field(default_factory=PlainContainer)
+        container: SpecialFieldsContainer = Field(
+            default_factory=SpecialFieldsContainer
+        )
         pipeline_no_clobber_sentinel: str = "INIT_CLOBBER_SENTINEL"
 
     shared_values = dict(
