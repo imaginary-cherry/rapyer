@@ -1,13 +1,18 @@
 import pytest
+import pytest_asyncio
 
 from rapyer.errors import KeyNotFound
+from tests.integration.conftest import REDUCED_TTL_SECONDS
 from tests.integration.foreign_keys.conftest import MISSING_AUTHOR_KEY
 from tests.models.foreign_key_types import (
+    FK_TTL_SECONDS,
     FkAuthor,
     FkBook,
     FkLibrary,
     FkRichAuthor,
     FkTree,
+    FkTTLOwner,
+    FkTTLReferee,
 )
 
 # --- Required FK (FkBook.author) ---
@@ -247,3 +252,47 @@ async def test_forward_ref_self_link():
 
     # Assert
     assert loaded.parent.value.name == "root"
+
+
+# --- TTL refresh across a reference ---
+
+
+@pytest_asyncio.fixture
+async def owner_with_referee(real_redis_client):
+    """Saved owner -> referee pair, with the referee's TTL manually reduced so a
+    refresh would be observable as a jump back toward FK_TTL_SECONDS."""
+    referee = FkTTLReferee(name="referee")
+    await referee.asave()
+    owner = FkTTLOwner(title="owner", referee=referee.key)
+    await owner.asave()
+
+    await real_redis_client.expire(referee.key, REDUCED_TTL_SECONDS)
+    await real_redis_client.expire(owner.key, REDUCED_TTL_SECONDS)
+    initial_referee_ttl = await real_redis_client.ttl(referee.key)
+
+    yield owner, referee, initial_referee_ttl
+
+    await owner.adelete()
+    await referee.adelete()
+
+
+@pytest.mark.asyncio
+async def test_afetch_does_not_refresh_referenced_model_ttl(
+    real_redis_client, owner_with_referee
+):
+    # Arrange
+    owner, referee, initial_referee_ttl = owner_with_referee
+    assert initial_referee_ttl <= REDUCED_TTL_SECONDS
+
+    # Act - load the owner and resolve the reference (both are read/fetch ops).
+    loaded = await FkTTLOwner.aget(owner.key)
+    await loaded.referee.afetch()
+
+    # Assert - the referee does not refresh on read/fetch, so its TTL stays in
+    # the reduced window instead of jumping back up to FK_TTL_SECONDS.
+    referee_ttl = await real_redis_client.ttl(referee.key)
+    assert 0 < referee_ttl <= REDUCED_TTL_SECONDS
+
+    # The owner does refresh on read/fetch, proving the fetch path actually ran.
+    owner_ttl = await real_redis_client.ttl(owner.key)
+    assert FK_TTL_SECONDS - 2 < owner_ttl <= FK_TTL_SECONDS

@@ -9,6 +9,12 @@
 
 Unlike regular Redis types (`RedisStr`, `RedisList`, etc.), the priority queue stores its data in a **separate Redis key** — not inline with the model's JSON. This means it operates as a pure Redis proxy with no local state.
 
+!!! warning "Always declare priority queue fields with `exclude=True`"
+    A priority queue isn't a real field on your model — its data lives only on the
+    server (Redis), never inside the model itself. So you must mark it with
+    `Field(..., exclude=True)`. Without it, dumping the model (e.g.
+    `model_dump(mode="json")`) will raise an error.
+
 ```python
 from pydantic import Field
 from rapyer import AtomicRedisModel
@@ -17,7 +23,7 @@ from rapyer.types import RedisPriorityQueue
 
 class JobQueue(AtomicRedisModel):
     name: str = "default"
-    tasks: RedisPriorityQueue[str] = Field(default_factory=RedisPriorityQueue)
+    tasks: RedisPriorityQueue[str] = Field(default_factory=RedisPriorityQueue, exclude=True)
 ```
 
 ## Basic Usage
@@ -44,10 +50,12 @@ task = await queue.tasks.apop()  # None (empty)
 
 ```python
 class IntQueue(AtomicRedisModel):
-    scores: RedisPriorityQueue[int] = Field(default_factory=RedisPriorityQueue)
+    scores: RedisPriorityQueue[int] = Field(default_factory=RedisPriorityQueue, exclude=True)
 
 class FloatQueue(AtomicRedisModel):
-    measurements: RedisPriorityQueue[float] = Field(default_factory=RedisPriorityQueue)
+    measurements: RedisPriorityQueue[float] = Field(
+        default_factory=RedisPriorityQueue, exclude=True
+    )
 ```
 
 ## Operations

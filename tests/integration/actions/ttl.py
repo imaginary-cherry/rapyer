@@ -47,6 +47,13 @@ class TTLActionTestBase(AsyncActionTestBase, ABC):
     def models_to_check_ttl(self):
         return self.created_models
 
+    def model_to_refresh(self):
+        """Model whose class receives the refresh-ttl wrapper and whose
+        configured TTL is the reference for the assertion. Defaults to the
+        acted-on model; override when the action refreshes a different model
+        (e.g. afetch refreshes the resolved target, not the owner)."""
+        return self.created_models[0]
+
     def all_keys_to_check(self):
         keys = []
         for model in self.models_to_check_ttl():
@@ -145,6 +152,7 @@ class TTLActionTestBase(AsyncActionTestBase, ABC):
         # Arrange
         self.created_models = await self._setup_ttl_data()
         model_for_keys = self.created_models[0]
+        model_to_refresh = self.model_to_refresh()
         ttls_before = None
         if self.model_exists_before_action:
             keys = self.all_keys_to_check()
@@ -154,14 +162,14 @@ class TTLActionTestBase(AsyncActionTestBase, ABC):
 
         # Act
         with self.installed_refresh_ttl(
-            type(model_for_keys),
+            type(model_to_refresh),
             ActionGroup.all(for_ttl=True),
         ):
             await self.perform_action(model_for_keys)
 
         # Assert
         keys = self.all_keys_to_check()
-        ttl_configured = model_for_keys.Meta.ttl
+        ttl_configured = model_to_refresh.Meta.ttl
         afters = await asyncio.gather(
             *[self.real_redis_client.ttl(key) for key in keys]
         )
@@ -183,7 +191,7 @@ class TTLActionTestBase(AsyncActionTestBase, ABC):
 
         # Act
         with self.installed_refresh_ttl(
-            type(model_for_keys),
+            type(self.model_to_refresh()),
             ActionGroup(0),
         ):
             await self.perform_action(model_for_keys)
@@ -207,7 +215,7 @@ class TTLActionTestBase(AsyncActionTestBase, ABC):
         # Act
         with (
             self.installed_refresh_ttl(
-                type(model_for_keys), ActionGroup.all(for_ttl=True)
+                type(self.model_to_refresh()), ActionGroup.all(for_ttl=True)
             ),
             patch.object(actions_module, "flush_action_targets", flush_spy),
             patch.object(Redis, "expire", redis_expire_spy),

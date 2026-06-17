@@ -1,0 +1,9 @@
+{
+  "_comment": "CI redis test-matrix config. versions = full list; sample_per_branch = how many to randomly test per target branch (0 = all). Branches not listed fall back to 'default'.",
+  "versions": ["6.0", "6.1", "6.2", "6.3", "6.4", "7.0", "7.1", "7.2", "7.3", "7.4", "8.0"],
+  "sample_per_branch": {
+    "main": 0,
+    "develop": 3,
+    "default": 3
+  }
+}

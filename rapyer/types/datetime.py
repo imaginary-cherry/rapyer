@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from pydantic_core import core_schema
 from pydantic_core.core_schema import SerializationInfo, ValidationInfo
@@ -11,7 +11,7 @@ from rapyer.types.base import REDIS_DUMP_FLAG_NAME, RedisType
 
 
 class RedisDatetime(datetime, RedisType):
-    original_type = datetime
+    wrapped_python_type: ClassVar[type] = datetime
 
     def __new__(cls, value, *args, **kwargs):
         if isinstance(value, datetime):
@@ -77,7 +77,7 @@ class RedisDatetimeTimestamp(RedisDatetime):
         return core_schema.no_info_after_validator_function(
             cls,
             core_schema.with_info_before_validator_function(
-                cls._validate_timestamp, handler(cls.original_type)
+                cls._validate_timestamp, handler(datetime)
             ),
             serialization=core_schema.plain_serializer_function_ser_schema(
                 cls._serialize_timestamp,

@@ -1,9 +1,8 @@
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union, get_args
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union
 
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
 
-from rapyer.actions import ActionGroup, TargetSource, mark_actions
 from rapyer.errors import NotResolvedError
 from rapyer.types.relational import RelationalFieldType
 
@@ -21,9 +20,6 @@ class ForeignKey(RelationalFieldType, Generic[T]):
     (e.g. ``"Author:abc-123"``). Construct from any of:
     """
 
-    original_type: type = str
-    _target_type_hint: Any = None
-
     def __init__(self, ref: "str | AtomicRedisModel"):
         super().__init__()
         if isinstance(ref, str):
@@ -34,11 +30,6 @@ class ForeignKey(RelationalFieldType, Generic[T]):
             # Anything else is assumed to be the target AtomicRedisModel.
             self._value = ref
             self._target_key = ref.key
-
-    def __class_getitem__(cls, item):
-        parameterized = super().__class_getitem__(item)
-        parameterized._target_type_hint = item
-        return parameterized
 
     @property
     def target_key(self) -> str | None:
@@ -57,7 +48,6 @@ class ForeignKey(RelationalFieldType, Generic[T]):
             )
         return self._value
 
-    @mark_actions(ActionGroup.READ, ActionGroup.FETCH, target=TargetSource.RESULT)
     async def afetch(self) -> "AtomicRedisModel":
         """Resolve the target instance from Redis and cache it in-place."""
         if self._value is not None:
@@ -96,6 +86,7 @@ class ForeignKey(RelationalFieldType, Generic[T]):
             )
         return getattr(value, name)
 
+    # TODO - support for atmoic model comparison
     def __eq__(self, other: object) -> bool:
         if isinstance(other, ForeignKey):
             return self._target_key == other._target_key
@@ -112,9 +103,7 @@ class ForeignKey(RelationalFieldType, Generic[T]):
     def __get_pydantic_core_schema__(
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
-        args = get_args(source_type)
-        target_hint = args[0] if args else cls._target_type_hint
-
+        # We validate with the Foriegn key with generic
         def _validate(value: Any) -> "ForeignKey":
             from rapyer.base import AtomicRedisModel
 
@@ -122,13 +111,13 @@ class ForeignKey(RelationalFieldType, Generic[T]):
                 return value
             if isinstance(value, (AtomicRedisModel, str)):
                 # __init__ dispatches: a str is a key, a model is the target.
-                return cls(value)
+                return source_type(value)
             if isinstance(value, dict):
                 # Beanie-style DBRef: {"$ref": "Author", "$id": "abc-123"}
                 ref = value.get("$ref")
                 pk = value.get("$id")
                 if ref is not None and pk is not None:
-                    return cls(f"{ref}:{pk}")
+                    return source_type(f"{ref}:{pk}")
             raise TypeError(
                 f"Cannot validate ForeignKey from {type(value).__name__}: {value!r}"
             )
@@ -137,13 +126,6 @@ class ForeignKey(RelationalFieldType, Generic[T]):
             if value is None:
                 return None
             return value._target_key
-
-        # TODO: this name-normalization exists only because the metaclass converts a
-        #       ForeignKey's target into a dynamic per-field subclass. Once reference
-        #       targets are kept as static types, this can be removed (or reduced to a thin
-        #       forward-ref-string fallback).
-        #       https://github.com/imaginary-cherry/rapyer/issues/247
-        cls._target_type_hint = target_hint
 
         return core_schema.no_info_plain_validator_function(
             _validate,

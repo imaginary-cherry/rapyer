@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Generic, TypeAlias, TypeVar, get_args
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeAlias, TypeVar
 
 from pydantic_core import core_schema
 
@@ -6,13 +6,14 @@ from rapyer.actions import ActionGroup, mark_actions
 from rapyer.scripts import DICT_POP_SCRIPT_NAME, DICT_POPITEM_SCRIPT_NAME, arun_sha
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME, RedisType
 from rapyer.types.generic import SKIP_SENTINEL, GenericRedisType
+from rapyer.utils.pythonic import resolve_generic_args
 from rapyer.utils.redis import update_keys_in_pipeline
 
 T = TypeVar("T")
 
 
 class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
-    original_type = dict
+    wrapped_python_type: ClassVar[type] = dict
 
     def __init__(self, *args, **kwargs):
         dict.__init__(self, *args, **kwargs)
@@ -20,7 +21,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
 
     @classmethod
     def find_inner_type(cls, type_):
-        args = get_args(type_)
+        args = resolve_generic_args(type_)
         if len(args) >= 2:
             return args[1]
         elif args:
