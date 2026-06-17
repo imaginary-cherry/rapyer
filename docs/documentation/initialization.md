@@ -86,6 +86,7 @@ For simple usage, it is possible to simply set the redis client yourself.
     parameters — is automatically left out of `init_rapyer`. Register and use a
     concrete parametrization instead:
 
+    <!-- markdownlint-disable-next-line MD046 -->
     ```python
     T = TypeVar("T")
 

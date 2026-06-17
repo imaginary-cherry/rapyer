@@ -40,6 +40,8 @@ jobs:
     steps:
       # Checkout project source
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       # Scan code tokenless with the auto ruleset, emitting a SARIF report.
       # Exclude the Python 3.7 importlib compat rule: this project targets

@@ -17,11 +17,14 @@ jobs:
   mirror-redis:
     runs-on: ubuntu-22.04
     permissions:
+      contents: read
       packages: write
     outputs:
       image: ${{ steps.mirror.outputs.image }}
     steps:
     - uses: actions/checkout@v6
+      with:
+        persist-credentials: false
     - id: mirror
       uses: ./.github/actions/mirror-redis
       with:
@@ -51,6 +54,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -105,6 +110,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Download coverage artifact
         uses: actions/download-artifact@v4
