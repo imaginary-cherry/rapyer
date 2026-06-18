@@ -17,20 +17,34 @@ jobs:
       name: benchmark
     name: Run benchmarks
     runs-on: codspeed-macro
-    services:
-      redis:
-        image: redis/redis-stack-server:latest
-        ports:
-          - 6370:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      # Run Redis Stack as a host-networked process instead of a GitHub
+      # `services:` container. A service container is reached via Docker's
+      # port-forward (docker-proxy / iptables NAT), and that hop is the dominant
+      # source of walltime variance for these I/O-bound, Lua-driven benchmarks —
+      # the macro runner tunes the benchmark process, not the sidecar. Host
+      # networking + a unix socket removes the hop; disabling RDB/AOF stops
+      # background saves from spiking latency mid-measurement.
+      - name: Start Redis Stack (tuned for low-variance walltime)
+        run: |
+          mkdir -p /tmp/redis-sock && chmod 777 /tmp/redis-sock
+          docker run -d --name redis-bench --network host \
+            -v /tmp/redis-sock:/sock \
+            -e REDIS_ARGS="--port 6370 --unixsocket /sock/redis.sock --unixsocketperm 777" \
+            redis/redis-stack-server:latest
+          ready=""
+          for _ in $(seq 1 60); do
+            if docker exec redis-bench redis-cli -s /sock/redis.sock ping 2>/dev/null | grep -q PONG; then
+              ready=1; break
+            fi
+            sleep 0.5
+          done
+          if [ -z "$ready" ]; then echo "Redis did not become ready" >&2; docker logs redis-bench || true; exit 1; fi
+          docker exec redis-bench redis-cli -s /sock/redis.sock CONFIG SET save ""
+          docker exec redis-bench redis-cli -s /sock/redis.sock CONFIG SET appendonly no
       - name: Install uv
         uses: astral-sh/setup-uv@v5
       - name: Set up Python
@@ -47,3 +61,4 @@ jobs:
           run: uv run pytest benchmarks/ --codspeed
         env:
           REDIS_DB: 0
+          REDIS_URL: unix:///tmp/redis-sock/redis.sock?db=0
