@@ -59,6 +59,8 @@ PRIVATE_METHODS = _group(
     AtomicRedisModel._all_keys_for_key,
     AtomicRedisModel._iter_expanded_filter_batches,
     AtomicRedisModel._resolve_key,
+    # Pure in-memory identity minting (lazily fills _pk); no Redis round trip.
+    AtomicRedisModel._ensure_pk,
     # Pure in-memory traversal / key enumeration for special fields — no
     # Redis round trips, so pipeline/TTL coverage doesn't apply.
     AtomicRedisModel._iter_special_fields,
