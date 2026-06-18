@@ -247,7 +247,8 @@ async def test_rapyer_get_functionality_sanity(model_instance):
     # Assert
     assert retrieved_model == model_instance
     assert isinstance(retrieved_model.key, RapyerKey)
-    assert isinstance(retrieved_model.key, RapyerKey)
+    # Loaded identity comes from Redis, not a freshly minted uuid (lazy _pk).
+    assert retrieved_model.key == redis_key
 
 
 @pytest.mark.asyncio
