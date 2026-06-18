@@ -11,7 +11,9 @@ T = TypeVar("T")
 
 
 class PriorityQueueModelBase(AtomicRedisModel, Generic[T]):
-    tasks: RedisPriorityQueue[T] = Field(default_factory=RedisPriorityQueue)
+    tasks: RedisPriorityQueue[T] = Field(
+        default_factory=RedisPriorityQueue, exclude=True
+    )
 
 
 class PriorityQueueModel(PriorityQueueModelBase[str]):
@@ -31,12 +33,14 @@ class MixedSpecialModel(PriorityQueueModelBase[str]):
 
 class OptionalPriorityQueueModel(AtomicRedisModel):
     name: str = "default"
-    tasks: Optional[RedisPriorityQueue[str]] = None
+    tasks: Optional[RedisPriorityQueue[str]] = Field(default=None, exclude=True)
 
 
 class GenericPriorityQueueModel(AtomicRedisModel, Generic[T]):
     name: str = "default"
-    tasks: RedisPriorityQueue[T] = Field(default_factory=RedisPriorityQueue)
+    tasks: RedisPriorityQueue[T] = Field(
+        default_factory=RedisPriorityQueue, exclude=True
+    )
 
 
 class SubSubPriorityQueueModel(PriorityQueueModel):
@@ -54,12 +58,16 @@ class PQContainerModel(AtomicRedisModel):
 
 class InnerSameNamePQModel(AtomicRedisModel):
     label: str = "inner"
-    tasks: RedisPriorityQueue[str] = Field(default_factory=RedisPriorityQueue)
+    tasks: RedisPriorityQueue[str] = Field(
+        default_factory=RedisPriorityQueue, exclude=True
+    )
 
 
 class NestedSameNamePQModel(AtomicRedisModel):
     name: str = "outer"
-    tasks: RedisPriorityQueue[str] = Field(default_factory=RedisPriorityQueue)
+    tasks: RedisPriorityQueue[str] = Field(
+        default_factory=RedisPriorityQueue, exclude=True
+    )
     inner: InnerSameNamePQModel = Field(default_factory=InnerSameNamePQModel)
 
 

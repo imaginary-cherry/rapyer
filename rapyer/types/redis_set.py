@@ -1,6 +1,6 @@
 import json
 import uuid
-from typing import Any, Generic, Iterable, Optional, TypeVar, get_args
+from typing import Any, Generic, Iterable, Optional, TypeVar
 
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
@@ -8,6 +8,7 @@ from pydantic_core import core_schema
 from rapyer.actions import ActionGroup, mark_actions
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME
 from rapyer.types.special import SpecialFieldType
+from rapyer.utils.pythonic import resolve_generic_args
 
 T = TypeVar("T")
 
@@ -18,7 +19,6 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
     no local state.
     """
 
-    original_type: type = set
     LUA_SNIPPET_DIR = "redis_set"
 
     def __init__(self, *args, **kwargs):
@@ -243,11 +243,11 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
 
     @classmethod
     def queue_special_loads_in_pipeline(
-        cls, pipe, key: str, plan: list, parent_path: str = ""
+        cls, pipe, key: str, plan: list, parent_path: str = "", field_name: str = ""
     ):
-        field_path = f"{parent_path}{cls.field_name}"
+        field_path = f"{parent_path}{field_name}"
         pipe.smembers(cls.special_field_key(key, field_path))
-        plan.append([cls.field_name.lstrip(".")])
+        plan.append([field_name.lstrip(".")])
 
     def clone(self):
         new = self.__class__()
@@ -260,7 +260,7 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
     def __get_pydantic_core_schema__(
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
-        args = get_args(source_type)
+        args = resolve_generic_args(source_type)
         inner = args[0] if args else Any
 
         def _validate_wrap(v, handler_call, info):

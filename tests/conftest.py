@@ -14,6 +14,7 @@ from rapyer.base import AtomicRedisModel
 from rapyer.types.base import BaseRedisType
 from rapyer.types.special import SpecialFieldType
 from tests.action_groups import (
+    ADDITIONAL_READ_ACTIONS,
     NON_ACTION_METHODS,
     PRIVATE_INHERITED_METHODS,
     PRIVATE_METHODS,
@@ -109,7 +110,8 @@ COVERAGE_CHECKS: list[CoverageCheck] = [
     CoverageCheck(
         name=COVER_PIPELINE_ATOM,
         help_text="pipeline atomicity",
-        expected=lambda: _collect_methods(ignore_groups=ActionGroup.READ),
+        expected=lambda: _collect_methods(ignore_groups=ActionGroup.READ)
+        - ADDITIONAL_READ_ACTIONS,
     ),
     CoverageCheck(
         name=COVER_READ_IN_PIPELINE,

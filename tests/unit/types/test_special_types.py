@@ -94,12 +94,16 @@ def test_priority_queue_clone():
     assert isinstance(clone, RedisPriorityQueue)
 
 
-def test_priority_queue_model_dump_serializes_none():
+def test_priority_queue_excluded_from_model_dump():
     model = PriorityQueueModel(name="test")
-    dump = model.model_dump()
 
-    assert isinstance(dump["tasks"], RedisPriorityQueue)
-    assert dump["name"] == "test"
+    python_dump = model.model_dump()
+    json_dump = model.model_dump(mode="json")
+
+    assert "tasks" not in python_dump
+    assert "tasks" not in json_dump
+    assert python_dump["name"] == "test"
+    assert json_dump["name"] == "test"
 
 
 @pytest.mark.asyncio

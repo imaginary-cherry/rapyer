@@ -8,8 +8,6 @@ from rapyer.types.base import REDIS_DUMP_FLAG_NAME, RedisType
 
 
 class RedisBytes(bytes, RedisType):
-    original_type = bytes
-
     def clone(self):
         return bytes(self)
 
@@ -28,7 +26,7 @@ class RedisBytes(bytes, RedisType):
         return core_schema.no_info_after_validator_function(
             cls,
             core_schema.with_info_before_validator_function(
-                cls._validate_pickle, handler(cls.original_type)
+                cls._validate_pickle, handler(bytes)
             ),
             serialization=core_schema.plain_serializer_function_ser_schema(
                 cls._serialize_pickle,

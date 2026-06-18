@@ -16,7 +16,9 @@ class TestForeignKeyAfetch(ReadActionTestBase, TTLActionTestBase):
 
     def create_models(self):
         target = ComprehensiveTestModel(name="resolved", counter=7)
-        return [ComprehensiveRefOwner(ref=target), target]
+        # Reference by key (unresolved) so afetch actually fetches via the
+        # target's aget — that read/fetch is what refreshes the target's TTL.
+        return [ComprehensiveRefOwner(ref=target.key), target]
 
     def ttl_keys(self, model):
         return list(model.all_keys)
@@ -32,6 +34,12 @@ class TestForeignKeyAfetch(ReadActionTestBase, TTLActionTestBase):
     def models_to_check_ttl(self):
         # afetch refreshes the fetched target, so its TTL is what we assert.
         return [self.created_models[1]]
+
+    def model_to_refresh(self):
+        # afetch resolves the target via ``target_cls.aget``; the refresh is
+        # governed by the target's settings, so install the wrapper on (and
+        # take the reference TTL from) the resolved target, not the owner.
+        return self.created_models[1]
 
     def expected_before(self):
         # afetch returns the hydrated target (the same cached instance).

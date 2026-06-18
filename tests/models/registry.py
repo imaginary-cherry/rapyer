@@ -41,6 +41,8 @@ from tests.models.foreign_key_types import (
     FkPublisher,
     FkRichAuthor,
     FkTree,
+    FkTTLOwner,
+    FkTTLReferee,
 )
 from tests.models.functionality_types import (
     AllTypesModel,
@@ -228,4 +230,6 @@ TESTED_REDIS_MODELS = [
     FkProfile,
     FkRichAuthor,
     FkLibrary,
+    FkTTLReferee,
+    FkTTLOwner,
 ]
