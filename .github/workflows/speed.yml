@@ -34,7 +34,7 @@ jobs:
           docker run -d --name redis-bench --network host \
             -v /tmp/redis-sock:/sock \
             -e REDIS_ARGS="--port 6370 --unixsocket /sock/redis.sock --unixsocketperm 777" \
-            redis/redis-stack-server:latest
+            redis/redis-stack-server:7.4.0-v8
           ready=""
           for _ in $(seq 1 60); do
             if docker exec redis-bench redis-cli -s /sock/redis.sock ping 2>/dev/null | grep -q PONG; then

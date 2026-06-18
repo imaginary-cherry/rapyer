@@ -252,6 +252,20 @@ async def test_rapyer_get_functionality_sanity(model_instance):
 
 
 @pytest.mark.asyncio
+async def test_aload_preserves_model_key_identity():
+    # Arrange
+    model = ListModel(items=["a", "b"], numbers=[1, 2])
+    original_key = model.key
+    await model.asave()
+
+    # Act
+    loaded = await model.aload()
+
+    # Assert - aload reloads identity from the stored key, never a fresh uuid.
+    assert loaded.key == original_key
+
+
+@pytest.mark.asyncio
 async def test_rapyer_aget_with_key_without_class_name_edge_case():
     # Arrange
     key_without_class = "12345"  # No class name prefix
