@@ -75,6 +75,7 @@ from rapyer.types.base import (
     REDIS_DUMP_FLAG_NAME,
     BaseRedisType,
     RedisType,
+    is_redis_field_value,
 )
 from rapyer.types.convert import RedisConverter
 from rapyer.types.generic import GenericRedisType
@@ -153,7 +154,7 @@ def make_pickle_field_serializer(
 
 
 class AtomicRedisModel(BaseModel):
-    _pk: str = PrivateAttr(default_factory=lambda: str(uuid.uuid4()))
+    _pk: str | None = PrivateAttr(default=None)
     _base_model_link: Self | BaseRedisType = PrivateAttr(default=None)
     _failed_fields: set[str] = PrivateAttr(default_factory=set)
 
@@ -172,11 +173,16 @@ class AtomicRedisModel(BaseModel):
     def failed_fields(self) -> set[str]:
         return self._failed_fields
 
+    def _ensure_pk(self) -> str:
+        if self._pk is None:
+            self._pk = str(uuid.uuid4())
+        return self._pk
+
     @property
     def pk(self):
         if self._key_field_name:
             return self.model_dump(include={self._key_field_name})[self._key_field_name]
-        return RapyerKey(self._pk)
+        return RapyerKey(self._ensure_pk())
 
     @pk.setter
     def pk(self, value: str):
@@ -646,7 +652,7 @@ class AtomicRedisModel(BaseModel):
         inject_at_paths(model_dump, plan, sf_raw)
         context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
         instance = cls.model_validate(model_dump, context=context)
-        instance._pk = self._pk
+        instance._pk = self._ensure_pk()
         instance._base_model_link = self._base_model_link
         instance.field_name = self.field_name
         instance._failed_fields = context.get(FAILED_FIELDS_KEY, set())
@@ -1045,7 +1051,7 @@ class AtomicRedisModel(BaseModel):
             return
 
         skip_redis_set = False
-        if isinstance(value, BaseRedisType):
+        if is_redis_field_value(value):
             skip_redis_set = value._redis_updated
             value._redis_updated = False
 

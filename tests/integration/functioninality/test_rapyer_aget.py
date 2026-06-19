@@ -247,7 +247,22 @@ async def test_rapyer_get_functionality_sanity(model_instance):
     # Assert
     assert retrieved_model == model_instance
     assert isinstance(retrieved_model.key, RapyerKey)
-    assert isinstance(retrieved_model.key, RapyerKey)
+    # Loaded identity comes from Redis, not a freshly minted uuid (lazy _pk).
+    assert retrieved_model.key == redis_key
+
+
+@pytest.mark.asyncio
+async def test_aload_preserves_model_key_identity():
+    # Arrange
+    model = ListModel(items=["a", "b"], numbers=[1, 2])
+    original_key = model.key
+    await model.asave()
+
+    # Act
+    loaded = await model.aload()
+
+    # Assert - aload reloads identity from the stored key, never a fresh uuid.
+    assert loaded.key == original_key
 
 
 @pytest.mark.asyncio

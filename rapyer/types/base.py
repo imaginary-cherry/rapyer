@@ -164,3 +164,8 @@ class RedisType(BaseRedisType):
     @staticmethod
     def deserialize_unknown(value: str):
         return pickle.loads(base64.b64decode(value))
+
+
+def is_redis_field_value(value: Any) -> bool:
+    # cheap isinstance(value, BaseRedisType): every instance sets _redis_updated in __init__
+    return hasattr(value, "_redis_updated")
