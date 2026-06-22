@@ -39,7 +39,7 @@ jobs:
       image: semgrep/semgrep
     steps:
       # Checkout project source
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # Scan code tokenless with the auto ruleset, emitting a SARIF report.
       # Exclude the Python 3.7 importlib compat rule: this project targets
