@@ -35,6 +35,7 @@ from rapyer.actions import (
     register_action_target,
     should_refresh_for_action,
 )
+from rapyer.cascade import CascadeTTL
 from rapyer.config import RedisConfig
 from rapyer.context import (
     _context_pipe,
@@ -85,6 +86,7 @@ from rapyer.typing_support import Self, Unpack
 from rapyer.utils.annotation import (
     DYNAMIC_CLASS_DOC,
     annotation_origin,
+    extract_annotation,
     field_with_flag,
     has_annotation,
     replace_to_redis_types_in_annotation,
@@ -166,6 +168,7 @@ class AtomicRedisModel(BaseModel):
     _redis_link_field_names: ClassVar[set[str]] = set()
     _contain_sf: ClassVar[set[str]] = set()
     _contain_fk: ClassVar[set[str]] = set()
+    _cascade_ttl_fields: ClassVar[dict[str, "CascadeTTL"]] = {}
     _field_name: str = PrivateAttr(default="")
     model_config = ConfigDict(validate_assignment=True, validate_default=True)
 
@@ -335,11 +338,15 @@ class AtomicRedisModel(BaseModel):
     def __init_subclass__(cls, **kwargs):
         # Find fields with KeyAnnotation and SafeLoadAnnotation
         cls._safe_load_fields = set()
+        cls._cascade_ttl_fields = {}
         for field_name, annotation in cls.__annotations__.items():
             if has_annotation(annotation, KeyAnnotation):
                 cls._key_field_name = field_name
             if has_annotation(annotation, SafeLoadAnnotation):
                 cls._safe_load_fields.add(field_name)
+            cascade_spec = extract_annotation(annotation, CascadeTTL)
+            if cascade_spec is not None:
+                cls._cascade_ttl_fields[field_name] = cascade_spec
 
         # Redefine annotations to use redis types
         pydantic_annotation = get_all_pydantic_annotation(cls, AtomicRedisModel)
