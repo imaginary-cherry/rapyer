@@ -3,16 +3,23 @@ import pytest
 from rapyer.cascade import CascadePlanner
 from tests.models.cascade_types import (
     CascadeAuthor,
+    CascadeBlanketCollectionRoot,
     CascadeBlanketLeaf,
+    CascadeBlanketNestedHolder,
+    CascadeBlanketNestedProfile,
     CascadeBlanketOptOut,
     CascadeBlanketRoot,
+    CascadeBookCollection,
     CascadeBookDirect,
+    CascadeBookNested,
     CascadeChainNode,
     CascadeChainRoot,
     CascadeDiamondChild,
     CascadeDiamondRoot,
     CascadeExtendingNode,
     CascadeMultiDepthRoot,
+    CascadeNestedDepthRoot,
+    CascadeProfile,
     CascadeShallowRoot,
 )
 
@@ -224,3 +231,111 @@ async def test_field_opt_out_blocks_traversal_under_blanket_global():
 
     # Assert
     assert result == [root.key]
+
+
+# --- D-06 shape 2: collection-of-FK ---
+
+
+@pytest.mark.asyncio
+async def test_collection_of_fk_reaches_every_element():
+    # Arrange: CascadeBookCollection.co_authors carries CascadeTTL() on the
+    # collection field itself; the marker applies to every element.
+    author_a = await CascadeAuthor(name="a").asave()
+    author_b = await CascadeAuthor(name="b").asave()
+    book = await CascadeBookCollection(
+        title="x", co_authors=[author_a.key, author_b.key]
+    ).asave()
+
+    # Act
+    result = await CascadePlanner().atraverse(book.key, CascadeBookCollection)
+
+    # Assert
+    assert set(result) == {book.key, author_a.key, author_b.key}
+
+
+@pytest.mark.asyncio
+async def test_dangling_element_in_collection_is_skipped_without_raising():
+    # Arrange: one real author, one key that was never saved.
+    author = await CascadeAuthor(name="a").asave()
+    book = await CascadeBookCollection(
+        title="x", co_authors=[author.key, "CascadeAuthor:does-not-exist"]
+    ).asave()
+
+    # Act
+    result = await CascadePlanner().atraverse(book.key, CascadeBookCollection)
+
+    # Assert
+    assert set(result) == {book.key, author.key}
+    assert "CascadeAuthor:does-not-exist" not in result
+
+
+# --- D-06 shape 3: nested inline sub-model (zero-hop) ---
+
+
+@pytest.mark.asyncio
+async def test_nested_submodel_fk_is_reached_as_a_zero_cost_hop():
+    # Arrange: CascadeBookNested.profile.mentor carries CascadeTTL() on the
+    # FK field INSIDE the nested submodel (D-06 shape 3).
+    mentor = await CascadeAuthor(name="mentor").asave()
+    book = await CascadeBookNested(
+        title="x", profile=CascadeProfile(mentor=mentor.key)
+    ).asave()
+
+    # Act
+    result = await CascadePlanner().atraverse(book.key, CascadeBookNested)
+
+    # Assert
+    assert set(result) == {book.key, mentor.key}
+
+
+@pytest.mark.asyncio
+async def test_nested_submodel_hop_does_not_consume_the_depth_budget():
+    # Arrange: CascadeNestedDepthRoot.holder carries an explicit depth=1;
+    # the zero-hop walk through .profile must not eat into that budget
+    # before the real FK hop into .mentor (which decrements CascadeBlanket-
+    # NestedProfile's own blanket global from 1 to 0).
+    mentor = await CascadeBlanketLeaf(name="mentor").asave()
+    holder = await CascadeBlanketNestedHolder(
+        profile=CascadeBlanketNestedProfile(mentor=mentor.key)
+    ).asave()
+    root = await CascadeNestedDepthRoot(holder=holder.key).asave()
+
+    # Act
+    result = await CascadePlanner().atraverse(root.key, CascadeNestedDepthRoot)
+
+    # Assert: reached despite only a depth=1 budget on the outer field.
+    assert set(result) == {root.key, holder.key, mentor.key}
+
+
+# --- D-07: blanket global enable covers ALL three D-06 shapes ---
+
+
+@pytest.mark.asyncio
+async def test_blanket_global_enable_reaches_every_element_of_unannotated_collection():
+    # Arrange: CascadeBlanketCollectionRoot.children is unannotated;
+    # Meta.cascade_ttl is blanket-enabled.
+    leaf_a = await CascadeBlanketLeaf(name="a").asave()
+    leaf_b = await CascadeBlanketLeaf(name="b").asave()
+    root = await CascadeBlanketCollectionRoot(children=[leaf_a.key, leaf_b.key]).asave()
+
+    # Act
+    result = await CascadePlanner().atraverse(root.key, CascadeBlanketCollectionRoot)
+
+    # Assert
+    assert set(result) == {root.key, leaf_a.key, leaf_b.key}
+
+
+@pytest.mark.asyncio
+async def test_blanket_global_enable_on_nested_class_reaches_unannotated_nested_fk():
+    # Arrange: CascadeBlanketNestedHolder.profile is unannotated; the
+    # blanket default that matters belongs to the NESTED class's own Meta.
+    mentor = await CascadeBlanketLeaf(name="mentor").asave()
+    holder = await CascadeBlanketNestedHolder(
+        profile=CascadeBlanketNestedProfile(mentor=mentor.key)
+    ).asave()
+
+    # Act
+    result = await CascadePlanner().atraverse(holder.key, CascadeBlanketNestedHolder)
+
+    # Assert
+    assert set(result) == {holder.key, mentor.key}

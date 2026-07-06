@@ -126,3 +126,42 @@ class CascadeBlanketOptOut(AtomicRedisModel):
     child: Annotated[Reference[CascadeBlanketLeaf], CascadeTTL(enabled=False)]
 
     Meta: ClassVar[RedisConfig] = RedisConfig(cascade_ttl=CascadeTTL(depth=2))
+
+
+# --- Plan 01-03 Task 2 additions: shapes 2/3 + D-07 full-shape blanket coverage ---
+
+
+class CascadeBlanketCollectionRoot(AtomicRedisModel):
+    """D-07: an unannotated collection-of-FK field cascades via the blanket global."""
+
+    children: list[Reference[CascadeBlanketLeaf]] = Field(default_factory=list)
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(cascade_ttl=CascadeTTL(depth=2))
+
+
+class CascadeBlanketNestedProfile(AtomicRedisModel):
+    """
+    D-07: an unannotated nested-submodel FK field cascades when the NESTED
+    class's own ``Meta.cascade_ttl`` is blanket-enabled — the blanket default
+    that matters for shape 3 belongs to the nested class, not its holder.
+    """
+
+    mentor: Reference[CascadeBlanketLeaf]
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(cascade_ttl=CascadeTTL(depth=2))
+
+
+class CascadeBlanketNestedHolder(AtomicRedisModel):
+    """Holder for CascadeBlanketNestedProfile — no Meta override needed."""
+
+    profile: CascadeBlanketNestedProfile
+
+
+class CascadeNestedDepthRoot(AtomicRedisModel):
+    """
+    Enters CascadeBlanketNestedHolder with an explicit depth=1, proving the
+    zero-hop nested-submodel walk doesn't consume the budget before the real
+    FK hop into ``mentor`` (which decrements via the profile's own blanket).
+    """
+
+    holder: Annotated[Reference[CascadeBlanketNestedHolder], CascadeTTL(depth=1)]

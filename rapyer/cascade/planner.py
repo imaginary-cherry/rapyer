@@ -83,6 +83,22 @@ class CascadePlanner:
         annotation = model_cls.model_fields[field_name].annotation
         return _unwrap_relational_target(annotation)
 
+    def _unwrap_nested_model_cls(self, annotation: Any) -> Any | None:
+        """
+        If ``annotation`` is itself an ``AtomicRedisModel`` subclass (D-06
+        shape 3: a nested inline sub-model), return that class; else ``None``
+        (D-06 shape 2: a collection-of-FK field). Both shapes currently land
+        in the same ``_contain_fk`` classification set (RESEARCH.md Pitfall
+        1) and must be re-disambiguated here, at traversal time.
+        """
+        # Imported lazily: rapyer.base already imports rapyer.cascade at
+        # module level, so a top-level import here would create a cycle.
+        from rapyer.base import AtomicRedisModel
+
+        stripped = strip_optional(annotation)
+        origin = get_origin(stripped) or stripped
+        return origin if safe_issubclass(origin, AtomicRedisModel) else None
+
     def _walk_edges(
         self,
         model_cls: Any,
@@ -104,6 +120,36 @@ class CascadePlanner:
             if target_cls is None:
                 continue
             yield child_key, target_cls, new_budget
+
+        for field_name in model_cls._contain_fk:
+            annotation = model_cls.model_fields[field_name].annotation
+            nested_cls = self._unwrap_nested_model_cls(annotation)
+            if nested_cls is not None:
+                # Shape 3: nested inline sub-model — same RedisJSON document,
+                # zero-hop recursion. Never call _next_hop for the nesting
+                # field itself; only the FK field(s) reached inside it.
+                nested_dump = dump.get(field_name) or {}
+                yield from self._walk_edges(
+                    nested_cls, nested_dump, remaining_budget, established
+                )
+                continue
+
+            # Shape 2: collection of FK — the marker lives on the collection
+            # field itself; every element shares the same new_budget.
+            enabled, new_budget = self._next_hop(
+                model_cls, field_name, remaining_budget, established
+            )
+            if not enabled:
+                continue
+            target_cls = self._resolve_target_cls(model_cls, field_name)
+            if target_cls is None:
+                continue
+            values = dump.get(field_name) or []
+            iterable = values.values() if isinstance(values, dict) else values
+            for child_key in iterable:
+                if not child_key:
+                    continue
+                yield child_key, target_cls, new_budget
 
     async def _mget(self, entries: list[tuple[str, Any]]) -> dict[str, Any]:
         """

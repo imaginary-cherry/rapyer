@@ -3,7 +3,10 @@ import pytest
 from rapyer.types.relational import resolve_relational_targets
 from tests.models.cascade_types import (
     CascadeAuthor,
+    CascadeBlanketCollectionRoot,
     CascadeBlanketLeaf,
+    CascadeBlanketNestedHolder,
+    CascadeBlanketNestedProfile,
     CascadeBlanketOptOut,
     CascadeBlanketRoot,
     CascadeBookCollection,
@@ -16,6 +19,7 @@ from tests.models.cascade_types import (
     CascadeDiamondRoot,
     CascadeExtendingNode,
     CascadeMultiDepthRoot,
+    CascadeNestedDepthRoot,
     CascadeProfile,
     CascadeShallowRoot,
 )
@@ -37,6 +41,10 @@ CASCADE_PLANNER_MODELS = [
     CascadeBlanketLeaf,
     CascadeBlanketRoot,
     CascadeBlanketOptOut,
+    CascadeBlanketCollectionRoot,
+    CascadeBlanketNestedProfile,
+    CascadeBlanketNestedHolder,
+    CascadeNestedDepthRoot,
 ]
 
 

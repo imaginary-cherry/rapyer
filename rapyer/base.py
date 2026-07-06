@@ -338,7 +338,14 @@ class AtomicRedisModel(BaseModel):
     def __init_subclass__(cls, **kwargs):
         # Find fields with KeyAnnotation and SafeLoadAnnotation
         cls._safe_load_fields = set()
-        cls._cascade_ttl_fields = {}
+        # Inherit-then-overwrite (mirrors _relational_field_names/_contain_fk
+        # in the second loop below): a nested-submodel field is wrapped in a
+        # dynamically-created subclass with no annotations of its own
+        # (convert_flat_type), so cls.__annotations__ is empty for it and the
+        # loop below never runs — without inheriting first, that wrapper
+        # would silently lose every explicit per-field CascadeTTL marker
+        # declared on the class it wraps, breaking D-06 shape 3 traversal.
+        cls._cascade_ttl_fields = dict(getattr(cls, "_cascade_ttl_fields", {}))
         for field_name, annotation in cls.__annotations__.items():
             if has_annotation(annotation, KeyAnnotation):
                 cls._key_field_name = field_name
