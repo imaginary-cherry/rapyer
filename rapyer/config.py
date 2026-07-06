@@ -16,6 +16,7 @@ from redis.asyncio import Redis
 from redis.commands.json import JSON
 
 from rapyer.actions import ActionGroup
+from rapyer.cascade import CascadeTTL
 from rapyer.errors import InvalidRefreshTtlError
 
 DEFAULT_CONNECTION = "redis://localhost:6379/0"
@@ -43,6 +44,8 @@ class RedisConfig(BaseModel):
     ]
     redis_type: dict[type, type] = Field(default_factory=create_all_types)
     ttl: int | None = None
+    # CFG-02: global TTL-cascade default, disabled unless init_rapyer(cascade_ttl=...) sets it.
+    cascade_ttl: CascadeTTL | None = None
     init_with_rapyer: bool = True
     # Enable TTL refresh on read/write operations by default.
     # Accepts bool (True=all actions, False=none) or ActionGroup flag set for fine-grained control.

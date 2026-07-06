@@ -5,6 +5,7 @@ from redis import ResponseError
 from redis.asyncio.client import Redis
 
 from rapyer.base import REDIS_MODELS
+from rapyer.cascade import CascadeTTL
 from rapyer.result import resolve_forward_refs
 from rapyer.scripts import register_scripts
 from rapyer.types.relational import resolve_relational_targets
@@ -19,6 +20,7 @@ async def init_rapyer(
     ttl: int = None,
     override_old_idx: bool = True,
     prefer_normal_json_dump: bool = None,
+    cascade_ttl: CascadeTTL | None = None,
     logger: logging.Logger = None,
 ):
     if logger is not None:
@@ -46,6 +48,9 @@ async def init_rapyer(
             model.Meta.ttl = ttl
         if prefer_normal_json_dump is not None:
             model.Meta.prefer_normal_json_dump = prefer_normal_json_dump
+        # D-08: cascade_ttl=None is itself a meaningful value ("off"), not
+        # "caller didn't pass this" — always reset, unlike ttl/prefer_normal_json_dump.
+        model.Meta.cascade_ttl = cascade_ttl
 
         # Initialize model fields
         model.init_class()
