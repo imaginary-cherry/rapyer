@@ -1,0 +1,161 @@
+from typing import Any, get_origin
+
+from rapyer.types.relational import RelationalFieldType
+from rapyer.utils.annotation import strip_optional
+from rapyer.utils.pythonic import resolve_generic_args, safe_issubclass
+
+
+def _unwrap_relational_target(annotation: Any) -> Any | None:
+    """
+    Resolve the ``AtomicRedisModel`` class an FK-shaped annotation points to,
+    peeling ``Optional[...]`` and container wrappers (``list[...]``) along the
+    way. Returns ``None`` when no relational type is reachable.
+    """
+    stripped = strip_optional(annotation)
+    origin = get_origin(stripped) or stripped
+    if safe_issubclass(origin, RelationalFieldType):
+        args = resolve_generic_args(stripped)
+        return args[0] if args else None
+    for arg in resolve_generic_args(stripped):
+        found = _unwrap_relational_target(arg)
+        if found is not None:
+            return found
+    return None
+
+
+class CascadePlanner:
+    """
+    Operation-agnostic FK-graph walker (EXT-01 extension seam): given a root
+    key and class, ``atraverse`` follows every cascade-enabled edge
+    cycle-safely to a per-subtree depth budget and returns a de-duplicated
+    flat list of Redis keys, never hydrating a full model.
+
+    ``field_attr``/``global_attr`` are parameterized so a future
+    ``CascadeDelete`` strategy can reuse this exact class unmodified by
+    pointing it at ``_cascade_delete_fields``/``Meta.cascade_delete``.
+    """
+
+    def __init__(
+        self,
+        field_attr: str = "_cascade_ttl_fields",
+        global_attr: str = "cascade_ttl",
+    ):
+        self.field_attr = field_attr
+        self.global_attr = global_attr
+
+    def _next_hop(
+        self,
+        model_cls: Any,
+        field_name: str,
+        remaining_budget: int | None,
+        established: bool,
+    ) -> tuple[bool, int | None]:
+        field_specs = getattr(model_cls, self.field_attr, {})
+        field_spec = field_specs.get(field_name)
+        if field_spec is not None:
+            # D-09: an explicit per-field spec is a whole-object override — it
+            # always wins and always REFRESHES the child's subtree budget,
+            # regardless of any inherited remaining_budget (D-03 revised:
+            # this is how a deeper field extends past a shallower ancestor).
+            if not field_spec.enabled:
+                return False, None
+            return True, field_spec.depth
+
+        global_spec = getattr(model_cls.Meta, self.global_attr, None)
+        if global_spec is None or not global_spec.enabled:
+            return False, None
+
+        if not established:
+            # D-01/D-03: first hop of a brand-new subtree via the blanket
+            # global — the child's subtree budget is freshly set.
+            return True, global_spec.depth
+
+        # Continuing an already-established subtree purely via blanket
+        # enable: decrement the inherited budget (D-05's visited-set remains
+        # the real termination backstop; this is just the optional cap).
+        if remaining_budget is None:
+            return True, None
+        if remaining_budget <= 0:
+            return False, None
+        return True, remaining_budget - 1
+
+    def _resolve_target_cls(self, model_cls: Any, field_name: str) -> Any | None:
+        annotation = model_cls.model_fields[field_name].annotation
+        return _unwrap_relational_target(annotation)
+
+    def _walk_edges(
+        self,
+        model_cls: Any,
+        dump: dict,
+        remaining_budget: int | None,
+        established: bool,
+    ):
+        """Yield ``(child_key, child_cls, new_budget)`` for every enabled, present edge."""
+        for field_name in model_cls._relational_field_names:
+            enabled, new_budget = self._next_hop(
+                model_cls, field_name, remaining_budget, established
+            )
+            if not enabled:
+                continue
+            child_key = dump.get(field_name)
+            if not child_key:
+                continue
+            target_cls = self._resolve_target_cls(model_cls, field_name)
+            if target_cls is None:
+                continue
+            yield child_key, target_cls, new_budget
+
+    async def _mget(self, entries: list[tuple[str, Any]]) -> dict[str, Any]:
+        """
+        Batch-read the raw JSON dump for every ``(key, cls)`` in ``entries``,
+        grouped by ``Meta.redis_json`` client — one round trip per distinct
+        client present at this BFS level (the common case is exactly one).
+        """
+        by_client: dict[Any, list[str]] = {}
+        for key, cls in entries:
+            by_client.setdefault(cls.Meta.redis_json, []).append(key)
+
+        results: dict[str, Any] = {}
+        for client, keys in by_client.items():
+            dumps = await client.mget(keys=keys, path="$")
+            for key, dump in zip(keys, dumps):
+                results[key] = dump
+        return results
+
+    async def atraverse(self, root_key: str, root_cls: Any) -> list[str]:
+        # CASC-04: the root key is visited before the first JSON.MGET, so a
+        # self-reference/cycle back to the root can never double-collect it.
+        visited: set[str] = {root_key}
+        result: list[str] = list(root_cls._all_keys_for_key(root_key))
+        frontier: list[tuple[str, Any, int | None, bool]] = [
+            (root_key, root_cls, None, False)
+        ]
+        is_root_level = True
+
+        while frontier:
+            dumps = await self._mget([(key, cls) for key, cls, _, _ in frontier])
+            next_frontier: list[tuple[str, Any, int | None, bool]] = []
+            for key, cls, remaining_budget, established in frontier:
+                dump = dumps.get(key)
+                # Real redis returns None for a missing key; fakeredis returns [].
+                if not dump:
+                    # A dangling/missing node stops recursion here without
+                    # raising; its own keyset was never added to the result
+                    # (only the root's keyset is added unconditionally).
+                    continue
+                dump = dump[0] if isinstance(dump, list) else dump
+                if not is_root_level:
+                    # A non-root node's keyset is added only once its own
+                    # JSON.MGET confirms it actually exists.
+                    result.extend(cls._all_keys_for_key(key))
+                for child_key, child_cls, new_budget in self._walk_edges(
+                    cls, dump, remaining_budget, established
+                ):
+                    if not child_key or child_key in visited:
+                        continue
+                    visited.add(child_key)
+                    next_frontier.append((child_key, child_cls, new_budget, True))
+            frontier = next_frontier
+            is_root_level = False
+
+        return result
