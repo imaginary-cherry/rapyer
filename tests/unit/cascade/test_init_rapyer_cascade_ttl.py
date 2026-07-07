@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from redis.asyncio.client import Redis
@@ -29,8 +29,14 @@ async def test_init_rapyer_with_cascade_ttl_sets_exact_instance_on_every_model_s
     # Arrange
     cascade_ttl = CascadeTTL()
 
-    # Act
-    await init_rapyer(mock_redis_client, cascade_ttl=cascade_ttl)
+    # Act: scope the blanket-enable to just the two fixtures under test — both
+    # have zero relational/FK fields of their own, so patching REDIS_MODELS
+    # down to this pair keeps the cascade graph edge-free and D-08's
+    # validate_cascade_ttl_targets trivially passes, instead of newly
+    # requiring Meta.ttl on every unrelated FK-target class in the whole
+    # global registry (FkAuthor, FkTree, ...).
+    with patch("rapyer.init.REDIS_MODELS", cascade_models):
+        await init_rapyer(mock_redis_client, cascade_ttl=cascade_ttl)
 
     # Assert
     for model in cascade_models:
