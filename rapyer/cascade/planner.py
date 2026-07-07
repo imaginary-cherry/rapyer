@@ -205,3 +205,130 @@ class CascadePlanner:
             is_root_level = False
 
         return result
+
+
+def _static_walk_fk_edges(
+    planner: CascadePlanner, model_cls: Any, parent_path: str, fks: list[dict]
+) -> None:
+    """Append every enabled, static FK edge reachable from ``model_cls``'s own
+    fields (shapes 1/2 directly, shape 3 by recursing into the nested
+    sub-model) into ``fks``, mirroring ``CascadePlanner._walk_edges`` but
+    without a runtime dump — each edge carries its OWN declared depth
+    (field override else global else unbounded), not an inherited budget.
+    """
+    for field_name in model_cls._relational_field_names:
+        enabled, depth = planner._next_hop(model_cls, field_name, None, False)
+        if not enabled:
+            continue
+        target_cls = planner._resolve_target_cls(model_cls, field_name)
+        if target_cls is None:
+            continue
+        edge = {
+            "path": f"{parent_path}.{field_name}",
+            "target": target_cls.__name__,
+            "collection": False,
+            "recurse": True,
+            "ttl": True,
+            "special": True,
+        }
+        if depth is not None:
+            edge["depth"] = depth
+        fks.append(edge)
+
+    for field_name in model_cls._contain_fk:
+        annotation = model_cls.model_fields[field_name].annotation
+        nested_cls = planner._unwrap_nested_model_cls(annotation)
+        if nested_cls is not None:
+            # Shape 3: nested inline sub-model — same RedisJSON document,
+            # zero-hop recursion; the marker lives on the nested class's own
+            # field, so keep walking with model_cls=nested_cls.
+            nested_path = f"{parent_path}.{field_name}"
+            _static_walk_fk_edges(planner, nested_cls, nested_path, fks)
+            continue
+
+        # Shape 2: collection of FK — the marker lives on the collection
+        # field itself; one edge covers every element.
+        enabled, depth = planner._next_hop(model_cls, field_name, None, False)
+        if not enabled:
+            continue
+        target_cls = planner._resolve_target_cls(model_cls, field_name)
+        if target_cls is None:
+            continue
+        edge = {
+            "path": f"{parent_path}.{field_name}",
+            "target": target_cls.__name__,
+            "collection": True,
+            "recurse": True,
+            "ttl": True,
+            "special": True,
+        }
+        if depth is not None:
+            edge["depth"] = depth
+        fks.append(edge)
+
+
+def _static_walk_special_suffixes(model_cls: Any, parent_path: str = "") -> list[str]:
+    """Derive the dotted-path ``special_suffixes`` for ``model_cls`` the same
+    way ``AtomicRedisModel._all_keys_for_key`` walks ``_special_field_names``/
+    ``_contain_sf`` (``rapyer/base.py``), stopping short of the model-key/
+    prefix concatenation the Lua script applies itself.
+    """
+    suffixes: list[str] = []
+    for field_name in model_cls._special_field_names:
+        field_path = f"{parent_path}.{field_name}"
+        suffixes.append(field_path.lstrip("."))
+    for field_name in model_cls._contain_sf:
+        field_cls = model_cls.model_fields[field_name].annotation
+        if not hasattr(field_cls, "_special_field_names"):
+            # _contain_sf also covers container-of-special-field shapes
+            # (e.g. list[RedisSet]) whose annotation is a BaseRedisType
+            # container, not an AtomicRedisModel — those have no per-class
+            # suffix set to statically enumerate (same gap _all_keys_for_key
+            # already has for this shape; out of this plan's scope).
+            continue
+        nested_path = f"{parent_path}.{field_name}"
+        suffixes.extend(_static_walk_special_suffixes(field_cls, nested_path))
+    return suffixes
+
+
+def build_cascade_plan(models: list[type["AtomicRedisModel"]]) -> dict[str, dict]:
+    """
+    Build the static, per-class cascade plan table (D-02): every model in
+    ``models`` gets exactly one entry keyed by its class name, covering all
+    three D-06 FK shapes plus special-field-suffix derivation and the
+    class's own ``Meta.ttl`` — the exact data shape the Lua cascade-apply
+    script bakes in at ``SCRIPT LOAD``. Pure class/annotation introspection;
+    never hydrates an instance or touches Redis.
+    """
+    planner = CascadePlanner()
+    plan: dict[str, dict] = {}
+    for model_cls in models:
+        fks: list[dict] = []
+        _static_walk_fk_edges(planner, model_cls, "$", fks)
+        plan[model_cls.__name__] = {
+            "ttl": model_cls.Meta.ttl,
+            "special_suffixes": _static_walk_special_suffixes(model_cls),
+            "fks": fks,
+        }
+    return plan
+
+
+def validate_cascade_ttl_targets(plan: dict[str, dict]) -> None:
+    """
+    Raise ``CascadeTargetTtlMissingError`` (D-08) on the first cascade-enabled
+    edge whose target class declares no ``Meta.ttl`` — a class never reached
+    by any cascade-enabled edge is never required to declare one. Iterates
+    deterministically in sorted-class-name, then list, order.
+    """
+    from rapyer.errors.cascade import CascadeTargetTtlMissingError
+
+    for class_name, entry in sorted(plan.items()):
+        for edge in entry["fks"]:
+            target = edge["target"]
+            if plan[target]["ttl"] is None:
+                raise CascadeTargetTtlMissingError(
+                    target,
+                    f"{target!r} is reachable via a cascade-enabled edge "
+                    f"from {class_name!r} (path {edge['path']!r}) but "
+                    "declares no Meta.ttl",
+                )
