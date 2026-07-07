@@ -87,24 +87,46 @@ local function read_reference_paths(key, paths)
     return values_by_path
 end
 
-local function child_budget(parent_budget, edge)
-    local inherited = parent_budget
-    if inherited ~= UNBOUNDED then
-        inherited = inherited - 1
+-- Mirror CascadePlanner._next_hop exactly (behavioral parity is the WR-01
+-- contract): for one edge out of a node whose subtree budget is
+-- `remaining_budget` (UNBOUNDED = no cap) and whose subtree is already
+-- `established`, decide whether to follow the edge and what budget the child
+-- carries. Returns (follow, child_budget).
+--
+-- An explicit per-field override (edge.override) is a whole-object override: it
+-- ALWAYS wins and REFRESHES the child's budget to this edge's own depth,
+-- ignoring any inherited remaining_budget -- this is how a deeper explicit
+-- field extends past a shallower ancestor (D-09). A blanket edge instead sets
+-- the budget on the first hop of a fresh subtree (not yet established) and
+-- decrements it on every subsequent established hop; the visited-set stays the
+-- real termination backstop, this is only the optional cap.
+--
+-- edge.depth is absent on an unbounded edge, so edge_depth stays UNBOUNDED. A
+-- depth=0 edge therefore yields a child budget of 0 (reach the target, follow
+-- no further BLANKET hops) -- never -1, so it can never alias the UNBOUNDED
+-- sentinel (CR-01). The `remaining_budget <= 0` stop below is only ever reached
+-- for a real (non-UNBOUNDED) budget, because UNBOUNDED is caught first.
+local function next_hop(edge, remaining_budget, established)
+    local edge_depth = UNBOUNDED
+    if type(edge.depth) == 'number' then
+        edge_depth = edge.depth
     end
-    if type(edge.depth) ~= 'number' then
-        return inherited
+    if edge.override then
+        return true, edge_depth
     end
-    -- A per-edge depth caps how far this subtree may go; the edge counts as the
-    -- first of its `depth` hops, so the child carries depth - 1.
-    local capped = edge.depth - 1
-    if inherited == UNBOUNDED then
-        return capped
+    if not established then
+        return true, edge_depth
     end
-    return math.min(capped, inherited)
+    if remaining_budget == UNBOUNDED then
+        return true, UNBOUNDED
+    end
+    if remaining_budget <= 0 then
+        return false, 0
+    end
+    return true, remaining_budget - 1
 end
 
-local function push_child(target_key, edge, next_budget)
+local function push_child(target_key, edge, budget)
     if type(target_key) == 'string' and not visited[target_key] then
         stack[#stack + 1] = {
             key = target_key,
@@ -113,18 +135,21 @@ local function push_child(target_key, edge, next_budget)
             -- back out of the key.
             class = edge.target,
             edge = edge,
-            budget = next_budget,
+            budget = budget,
+            -- A child's subtree is always established: it was entered via a
+            -- cascade edge. Only the root frame is not-yet-established.
+            established = true,
         }
     end
 end
 
--- Worklist of (key, class, budget) where budget is the remaining number of hops
--- we may still follow out of `key` (UNBOUNDED = no cap, 0 = stop). Following an
--- edge with its own `depth` clamps the child's budget to that edge's limit.
-local function push_edges(parent_key, parent_class, budget)
-    if budget == 0 then
-        return  -- budget exhausted: do not follow any further edges from here
-    end
+-- Worklist of (key, class, budget, established) frames: budget is the number of
+-- remaining BLANKET hops still allowed out of `key` (UNBOUNDED = no cap), and
+-- established marks whether `key`'s subtree was already entered via cascade. The
+-- per-edge follow/budget decision lives entirely in next_hop; a node whose own
+-- budget is 0 can still follow its explicit-override edges (which refresh),
+-- exactly as CascadePlanner does.
+local function push_edges(parent_key, parent_class, remaining_budget, established)
     local edges = fk_edges(parent_class)
     if #edges == 0 then
         return  -- no reference paths to read for this class
@@ -138,26 +163,29 @@ local function push_edges(parent_key, parent_class, budget)
     for _, edge in ipairs(edges) do
         local matched = values_by_path[edge.path]
         if matched ~= nil then
-            local next_budget = 0
-            if edge.recurse then
-                next_budget = child_budget(budget, edge)
-            end
-            if not edge.collection then
-                -- Shape 1 (unchanged prototype behavior): the matched value
-                -- is a single scalar FK -- the target's own key string.
-                if type(matched) == 'string' then
-                    push_child(matched, edge, next_budget)
+            local follow, budget = next_hop(edge, remaining_budget, established)
+            if follow then
+                if not edge.recurse then
+                    -- A non-recursing edge reaches (and refreshes) its target
+                    -- but never follows any further edges out of it.
+                    budget = 0
                 end
-            elseif edge.collection then
-                -- Shape 2: list[Reference[T]]/dict[K, Reference[T]] -- the
-                -- matched value is a JSON array (1-indexed Lua sequence) or a
-                -- JSON object (string-keyed Lua table); either way `pairs`
-                -- correctly iterates every element regardless of key shape,
-                -- and every element shares this SAME edge (and therefore the
-                -- same budget).
-                if type(matched) == 'table' then
-                    for _, target_key in pairs(matched) do
-                        push_child(target_key, edge, next_budget)
+                if not edge.collection then
+                    -- Shape 1 (unchanged prototype behavior): the matched
+                    -- value is a single scalar FK -- the target's key string.
+                    if type(matched) == 'string' then
+                        push_child(matched, edge, budget)
+                    end
+                elseif edge.collection then
+                    -- Shape 2: list[Reference[T]]/dict[K, Reference[T]] -- the
+                    -- matched value is a JSON array (1-indexed Lua sequence) or
+                    -- a JSON object (string-keyed Lua table); either way `pairs`
+                    -- iterates every element regardless of key shape, and every
+                    -- element shares this SAME edge (and therefore budget).
+                    if type(matched) == 'table' then
+                        for _, target_key in pairs(matched) do
+                            push_child(target_key, edge, budget)
+                        end
                     end
                 end
             end
@@ -174,7 +202,9 @@ local function plan_refresh_keys()
     queue_refresh(root_key, root_class)
     queue_special_refresh(root_key, root_class)
     visited[root_key] = true
-    push_edges(root_key, root_class, UNBOUNDED)
+    -- The root frame is UNBOUNDED + not-yet-established, matching atraverse's
+    -- initial (root_key, root_cls, remaining_budget=None, established=False).
+    push_edges(root_key, root_class, UNBOUNDED, false)
 
     while #stack > 0 do
         local item = table.remove(stack)
@@ -188,7 +218,7 @@ local function plan_refresh_keys()
             if edge.special then
                 queue_special_refresh(key, item.class)
             end
-            push_edges(key, item.class, item.budget)
+            push_edges(key, item.class, item.budget, item.established)
         end
     end
 

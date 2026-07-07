@@ -1,5 +1,6 @@
 import pytest
 
+from rapyer.cascade import CascadePlanner
 from rapyer.scripts import arun_sha
 from rapyer.scripts.constants import CASCADE_TTL_APPLY_SCRIPT_NAME
 from rapyer.types.priority_queue import RedisPriorityQueue
@@ -13,7 +14,10 @@ from tests.models.cascade_types import (
     CascadeChainRoot,
     CascadeDiamondChild,
     CascadeDiamondRoot,
+    CascadeExtendingNode,
+    CascadeMultiDepthRoot,
     CascadeProfile,
+    CascadeShallowRoot,
     CascadeSpecialChild,
     CascadeSpecialParent,
     CascadeWR02Grandchild,
@@ -78,25 +82,106 @@ async def test_shape1_chain_root_reaches_the_expected_prefix_of_the_chain_sanity
     fake_redis_client,
 ):
     # Arrange: CascadeChainRoot.head carries CascadeTTL(depth=2); a->b->c->d chain.
+    # depth=2 is the child subtree's budget: root->a (fresh budget 2), a->b
+    # (blanket, budget 1), b->c (blanket, budget 0), c->d (budget exhausted).
+    # This is the WR-01 contract the client-side CascadePlanner is unit-tested
+    # for (test_multi_hop_chain_truncated_by_field_depth: [root, a, b, c]); the
+    # server-side Lua must now match it exactly rather than the old off-by-one
+    # min-cap semantics that stopped a hop short at [root, a, b].
     d = await CascadeChainNode(name="d").asave()
     c = await CascadeChainNode(name="c", next=d.key).asave()
     b = await CascadeChainNode(name="b", next=c.key).asave()
     a = await CascadeChainNode(name="a", next=b.key).asave()
     root = await CascadeChainRoot(head=a.key).asave()
-    for key in (d.key, c.key, b.key, a.key, root.key):
+    all_keys = (root.key, a.key, b.key, c.key, d.key)
+    for key in all_keys:
         await fake_redis_client.persist(key)
+
+    # The client-side planner is the authority for the depth budget.
+    expected = set(await CascadePlanner().atraverse(root.key, CascadeChainRoot))
 
     # Act
     await _apply_cascade(fake_redis_client, root)
 
-    # Assert: root itself is always refreshed; nodes reached within the
-    # depth-2 budget carry a positive TTL, nodes beyond it are left untouched.
-    assert await fake_redis_client.ttl(root.key) > 0
-    assert await fake_redis_client.ttl(a.key) > 0
-    assert await fake_redis_client.ttl(b.key) > 0
-    for key in (c.key, d.key):
-        ttl = await fake_redis_client.ttl(key)
-        assert ttl in (-1, -2), f"expected {key} untouched, got ttl={ttl}"
+    # Assert: the Lua refresh set matches the planner exactly — root, a, b, c
+    # refreshed; d (beyond the depth-2 budget) left untouched.
+    refreshed = {key for key in all_keys if await fake_redis_client.ttl(key) > 0}
+    assert refreshed == expected
+    assert refreshed == {root.key, a.key, b.key, c.key}
+    assert await fake_redis_client.ttl(d.key) in (-1, -2)
+
+
+@pytest.mark.asyncio
+async def test_depth0_shallow_root_extends_via_explicit_override_matches_planner_parity(
+    fake_redis_client,
+):
+    # CR-01/WR-01 regression. CascadeShallowRoot.entry carries CascadeTTL(depth=0)
+    # — the value that used to compute `depth - 1 == -1 == UNBOUNDED` and turn the
+    # whole subtree unbounded. CascadeExtendingNode.onward is an explicit depth=5
+    # override that must REFRESH the budget and extend PAST the depth=0 entry
+    # (D-09), not be silenced by it. The Lua must reach EXACTLY the CascadePlanner
+    # refresh set for this scalar shape-1 chain (no shape-2 fakeredis divergence).
+    tail = await CascadeChainNode(name="tail").asave()
+    head = await CascadeChainNode(name="head", next=tail.key).asave()
+    extending = await CascadeExtendingNode(onward=head.key).asave()
+    root = await CascadeShallowRoot(entry=extending.key).asave()
+    all_keys = (root.key, extending.key, head.key, tail.key)
+    for key in all_keys:
+        await fake_redis_client.persist(key)
+
+    expected = set(await CascadePlanner().atraverse(root.key, CascadeShallowRoot))
+
+    # Act
+    await _apply_cascade(fake_redis_client, root)
+
+    # Assert: parity with the planner, and the depth=0 entry did extend the full
+    # chain via the explicit override (all four keys), not by an unbounded walk
+    # of a mis-cast sentinel.
+    refreshed = {key for key in all_keys if await fake_redis_client.ttl(key) > 0}
+    assert refreshed == expected
+    assert refreshed == set(all_keys)
+
+
+@pytest.mark.asyncio
+async def test_independent_sibling_depth_budgets_match_planner_parity(
+    fake_redis_client,
+):
+    # WR-01 regression on the blanket-decrement path (distinguishes the fixed Lua
+    # from the old off-by-one). CascadeMultiDepthRoot.short_reach=depth1 reaches
+    # exactly s1,s2; long_reach=depth3 reaches the whole l-chain. Two SEPARATE
+    # chains so the shared visited-set never interferes.
+    s4 = await CascadeChainNode(name="s4").asave()
+    s3 = await CascadeChainNode(name="s3", next=s4.key).asave()
+    s2 = await CascadeChainNode(name="s2", next=s3.key).asave()
+    s1 = await CascadeChainNode(name="s1", next=s2.key).asave()
+    l4 = await CascadeChainNode(name="l4").asave()
+    l3 = await CascadeChainNode(name="l3", next=l4.key).asave()
+    l2 = await CascadeChainNode(name="l2", next=l3.key).asave()
+    l1 = await CascadeChainNode(name="l1", next=l2.key).asave()
+    root = await CascadeMultiDepthRoot(short_reach=s1.key, long_reach=l1.key).asave()
+    all_keys = (
+        root.key,
+        s1.key,
+        s2.key,
+        s3.key,
+        s4.key,
+        l1.key,
+        l2.key,
+        l3.key,
+        l4.key,
+    )
+    for key in all_keys:
+        await fake_redis_client.persist(key)
+
+    expected = set(await CascadePlanner().atraverse(root.key, CascadeMultiDepthRoot))
+
+    # Act
+    await _apply_cascade(fake_redis_client, root)
+
+    # Assert
+    refreshed = {key for key in all_keys if await fake_redis_client.ttl(key) > 0}
+    assert refreshed == expected
+    assert refreshed == {root.key, s1.key, s2.key, l1.key, l2.key, l3.key, l4.key}
 
 
 @pytest.mark.asyncio

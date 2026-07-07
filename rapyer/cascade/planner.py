@@ -216,6 +216,7 @@ def _static_walk_fk_edges(
     without a runtime dump — each edge carries its OWN declared depth
     (field override else global else unbounded), not an inherited budget.
     """
+    field_specs = getattr(model_cls, planner.field_attr, {})
     for field_name in model_cls._relational_field_names:
         enabled, depth = planner._next_hop(model_cls, field_name, None, False)
         if not enabled:
@@ -230,6 +231,12 @@ def _static_walk_fk_edges(
             "recurse": True,
             "ttl": True,
             "special": True,
+            # WR-01: an enabled explicit per-field spec is a whole-object
+            # override — the Lua traversal REFRESHES the child's budget to
+            # this edge's depth (D-09 extend-past), never decrements it.
+            # Without a field spec the edge is a blanket-global edge, which
+            # decrements/caps the inherited budget instead.
+            "override": field_specs.get(field_name) is not None,
         }
         if depth is not None:
             edge["depth"] = depth
@@ -261,6 +268,9 @@ def _static_walk_fk_edges(
             "recurse": True,
             "ttl": True,
             "special": True,
+            # WR-01: see the shape-1 branch above — override vs blanket
+            # decides refresh-vs-decrement in the Lua budget arithmetic.
+            "override": field_specs.get(field_name) is not None,
         }
         if depth is not None:
             edge["depth"] = depth
