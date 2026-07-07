@@ -13,7 +13,7 @@ from rapyer.errors.base import (
     UnsupportedArgumentValueError,
     UpdateAtomicModelError,
 )
-from rapyer.errors.cascade import InvalidCascadeDepthError
+from rapyer.errors.cascade import CascadeTargetTtlMissingError, InvalidCascadeDepthError
 from rapyer.errors.delete import BadDeleteActionError
 from rapyer.errors.find import (
     BadFilterError,
@@ -42,6 +42,7 @@ __all__ = [
     "BadDeleteActionError",
     "BadFilterError",
     "CantSerializeRedisValueError",
+    "CascadeTargetTtlMissingError",
     "CorruptedModelError",
     "DuplicateModelNameError",
     "FindError",
