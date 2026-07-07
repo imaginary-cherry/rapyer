@@ -1,8 +1,13 @@
-from typing import Any, get_origin
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, get_origin
 
+from rapyer.errors.cascade import CascadeTargetTtlMissingError
 from rapyer.types.relational import RelationalFieldType
 from rapyer.utils.annotation import strip_optional
 from rapyer.utils.pythonic import resolve_generic_args, safe_issubclass
+
+if TYPE_CHECKING:
+    from rapyer.base import AtomicRedisModel
 
 
 def _unwrap_relational_target(annotation: Any) -> Any | None:
@@ -23,86 +28,79 @@ def _unwrap_relational_target(annotation: Any) -> Any | None:
     return None
 
 
-class CascadePlanner:
+@dataclass(frozen=True)
+class CascadeEdge:
     """
-    Small bundle of static edge-classification helpers (EXT-01 extension
-    seam): ``_next_hop``/``_resolve_target_cls``/``_unwrap_nested_model_cls``
-    are used by ``build_cascade_plan``'s ``_static_walk_fk_edges`` to build
-    the baked, per-class plan table consumed by the Lua ``cascade_ttl_apply``
-    script. It never touches Redis and never hydrates a model.
-
-    ``field_attr``/``global_attr`` are parameterized so a future
-    ``CascadeDelete`` strategy can reuse this exact class unmodified by
-    pointing it at ``_cascade_delete_fields``/``Meta.cascade_delete``.
+    One FK edge out of a class in the cascade plan table. ``depth=None`` means
+    unbounded; ``_lua_literal`` (``rapyer/scripts/registry.py``) omits
+    ``None``-valued fields, so the Lua table never carries a literal ``depth``
+    key for these.
     """
 
-    def __init__(
-        self,
-        field_attr: str = "_cascade_ttl_fields",
-        global_attr: str = "cascade_ttl",
-    ):
-        self.field_attr = field_attr
-        self.global_attr = global_attr
+    path: str
+    target: str
+    collection: bool
+    recurse: bool
+    ttl: bool
+    special: bool
+    override: bool
+    depth: int | None = None
 
-    def _next_hop(
-        self,
-        model_cls: Any,
-        field_name: str,
-        remaining_budget: int | None,
-        established: bool,
-    ) -> tuple[bool, int | None]:
-        field_specs = getattr(model_cls, self.field_attr, {})
-        field_spec = field_specs.get(field_name)
-        if field_spec is not None:
-            # D-09: an explicit per-field spec is a whole-object override — it
-            # always wins and always REFRESHES the child's subtree budget,
-            # regardless of any inherited remaining_budget (D-03 revised:
-            # this is how a deeper field extends past a shallower ancestor).
-            if not field_spec.enabled:
-                return False, None
-            return True, field_spec.depth
 
-        global_spec = getattr(model_cls.Meta, self.global_attr, None)
-        if global_spec is None or not global_spec.enabled:
-            return False, None
+@dataclass(frozen=True)
+class CascadePlanEntry:
+    """One class's full entry in the cascade plan table."""
 
-        if not established:
-            # D-01/D-03: first hop of a brand-new subtree via the blanket
-            # global — the child's subtree budget is freshly set.
-            return True, global_spec.depth
+    ttl: int | None
+    special_suffixes: list[str]
+    fks: list[CascadeEdge]
 
-        # Continuing an already-established subtree purely via blanket
-        # enable: decrement the inherited budget (D-05's visited-set remains
-        # the real termination backstop; this is just the optional cap).
-        if remaining_budget is None:
-            return True, None
-        if remaining_budget <= 0:
-            return False, None
-        return True, remaining_budget - 1
 
-    def _resolve_target_cls(self, model_cls: Any, field_name: str) -> Any | None:
-        annotation = model_cls.model_fields[field_name].annotation
-        return _unwrap_relational_target(annotation)
+def _classify_edge(model_cls: Any, field_name: str) -> tuple[bool, int | None, bool]:
+    """
+    Single-hop static classification of one FK-shaped field on ``model_cls``:
+    field-spec override else global blanket else disabled. Returns
+    ``(enabled, depth, override)``. Carries no budget accounting -- all
+    multi-hop decrement/refresh bookkeeping lives entirely in the Lua
+    ``cascade_ttl_apply`` script's own ``next_hop``.
+    """
+    field_specs = getattr(model_cls, "_cascade_ttl_fields", {})
+    field_spec = field_specs.get(field_name)
+    if field_spec is not None:
+        if not field_spec.enabled:
+            return False, None, True
+        return True, field_spec.depth, True
 
-    def _unwrap_nested_model_cls(self, annotation: Any) -> Any | None:
-        """
-        If ``annotation`` is itself an ``AtomicRedisModel`` subclass (D-06
-        shape 3: a nested inline sub-model), return that class; else ``None``
-        (D-06 shape 2: a collection-of-FK field). Both shapes currently land
-        in the same ``_contain_fk`` classification set (RESEARCH.md Pitfall
-        1) and must be re-disambiguated here, at traversal time.
-        """
-        # Imported lazily: rapyer.base already imports rapyer.cascade at
-        # module level, so a top-level import here would create a cycle.
-        from rapyer.base import AtomicRedisModel
+    global_spec = getattr(model_cls.Meta, "cascade_ttl", None)
+    if global_spec is None or not global_spec.enabled:
+        return False, None, False
+    return True, global_spec.depth, False
 
-        stripped = strip_optional(annotation)
-        origin = get_origin(stripped) or stripped
-        return origin if safe_issubclass(origin, AtomicRedisModel) else None
+
+def _resolve_target_cls(model_cls: Any, field_name: str) -> Any | None:
+    annotation = model_cls.model_fields[field_name].annotation
+    return _unwrap_relational_target(annotation)
+
+
+def _unwrap_nested_model_cls(annotation: Any) -> Any | None:
+    """
+    If ``annotation`` is itself an ``AtomicRedisModel`` subclass (D-06
+    shape 3: a nested inline sub-model), return that class; else ``None``
+    (D-06 shape 2: a collection-of-FK field). Both shapes currently land
+    in the same ``_contain_fk`` classification set (RESEARCH.md Pitfall
+    1) and must be re-disambiguated here, at traversal time.
+    """
+    # Imported lazily: rapyer.base already imports rapyer.cascade at
+    # module level, so a top-level import here would create a cycle.
+    from rapyer.base import AtomicRedisModel
+
+    stripped = strip_optional(annotation)
+    origin = get_origin(stripped) or stripped
+    return origin if safe_issubclass(origin, AtomicRedisModel) else None
 
 
 def _static_walk_fk_edges(
-    planner: CascadePlanner, model_cls: Any, parent_path: str, fks: list[dict]
+    model_cls: Any, parent_path: str, fks: list[CascadeEdge]
 ) -> None:
     """Append every enabled, static FK edge reachable from ``model_cls``'s own
     fields (shapes 1/2 directly, shape 3 by recursing into the nested
@@ -111,65 +109,64 @@ def _static_walk_fk_edges(
     declared depth (field override else global else unbounded), not an
     inherited budget.
     """
-    field_specs = getattr(model_cls, planner.field_attr, {})
     for field_name in model_cls._relational_field_names:
-        enabled, depth = planner._next_hop(model_cls, field_name, None, False)
+        enabled, depth, override = _classify_edge(model_cls, field_name)
         if not enabled:
             continue
-        target_cls = planner._resolve_target_cls(model_cls, field_name)
+        target_cls = _resolve_target_cls(model_cls, field_name)
         if target_cls is None:
             continue
-        edge = {
-            "path": f"{parent_path}.{field_name}",
-            "target": target_cls.__name__,
-            "collection": False,
-            "recurse": True,
-            "ttl": True,
-            "special": True,
-            # WR-01: an enabled explicit per-field spec is a whole-object
-            # override — the Lua traversal REFRESHES the child's budget to
-            # this edge's depth (D-09 extend-past), never decrements it.
-            # Without a field spec the edge is a blanket-global edge, which
-            # decrements/caps the inherited budget instead.
-            "override": field_specs.get(field_name) is not None,
-        }
-        if depth is not None:
-            edge["depth"] = depth
-        fks.append(edge)
+        # WR-01: an enabled explicit per-field spec is a whole-object
+        # override — the Lua traversal REFRESHES the child's budget to
+        # this edge's depth (D-09 extend-past), never decrements it.
+        # Without a field spec the edge is a blanket-global edge, which
+        # decrements/caps the inherited budget instead.
+        fks.append(
+            CascadeEdge(
+                path=f"{parent_path}.{field_name}",
+                target=target_cls.__name__,
+                collection=False,
+                recurse=True,
+                ttl=True,
+                special=True,
+                override=override,
+                depth=depth,
+            )
+        )
 
     for field_name in model_cls._contain_fk:
         annotation = model_cls.model_fields[field_name].annotation
-        nested_cls = planner._unwrap_nested_model_cls(annotation)
+        nested_cls = _unwrap_nested_model_cls(annotation)
         if nested_cls is not None:
             # Shape 3: nested inline sub-model — same RedisJSON document,
             # zero-hop recursion; the marker lives on the nested class's own
             # field, so keep walking with model_cls=nested_cls.
             nested_path = f"{parent_path}.{field_name}"
-            _static_walk_fk_edges(planner, nested_cls, nested_path, fks)
+            _static_walk_fk_edges(nested_cls, nested_path, fks)
             continue
 
         # Shape 2: collection of FK — the marker lives on the collection
         # field itself; one edge covers every element.
-        enabled, depth = planner._next_hop(model_cls, field_name, None, False)
+        enabled, depth, override = _classify_edge(model_cls, field_name)
         if not enabled:
             continue
-        target_cls = planner._resolve_target_cls(model_cls, field_name)
+        target_cls = _resolve_target_cls(model_cls, field_name)
         if target_cls is None:
             continue
-        edge = {
-            "path": f"{parent_path}.{field_name}",
-            "target": target_cls.__name__,
-            "collection": True,
-            "recurse": True,
-            "ttl": True,
-            "special": True,
-            # WR-01: see the shape-1 branch above — override vs blanket
-            # decides refresh-vs-decrement in the Lua budget arithmetic.
-            "override": field_specs.get(field_name) is not None,
-        }
-        if depth is not None:
-            edge["depth"] = depth
-        fks.append(edge)
+        # WR-01: see the shape-1 branch above — override vs blanket
+        # decides refresh-vs-decrement in the Lua budget arithmetic.
+        fks.append(
+            CascadeEdge(
+                path=f"{parent_path}.{field_name}",
+                target=target_cls.__name__,
+                collection=True,
+                recurse=True,
+                ttl=True,
+                special=True,
+                override=override,
+                depth=depth,
+            )
+        )
 
 
 def _static_walk_special_suffixes(model_cls: Any, parent_path: str = "") -> list[str]:
@@ -196,7 +193,9 @@ def _static_walk_special_suffixes(model_cls: Any, parent_path: str = "") -> list
     return suffixes
 
 
-def build_cascade_plan(models: list[type["AtomicRedisModel"]]) -> dict[str, dict]:
+def build_cascade_plan(
+    models: list[type["AtomicRedisModel"]],
+) -> dict[str, CascadePlanEntry]:
     """
     Build the static, per-class cascade plan table (D-02): every model in
     ``models`` gets exactly one entry keyed by its class name, covering all
@@ -205,20 +204,19 @@ def build_cascade_plan(models: list[type["AtomicRedisModel"]]) -> dict[str, dict
     script bakes in at ``SCRIPT LOAD``. Pure class/annotation introspection;
     never hydrates an instance or touches Redis.
     """
-    planner = CascadePlanner()
-    plan: dict[str, dict] = {}
+    plan: dict[str, CascadePlanEntry] = {}
     for model_cls in models:
-        fks: list[dict] = []
-        _static_walk_fk_edges(planner, model_cls, "$", fks)
-        plan[model_cls.__name__] = {
-            "ttl": model_cls.Meta.ttl,
-            "special_suffixes": _static_walk_special_suffixes(model_cls),
-            "fks": fks,
-        }
+        fks: list[CascadeEdge] = []
+        _static_walk_fk_edges(model_cls, "$", fks)
+        plan[model_cls.__name__] = CascadePlanEntry(
+            ttl=model_cls.Meta.ttl,
+            special_suffixes=_static_walk_special_suffixes(model_cls),
+            fks=fks,
+        )
     return plan
 
 
-def validate_cascade_ttl_targets(plan: dict[str, dict]) -> None:
+def validate_cascade_ttl_targets(plan: dict[str, CascadePlanEntry]) -> None:
     """
     Raise ``CascadeTargetTtlMissingError`` (D-08) whenever a class that
     participates in a cascade lacks a ``Meta.ttl``. The Lua write phase EXPIREs
@@ -232,11 +230,9 @@ def validate_cascade_ttl_targets(plan: dict[str, dict]) -> None:
 
     Both passes iterate deterministically in sorted-class-name, then list order.
     """
-    from rapyer.errors.cascade import CascadeTargetTtlMissingError
-
     for class_name, entry in sorted(plan.items()):
-        for edge in entry["fks"]:
-            target = edge["target"]
+        for edge in entry.fks:
+            target = edge.target
             # WR-03: a partial plan (built from a subset of models) may omit an
             # edge's target entirely — surface a RapyerError, never a bare
             # KeyError, per the "all library errors inherit RapyerError" rule.
@@ -245,14 +241,14 @@ def validate_cascade_ttl_targets(plan: dict[str, dict]) -> None:
                 raise CascadeTargetTtlMissingError(
                     target,
                     f"{target!r} is reachable via a cascade-enabled edge from "
-                    f"{class_name!r} (path {edge['path']!r}) but is absent from "
+                    f"{class_name!r} (path {edge.path!r}) but is absent from "
                     "the cascade plan",
                 )
-            if target_entry["ttl"] is None:
+            if target_entry.ttl is None:
                 raise CascadeTargetTtlMissingError(
                     target,
                     f"{target!r} is reachable via a cascade-enabled edge "
-                    f"from {class_name!r} (path {edge['path']!r}) but "
+                    f"from {class_name!r} (path {edge.path!r}) but "
                     "declares no Meta.ttl",
                 )
 
@@ -261,7 +257,7 @@ def validate_cascade_ttl_targets(plan: dict[str, dict]) -> None:
     # ttl. Checked in a second pass so an edge-target violation (above) always
     # takes precedence, keeping the original first-violation ordering stable.
     for class_name, entry in sorted(plan.items()):
-        if entry["fks"] and entry["ttl"] is None:
+        if entry.fks and entry.ttl is None:
             raise CascadeTargetTtlMissingError(
                 class_name,
                 f"{class_name!r} has outgoing cascade-enabled edges (it is a "
