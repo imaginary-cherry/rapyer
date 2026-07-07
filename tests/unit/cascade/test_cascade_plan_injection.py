@@ -1,5 +1,6 @@
 import pytest
 
+from rapyer.cascade.planner import CascadeEdge, CascadePlanEntry
 from rapyer.scripts.constants import CASCADE_TTL_APPLY_SCRIPT_NAME
 from rapyer.scripts.registry import (
     _REGISTERED_SCRIPT_SHAS,
@@ -19,7 +20,7 @@ def test_cascade_registry_entry_present():
 
 def test_inject_cascade_plan_is_noop_when_placeholder_absent():
     template = "no placeholder here"
-    plan = {"A": {"ttl": None, "special_suffixes": [], "fks": []}}
+    plan = {"A": CascadePlanEntry(ttl=None, special_suffixes=[], fks=[])}
 
     assert _inject_cascade_plan(template, plan) == template
 
@@ -28,7 +29,7 @@ def test_inject_cascade_plan_is_noop_when_placeholder_absent():
 async def test_inject_cascade_plan_escapes_single_quote_in_class_name(
     fake_redis_client,
 ):
-    plan = {"A's": {"ttl": 5, "special_suffixes": [], "fks": []}}
+    plan = {"A's": CascadePlanEntry(ttl=5, special_suffixes=[], fks=[])}
 
     injected = _inject_cascade_plan("--[[CASCADE_PLAN_TABLE]]", plan)
 
@@ -45,20 +46,21 @@ async def test_inject_cascade_plan_escapes_single_quote_in_class_name(
 
 def test_inject_cascade_plan_serializes_bool_int_and_omits_absent_depth():
     plan = {
-        "Foo": {
-            "ttl": 10,
-            "special_suffixes": ["tasks"],
-            "fks": [
-                {
-                    "path": "$.author",
-                    "target": "Author",
-                    "collection": False,
-                    "recurse": True,
-                    "ttl": True,
-                    "special": True,
-                }
+        "Foo": CascadePlanEntry(
+            ttl=10,
+            special_suffixes=["tasks"],
+            fks=[
+                CascadeEdge(
+                    path="$.author",
+                    target="Author",
+                    collection=False,
+                    recurse=True,
+                    ttl=True,
+                    special=True,
+                    override=False,
+                )
             ],
-        }
+        )
     }
 
     injected = _inject_cascade_plan("--[[CASCADE_PLAN_TABLE]]", plan)
