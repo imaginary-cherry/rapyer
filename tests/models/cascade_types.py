@@ -6,6 +6,8 @@ from rapyer.base import AtomicRedisModel
 from rapyer.cascade import CascadeTTL
 from rapyer.config import RedisConfig
 from rapyer.types.foreign_key import Reference
+from rapyer.types.priority_queue import RedisPriorityQueue
+from rapyer.types.redis_set import RedisSet
 
 # D-08: every cascade fixture below gets this ttl so no `classes[<class>].ttl`
 # lookup in the Lua write phase can ever resolve to nil, regardless of which
@@ -208,5 +210,68 @@ class CascadeNestedDepthRoot(AtomicRedisModel):
     """
 
     holder: Annotated[Reference[CascadeBlanketNestedHolder], CascadeTTL(depth=1)]
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+# --- Plan 02-04 additions: special-field-child gap closure + WR-02 fixtures ---
+
+
+class CascadeSpecialChild(AtomicRedisModel):
+    """
+    Cascade-reachable child carrying its OWN special fields (RedisSet /
+    RedisPriorityQueue) — closes the Phase-1 test gap (01-HUMAN-UAT.md):
+    cascade_ttl_apply must refresh a reached child's special-field keys too,
+    not just its main key.
+
+    ``name`` is a plain field (not just special fields) so the model's own
+    JSON dump is never the empty object ``{}`` — fakeredis's ``EXISTS``/``TTL``
+    do not recognize a RedisJSON key whose root document is an empty dict as
+    present (a documented fakeredis/real-Redis divergence; see CONCERNS.md).
+    """
+
+    name: str = "special_child"
+    tags: RedisSet[str] = Field(default_factory=RedisSet)
+    scores: RedisPriorityQueue[float] = Field(default_factory=RedisPriorityQueue)
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+class CascadeSpecialParent(AtomicRedisModel):
+    """Cascade root pointing at CascadeSpecialChild (shape 1 + special-field child)."""
+
+    child: Annotated[Reference[CascadeSpecialChild], CascadeTTL()]
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+class CascadeWR02Grandchild(AtomicRedisModel):
+    """Plain leaf, reachable only through CascadeWR02SharedChild's own edge (WR-02)."""
+
+    name: str = "grandchild"
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+class CascadeWR02SharedChild(AtomicRedisModel):
+    """Shared child reached via two sibling root edges with differing depth budgets (WR-02)."""
+
+    next: Annotated[Reference[CascadeWR02Grandchild], CascadeTTL()]
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+class CascadeWR02Root(AtomicRedisModel):
+    """
+    WR-02: two fields point at the SAME saved CascadeWR02SharedChild instance
+    but carry different depth budgets (the diamond-with-differing-depths
+    scenario). Under D-04 the shared child's OWN key is always refreshed
+    regardless of DFS visit order (first-visit dedup); only its deeper
+    descendant's (the grandchild's) reach is order-dependent and therefore
+    deliberately not asserted one way or the other (see STATE.md WR-02).
+    """
+
+    deep_path: Annotated[Reference[CascadeWR02SharedChild], CascadeTTL(depth=5)]
+    shallow_path: Annotated[Reference[CascadeWR02SharedChild], CascadeTTL(depth=1)]
 
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
