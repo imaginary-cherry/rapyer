@@ -1,0 +1,206 @@
+-- An unbounded recursion budget: keep following edges with no depth cap.
+local UNBOUNDED = -1
+
+local CASCADE_PLAN = {}
+--[[CASCADE_PLAN_TABLE]]
+-- The per-class cascade data (special-key suffixes + FK edges) is baked into the
+-- script at SCRIPT LOAD via the placeholder above; the body indexes it by class.
+local classes = CASCADE_PLAN
+
+local root_key = KEYS[1]
+local root_class = ARGV[1]
+-- The bare special-key prefix (no separators). This script owns the ':'
+-- separators and assembles the full key as prefix .. ':' .. key .. ':' ..
+-- suffix; it is the Lua-side counterpart of special_field_key on the Python
+-- side. The prefix value and the per-class suffixes are shipped as data.
+local special_prefix = ARGV[2]
+
+-- Collect-phase state: the read walk queues every key needing a refresh (deduped
+-- into refresh_order); the shell at the bottom holds the one mutation (the EXPIRE
+-- loop) so the write window stays as small as possible. Every queued entry
+-- carries its OWNING CLASS alongside the key so the write phase can look up
+-- that class's own Meta.ttl (D-04) -- no single caller-supplied ttl is ever
+-- used, and no GT/NX/XX flag is ever passed to EXPIRE (D-05).
+local visited = {}
+local pending_refresh = {}
+local refresh_order = {}
+local stack = {}
+
+local function queue_refresh(full_key, class_name)
+    if not pending_refresh[full_key] then
+        pending_refresh[full_key] = true
+        refresh_order[#refresh_order + 1] = { key = full_key, class = class_name }
+    end
+end
+
+local function queue_special_refresh(key, class_name)
+    local entry = classes[class_name]
+    if not entry then
+        return
+    end
+    for _, suffix in ipairs(entry.special_suffixes) do
+        queue_refresh(special_prefix .. ':' .. key .. ':' .. suffix, class_name)
+    end
+end
+
+local function fk_edges(class_name)
+    local entry = classes[class_name]
+    if entry then
+        return entry.fks
+    end
+    return {}
+end
+
+-- Read every reference path of a node in ONE JSON.GET and return a
+-- path -> target-value map. JSON.GET's output shape depends on arg count
+-- (verified identical on real redis and fakeredis):
+--   * one path  -> a bare array of matches, e.g. ["A:1"] (or [] when missing)
+--   * many paths -> an object keyed by the path string, each value such an
+--     array, e.g. {"$.a":["A:1"],"$.b":[]} (order not guaranteed -> key by path)
+-- Either way a match is the first array element. A live reference is either a
+-- single target-key string (shape 1) or a table of target-key strings/objects
+-- (shape 2, collection-of-FK); push_edges below does the type-specific
+-- filtering per edge.collection -- this function only strips absent/null
+-- matches so both shapes reach push_edges intact.
+local function read_reference_paths(key, paths)
+    -- unpack is the Lua 5.1 global redis runs on; spreads the paths as args.
+    local raw = redis.call('JSON.GET', key, unpack(paths))
+    local values_by_path = {}
+    if not raw or raw == '' then
+        return values_by_path
+    end
+    local decoded = cjson.decode(raw)
+    if #paths == 1 then  -- single-path JSON.GET returns a bare array, not an object
+        local match = decoded[1]
+        if match ~= nil and match ~= cjson.null then
+            values_by_path[paths[1]] = match
+        end
+        return values_by_path
+    end
+    for _, path in ipairs(paths) do
+        local matches = decoded[path]
+        local match = matches and matches[1]
+        if match ~= nil and match ~= cjson.null then
+            values_by_path[path] = match
+        end
+    end
+    return values_by_path
+end
+
+local function child_budget(parent_budget, edge)
+    local inherited = parent_budget
+    if inherited ~= UNBOUNDED then
+        inherited = inherited - 1
+    end
+    if type(edge.depth) ~= 'number' then
+        return inherited
+    end
+    -- A per-edge depth caps how far this subtree may go; the edge counts as the
+    -- first of its `depth` hops, so the child carries depth - 1.
+    local capped = edge.depth - 1
+    if inherited == UNBOUNDED then
+        return capped
+    end
+    return math.min(capped, inherited)
+end
+
+local function push_child(target_key, edge, next_budget)
+    if type(target_key) == 'string' and not visited[target_key] then
+        stack[#stack + 1] = {
+            key = target_key,
+            -- The edge already carries its target's class name, so the
+            -- child's class is read straight from the plan, never parsed
+            -- back out of the key.
+            class = edge.target,
+            edge = edge,
+            budget = next_budget,
+        }
+    end
+end
+
+-- Worklist of (key, class, budget) where budget is the remaining number of hops
+-- we may still follow out of `key` (UNBOUNDED = no cap, 0 = stop). Following an
+-- edge with its own `depth` clamps the child's budget to that edge's limit.
+local function push_edges(parent_key, parent_class, budget)
+    if budget == 0 then
+        return  -- budget exhausted: do not follow any further edges from here
+    end
+    local edges = fk_edges(parent_class)
+    if #edges == 0 then
+        return  -- no reference paths to read for this class
+    end
+    local paths = {}
+    for _, edge in ipairs(edges) do
+        paths[#paths + 1] = edge.path
+    end
+    -- One JSON.GET reads every edge path of this node, not one per edge.
+    local values_by_path = read_reference_paths(parent_key, paths)
+    for _, edge in ipairs(edges) do
+        local matched = values_by_path[edge.path]
+        if matched ~= nil then
+            local next_budget = 0
+            if edge.recurse then
+                next_budget = child_budget(budget, edge)
+            end
+            if not edge.collection then
+                -- Shape 1 (unchanged prototype behavior): the matched value
+                -- is a single scalar FK -- the target's own key string.
+                if type(matched) == 'string' then
+                    push_child(matched, edge, next_budget)
+                end
+            elseif edge.collection then
+                -- Shape 2: list[Reference[T]]/dict[K, Reference[T]] -- the
+                -- matched value is a JSON array (1-indexed Lua sequence) or a
+                -- JSON object (string-keyed Lua table); either way `pairs`
+                -- correctly iterates every element regardless of key shape,
+                -- and every element shares this SAME edge (and therefore the
+                -- same budget).
+                if type(matched) == 'table' then
+                    for _, target_key in pairs(matched) do
+                        push_child(target_key, edge, next_budget)
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- The read walk: the root is always fully refreshed (main key + every special
+-- key), matching aset_ttl. Cascade edges then control whether each *target*
+-- refreshes its main key / special keys and whether traversal continues from it.
+-- Returns the ordered, deduped {key=, class=} entries to refresh and mutates no
+-- Redis state.
+local function plan_refresh_keys()
+    queue_refresh(root_key, root_class)
+    queue_special_refresh(root_key, root_class)
+    visited[root_key] = true
+    push_edges(root_key, root_class, UNBOUNDED)
+
+    while #stack > 0 do
+        local item = table.remove(stack)
+        local key = item.key
+        if not visited[key] then
+            visited[key] = true
+            local edge = item.edge
+            if edge.ttl then
+                queue_refresh(key, item.class)
+            end
+            if edge.special then
+                queue_special_refresh(key, item.class)
+            end
+            push_edges(key, item.class, item.budget)
+        end
+    end
+
+    return refresh_order
+end
+
+-- Write phase: the only place EXPIRE appears -- issue every queued refresh now
+-- that the read walk is complete. Each key expires at its OWNING CLASS's own
+-- baked-in Meta.ttl (D-04/D-05): a plain relative EXPIRE, never a single
+-- caller-supplied ttl and never GT/NX/XX flags.
+for _, item in ipairs(plan_refresh_keys()) do
+    redis.call('EXPIRE', item.key, classes[item.class].ttl)
+end
+
+return 1
