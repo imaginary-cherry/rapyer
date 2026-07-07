@@ -1,6 +1,5 @@
 import pytest
 
-from rapyer.cascade import CascadePlanner
 from rapyer.scripts import arun_sha
 from rapyer.scripts.constants import CASCADE_TTL_APPLY_SCRIPT_NAME
 from rapyer.types.priority_queue import RedisPriorityQueue
@@ -8,6 +7,10 @@ from rapyer.types.redis_set import RedisSet
 from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX
 from tests.models.cascade_types import (
     CascadeAuthor,
+    CascadeBlanketLeaf,
+    CascadeBlanketNestedHolder,
+    CascadeBlanketNestedProfile,
+    CascadeBlanketOptOut,
     CascadeBookCollection,
     CascadeBookNested,
     CascadeChainNode,
@@ -16,6 +19,7 @@ from tests.models.cascade_types import (
     CascadeDiamondRoot,
     CascadeExtendingNode,
     CascadeMultiDepthRoot,
+    CascadeNestedDepthRoot,
     CascadeProfile,
     CascadeShallowRoot,
     CascadeSpecialChild,
@@ -84,10 +88,10 @@ async def test_shape1_chain_root_reaches_the_expected_prefix_of_the_chain_sanity
     # Arrange: CascadeChainRoot.head carries CascadeTTL(depth=2); a->b->c->d chain.
     # depth=2 is the child subtree's budget: root->a (fresh budget 2), a->b
     # (blanket, budget 1), b->c (blanket, budget 0), c->d (budget exhausted).
-    # This is the WR-01 contract the client-side CascadePlanner is unit-tested
-    # for (test_multi_hop_chain_truncated_by_field_depth: [root, a, b, c]); the
-    # server-side Lua must now match it exactly rather than the old off-by-one
-    # min-cap semantics that stopped a hop short at [root, a, b].
+    # CascadeChainRoot.head carries an explicit depth=2 override (refreshes
+    # child budget to 2), then CascadeChainNode.next is a blanket-decrementing
+    # hop at each subsequent established step (root->a budget 2, a->b budget
+    # 1, b->c budget 0, c->d exhausted -- d is never reached).
     d = await CascadeChainNode(name="d").asave()
     c = await CascadeChainNode(name="c", next=d.key).asave()
     b = await CascadeChainNode(name="b", next=c.key).asave()
@@ -97,30 +101,27 @@ async def test_shape1_chain_root_reaches_the_expected_prefix_of_the_chain_sanity
     for key in all_keys:
         await fake_redis_client.persist(key)
 
-    # The client-side planner is the authority for the depth budget.
-    expected = set(await CascadePlanner().atraverse(root.key, CascadeChainRoot))
-
     # Act
     await _apply_cascade(fake_redis_client, root)
 
-    # Assert: the Lua refresh set matches the planner exactly — root, a, b, c
-    # refreshed; d (beyond the depth-2 budget) left untouched.
+    # Assert: the Lua refresh set matches the hand-derived expected set —
+    # root, a, b, c refreshed; d (beyond the depth-2 budget) left untouched.
     refreshed = {key for key in all_keys if await fake_redis_client.ttl(key) > 0}
-    assert refreshed == expected
     assert refreshed == {root.key, a.key, b.key, c.key}
     assert await fake_redis_client.ttl(d.key) in (-1, -2)
 
 
 @pytest.mark.asyncio
-async def test_depth0_shallow_root_extends_via_explicit_override_matches_planner_parity(
+async def test_depth0_shallow_root_extends_via_explicit_override_matches_hand_derived_expected_set(
     fake_redis_client,
 ):
     # CR-01/WR-01 regression. CascadeShallowRoot.entry carries CascadeTTL(depth=0)
     # — the value that used to compute `depth - 1 == -1 == UNBOUNDED` and turn the
     # whole subtree unbounded. CascadeExtendingNode.onward is an explicit depth=5
     # override that must REFRESH the budget and extend PAST the depth=0 entry
-    # (D-09), not be silenced by it. The Lua must reach EXACTLY the CascadePlanner
-    # refresh set for this scalar shape-1 chain (no shape-2 fakeredis divergence).
+    # (D-09), not be silenced by it. The Lua must reach EXACTLY the hand-derived
+    # expected set below for this scalar shape-1 chain (no shape-2 fakeredis
+    # divergence).
     tail = await CascadeChainNode(name="tail").asave()
     head = await CascadeChainNode(name="head", next=tail.key).asave()
     extending = await CascadeExtendingNode(onward=head.key).asave()
@@ -129,21 +130,17 @@ async def test_depth0_shallow_root_extends_via_explicit_override_matches_planner
     for key in all_keys:
         await fake_redis_client.persist(key)
 
-    expected = set(await CascadePlanner().atraverse(root.key, CascadeShallowRoot))
-
     # Act
     await _apply_cascade(fake_redis_client, root)
 
-    # Assert: parity with the planner, and the depth=0 entry did extend the full
-    # chain via the explicit override (all four keys), not by an unbounded walk
-    # of a mis-cast sentinel.
+    # Assert: the depth=0 entry did extend the full chain via the explicit
+    # override (all four keys), not by an unbounded walk of a mis-cast sentinel.
     refreshed = {key for key in all_keys if await fake_redis_client.ttl(key) > 0}
-    assert refreshed == expected
     assert refreshed == set(all_keys)
 
 
 @pytest.mark.asyncio
-async def test_independent_sibling_depth_budgets_match_planner_parity(
+async def test_independent_sibling_depth_budgets_match_hand_derived_expected_set(
     fake_redis_client,
 ):
     # WR-01 regression on the blanket-decrement path (distinguishes the fixed Lua
@@ -173,14 +170,11 @@ async def test_independent_sibling_depth_budgets_match_planner_parity(
     for key in all_keys:
         await fake_redis_client.persist(key)
 
-    expected = set(await CascadePlanner().atraverse(root.key, CascadeMultiDepthRoot))
-
     # Act
     await _apply_cascade(fake_redis_client, root)
 
     # Assert
     refreshed = {key for key in all_keys if await fake_redis_client.ttl(key) > 0}
-    assert refreshed == expected
     assert refreshed == {root.key, s1.key, s2.key, l1.key, l2.key, l3.key, l4.key}
 
 
@@ -323,3 +317,61 @@ async def test_wr02_shared_child_own_key_always_refreshed_regardless_of_visit_or
     # non-flaky across interpreter runs / PYTHONHASHSEED values.
     grandchild_ttl = await fake_redis_client.ttl(grandchild.key)
     assert grandchild_ttl > 0 or grandchild_ttl in (-1, -2)
+
+
+# --- Ported from the deleted client-side-planner unit tests (blanket opt-out + nested-submodel budget) ---
+
+
+@pytest.mark.asyncio
+async def test_blanket_opt_out_field_stops_traversal_despite_blanket_global(
+    fake_redis_client,
+):
+    # Arrange: CascadeBlanketOptOut.child carries an explicit
+    # CascadeTTL(enabled=False), overriding an otherwise-blanket-enabled
+    # Meta.cascade_ttl(depth=2) — the explicit per-field opt-out wins.
+    leaf = await CascadeBlanketLeaf(name="leaf").asave()
+    root = await CascadeBlanketOptOut(child=leaf.key).asave()
+    await fake_redis_client.persist(root.key)
+    await fake_redis_client.persist(leaf.key)
+
+    # Act
+    await _apply_cascade(fake_redis_client, root)
+
+    # Assert: root refreshed, leaf never reached.
+    assert await fake_redis_client.ttl(root.key) > 0
+    assert await fake_redis_client.ttl(leaf.key) in (-1, -2)
+
+
+@pytest.mark.asyncio
+async def test_nested_submodel_zero_hop_does_not_consume_depth_budget(
+    fake_redis_client,
+):
+    # WR-01/D-06-shape-3 budget-non-consumption contract, ported from the
+    # deleted test_nested_submodel_hop_does_not_consume_the_depth_budget
+    # planner unit test. CascadeNestedDepthRoot.holder carries an explicit
+    # depth=1; the zero-hop walk through .profile (a nested inline submodel,
+    # shape 3) must not consume that budget before the real FK hop into
+    # .mentor (which is reached via CascadeBlanketNestedProfile's own
+    # blanket-enabled Meta.cascade_ttl(depth=2)).
+    mentor = await CascadeBlanketLeaf(name="mentor").asave()
+    holder = await CascadeBlanketNestedHolder(
+        profile=CascadeBlanketNestedProfile(mentor=mentor.key)
+    ).asave()
+    root = await CascadeNestedDepthRoot(holder=holder.key).asave()
+    await fake_redis_client.persist(root.key)
+    await fake_redis_client.persist(holder.key)
+    await fake_redis_client.persist(mentor.key)
+
+    # Act
+    await _apply_cascade(fake_redis_client, root)
+
+    # Assert: reached despite only a depth=1 budget on the outer field —
+    # proving the zero-hop `profile` field never decremented the depth=1
+    # budget inherited by `holder`, so the real FK hop into `mentor` still
+    # saw the untouched budget and was followed.
+    refreshed = {
+        key
+        for key in (root.key, holder.key, mentor.key)
+        if await fake_redis_client.ttl(key) > 0
+    }
+    assert refreshed == {root.key, holder.key, mentor.key}
