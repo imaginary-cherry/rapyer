@@ -325,20 +325,51 @@ def build_cascade_plan(models: list[type["AtomicRedisModel"]]) -> dict[str, dict
 
 def validate_cascade_ttl_targets(plan: dict[str, dict]) -> None:
     """
-    Raise ``CascadeTargetTtlMissingError`` (D-08) on the first cascade-enabled
-    edge whose target class declares no ``Meta.ttl`` — a class never reached
-    by any cascade-enabled edge is never required to declare one. Iterates
-    deterministically in sorted-class-name, then list, order.
+    Raise ``CascadeTargetTtlMissingError`` (D-08) whenever a class that
+    participates in a cascade lacks a ``Meta.ttl``. The Lua write phase EXPIREs
+    every key with its OWNING class's baked-in ttl, so a ``None`` ttl becomes a
+    nil-arg Lua runtime error. Two cases are enforced:
+
+    - a cascade-enabled edge TARGET refreshes the target's own key (checked
+      first, preserving the original D-08 first-violation ordering);
+    - a cascade ROOT — any class with outgoing cascade-enabled edges (WR-02) —
+      also refreshes its OWN key, so it too must declare a ttl.
+
+    Both passes iterate deterministically in sorted-class-name, then list order.
     """
     from rapyer.errors.cascade import CascadeTargetTtlMissingError
 
     for class_name, entry in sorted(plan.items()):
         for edge in entry["fks"]:
             target = edge["target"]
-            if plan[target]["ttl"] is None:
+            # WR-03: a partial plan (built from a subset of models) may omit an
+            # edge's target entirely — surface a RapyerError, never a bare
+            # KeyError, per the "all library errors inherit RapyerError" rule.
+            target_entry = plan.get(target)
+            if target_entry is None:
+                raise CascadeTargetTtlMissingError(
+                    target,
+                    f"{target!r} is reachable via a cascade-enabled edge from "
+                    f"{class_name!r} (path {edge['path']!r}) but is absent from "
+                    "the cascade plan",
+                )
+            if target_entry["ttl"] is None:
                 raise CascadeTargetTtlMissingError(
                     target,
                     f"{target!r} is reachable via a cascade-enabled edge "
                     f"from {class_name!r} (path {edge['path']!r}) but "
                     "declares no Meta.ttl",
                 )
+
+    # WR-02: a cascade root refreshes its own key too, so a class with outgoing
+    # cascade-enabled edges but no Meta.ttl is just as fatal as a target with no
+    # ttl. Checked in a second pass so an edge-target violation (above) always
+    # takes precedence, keeping the original first-violation ordering stable.
+    for class_name, entry in sorted(plan.items()):
+        if entry["fks"] and entry["ttl"] is None:
+            raise CascadeTargetTtlMissingError(
+                class_name,
+                f"{class_name!r} has outgoing cascade-enabled edges (it is a "
+                "cascade root) but declares no Meta.ttl; the cascade would "
+                "EXPIRE its own key with a nil ttl",
+            )
