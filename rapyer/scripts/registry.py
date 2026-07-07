@@ -5,6 +5,7 @@ from redis.exceptions import NoScriptError
 from rapyer.errors import PersistentNoScriptError, ScriptsNotInitializedError
 from rapyer.scripts.constants import (
     ATOMIC_GET_OR_CREATE_SCRIPT_NAME,
+    CASCADE_TTL_APPLY_SCRIPT_NAME,
     DATETIME_ADD_SCRIPT_NAME,
     DICT_POP_SCRIPT_NAME,
     DICT_POPITEM_SCRIPT_NAME,
@@ -39,11 +40,13 @@ SCRIPT_REGISTRY: list[tuple[str, str, str]] = [
     ("dict", "pop", DICT_POP_SCRIPT_NAME),
     ("dict", "popitem", DICT_POPITEM_SCRIPT_NAME),
     ("atomic", "get_or_create", ATOMIC_GET_OR_CREATE_SCRIPT_NAME),
+    ("cascade", "apply", CASCADE_TTL_APPLY_SCRIPT_NAME),
 ]
 
 _REGISTERED_SCRIPT_SHAS: dict[str, str] = {}
 
 SF_DISPATCH_PLACEHOLDER = "--[[SF_DISPATCH_TABLE]]"
+CASCADE_PLAN_PLACEHOLDER = "--[[CASCADE_PLAN_TABLE]]"
 
 
 def _build_scripts(variant: str) -> dict[str, str]:
@@ -82,20 +85,71 @@ def _inject_sf_dispatch(template: str, sf_base) -> str:
     return template.replace(SF_DISPATCH_PLACEHOLDER, "\n".join(lines))
 
 
+def _lua_literal(value) -> str:
+    """
+    Serialize a Python value (``dict``/``list``/``str``/``bool``/``int``) into
+    a Lua table-literal fragment for embedding into a script template at
+    ``SCRIPT LOAD`` time. ``dict`` values that are ``None`` are omitted
+    entirely (mirrors ``build_cascade_plan``'s depth-absent-when-unbounded
+    convention). Strings are single-quoted with ``\\``/``'`` escaped first —
+    this is the injection-mitigation boundary; never raw-interpolate an
+    unescaped string into Lua source.
+    """
+    if isinstance(value, dict):
+        parts = [
+            f"[{_lua_literal(key)}] = {_lua_literal(inner)}"
+            for key, inner in value.items()
+            if inner is not None
+        ]
+        return "{" + ", ".join(parts) + "}"
+    if isinstance(value, list):
+        return "{" + ", ".join(_lua_literal(item) for item in value) + "}"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, str):
+        escaped = value.replace("\\", "\\\\").replace("'", "\\'")
+        return f"'{escaped}'"
+    raise TypeError(f"Unsupported cascade-plan Lua literal type: {type(value)!r}")
+
+
+def _inject_cascade_plan(template: str, plan: dict[str, dict]) -> str:
+    """
+    Replace ``--[[CASCADE_PLAN_TABLE]]`` in ``template`` with one
+    ``CASCADE_PLAN['ClassName'] = {...}`` assignment line per class in
+    ``plan`` (``build_cascade_plan``'s output shape). No-ops when the
+    placeholder is absent, mirroring ``_inject_sf_dispatch``.
+    """
+    if CASCADE_PLAN_PLACEHOLDER not in template:
+        return template
+    lines = [
+        f"CASCADE_PLAN[{_lua_literal(name)}] = {_lua_literal(entry)}"
+        for name, entry in plan.items()
+    ]
+    return template.replace(CASCADE_PLAN_PLACEHOLDER, "\n".join(lines))
+
+
 async def register_scripts(redis_client, is_fakeredis: bool = False) -> None:
-    # Late import: SpecialFieldType lives under rapyer.types, which depends on
-    # this module via the SCRIPT_REGISTRY constants. Importing it at call time
-    # avoids the circular import while still letting __subclasses__() see every
-    # SF type that was loaded before init_rapyer() ran.
+    # Late imports: SpecialFieldType lives under rapyer.types, and REDIS_MODELS/
+    # build_cascade_plan live under rapyer.base/rapyer.cascade, both of which
+    # depend on this module via the SCRIPT_REGISTRY constants. Importing at
+    # call time avoids the circular import while still letting __subclasses__()/
+    # REDIS_MODELS see every type/model that was loaded before init_rapyer() ran.
+    from rapyer.base import REDIS_MODELS
+    from rapyer.cascade.planner import build_cascade_plan
     from rapyer.types.special import SpecialFieldType
 
     variant = FAKEREDIS_VARIANT if is_fakeredis else REDIS_VARIANT
     scripts = _build_scripts(variant)
-    # Any script in the registry may opt into SF dispatch by including the
-    # ``--[[SF_DISPATCH_TABLE]]`` placeholder; templates without it pass through
-    # unchanged (the helper short-circuits).
+    cascade_plan = build_cascade_plan(REDIS_MODELS)
+    # Any script in the registry may opt into SF dispatch / cascade-plan
+    # injection by including the respective placeholder; templates without it
+    # pass through unchanged (each helper short-circuits).
     for name, script_text in scripts.items():
         scripts[name] = _inject_sf_dispatch(script_text, SpecialFieldType)
+    for name, script_text in scripts.items():
+        scripts[name] = _inject_cascade_plan(script_text, cascade_plan)
     for name, script_text in scripts.items():
         sha = await redis_client.script_load(script_text)
         _REGISTERED_SCRIPT_SHAS[name] = sha
