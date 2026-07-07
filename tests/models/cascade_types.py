@@ -7,9 +7,16 @@ from rapyer.cascade import CascadeTTL
 from rapyer.config import RedisConfig
 from rapyer.types.foreign_key import Reference
 
+# D-08: every cascade fixture below gets this ttl so no `classes[<class>].ttl`
+# lookup in the Lua write phase can ever resolve to nil, regardless of which
+# fixture 02-04 roots a real cascade-apply invocation at.
+CASCADE_FIXTURE_TTL_SECONDS = 3600
+
 
 class CascadeAuthor(AtomicRedisModel):
     name: str = "anon"
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
 
 
 class CascadeBookDirect(AtomicRedisModel):
@@ -17,6 +24,8 @@ class CascadeBookDirect(AtomicRedisModel):
 
     title: str = "untitled"
     author: Annotated[Reference[CascadeAuthor], CascadeTTL(enabled=False)]
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
 
 
 class CascadeBookCollection(AtomicRedisModel):
@@ -27,11 +36,15 @@ class CascadeBookCollection(AtomicRedisModel):
         default_factory=list
     )
 
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
 
 class CascadeProfile(AtomicRedisModel):
     """Nested submodel whose own field carries the cascade marker (shape 3)."""
 
     mentor: Annotated[Reference[CascadeAuthor], CascadeTTL()]
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
 
 
 class CascadeBookNested(AtomicRedisModel):
@@ -40,12 +53,16 @@ class CascadeBookNested(AtomicRedisModel):
     title: str = "untitled"
     profile: CascadeProfile
 
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
 
 class CascadeBookPlain(AtomicRedisModel):
     """No CascadeTTL anywhere — used for the COMPAT-02 'no marker present' case."""
 
     title: str = "untitled"
     author: Reference[CascadeAuthor]
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
 
 
 # --- Plan 01-03 additions: CascadePlanner traversal fixtures (shape 1) ---
@@ -64,13 +81,17 @@ class CascadeChainNode(AtomicRedisModel):
     name: str = "node"
     next: Optional[Reference["CascadeChainNode"]] = None
 
-    Meta: ClassVar[RedisConfig] = RedisConfig(cascade_ttl=CascadeTTL())
+    Meta: ClassVar[RedisConfig] = RedisConfig(
+        cascade_ttl=CascadeTTL(), ttl=CASCADE_FIXTURE_TTL_SECONDS
+    )
 
 
 class CascadeChainRoot(AtomicRedisModel):
     """Enters a CascadeChainNode chain with an explicit per-field depth cap."""
 
     head: Annotated[Reference[CascadeChainNode], CascadeTTL(depth=2)]
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
 
 
 class CascadeExtendingNode(AtomicRedisModel):
@@ -79,17 +100,23 @@ class CascadeExtendingNode(AtomicRedisModel):
     name: str = "extending"
     onward: Annotated[Reference[CascadeChainNode], CascadeTTL(depth=5)]
 
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
 
 class CascadeShallowRoot(AtomicRedisModel):
     """Enters CascadeExtendingNode with a near-exhausted budget (depth=0)."""
 
     entry: Annotated[Reference[CascadeExtendingNode], CascadeTTL(depth=0)]
 
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
 
 class CascadeDiamondChild(AtomicRedisModel):
     """Plain leaf with no FK — the shared child in a diamond graph."""
 
     name: str = "child"
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
 
 
 class CascadeDiamondRoot(AtomicRedisModel):
@@ -98,6 +125,8 @@ class CascadeDiamondRoot(AtomicRedisModel):
     left: Annotated[Reference[CascadeDiamondChild], CascadeTTL()]
     right: Annotated[Reference[CascadeDiamondChild], CascadeTTL()]
 
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
 
 class CascadeMultiDepthRoot(AtomicRedisModel):
     """D-11: sibling root fields with independent, non-reconciled depth ceilings."""
@@ -105,11 +134,15 @@ class CascadeMultiDepthRoot(AtomicRedisModel):
     short_reach: Annotated[Reference[CascadeChainNode], CascadeTTL(depth=1)]
     long_reach: Annotated[Reference[CascadeChainNode], CascadeTTL(depth=3)]
 
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
 
 class CascadeBlanketLeaf(AtomicRedisModel):
     """Plain leaf reached purely via a blanket-enabled global default."""
 
     name: str = "leaf"
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
 
 
 class CascadeBlanketRoot(AtomicRedisModel):
@@ -117,7 +150,9 @@ class CascadeBlanketRoot(AtomicRedisModel):
 
     child: Reference[CascadeBlanketLeaf]
 
-    Meta: ClassVar[RedisConfig] = RedisConfig(cascade_ttl=CascadeTTL(depth=2))
+    Meta: ClassVar[RedisConfig] = RedisConfig(
+        cascade_ttl=CascadeTTL(depth=2), ttl=CASCADE_FIXTURE_TTL_SECONDS
+    )
 
 
 class CascadeBlanketOptOut(AtomicRedisModel):
@@ -125,7 +160,9 @@ class CascadeBlanketOptOut(AtomicRedisModel):
 
     child: Annotated[Reference[CascadeBlanketLeaf], CascadeTTL(enabled=False)]
 
-    Meta: ClassVar[RedisConfig] = RedisConfig(cascade_ttl=CascadeTTL(depth=2))
+    Meta: ClassVar[RedisConfig] = RedisConfig(
+        cascade_ttl=CascadeTTL(depth=2), ttl=CASCADE_FIXTURE_TTL_SECONDS
+    )
 
 
 # --- Plan 01-03 Task 2 additions: shapes 2/3 + D-07 full-shape blanket coverage ---
@@ -136,7 +173,9 @@ class CascadeBlanketCollectionRoot(AtomicRedisModel):
 
     children: list[Reference[CascadeBlanketLeaf]] = Field(default_factory=list)
 
-    Meta: ClassVar[RedisConfig] = RedisConfig(cascade_ttl=CascadeTTL(depth=2))
+    Meta: ClassVar[RedisConfig] = RedisConfig(
+        cascade_ttl=CascadeTTL(depth=2), ttl=CASCADE_FIXTURE_TTL_SECONDS
+    )
 
 
 class CascadeBlanketNestedProfile(AtomicRedisModel):
@@ -148,13 +187,17 @@ class CascadeBlanketNestedProfile(AtomicRedisModel):
 
     mentor: Reference[CascadeBlanketLeaf]
 
-    Meta: ClassVar[RedisConfig] = RedisConfig(cascade_ttl=CascadeTTL(depth=2))
+    Meta: ClassVar[RedisConfig] = RedisConfig(
+        cascade_ttl=CascadeTTL(depth=2), ttl=CASCADE_FIXTURE_TTL_SECONDS
+    )
 
 
 class CascadeBlanketNestedHolder(AtomicRedisModel):
     """Holder for CascadeBlanketNestedProfile — no Meta override needed."""
 
     profile: CascadeBlanketNestedProfile
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
 
 
 class CascadeNestedDepthRoot(AtomicRedisModel):
@@ -165,3 +208,5 @@ class CascadeNestedDepthRoot(AtomicRedisModel):
     """
 
     holder: Annotated[Reference[CascadeBlanketNestedHolder], CascadeTTL(depth=1)]
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)

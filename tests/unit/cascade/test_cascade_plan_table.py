@@ -3,6 +3,7 @@ import pytest
 from rapyer.base import REDIS_MODELS
 from rapyer.cascade.planner import build_cascade_plan
 from tests.models.cascade_types import (
+    CASCADE_FIXTURE_TTL_SECONDS,
     CascadeAuthor,
     CascadeBlanketLeaf,
     CascadeBlanketRoot,
@@ -12,6 +13,7 @@ from tests.models.cascade_types import (
     CascadeProfile,
 )
 from tests.models.special_types import PQContainerModel, PriorityQueueModel
+from tests.unit.cascade.conftest import CASCADE_PLANNER_MODELS
 
 pytestmark = pytest.mark.usefixtures("setup_fake_redis_for_cascade_models")
 
@@ -23,7 +25,16 @@ def test_build_cascade_plan_is_importable():
 def test_every_model_gets_exactly_one_entry_even_a_plain_leaf():
     plan = build_cascade_plan([CascadeAuthor])
 
-    assert plan == {"CascadeAuthor": {"ttl": None, "special_suffixes": [], "fks": []}}
+    # D-08 (02-03): CascadeAuthor now carries CASCADE_FIXTURE_TTL_SECONDS so it
+    # can never fail a nil-ttl target/root check; read the ttl back off the
+    # class itself rather than hardcoding a stale None.
+    assert plan == {
+        "CascadeAuthor": {
+            "ttl": CascadeAuthor.Meta.ttl,
+            "special_suffixes": [],
+            "fks": [],
+        }
+    }
 
 
 def test_shape1_disabled_field_produces_no_edge():
@@ -103,3 +114,28 @@ def test_build_cascade_plan_over_redis_models_never_uses_none_as_unbounded_signa
         for edge in entry["fks"]:
             if "depth" in edge:
                 assert edge["depth"] is not None
+
+
+def test_every_cascade_fixture_has_the_shared_fixture_ttl_sanity():
+    # D-08 (02-03): every fixture 02-04 might root a real cascade-apply
+    # invocation at — not just D-08 cascade TARGETS — must carry a non-None
+    # Meta.ttl, or the Lua write phase's `classes[<class>].ttl` lookup for
+    # the root's own EXPIRE would resolve to nil (a Lua runtime error).
+    for model_cls in CASCADE_PLANNER_MODELS:
+        assert model_cls.Meta.ttl == CASCADE_FIXTURE_TTL_SECONDS, model_cls.__name__
+
+
+@pytest.mark.parametrize(
+    "model_cls",
+    [
+        pytest.param(m, id=m.__name__)
+        for m in CASCADE_PLANNER_MODELS
+        if m.__name__
+        in {"CascadeBookCollection", "CascadeBookNested", "CascadeDiamondRoot"}
+    ],
+)
+def test_flagged_invocation_root_only_fixtures_have_ttl_sanity(model_cls):
+    # The three concrete invocation roots 02-04 will exercise that D-08's
+    # TARGET-only validator never required a ttl on (they're roots, never
+    # someone else's cascade-enabled target).
+    assert model_cls.Meta.ttl == CASCADE_FIXTURE_TTL_SECONDS

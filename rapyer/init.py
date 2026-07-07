@@ -6,6 +6,7 @@ from redis.asyncio.client import Redis
 
 from rapyer.base import REDIS_MODELS
 from rapyer.cascade import CascadeTTL
+from rapyer.cascade.planner import build_cascade_plan, validate_cascade_ttl_targets
 from rapyer.result import resolve_forward_refs
 from rapyer.scripts import register_scripts
 from rapyer.types.relational import resolve_relational_targets
@@ -37,8 +38,6 @@ async def init_rapyer(
         redis = redis_async.from_url(redis, decode_responses=True, max_connections=20)
 
     is_fake_redis = is_fakeredis(redis)
-    if redis is not None:
-        await register_scripts(redis, is_fake_redis)
 
     for model in REDIS_MODELS:
         if redis is not None:
@@ -69,6 +68,16 @@ async def init_rapyer(
                 except ResponseError as e:
                     if override_old_idx:
                         raise
+
+    # D-08: fail fast on a mis-configured cascade graph using each model's
+    # FINAL per-call Meta.ttl/cascade_ttl (just assigned above), before any
+    # script gets registered. Pure config check — needs no Redis connection,
+    # runs unconditionally, and is allowed to raise uncaught (matches this
+    # file's existing "let startup errors propagate" convention).
+    validate_cascade_ttl_targets(build_cascade_plan(REDIS_MODELS))
+
+    if redis is not None:
+        await register_scripts(redis, is_fake_redis)
 
 
 async def teardown_rapyer():
