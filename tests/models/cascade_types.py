@@ -67,7 +67,7 @@ class CascadeBookPlain(AtomicRedisModel):
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
 
 
-# --- Plan 01-03 additions: CascadePlanner traversal fixtures (shape 1) ---
+# --- Plan 01-03 additions: cascade-edge-classification fixtures (shape 1) ---
 
 
 class CascadeChainNode(AtomicRedisModel):
@@ -75,7 +75,7 @@ class CascadeChainNode(AtomicRedisModel):
     Self-referencing chain node. ``next`` carries no per-field marker — cascade
     is driven entirely by this class's own blanket ``Meta.cascade_ttl``, so a
     hop through ``next`` always takes the DECREMENTING blanket path
-    (``CascadePlanner._next_hop``'s "established" branch) instead of an
+    (the Lua apply script's ``next_hop`` "established" branch) instead of an
     explicit per-field override, which would REFRESH (never decrement) the
     budget at every hop of a self-referencing field (D-03 revised).
     """

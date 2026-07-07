@@ -1,26 +1,31 @@
 import pytest
 
-from rapyer.cascade.planner import validate_cascade_ttl_targets
+from rapyer.cascade.planner import (
+    CascadeEdge,
+    CascadePlanEntry,
+    validate_cascade_ttl_targets,
+)
 from rapyer.errors import CascadeTargetTtlMissingError
 
 
 def _plan(a_ttl, b_ttl, edge_target="B"):
     return {
-        "A": {
-            "ttl": a_ttl,
-            "special_suffixes": [],
-            "fks": [
-                {
-                    "path": "$.b",
-                    "target": edge_target,
-                    "collection": False,
-                    "recurse": True,
-                    "ttl": True,
-                    "special": True,
-                }
+        "A": CascadePlanEntry(
+            ttl=a_ttl,
+            special_suffixes=[],
+            fks=[
+                CascadeEdge(
+                    path="$.b",
+                    target=edge_target,
+                    collection=False,
+                    recurse=True,
+                    ttl=True,
+                    special=True,
+                    override=False,
+                )
             ],
-        },
-        "B": {"ttl": b_ttl, "special_suffixes": [], "fks": []},
+        ),
+        "B": CascadePlanEntry(ttl=b_ttl, special_suffixes=[], fks=[]),
     }
 
 
@@ -60,20 +65,21 @@ def test_wr03_raises_rapyer_error_when_edge_target_absent_from_partial_plan():
     # not itself in the plan; the lookup must raise a RapyerError, not a bare
     # KeyError.
     partial_plan = {
-        "A": {
-            "ttl": 60,
-            "special_suffixes": [],
-            "fks": [
-                {
-                    "path": "$.b",
-                    "target": "MissingTarget",
-                    "collection": False,
-                    "recurse": True,
-                    "ttl": True,
-                    "special": True,
-                }
+        "A": CascadePlanEntry(
+            ttl=60,
+            special_suffixes=[],
+            fks=[
+                CascadeEdge(
+                    path="$.b",
+                    target="MissingTarget",
+                    collection=False,
+                    recurse=True,
+                    ttl=True,
+                    special=True,
+                    override=False,
+                )
             ],
-        }
+        )
     }
 
     with pytest.raises(CascadeTargetTtlMissingError) as exc_info:
@@ -83,7 +89,7 @@ def test_wr03_raises_rapyer_error_when_edge_target_absent_from_partial_plan():
 
 def test_does_not_raise_for_a_class_never_reached_as_a_target_even_with_no_ttl():
     plan = {
-        "A": {"ttl": None, "special_suffixes": [], "fks": []},
+        "A": CascadePlanEntry(ttl=None, special_suffixes=[], fks=[]),
     }
 
     validate_cascade_ttl_targets(plan)
@@ -91,36 +97,38 @@ def test_does_not_raise_for_a_class_never_reached_as_a_target_even_with_no_ttl()
 
 def test_raises_on_first_violation_deterministically_sorted_by_class_name():
     plan = {
-        "A": {
-            "ttl": None,
-            "special_suffixes": [],
-            "fks": [
-                {
-                    "path": "$.z",
-                    "target": "Z",
-                    "collection": False,
-                    "recurse": True,
-                    "ttl": True,
-                    "special": True,
-                }
+        "A": CascadePlanEntry(
+            ttl=None,
+            special_suffixes=[],
+            fks=[
+                CascadeEdge(
+                    path="$.z",
+                    target="Z",
+                    collection=False,
+                    recurse=True,
+                    ttl=True,
+                    special=True,
+                    override=False,
+                )
             ],
-        },
-        "M": {
-            "ttl": None,
-            "special_suffixes": [],
-            "fks": [
-                {
-                    "path": "$.y",
-                    "target": "Y",
-                    "collection": False,
-                    "recurse": True,
-                    "ttl": True,
-                    "special": True,
-                }
+        ),
+        "M": CascadePlanEntry(
+            ttl=None,
+            special_suffixes=[],
+            fks=[
+                CascadeEdge(
+                    path="$.y",
+                    target="Y",
+                    collection=False,
+                    recurse=True,
+                    ttl=True,
+                    special=True,
+                    override=False,
+                )
             ],
-        },
-        "Y": {"ttl": None, "special_suffixes": [], "fks": []},
-        "Z": {"ttl": None, "special_suffixes": [], "fks": []},
+        ),
+        "Y": CascadePlanEntry(ttl=None, special_suffixes=[], fks=[]),
+        "Z": CascadePlanEntry(ttl=None, special_suffixes=[], fks=[]),
     }
 
     with pytest.raises(CascadeTargetTtlMissingError) as exc_info:
