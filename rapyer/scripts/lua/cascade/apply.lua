@@ -87,11 +87,13 @@ local function read_reference_paths(key, paths)
     return values_by_path
 end
 
--- Mirror CascadePlanner._next_hop exactly (behavioral parity is the WR-01
--- contract): for one edge out of a node whose subtree budget is
--- `remaining_budget` (UNBOUNDED = no cap) and whose subtree is already
--- `established`, decide whether to follow the edge and what budget the child
--- carries. Returns (follow, child_budget).
+-- Runtime per-edge follow/budget decision (WR-01 contract): the Python-side
+-- classifier (_classify_edge in rapyer/cascade/planner.py) only performs
+-- static, single-hop classification with no budget accounting -- ALL
+-- multi-hop budget bookkeeping happens here. For one edge out of a node whose
+-- subtree budget is `remaining_budget` (UNBOUNDED = no cap) and whose subtree
+-- is already `established`, decide whether to follow the edge and what
+-- budget the child carries. Returns (follow, child_budget).
 --
 -- An explicit per-field override (edge.override) is a whole-object override: it
 -- ALWAYS wins and REFRESHES the child's budget to this edge's own depth,
@@ -148,7 +150,8 @@ end
 -- established marks whether `key`'s subtree was already entered via cascade. The
 -- per-edge follow/budget decision lives entirely in next_hop; a node whose own
 -- budget is 0 can still follow its explicit-override edges (which refresh),
--- exactly as CascadePlanner does.
+-- matching the field-over-global override precedence _classify_edge bakes
+-- into the plan.
 local function push_edges(parent_key, parent_class, remaining_budget, established)
     local edges = fk_edges(parent_class)
     if #edges == 0 then
@@ -202,8 +205,8 @@ local function plan_refresh_keys()
     queue_refresh(root_key, root_class)
     queue_special_refresh(root_key, root_class)
     visited[root_key] = true
-    -- The root frame is UNBOUNDED + not-yet-established, matching atraverse's
-    -- initial (root_key, root_cls, remaining_budget=None, established=False).
+    -- The root frame is UNBOUNDED + not-yet-established: the very first hop
+    -- out of any cascade root is always treated as entering a fresh subtree.
     push_edges(root_key, root_class, UNBOUNDED, false)
 
     while #stack > 0 do

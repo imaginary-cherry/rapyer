@@ -1,3 +1,4 @@
+from dataclasses import asdict
 from typing import TYPE_CHECKING
 
 from redis.exceptions import NoScriptError
@@ -24,6 +25,7 @@ from rapyer.scripts.constants import (
 from rapyer.scripts.loader import load_script
 
 if TYPE_CHECKING:
+    from rapyer.cascade.planner import CascadePlanEntry
     from rapyer.config import RedisConfig
 
 SCRIPT_REGISTRY: list[tuple[str, str, str]] = [
@@ -114,17 +116,20 @@ def _lua_literal(value) -> str:
     raise TypeError(f"Unsupported cascade-plan Lua literal type: {type(value)!r}")
 
 
-def _inject_cascade_plan(template: str, plan: dict[str, dict]) -> str:
+def _inject_cascade_plan(template: str, plan: dict[str, "CascadePlanEntry"]) -> str:
     """
     Replace ``--[[CASCADE_PLAN_TABLE]]`` in ``template`` with one
     ``CASCADE_PLAN['ClassName'] = {...}`` assignment line per class in
-    ``plan`` (``build_cascade_plan``'s output shape). No-ops when the
-    placeholder is absent, mirroring ``_inject_sf_dispatch``.
+    ``plan`` (``build_cascade_plan``'s output shape). Models-only: every
+    entry is a ``CascadePlanEntry`` (no plain-dict acceptance path) and is
+    always converted via ``dataclasses.asdict`` before ``_lua_literal``
+    serializes the resulting nested-dict shape. No-ops when the placeholder
+    is absent, mirroring ``_inject_sf_dispatch``.
     """
     if CASCADE_PLAN_PLACEHOLDER not in template:
         return template
     lines = [
-        f"CASCADE_PLAN[{_lua_literal(name)}] = {_lua_literal(entry)}"
+        f"CASCADE_PLAN[{_lua_literal(name)}] = {_lua_literal(asdict(entry))}"
         for name, entry in plan.items()
     ]
     return template.replace(CASCADE_PLAN_PLACEHOLDER, "\n".join(lines))
