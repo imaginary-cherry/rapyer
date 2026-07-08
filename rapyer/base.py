@@ -39,7 +39,6 @@ from rapyer.config import RedisConfig
 from rapyer.context import (
     _context_pipe,
     ensure_pipeline,
-    execute_pipeline_with_noscript_recovery,
     get_pipe_json,
     pipeline_with_execution,
     with_pipe_context,
@@ -64,17 +63,13 @@ from rapyer.fields.key import KeyAnnotation, RapyerKey
 from rapyer.fields.safe_load import SafeLoadAnnotation
 from rapyer.links import ATOMIC_MODEL_API_REF_LINK, REDIS_SUPPORTED_LINK
 from rapyer.result import (
-    CascadeResult,
     DeleteResult,
     GetOrCreateResult,
     GetOrCreateStatus,
     RapyerDeleteResult,
 )
 from rapyer.scripts import registry as scripts_registry
-from rapyer.scripts.constants import (
-    ATOMIC_GET_OR_CREATE_SCRIPT_NAME,
-    CASCADE_TTL_APPLY_SCRIPT_NAME,
-)
+from rapyer.scripts.constants import ATOMIC_GET_OR_CREATE_SCRIPT_NAME
 from rapyer.types.base import (
     FAILED_FIELDS_KEY,
     REDIS_DUMP_FLAG_NAME,
@@ -85,7 +80,7 @@ from rapyer.types.base import (
 from rapyer.types.convert import RedisConverter
 from rapyer.types.generic import GenericRedisType
 from rapyer.types.relational import RelationalFieldType
-from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX, SpecialFieldType
+from rapyer.types.special import SpecialFieldType
 from rapyer.typing_support import Self, Unpack
 from rapyer.utils.annotation import (
     DYNAMIC_CLASS_DOC,
@@ -171,7 +166,6 @@ class AtomicRedisModel(BaseModel):
     _redis_link_field_names: ClassVar[set[str]] = set()
     _contain_sf: ClassVar[set[str]] = set()
     _contain_fk: ClassVar[set[str]] = set()
-    _has_cascade: ClassVar[bool] = False
     _field_name: str = PrivateAttr(default="")
     model_config = ConfigDict(validate_assignment=True, validate_default=True)
 
@@ -251,24 +245,8 @@ class AtomicRedisModel(BaseModel):
             return None
         pipe_context = ensure_pipeline if can_use_pipeline else pipeline_with_execution
         async with pipe_context(self.Meta) as pipe:
-            if not self._has_cascade:
-                for key in self._ttl_keys():
-                    pipe.expire(key, self.Meta.ttl)
-            else:
-                # D-04: the auto path has no caller-supplied root ttl, so the
-                # root refreshes to its own Meta.ttl, matching pre-existing
-                # refresh_ttl semantics. The dangling-count return is
-                # intentionally discarded, exactly as the legacy loop
-                # discards pipe.expire's return values (D-08).
-                scripts_registry.run_sha(
-                    pipe,
-                    CASCADE_TTL_APPLY_SCRIPT_NAME,
-                    1,
-                    self.key,
-                    type(self).__name__,
-                    SPECIAL_FIELD_KEY_PREFIX,
-                    self.Meta.ttl,
-                )
+            for key in self._ttl_keys():
+                pipe.expire(key, self.Meta.ttl)
             return None
 
     @classmethod
@@ -595,45 +573,12 @@ class AtomicRedisModel(BaseModel):
             update_keys_in_pipeline(pipe_json, self.key, **json_path_kwargs)
 
     @mark_actions(ActionGroup.UPDATE, ignore_refresh=True)
-    async def aset_ttl(
-        self, ttl: int, cascade: bool = False
-    ) -> Optional[CascadeResult]:
+    async def aset_ttl(self, ttl: int) -> None:
         if self.is_inner_model():
             raise RuntimeError("Can only set TTL from top level model")
-
-        if not cascade or not self._has_cascade:
-            # D-01/D-03: cascade omitted, or the flag is a gate over an
-            # edge-free class -- byte-identical to pre-Phase-3 (COMPAT-01).
-            async with ensure_pipeline(self.Meta) as pipe:
-                for key in self._ttl_keys():
-                    pipe.expire(key, ttl)
-            return None
-
-        # Load-bearing ordering (RESEARCH.md Pitfall 2): check BEFORE
-        # entering the pipeline context, since ensure_pipeline itself pushes
-        # a pipeline into context.
-        in_outer_pipe = _context_pipe.get() is not None
-        async with ensure_pipeline(self.Meta, should_execute=False) as pipe:
-            scripts_registry.run_sha(
-                pipe,
-                CASCADE_TTL_APPLY_SCRIPT_NAME,
-                1,
-                self.key,
-                type(self).__name__,
-                SPECIAL_FIELD_KEY_PREFIX,
-                ttl,
-            )
-            if in_outer_pipe:
-                # Outer caller owns execution; we cannot observe the result here.
-                return None
-            # WR-01: route through the shared NOSCRIPT self-heal helper (not
-            # a bare pipe.execute()) so a SCRIPT-FLUSHed server doesn't fail
-            # this write with no retry.
-            results = await execute_pipeline_with_noscript_recovery(pipe, self.Meta)
-        dangling_children, dangling_special = results[-1]
-        return CascadeResult(
-            dangling_children=dangling_children, dangling_special=dangling_special
-        )
+        async with ensure_pipeline(self.Meta) as pipe:
+            for key in self._ttl_keys():
+                pipe.expire(key, ttl)
 
     @functools.cached_property
     def all_keys(self) -> list[str]:
