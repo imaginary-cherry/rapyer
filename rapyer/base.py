@@ -70,7 +70,10 @@ from rapyer.result import (
     RapyerDeleteResult,
 )
 from rapyer.scripts import registry as scripts_registry
-from rapyer.scripts.constants import ATOMIC_GET_OR_CREATE_SCRIPT_NAME
+from rapyer.scripts.constants import (
+    ATOMIC_GET_OR_CREATE_SCRIPT_NAME,
+    CASCADE_TTL_APPLY_SCRIPT_NAME,
+)
 from rapyer.types.base import (
     FAILED_FIELDS_KEY,
     REDIS_DUMP_FLAG_NAME,
@@ -81,7 +84,7 @@ from rapyer.types.base import (
 from rapyer.types.convert import RedisConverter
 from rapyer.types.generic import GenericRedisType
 from rapyer.types.relational import RelationalFieldType
-from rapyer.types.special import SpecialFieldType
+from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX, SpecialFieldType
 from rapyer.typing_support import Self, Unpack
 from rapyer.utils.annotation import (
     DYNAMIC_CLASS_DOC,
@@ -249,8 +252,24 @@ class AtomicRedisModel(BaseModel):
             return None
         pipe_context = ensure_pipeline if can_use_pipeline else pipeline_with_execution
         async with pipe_context(self.Meta) as pipe:
-            for key in self._ttl_keys():
-                pipe.expire(key, self.Meta.ttl)
+            if not self._has_cascade:
+                for key in self._ttl_keys():
+                    pipe.expire(key, self.Meta.ttl)
+            else:
+                # D-04: the auto path has no caller-supplied root ttl, so the
+                # root refreshes to its own Meta.ttl, matching pre-existing
+                # refresh_ttl semantics. The dangling-count return is
+                # intentionally discarded, exactly as the legacy loop
+                # discards pipe.expire's return values (D-08).
+                scripts_registry.run_sha(
+                    pipe,
+                    CASCADE_TTL_APPLY_SCRIPT_NAME,
+                    1,
+                    self.key,
+                    type(self).__name__,
+                    SPECIAL_FIELD_KEY_PREFIX,
+                    self.Meta.ttl,
+                )
             return None
 
     @classmethod
