@@ -74,7 +74,15 @@ async def init_rapyer(
     # script gets registered. Pure config check — needs no Redis connection,
     # runs unconditionally, and is allowed to raise uncaught (matches this
     # file's existing "let startup errors propagate" convention).
-    validate_cascade_ttl_targets(build_cascade_plan(REDIS_MODELS))
+    plan = build_cascade_plan(REDIS_MODELS)
+    validate_cascade_ttl_targets(plan)
+
+    # D-05: reuse the single plan build above (no redundant traversal) to
+    # stash a per-class predicate that action-boundary methods (refresh_ttl,
+    # aset_ttl) branch on at call time — True only for classes with >=1
+    # cascade-enabled outgoing edge.
+    for model in REDIS_MODELS:
+        model._has_cascade = bool(plan[model.__name__].fks)
 
     if redis is not None:
         await register_scripts(redis, is_fake_redis)
