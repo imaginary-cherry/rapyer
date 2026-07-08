@@ -169,6 +169,7 @@ class AtomicRedisModel(BaseModel):
     _contain_sf: ClassVar[set[str]] = set()
     _contain_fk: ClassVar[set[str]] = set()
     _cascade_ttl_fields: ClassVar[dict[str, "CascadeTTL"]] = {}
+    _has_cascade: ClassVar[bool] = False
     _field_name: str = PrivateAttr(default="")
     model_config = ConfigDict(validate_assignment=True, validate_default=True)
 
