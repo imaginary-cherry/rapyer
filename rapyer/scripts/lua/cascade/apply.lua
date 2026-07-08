@@ -14,6 +14,10 @@ local root_class = ARGV[1]
 -- suffix; it is the Lua-side counterpart of special_field_key on the Python
 -- side. The prefix value and the per-class suffixes are shipped as data.
 local special_prefix = ARGV[2]
+-- The root's own explicit ttl (D-02): applies ONLY to the root's own keys
+-- (main + special), never to any cascade-reached child -- every child still
+-- expires at its owning class's baked-in Meta.ttl (D-04/D-05, unchanged).
+local root_ttl = tonumber(ARGV[3])
 
 -- Collect-phase state: the read walk queues every key needing a refresh (deduped
 -- into refresh_order); the shell at the bottom holds the one mutation (the EXPIRE
@@ -26,20 +30,27 @@ local pending_refresh = {}
 local refresh_order = {}
 local stack = {}
 
-local function queue_refresh(full_key, class_name)
+local function queue_refresh(full_key, class_name, is_root, is_special)
+    is_root = is_root or false
+    is_special = is_special or false
     if not pending_refresh[full_key] then
         pending_refresh[full_key] = true
-        refresh_order[#refresh_order + 1] = { key = full_key, class = class_name }
+        refresh_order[#refresh_order + 1] = {
+            key = full_key,
+            class = class_name,
+            is_root = is_root,
+            is_special = is_special,
+        }
     end
 end
 
-local function queue_special_refresh(key, class_name)
+local function queue_special_refresh(key, class_name, is_root)
     local entry = classes[class_name]
     if not entry then
         return
     end
     for _, suffix in ipairs(entry.special_suffixes) do
-        queue_refresh(special_prefix .. ':' .. key .. ':' .. suffix, class_name)
+        queue_refresh(special_prefix .. ':' .. key .. ':' .. suffix, class_name, is_root, true)
     end
 end
 
@@ -202,8 +213,8 @@ end
 -- Returns the ordered, deduped {key=, class=} entries to refresh and mutates no
 -- Redis state.
 local function plan_refresh_keys()
-    queue_refresh(root_key, root_class)
-    queue_special_refresh(root_key, root_class)
+    queue_refresh(root_key, root_class, true)
+    queue_special_refresh(root_key, root_class, true)
     visited[root_key] = true
     -- The root frame is UNBOUNDED + not-yet-established: the very first hop
     -- out of any cascade root is always treated as entering a fresh subtree.
@@ -229,11 +240,25 @@ local function plan_refresh_keys()
 end
 
 -- Write phase: the only place EXPIRE appears -- issue every queued refresh now
--- that the read walk is complete. Each key expires at its OWNING CLASS's own
--- baked-in Meta.ttl (D-04/D-05): a plain relative EXPIRE, never a single
--- caller-supplied ttl and never GT/NX/XX flags.
+-- that the read walk is complete. The root's own keys (main + special) honor
+-- the caller-supplied root_ttl (D-02); every other key still expires at its
+-- OWNING CLASS's own baked-in Meta.ttl (D-04/D-05) -- a plain relative
+-- EXPIRE, never GT/NX/XX flags. A dangling (missing) reached child's key
+-- makes EXPIRE a cheap no-op (returns 0); tally those misses per D-06/D-07
+-- (main vs special) so the caller can observe a graph that has drifted out
+-- of sync -- the root's own keys are never counted, even if somehow absent.
+local dangling_children_count = 0
+local dangling_special_count = 0
 for _, item in ipairs(plan_refresh_keys()) do
-    redis.call('EXPIRE', item.key, classes[item.class].ttl)
+    local ttl = item.is_root and root_ttl or classes[item.class].ttl
+    local expired = redis.call('EXPIRE', item.key, ttl)
+    if expired == 0 and not item.is_root then
+        if item.is_special then
+            dangling_special_count = dangling_special_count + 1
+        else
+            dangling_children_count = dangling_children_count + 1
+        end
+    end
 end
 
-return 1
+return {dangling_children_count, dangling_special_count}
