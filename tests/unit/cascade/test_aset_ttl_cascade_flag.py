@@ -118,6 +118,40 @@ async def test_aset_ttl_cascade_standalone_owns_execution_and_returns_cascade_re
 
 
 @pytest.mark.asyncio
+async def test_aset_ttl_cascade_standalone_executes_via_noscript_recovery_helper():
+    # WR-01: the standalone (should_execute=False, own-pipeline) branch must
+    # route its manual `pipe.execute()` through the shared NOSCRIPT
+    # self-heal helper -- not a bare `await pipe.execute()` -- so a
+    # SCRIPT-FLUSHed server doesn't fail the triggering write. It must still
+    # capture the helper's returned results[-1] for the CascadeResult.
+    assert CascadeChainRoot._has_cascade is True
+    root = CascadeChainRoot(head="CascadeChainNode:fake")
+    mock_pipe = MagicMock()
+    mock_pipe.execute = AsyncMock()
+
+    @asynccontextmanager
+    async def fake_ensure_pipeline(_meta, should_execute=True):
+        yield mock_pipe
+
+    with (
+        patch("rapyer.base._context_pipe") as mock_context_pipe,
+        patch("rapyer.base.ensure_pipeline", fake_ensure_pipeline),
+        patch("rapyer.base.scripts_registry.run_sha"),
+        patch(
+            "rapyer.base.execute_pipeline_with_noscript_recovery",
+            new_callable=AsyncMock,
+            return_value=[True, [3, 4]],
+        ) as mock_execute_with_recovery,
+    ):
+        mock_context_pipe.get.return_value = None
+        result = await root.aset_ttl(TTL_SECONDS, cascade=True)
+
+    mock_execute_with_recovery.assert_awaited_once_with(mock_pipe, root.Meta)
+    mock_pipe.execute.assert_not_awaited()
+    assert result == CascadeResult(dangling_children=3, dangling_special=4)
+
+
+@pytest.mark.asyncio
 async def test_aset_ttl_cascade_inside_outer_pipeline_returns_none_without_executing():
     # (d) called while already inside an outer pipeline: enqueues into the
     # outer pipe, never calls pipe.execute() itself, returns None.
