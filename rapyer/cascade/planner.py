@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, get_origin
 
+from rapyer.cascade.ttl import CascadeTTL
 from rapyer.errors.cascade import CascadeTargetTtlMissingError
 from rapyer.types.relational import RelationalFieldType
 from rapyer.utils.annotation import strip_optional
@@ -8,6 +9,23 @@ from rapyer.utils.pythonic import resolve_generic_args, safe_issubclass
 
 if TYPE_CHECKING:
     from rapyer.base import AtomicRedisModel
+
+
+def _field_cascade_spec(model_cls: Any, field_name: str) -> CascadeTTL | None:
+    """
+    Read the explicit per-field ``CascadeTTL`` marker straight off pydantic's
+    own field metadata (``model_cls.model_fields[field_name].metadata``) --
+    pydantic already preserves this ``Annotated[...]`` metadata verbatim
+    (including, for D-06 shape 3, inheriting it onto a nested-submodel
+    wrapper's fields for free), so no separate class-level cache is needed.
+    """
+    field_info = model_cls.model_fields.get(field_name)
+    if field_info is None:
+        return None
+    for metadata in field_info.metadata:
+        if isinstance(metadata, CascadeTTL):
+            return metadata
+    return None
 
 
 def _unwrap_relational_target(annotation: Any) -> Any | None:
@@ -64,8 +82,7 @@ def _classify_edge(model_cls: Any, field_name: str) -> tuple[bool, int | None, b
     multi-hop decrement/refresh bookkeeping lives entirely in the Lua
     ``cascade_ttl_apply`` script's own ``next_hop``.
     """
-    field_specs = getattr(model_cls, "_cascade_ttl_fields", {})
-    field_spec = field_specs.get(field_name)
+    field_spec = _field_cascade_spec(model_cls, field_name)
     if field_spec is not None:
         if not field_spec.enabled:
             return False, None, True
