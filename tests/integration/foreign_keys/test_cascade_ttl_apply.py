@@ -16,8 +16,8 @@ from tests.models.cascade_types import (
 pytestmark = pytest.mark.usefixtures("setup_real_redis_for_cascade_apply")
 
 
-async def _apply_cascade(real_redis_client, root) -> None:
-    await arun_sha(
+async def _apply_cascade(real_redis_client, root):
+    return await arun_sha(
         real_redis_client,
         type(root).Meta,
         CASCADE_TTL_APPLY_SCRIPT_NAME,
@@ -25,6 +25,7 @@ async def _apply_cascade(real_redis_client, root) -> None:
         root.key,
         type(root).__name__,
         SPECIAL_FIELD_KEY_PREFIX,
+        type(root).Meta.ttl,
     )
 
 

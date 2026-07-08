@@ -32,8 +32,8 @@ from tests.models.cascade_types import (
 pytestmark = pytest.mark.usefixtures("setup_fake_redis_for_cascade_apply")
 
 
-async def _apply_cascade(fake_redis_client, root) -> None:
-    await arun_sha(
+async def _apply_cascade(fake_redis_client, root):
+    return await arun_sha(
         fake_redis_client,
         type(root).Meta,
         CASCADE_TTL_APPLY_SCRIPT_NAME,
@@ -41,6 +41,7 @@ async def _apply_cascade(fake_redis_client, root) -> None:
         root.key,
         type(root).__name__,
         SPECIAL_FIELD_KEY_PREFIX,
+        type(root).Meta.ttl,
     )
 
 
@@ -76,6 +77,67 @@ async def test_cascade_apply_refreshes_special_field_child_keys_sanity(
         )
         > 0
     )
+
+
+# --- D-06/D-07 dangling-count contract ---
+
+
+@pytest.mark.asyncio
+async def test_cascade_apply_returns_zero_dangling_counts_when_everything_exists(
+    fake_redis_client,
+):
+    # Arrange: identical arrangement to the sanity test above — both special
+    # fields on the reached child are actually populated, so nothing is
+    # dangling.
+    child = await CascadeSpecialChild().asave()
+    await child.tags.aadd("x")
+    await child.scores.apush(1.0, priority=1.0)
+    parent = await CascadeSpecialParent(child=child.key).asave()
+    await fake_redis_client.persist(parent.key)
+    await fake_redis_client.persist(child.key)
+
+    # Act
+    result = await _apply_cascade(fake_redis_client, parent)
+
+    # Assert: no dangling children, no dangling special keys.
+    assert result == [0, 0]
+
+
+@pytest.mark.asyncio
+async def test_cascade_apply_counts_fully_dangling_child_and_its_special_keys(
+    fake_redis_client,
+):
+    # Arrange: the referenced child key is never created — its main key AND
+    # both of CascadeSpecialChild's special-field keys (tags, scores) are all
+    # dangling.
+    parent = await CascadeSpecialParent(
+        child="CascadeSpecialChild:does-not-exist"
+    ).asave()
+    await fake_redis_client.persist(parent.key)
+
+    # Act
+    result = await _apply_cascade(fake_redis_client, parent)
+
+    # Assert: one dangling main key, two dangling special keys.
+    assert result == [1, 2]
+
+
+@pytest.mark.asyncio
+async def test_cascade_apply_counts_dangling_special_keys_on_an_existing_child(
+    fake_redis_client,
+):
+    # Arrange: the child's main key exists but neither special field was ever
+    # populated, so only its two special-field keys are dangling.
+    child = await CascadeSpecialChild().asave()
+    parent = await CascadeSpecialParent(child=child.key).asave()
+    await fake_redis_client.persist(parent.key)
+    await fake_redis_client.persist(child.key)
+
+    # Act
+    result = await _apply_cascade(fake_redis_client, parent)
+
+    # Assert: child main key present (not dangling), both special keys dangling.
+    assert result == [0, 2]
 
 
 # --- Shape-1/2/3 re-proof under the REAL script ---
