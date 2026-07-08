@@ -31,11 +31,6 @@ class RapyerDeleteResult(DeleteResult):
     by_model: dict[type[AtomicRedisModel], int]
 
 
-class CascadeResult(BaseModel):
-    dangling_children: int
-    dangling_special: int
-
-
 class GetOrCreateStatus(str, Enum):
     CREATED = "created"
     FOUND = "found"

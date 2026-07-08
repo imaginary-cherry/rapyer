@@ -4,10 +4,6 @@ from typing import Optional
 
 from redis.asyncio.client import Pipeline
 from redis.commands.json import JSON
-from redis.exceptions import NoScriptError
-
-from rapyer.errors import PersistentNoScriptError
-from rapyer.scripts import registry as scripts_registry
 
 # Create a context variable to store the context
 _context_pipe: contextvars.ContextVar[Optional["Pipeline"]] = contextvars.ContextVar(
@@ -42,41 +38,6 @@ def get_pipe_json() -> Optional["JSON"]:
     return json_client
 
 
-async def execute_pipeline_with_noscript_recovery(pipe: Pipeline, meta) -> list:
-    """Execute a queued pipeline, self-healing once on NoScriptError.
-
-    Backs up the FULL command stack before executing -- not just the
-    EVALSHA entries -- because a pipeline built via ``ensure_pipeline``/
-    ``pipeline_with_execution`` can carry ride-along commands (e.g. a
-    cascade EVALSHA alongside a JSON.SET from ``asave()``); an EVALSHA-only
-    replay (as ``_apipeline`` does for its own, different, use case) would
-    silently drop those ride-along writes. Re-registering scripts yields
-    the same SHA for unchanged script text, so the backed-up EVALSHA args
-    stay valid on replay.
-
-    The success path returns ``pipe.execute()``'s result unchanged -- this
-    only adds an exception branch, so it is behaviorally identical to a
-    bare ``await pipe.execute()`` when no NOSCRIPT error occurs.
-    """
-    commands_backup = list(pipe.command_stack)
-    try:
-        return await pipe.execute()
-    except NoScriptError:
-        pass
-
-    await scripts_registry.handle_noscript_error(meta.redis, meta)
-    async with meta.redis.pipeline(transaction=True) as retry_pipe:
-        for args, options in commands_backup:
-            retry_pipe.execute_command(*args, **options)
-        try:
-            return await retry_pipe.execute()
-        except NoScriptError as e:
-            raise PersistentNoScriptError(
-                "NOSCRIPT error persisted after re-registering scripts. "
-                "This indicates a server-side problem with Redis."
-            ) from e
-
-
 @contextlib.asynccontextmanager
 async def ensure_pipeline(meta, should_execute: bool = True):
     """Yield existing pipeline from context, or create a new transactional one.
@@ -97,11 +58,11 @@ async def ensure_pipeline(meta, should_execute: bool = True):
             with with_pipe_context(pipe):
                 yield pipe
                 if should_execute:
-                    await execute_pipeline_with_noscript_recovery(pipe, meta)
+                    await pipe.execute()
 
 
 @contextlib.asynccontextmanager
 async def pipeline_with_execution(meta):
     async with meta.redis.pipeline(transaction=True) as pipe:
         yield pipe
-        await execute_pipeline_with_noscript_recovery(pipe, meta)
+        await pipe.execute()

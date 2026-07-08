@@ -1,44 +1,9 @@
 import pytest_asyncio
 
-from rapyer.scripts import register_scripts
-from rapyer.types.relational import resolve_relational_targets
-from tests.models.cascade_types import (
-    CascadeAuthor,
-    CascadeBookCollection,
-    CascadeSpecialChild,
-    CascadeSpecialParent,
-)
 from tests.models.foreign_key_types import FkAuthor, FkBook, FkPublisher
 
 MISSING_AUTHOR_KEY = "FkAuthor:missing"
 MISSING_PUBLISHER_KEY = "FkPublisher:missing"
-
-# Not in tests/models/registry.py::TESTED_REDIS_MODELS, so the autouse
-# real_redis_client fixture (tests/integration/conftest.py) does not wire
-# their Meta.redis automatically — this plan's cascade fixtures need it
-# wired explicitly, mirroring setup_fake_redis_for_cascade_apply's
-# save/restore shape but against the real client.
-CASCADE_INTEGRATION_MODELS = [
-    CascadeAuthor,
-    CascadeBookCollection,
-    CascadeSpecialChild,
-    CascadeSpecialParent,
-]
-
-
-@pytest_asyncio.fixture
-async def setup_real_redis_for_cascade_apply(real_redis_client):
-    original_clients = {}
-    for model in CASCADE_INTEGRATION_MODELS:
-        original_clients[model] = (model.Meta.redis, model.Meta.is_fake_redis)
-        model.Meta.redis = real_redis_client
-        model.Meta.is_fake_redis = False
-    resolve_relational_targets(CASCADE_INTEGRATION_MODELS)
-    await register_scripts(real_redis_client, is_fakeredis=False)
-    yield
-    for model, (original_redis, original_is_fake) in original_clients.items():
-        model.Meta.redis = original_redis
-        model.Meta.is_fake_redis = original_is_fake
 
 
 @pytest_asyncio.fixture
