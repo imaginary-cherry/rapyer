@@ -64,6 +64,7 @@ from rapyer.fields.key import KeyAnnotation, RapyerKey
 from rapyer.fields.safe_load import SafeLoadAnnotation
 from rapyer.links import ATOMIC_MODEL_API_REF_LINK, REDIS_SUPPORTED_LINK
 from rapyer.result import (
+    CascadeResult,
     DeleteResult,
     GetOrCreateResult,
     GetOrCreateStatus,
@@ -607,12 +608,42 @@ class AtomicRedisModel(BaseModel):
             update_keys_in_pipeline(pipe_json, self.key, **json_path_kwargs)
 
     @mark_actions(ActionGroup.UPDATE, ignore_refresh=True)
-    async def aset_ttl(self, ttl: int) -> None:
+    async def aset_ttl(
+        self, ttl: int, cascade: bool = False
+    ) -> Optional[CascadeResult]:
         if self.is_inner_model():
             raise RuntimeError("Can only set TTL from top level model")
-        async with ensure_pipeline(self.Meta) as pipe:
-            for key in self._ttl_keys():
-                pipe.expire(key, ttl)
+
+        if not cascade or not self._has_cascade:
+            # D-01/D-03: cascade omitted, or the flag is a gate over an
+            # edge-free class -- byte-identical to pre-Phase-3 (COMPAT-01).
+            async with ensure_pipeline(self.Meta) as pipe:
+                for key in self._ttl_keys():
+                    pipe.expire(key, ttl)
+            return None
+
+        # Load-bearing ordering (RESEARCH.md Pitfall 2): check BEFORE
+        # entering the pipeline context, since ensure_pipeline itself pushes
+        # a pipeline into context.
+        in_outer_pipe = _context_pipe.get() is not None
+        async with ensure_pipeline(self.Meta, should_execute=False) as pipe:
+            scripts_registry.run_sha(
+                pipe,
+                CASCADE_TTL_APPLY_SCRIPT_NAME,
+                1,
+                self.key,
+                type(self).__name__,
+                SPECIAL_FIELD_KEY_PREFIX,
+                ttl,
+            )
+            if in_outer_pipe:
+                # Outer caller owns execution; we cannot observe the result here.
+                return None
+            results = await pipe.execute()
+        dangling_children, dangling_special = results[-1]
+        return CascadeResult(
+            dangling_children=dangling_children, dangling_special=dangling_special
+        )
 
     @functools.cached_property
     def all_keys(self) -> list[str]:
