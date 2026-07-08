@@ -167,6 +167,47 @@ async def test_init_rapyer_raises_response_error_when_acreate_index_fails_with_o
 
 
 @pytest.mark.asyncio
+async def test_init_rapyer_rebinds_all_models_before_script_registration_error():
+    # Arrange
+    mock_redis = AsyncMock(spec=Redis)
+    mock_redis.ft.return_value.dropindex = AsyncMock()
+    mock_redis.ft.return_value.create_index = AsyncMock()
+    registered_models = REDIS_MODELS.copy()
+
+    with patch(
+        "rapyer.init.register_scripts",
+        AsyncMock(side_effect=ConnectionError("Redis unavailable")),
+    ):
+        # Act & Assert
+        with pytest.raises(ConnectionError):
+            await init_rapyer(mock_redis)
+
+    for model in registered_models:
+        assert model.Meta.redis is mock_redis
+
+
+@pytest.mark.asyncio
+async def test_init_rapyer_rebinds_all_models_before_index_creation_error():
+    # Arrange
+    mock_redis = AsyncMock(spec=Redis)
+    mock_redis.ft.return_value.dropindex = AsyncMock()
+    mock_redis.script_load = AsyncMock(return_value="mock_sha")
+    registered_models = REDIS_MODELS.copy()
+
+    with patch.object(
+        IndexTestModel,
+        "acreate_index",
+        AsyncMock(side_effect=ResponseError("Index error")),
+    ):
+        # Act & Assert
+        with pytest.raises(ResponseError):
+            await init_rapyer(mock_redis, override_old_idx=True)
+
+    for model in registered_models:
+        assert model.Meta.redis is mock_redis
+
+
+@pytest.mark.asyncio
 async def test_init_rapyer_with_prefer_normal_json_dump_overrides_all_models_sanity():
     # Arrange
     original_preconfigured = ModelWithPreferJsonDumpConfig.Meta.prefer_normal_json_dump

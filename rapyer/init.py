@@ -47,6 +47,7 @@ async def init_rapyer(
         if prefer_normal_json_dump is not None:
             model.Meta.prefer_normal_json_dump = prefer_normal_json_dump
 
+    for model in REDIS_MODELS:
         # Initialize model fields
         model.init_class()
 
