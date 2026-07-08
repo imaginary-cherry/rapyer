@@ -40,6 +40,7 @@ from rapyer.config import RedisConfig
 from rapyer.context import (
     _context_pipe,
     ensure_pipeline,
+    execute_pipeline_with_noscript_recovery,
     get_pipe_json,
     pipeline_with_execution,
     with_pipe_context,
@@ -639,7 +640,10 @@ class AtomicRedisModel(BaseModel):
             if in_outer_pipe:
                 # Outer caller owns execution; we cannot observe the result here.
                 return None
-            results = await pipe.execute()
+            # WR-01: route through the shared NOSCRIPT self-heal helper (not
+            # a bare pipe.execute()) so a SCRIPT-FLUSHed server doesn't fail
+            # this write with no retry.
+            results = await execute_pipeline_with_noscript_recovery(pipe, self.Meta)
         dangling_children, dangling_special = results[-1]
         return CascadeResult(
             dangling_children=dangling_children, dangling_special=dangling_special

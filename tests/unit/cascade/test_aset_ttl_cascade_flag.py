@@ -127,6 +127,7 @@ async def test_aset_ttl_cascade_standalone_executes_via_noscript_recovery_helper
     assert CascadeChainRoot._has_cascade is True
     root = CascadeChainRoot(head="CascadeChainNode:fake")
     mock_pipe = MagicMock()
+    mock_pipe.execute = AsyncMock()
 
     @asynccontextmanager
     async def fake_ensure_pipeline(_meta, should_execute=True):
