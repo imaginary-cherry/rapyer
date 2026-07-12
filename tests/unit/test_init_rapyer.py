@@ -5,15 +5,11 @@ import pytest
 from redis import ResponseError
 from redis.asyncio.client import Redis
 
-from rapyer.base import REDIS_MODELS
-from rapyer.cascade.planner import build_cascade_plan
 from rapyer.init import init_rapyer, teardown_rapyer
 from rapyer.result import RapyerDeleteResult
 from rapyer.scripts import SCRIPTS
 from rapyer.scripts.registry import (
-    CASCADE_PLAN_PLACEHOLDER,
     SF_DISPATCH_PLACEHOLDER,
-    _inject_cascade_plan,
     _inject_sf_dispatch,
 )
 from rapyer.types.special import SpecialFieldType
@@ -56,7 +52,7 @@ def redis_models():
 @pytest.mark.asyncio
 async def test_init_rapyer_with_redis_client_sanity(mock_redis_client, redis_models):
     # Arrange
-    await init_rapyer(mock_redis_client, ttl=30)
+    NoneTestModel.Meta.ttl = 30
 
     # Act
     await init_rapyer(mock_redis_client)
@@ -120,14 +116,14 @@ async def test_init_rapyer_override_existing_redis_and_ttl_sanity(
     mock_redis_client, redis_models
 ):
     # Arrange
-    old_redis_client = AsyncMock(spec=Redis)
-    old_redis_client.ft.return_value.dropindex = AsyncMock()
-    old_redis_client.ft.return_value.create_index = AsyncMock()
-    old_redis_client.script_load = AsyncMock(return_value="mock_sha")
+    old_redis_client = Mock(spec=Redis)
     old_ttl = 60
     new_ttl = 240
 
-    await init_rapyer(old_redis_client, ttl=old_ttl)
+    UserModelWithTTL.Meta.redis = old_redis_client
+    UserModelWithTTL.Meta.ttl = old_ttl
+    TaskModel.Meta.redis = old_redis_client
+    TaskModel.Meta.ttl = old_ttl
 
     # Act
     await init_rapyer(mock_redis_client, ttl=new_ttl)
@@ -207,15 +203,14 @@ async def test_init_rapyer_without_prefer_normal_json_dump_keeps_preconfigured_v
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ["script_name", "script_text"],
-    # Scripts carrying the SF dispatch or cascade-plan placeholder are
-    # substituted by `register_scripts` before being uploaded, so their loaded
-    # text won't match the raw template verbatim. They are covered separately
-    # by `test_init_rapyer_loads_sf_injected_scripts_sanity` /
-    # `test_init_rapyer_loads_cascade_injected_scripts_sanity`.
+    # Scripts carrying the SF dispatch placeholder are substituted by
+    # `register_scripts` before being uploaded, so their loaded text won't match
+    # the raw template verbatim. They are covered separately by
+    # `test_init_rapyer_loads_sf_injected_scripts_sanity`.
     [
         [name, text]
         for name, text in SCRIPTS.items()
-        if SF_DISPATCH_PLACEHOLDER not in text and CASCADE_PLAN_PLACEHOLDER not in text
+        if SF_DISPATCH_PLACEHOLDER not in text
     ],
 )
 async def test_init_rapyer_loads_all_scripts_sanity(
@@ -238,30 +233,6 @@ async def test_init_rapyer_loads_sf_injected_scripts_sanity(
 ):
     # Arrange
     expected = _inject_sf_dispatch(raw_template, SpecialFieldType)
-
-    # Act
-    await init_rapyer(mock_redis_client)
-
-    # Assert
-    mock_redis_client.script_load.assert_any_call(expected)
-    loaded_sources = [c.args[0] for c in mock_redis_client.script_load.await_args_list]
-    assert raw_template not in loaded_sources
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ["script_name", "raw_template"],
-    [
-        [name, text]
-        for name, text in SCRIPTS.items()
-        if CASCADE_PLAN_PLACEHOLDER in text
-    ],
-)
-async def test_init_rapyer_loads_cascade_injected_scripts_sanity(
-    mock_redis_client, script_name, raw_template
-):
-    # Arrange
-    expected = _inject_cascade_plan(raw_template, build_cascade_plan(REDIS_MODELS))
 
     # Act
     await init_rapyer(mock_redis_client)
