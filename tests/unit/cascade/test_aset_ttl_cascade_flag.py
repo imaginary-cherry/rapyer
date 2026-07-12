@@ -39,7 +39,7 @@ def test_aset_ttl_signature_has_cascade_kwarg_defaulting_false():
 
 @pytest.mark.asyncio
 async def test_aset_ttl_no_cascade_flag_on_cascade_enabled_model_never_calls_run_sha():
-    # (a) D-03: no flag -> no cascade, even on a _has_cascade=True model.
+    # (a) no flag -> no cascade, even on a _has_cascade=True model.
     assert CascadeChainRoot._has_cascade is True
     root = CascadeChainRoot(head="CascadeChainNode:fake")
     mock_pipe = MagicMock()
@@ -61,7 +61,7 @@ async def test_aset_ttl_no_cascade_flag_on_cascade_enabled_model_never_calls_run
 
 @pytest.mark.asyncio
 async def test_aset_ttl_cascade_flag_on_non_cascade_model_never_calls_run_sha():
-    # (b) D-03: the flag is a gate over pre-configured edges, never an
+    # (b) the flag is a gate over pre-configured edges, never an
     # override -- a _has_cascade=False model stays on the legacy path even
     # with cascade=True.
     assert CascadeAuthor._has_cascade is False
@@ -119,7 +119,7 @@ async def test_aset_ttl_cascade_standalone_owns_execution_and_returns_cascade_re
 
 @pytest.mark.asyncio
 async def test_aset_ttl_cascade_standalone_executes_via_noscript_recovery_helper():
-    # WR-01: the standalone (should_execute=False, own-pipeline) branch must
+    # The standalone (should_execute=False, own-pipeline) branch must
     # route its manual `pipe.execute()` through the shared NOSCRIPT
     # self-heal helper -- not a bare `await pipe.execute()` -- so a
     # SCRIPT-FLUSHed server doesn't fail the triggering write. It must still

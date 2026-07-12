@@ -111,9 +111,9 @@ def _lua_literal(value) -> str:
     if isinstance(value, int):
         return str(value)
     if isinstance(value, str):
-        # IN-03: also escape newlines/CR so a stray control char in an injected
-        # literal (class name, field path, special suffix) yields valid Lua at
-        # SCRIPT LOAD rather than a silently broken script body. Backslash first.
+        # Also escape newlines/CR so a stray control char in an injected literal
+        # (class name, field path, special suffix) yields valid Lua at SCRIPT
+        # LOAD rather than a silently broken script body. Backslash first.
         escaped = (
             value.replace("\\", "\\\\")
             .replace("'", "\\'")

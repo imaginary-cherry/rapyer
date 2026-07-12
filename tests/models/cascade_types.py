@@ -9,9 +9,9 @@ from rapyer.types.foreign_key import Reference
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.redis_set import RedisSet
 
-# D-08: every cascade fixture below gets this ttl so no `classes[<class>].ttl`
+# Every cascade fixture below gets this ttl so no `classes[<class>].ttl`
 # lookup in the Lua write phase can ever resolve to nil, regardless of which
-# fixture 02-04 roots a real cascade-apply invocation at.
+# fixture roots a real cascade-apply invocation at.
 CASCADE_FIXTURE_TTL_SECONDS = 3600
 
 
@@ -59,7 +59,7 @@ class CascadeBookNested(AtomicRedisModel):
 
 
 class CascadeBookPlain(AtomicRedisModel):
-    """No CascadeTTL anywhere — used for the COMPAT-02 'no marker present' case."""
+    """No CascadeTTL anywhere — used for the 'no marker present' case."""
 
     title: str = "untitled"
     author: Reference[CascadeAuthor]
@@ -67,7 +67,7 @@ class CascadeBookPlain(AtomicRedisModel):
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
 
 
-# --- Plan 01-03 additions: cascade-edge-classification fixtures (shape 1) ---
+# --- Cascade-edge-classification fixtures (shape 1) ---
 
 
 class CascadeChainNode(AtomicRedisModel):
@@ -77,7 +77,7 @@ class CascadeChainNode(AtomicRedisModel):
     hop through ``next`` always takes the DECREMENTING blanket path
     (the Lua apply script's ``next_hop`` "established" branch) instead of an
     explicit per-field override, which would REFRESH (never decrement) the
-    budget at every hop of a self-referencing field (D-03 revised).
+    budget at every hop of a self-referencing field.
     """
 
     name: str = "node"
@@ -131,7 +131,7 @@ class CascadeDiamondRoot(AtomicRedisModel):
 
 
 class CascadeMultiDepthRoot(AtomicRedisModel):
-    """D-11: sibling root fields with independent, non-reconciled depth ceilings."""
+    """Sibling root fields with independent, non-reconciled depth ceilings."""
 
     short_reach: Annotated[Reference[CascadeChainNode], CascadeTTL(depth=1)]
     long_reach: Annotated[Reference[CascadeChainNode], CascadeTTL(depth=3)]
@@ -148,7 +148,7 @@ class CascadeBlanketLeaf(AtomicRedisModel):
 
 
 class CascadeBlanketRoot(AtomicRedisModel):
-    """D-01/D-07: an unannotated FK field cascades purely via the blanket global."""
+    """An unannotated FK field cascades purely via the blanket global."""
 
     child: Reference[CascadeBlanketLeaf]
 
@@ -158,7 +158,7 @@ class CascadeBlanketRoot(AtomicRedisModel):
 
 
 class CascadeBlanketOptOut(AtomicRedisModel):
-    """D-01/D-02: a field opts OUT of an otherwise-blanket-enabled global."""
+    """A field opts OUT of an otherwise-blanket-enabled global."""
 
     child: Annotated[Reference[CascadeBlanketLeaf], CascadeTTL(enabled=False)]
 
@@ -167,11 +167,11 @@ class CascadeBlanketOptOut(AtomicRedisModel):
     )
 
 
-# --- Plan 01-03 Task 2 additions: shapes 2/3 + D-07 full-shape blanket coverage ---
+# --- Shapes 2/3 + full-shape blanket coverage ---
 
 
 class CascadeBlanketCollectionRoot(AtomicRedisModel):
-    """D-07: an unannotated collection-of-FK field cascades via the blanket global."""
+    """An unannotated collection-of-FK field cascades via the blanket global."""
 
     children: list[Reference[CascadeBlanketLeaf]] = Field(default_factory=list)
 
@@ -182,7 +182,7 @@ class CascadeBlanketCollectionRoot(AtomicRedisModel):
 
 class CascadeBlanketNestedProfile(AtomicRedisModel):
     """
-    D-07: an unannotated nested-submodel FK field cascades when the NESTED
+    An unannotated nested-submodel FK field cascades when the NESTED
     class's own ``Meta.cascade_ttl`` is blanket-enabled — the blanket default
     that matters for shape 3 belongs to the nested class, not its holder.
     """
@@ -214,13 +214,13 @@ class CascadeNestedDepthRoot(AtomicRedisModel):
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
 
 
-# --- Plan 02-04 additions: special-field-child gap closure + WR-02 fixtures ---
+# --- Special-field-child gap closure + shared-child fixtures ---
 
 
 class CascadeSpecialChild(AtomicRedisModel):
     """
     Cascade-reachable child carrying its OWN special fields (RedisSet /
-    RedisPriorityQueue) — closes the Phase-1 test gap (01-HUMAN-UAT.md):
+    RedisPriorityQueue) — closes the test gap:
     cascade_ttl_apply must refresh a reached child's special-field keys too,
     not just its main key.
 
@@ -246,7 +246,7 @@ class CascadeSpecialParent(AtomicRedisModel):
 
 
 class CascadeWR02Grandchild(AtomicRedisModel):
-    """Plain leaf, reachable only through CascadeWR02SharedChild's own edge (WR-02)."""
+    """Plain leaf, reachable only through CascadeWR02SharedChild's own edge."""
 
     name: str = "grandchild"
 
@@ -254,7 +254,7 @@ class CascadeWR02Grandchild(AtomicRedisModel):
 
 
 class CascadeWR02SharedChild(AtomicRedisModel):
-    """Shared child reached via two sibling root edges with differing depth budgets (WR-02)."""
+    """Shared child reached via two sibling root edges with differing depth budgets."""
 
     next: Annotated[Reference[CascadeWR02Grandchild], CascadeTTL()]
 
@@ -263,12 +263,12 @@ class CascadeWR02SharedChild(AtomicRedisModel):
 
 class CascadeWR02Root(AtomicRedisModel):
     """
-    WR-02: two fields point at the SAME saved CascadeWR02SharedChild instance
+    Two fields point at the SAME saved CascadeWR02SharedChild instance
     but carry different depth budgets (the diamond-with-differing-depths
-    scenario). Under D-04 the shared child's OWN key is always refreshed
+    scenario). The shared child's OWN key is always refreshed
     regardless of DFS visit order (first-visit dedup); only its deeper
     descendant's (the grandchild's) reach is order-dependent and therefore
-    deliberately not asserted one way or the other (see STATE.md WR-02).
+    deliberately not asserted one way or the other.
     """
 
     deep_path: Annotated[Reference[CascadeWR02SharedChild], CascadeTTL(depth=5)]
@@ -279,7 +279,7 @@ class CascadeWR02Root(AtomicRedisModel):
 
 class CascadeMaxBudgetRoot(AtomicRedisModel):
     """
-    D-03/D-04 max-budget-wins regression: two fields point at the SAME saved
+    Max-budget-wins regression: two fields point at the SAME saved
     ``CascadeChainNode`` head with differing finite depth budgets. Unlike
     ``CascadeWR02SharedChild.next`` (an explicit per-field override edge that
     always refreshes regardless of the inherited budget), ``CascadeChainNode.next``
@@ -287,7 +287,7 @@ class CascadeMaxBudgetRoot(AtomicRedisModel):
     ``Meta.cascade_ttl`` — it genuinely decrements a real remaining budget on
     every established hop. That makes the two differing budgets here (4 vs 1)
     actually distinguishable: the shared head's onward reach depends on which
-    budget it is walked at, proving D-03/D-04 rather than being silently masked
+    budget it is walked at, rather than being silently masked
     by override semantics.
     """
 

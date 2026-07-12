@@ -6,11 +6,11 @@ from rapyer.errors.cascade import InvalidCascadeDepthError
 
 
 class TTLCascadeMode(enum.Enum):
-    """How a cascaded TTL is applied relative to the child's existing TTL.
+    """
+    How a cascaded TTL is applied relative to the child's existing TTL.
 
-    - ``EXTEND``: only raise the child's TTL if the cascaded value is longer.
-    - (future modes, e.g. ``OVERWRITE``/``IF_UNSET``, land here without
-      touching ``CascadeTTL``'s shape.)
+    EXTEND only raises the child's TTL if the cascaded value is longer; future
+    modes (e.g. OVERWRITE/IF_UNSET) can be added without changing CascadeTTL.
     """
 
     EXTEND = "extend"
@@ -18,17 +18,14 @@ class TTLCascadeMode(enum.Enum):
 
 @dataclasses.dataclass(frozen=True)
 class CascadeSpec(abc.ABC):
-    """Shared data contract for every cascade strategy (EXT-01 extension seam).
+    """
+    Shared data contract for every cascade strategy (extension seam).
 
-    Future strategies (``CascadeDelete``/``CascadeSave``) subclass this to
-    reuse the same ``enabled``/``depth`` surface and the same traversal
-    backbone; only the apply step differs per strategy.
-
-    D-01: ``CascadeDelete``/``CascadeSave`` are documented extension points
-    only for this milestone -- no such class is shipped as an importable
-    subclass here or anywhere else in the codebase. See the docs site's TTL
-    Cascade page's "Extension Points" section for the illustrative, not-
-    shipped shape such a subclass would take.
+    Future strategies (CascadeDelete/CascadeSave) subclass this to reuse the
+    same enabled/depth surface and traversal backbone; only the apply step
+    differs. They are documented extension points only — none is shipped as an
+    importable subclass; see the docs site's TTL Cascade "Extension Points"
+    section for the illustrative shape such a subclass would take.
     """
 
     enabled: bool = True

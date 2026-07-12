@@ -32,7 +32,7 @@ def _make_meta_with_retry_pipe(retry_pipe):
 @pytest.mark.asyncio
 async def test_execute_pipeline_with_noscript_recovery_returns_result_on_success_sanity():
     # Success path MUST be behaviorally identical to a bare `await pipe.execute()`
-    # -- same return value, no extra calls -- so COMPAT-01 stays intact.
+    # -- same return value, no extra calls.
     pipe = _make_pipe(
         command_stack=[(("EVALSHA", "sha1", 1, "key"), {})],
         execute_side_effect=[["ok"]],
@@ -50,7 +50,7 @@ async def test_execute_pipeline_with_noscript_recovery_returns_result_on_success
 async def test_execute_pipeline_with_noscript_recovery_replays_evalsha_only_on_noscript(
     monkeypatch,
 ):
-    # CR-01: the cascade EVALSHA rides the SAME transactional pipeline as a
+    # The cascade EVALSHA rides the SAME transactional pipeline as a
     # ride-along JSON.SET (e.g. from asave()). A NOSCRIPT surfaces at EXEC time
     # AFTER the JSON.SET already committed (Redis does not roll back MULTI/EXEC
     # on a mid-execution command error), so the retry must replay ONLY the
