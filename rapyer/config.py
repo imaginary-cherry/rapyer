@@ -74,11 +74,15 @@ class RedisConfig(BaseModel):
         return self._redis_json
 
     def __setattr__(self, name: str, value: Any) -> None:
-        if name == "ttl" and self._ttl_frozen:
+        # WR-04: freeze every cascade-shaping field, not just ttl. init_rapyer()
+        # bakes both ttl AND cascade_ttl into the per-class Lua plan / _has_cascade
+        # gate; mutating cascade_ttl post-freeze would silently desync the runtime
+        # cascade from the baked plan. Reconfigure via init_rapyer() instead.
+        if name in ("ttl", "cascade_ttl") and self._ttl_frozen:
             raise MetaTtlFrozenError(
-                "Meta.ttl is frozen after init_rapyer() bakes the cascade plan "
-                "against it — call init_rapyer() again to reconfigure ttl "
-                "instead of mutating Meta.ttl directly."
+                f"Meta.{name} is frozen after init_rapyer() bakes the cascade "
+                f"plan against it — call init_rapyer() again to reconfigure "
+                f"instead of mutating Meta.{name} directly."
             )
         super().__setattr__(name, value)
 
