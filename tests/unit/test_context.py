@@ -47,13 +47,15 @@ async def test_execute_pipeline_with_noscript_recovery_returns_result_on_success
 
 
 @pytest.mark.asyncio
-async def test_execute_pipeline_with_noscript_recovery_replays_full_command_stack_on_noscript(
+async def test_execute_pipeline_with_noscript_recovery_replays_evalsha_only_on_noscript(
     monkeypatch,
 ):
-    # RED: the cascade EVALSHA rides the SAME pipeline as a ride-along
-    # JSON.SET (e.g. from asave()). An EVALSHA-only replay would silently
-    # drop the JSON.SET. Assert the retry pipe receives BOTH commands, in
-    # order, exactly as originally enqueued.
+    # CR-01: the cascade EVALSHA rides the SAME transactional pipeline as a
+    # ride-along JSON.SET (e.g. from asave()). A NOSCRIPT surfaces at EXEC time
+    # AFTER the JSON.SET already committed (Redis does not roll back MULTI/EXEC
+    # on a mid-execution command error), so the retry must replay ONLY the
+    # EVALSHA -- re-issuing the JSON.SET would double-apply it. Assert the retry
+    # pipe receives the EVALSHA and NOT the already-committed JSON.SET.
     command_stack = [
         (("JSON.SET", "Model:abc", "$", "{}"), {}),
         (("EVALSHA", "sha1", 1, "Model:abc"), {}),
@@ -61,7 +63,7 @@ async def test_execute_pipeline_with_noscript_recovery_replays_full_command_stac
     pipe = _make_pipe(command_stack=command_stack, execute_side_effect=NoScriptError())
 
     retry_pipe = MagicMock()
-    retry_pipe.execute = AsyncMock(return_value=[True, [0, 0]])
+    retry_pipe.execute = AsyncMock(return_value=[[0, 0]])
     meta = _make_meta_with_retry_pipe(retry_pipe)
 
     handle_noscript_error = AsyncMock()
@@ -73,11 +75,12 @@ async def test_execute_pipeline_with_noscript_recovery_replays_full_command_stac
 
     handle_noscript_error.assert_awaited_once_with(meta.redis, meta)
     assert retry_pipe.execute_command.call_args_list == [
-        (("JSON.SET", "Model:abc", "$", "{}"), {}),
         (("EVALSHA", "sha1", 1, "Model:abc"), {}),
     ]
     retry_pipe.execute.assert_awaited_once()
-    assert result == [True, [0, 0]]
+    # Only the replayed EVALSHA's result comes back from the retry pipe; the
+    # JSON.SET committed on attempt 1 and is intentionally not re-run.
+    assert result == [[0, 0]]
 
 
 @pytest.mark.asyncio

@@ -24,7 +24,6 @@ from redis.asyncio.client import Pipeline
 from redis.commands.search.aggregation import AggregateRequest
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
-from redis.exceptions import NoScriptError, ResponseError
 
 from rapyer.actions import (
     ActionGroup,
@@ -51,7 +50,6 @@ from rapyer.errors import (
     DuplicateModelNameError,
     KeyNotFound,
     MissingParameterError,
-    PersistentNoScriptError,
     RapyerModelDoesntExistError,
     UnsupportedArgumentTypeError,
     UnsupportedArgumentValueError,
@@ -609,6 +607,12 @@ class AtomicRedisModel(BaseModel):
                     pipe.expire(key, ttl)
             return None
 
+        # IN-04: a non-positive `ttl` is passed straight to EXPIRE for the
+        # root's own keys, so it deletes the root immediately (legacy EXPIRE
+        # semantics, matching the non-cascade branch above) while each cascade
+        # child is still re-armed to its own positive Meta.ttl. The asymmetry
+        # (root gone, children extended) is intentional but surprising -- pass a
+        # positive ttl to keep the whole subtree alive.
         # Load-bearing ordering (RESEARCH.md Pitfall 2): check BEFORE
         # entering the pipeline context, since ensure_pipeline itself pushes
         # a pipeline into context.
@@ -1385,42 +1389,8 @@ async def _apipeline(
     async with redis.pipeline(transaction=True) as pipe:
         with with_pipe_context(pipe):
             yield pipe
-            commands_backup = list(pipe.command_stack)
-            noscript_on_first_attempt = False
-            noscript_on_retry = False
-
-            try:
-                await pipe.execute()
-            except NoScriptError:
-                noscript_on_first_attempt = True
-            except ResponseError as exc:
-                if ignore_redis_error:
-                    logger.warning(
-                        "Swallowed ResponseError during pipeline.execute() with "
-                        "ignore_redis_error=True: %s",
-                        exc,
-                    )
-                else:
-                    raise
-
-            if noscript_on_first_attempt:
-                await scripts_registry.handle_noscript_error(redis, _meta)
-                evalsha_commands = [
-                    (args, options)
-                    for args, options in commands_backup
-                    if args[0] == "EVALSHA"
-                ]
-                # Retry execute the pipeline actions
-                async with redis.pipeline(transaction=True) as retry_pipe:
-                    for args, options in evalsha_commands:
-                        retry_pipe.execute_command(*args, **options)
-                    try:
-                        await retry_pipe.execute()
-                    except NoScriptError:
-                        noscript_on_retry = True
-
-            if noscript_on_retry:
-                raise PersistentNoScriptError(
-                    "NOSCRIPT error persisted after re-registering scripts. "
-                    "This indicates a server-side problem with Redis."
-                )
+            # Single shared NOSCRIPT self-heal (EVALSHA-only replay) so this
+            # path and ensure_pipeline/pipeline_with_execution cannot drift.
+            await execute_pipeline_with_noscript_recovery(
+                pipe, _meta, ignore_redis_error
+            )
