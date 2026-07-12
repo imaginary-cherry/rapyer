@@ -206,8 +206,12 @@ local function push_edges(parent_key, parent_class, remaining_budget, establishe
             local follow, budget = next_hop(edge, remaining_budget, established)
             if follow then
                 if not edge.recurse then
-                    -- A non-recursing edge reaches (and refreshes) its target
-                    -- but never follows any further edges out of it.
+                    -- IN-02: not-yet-exercised seam. Every edge the planner
+                    -- currently emits has recurse=true, so this branch is dead
+                    -- today. A non-recursing edge reaches (and refreshes) its
+                    -- target and yields it zero traversal budget; note that
+                    -- the target's own OVERRIDE edges can still be followed,
+                    -- since next_hop ignores budget for overrides.
                     budget = 0
                 end
                 if not edge.collection then
