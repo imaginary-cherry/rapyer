@@ -249,24 +249,19 @@ class AtomicRedisModel(BaseModel):
             return None
         pipe_context = ensure_pipeline if can_use_pipeline else pipeline_with_execution
         async with pipe_context(self.Meta) as pipe:
-            if not self._has_cascade:
-                for key in self._ttl_keys():
-                    pipe.expire(key, self.Meta.ttl)
-            else:
-                # D-04: the auto path has no caller-supplied root ttl, so the
-                # root refreshes to its own Meta.ttl, matching pre-existing
-                # refresh_ttl semantics. The dangling-count return is
-                # intentionally discarded, exactly as the legacy loop
-                # discards pipe.expire's return values (D-08).
-                scripts_registry.run_sha(
-                    pipe,
-                    CASCADE_TTL_APPLY_SCRIPT_NAME,
-                    1,
-                    self.key,
-                    type(self).__name__,
-                    SPECIAL_FIELD_KEY_PREFIX,
-                    self.Meta.ttl,
-                )
+            # Always go through the cascade script. With no outgoing edges it
+            # just re-arms this model's own keys to its Meta.ttl (the root has
+            # no caller-supplied ttl on the auto path). The dangling-count
+            # return is discarded, like the previous pipe.expire returns were.
+            scripts_registry.run_sha(
+                pipe,
+                CASCADE_TTL_APPLY_SCRIPT_NAME,
+                1,
+                self.key,
+                type(self).__name__,
+                SPECIAL_FIELD_KEY_PREFIX,
+                self.Meta.ttl,
+            )
             return None
 
     @classmethod
@@ -600,22 +595,20 @@ class AtomicRedisModel(BaseModel):
             raise RuntimeError("Can only set TTL from top level model")
 
         if not cascade or not self._has_cascade:
-            # D-01/D-03: cascade omitted, or the flag is a gate over an
-            # edge-free class -- byte-identical to pre-Phase-3 (COMPAT-01).
+            # No cascade requested (or no outgoing edges): plain per-key EXPIRE,
+            # identical to the non-cascade behavior.
             async with ensure_pipeline(self.Meta) as pipe:
                 for key in self._ttl_keys():
                     pipe.expire(key, ttl)
             return None
 
-        # IN-04: a non-positive `ttl` is passed straight to EXPIRE for the
-        # root's own keys, so it deletes the root immediately (legacy EXPIRE
-        # semantics, matching the non-cascade branch above) while each cascade
-        # child is still re-armed to its own positive Meta.ttl. The asymmetry
-        # (root gone, children extended) is intentional but surprising -- pass a
-        # positive ttl to keep the whole subtree alive.
-        # Load-bearing ordering (RESEARCH.md Pitfall 2): check BEFORE
-        # entering the pipeline context, since ensure_pipeline itself pushes
-        # a pipeline into context.
+        # A non-positive ttl is passed straight to EXPIRE for the root's own
+        # keys, so it deletes the root immediately (legacy EXPIRE semantics)
+        # while each cascade child is re-armed to its own positive Meta.ttl.
+        # Pass a positive ttl to keep the whole subtree alive.
+        #
+        # Check for an outer pipeline BEFORE entering the pipeline context,
+        # since ensure_pipeline itself pushes a pipeline into context.
         in_outer_pipe = _context_pipe.get() is not None
         async with ensure_pipeline(self.Meta, should_execute=False) as pipe:
             scripts_registry.run_sha(
@@ -630,9 +623,8 @@ class AtomicRedisModel(BaseModel):
             if in_outer_pipe:
                 # Outer caller owns execution; we cannot observe the result here.
                 return None
-            # WR-01: route through the shared NOSCRIPT self-heal helper (not
-            # a bare pipe.execute()) so a SCRIPT-FLUSHed server doesn't fail
-            # this write with no retry.
+            # Route through the shared NOSCRIPT self-heal helper so a
+            # SCRIPT-FLUSHed server doesn't fail this write with no retry.
             results = await execute_pipeline_with_noscript_recovery(pipe, self.Meta)
         dangling_children, dangling_special = results[-1]
         return CascadeResult(
