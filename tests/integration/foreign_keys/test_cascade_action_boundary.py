@@ -13,7 +13,7 @@ from tests.models.cascade_types import (
 )
 
 # Deliberately different from CASCADE_FIXTURE_TTL_SECONDS so a passing test
-# proves the D-02 root-vs-child ttl split rather than a coincidental match.
+# proves the root-vs-child ttl split rather than a coincidental match.
 ROOT_TTL_SECONDS = 120
 
 
@@ -23,7 +23,7 @@ async def setup_real_redis_for_action_boundary(setup_real_redis_for_cascade_appl
     Composes on top of ``setup_real_redis_for_cascade_apply`` (real-Redis
     wiring + a real ``register_scripts`` call) by additionally stashing
     ``_has_cascade`` on every class in ``CASCADE_INTEGRATION_MODELS``, using
-    the exact same mechanism ``init_rapyer()`` uses (D-05), so the tests in
+    the exact same mechanism ``init_rapyer()`` uses, so the tests in
     this module drive the real ``refresh_ttl``/``aset_ttl`` cascade branches
     in ``rapyer/base.py`` against actual Redis Stack rather than the legacy
     per-key EXPIRE loop.
@@ -55,7 +55,7 @@ async def test_aset_ttl_cascade_true_healthy_splits_parent_and_child_ttl_and_rep
     # Act
     result = await parent.aset_ttl(ROOT_TTL_SECONDS, cascade=True)
 
-    # Assert: CascadeResult with zero dangling counts (CASC-01/CASC-06),
+    # Assert: CascadeResult with zero dangling counts,
     # proven end-to-end against real Redis Stack, not just fakeredis.
     assert isinstance(result, CascadeResult)
     assert result.dangling_children == 0
@@ -67,7 +67,7 @@ async def test_aset_ttl_cascade_true_healthy_splits_parent_and_child_ttl_and_rep
 
     # ...while the cascade-reached child (+ its own special-field keys)
     # refreshes to ITS OWN configured Meta.ttl, a DIFFERENT value than the
-    # caller-supplied root ttl (D-02 root-vs-child split, real Redis).
+    # caller-supplied root ttl (root-vs-child split, real Redis).
     child_ttl = await real_redis_client.ttl(child.key)
     assert ROOT_TTL_SECONDS < child_ttl <= CASCADE_FIXTURE_TTL_SECONDS
     tags_ttl = await real_redis_client.ttl(
@@ -91,7 +91,7 @@ async def test_asave_auto_cascades_child_ttl_with_no_explicit_ttl_call(
     await real_redis_client.persist(parent.key)
     await real_redis_client.persist(child.key)
 
-    # Act: an ordinary write with no explicit ttl/cascade call anywhere (D-04).
+    # Act: an ordinary write with no explicit ttl/cascade call anywhere.
     await parent.asave()
 
     # Assert: the cascade-reached child's own key was automatically re-armed.

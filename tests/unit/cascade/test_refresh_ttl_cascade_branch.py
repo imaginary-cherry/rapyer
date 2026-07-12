@@ -57,7 +57,9 @@ async def test_refresh_ttl_cascade_enabled_model_calls_run_sha_not_expire():
 
 
 @pytest.mark.asyncio
-async def test_refresh_ttl_non_cascade_model_calls_expire_not_run_sha():
+async def test_refresh_ttl_non_cascade_model_also_calls_run_sha():
+    # refresh_ttl always routes through the cascade script; a model with no
+    # outgoing edges just re-arms its own keys via the script, never expire.
     assert CascadeAuthor._has_cascade is False
     author = CascadeAuthor()
     mock_pipe = MagicMock()
@@ -72,5 +74,13 @@ async def test_refresh_ttl_non_cascade_model_calls_expire_not_run_sha():
     ):
         await author.refresh_ttl(can_use_pipeline=True)
 
-    mock_run_sha.assert_not_called()
-    mock_pipe.expire.assert_called_once_with(author.key, author.Meta.ttl)
+    mock_run_sha.assert_called_once_with(
+        mock_pipe,
+        CASCADE_TTL_APPLY_SCRIPT_NAME,
+        1,
+        author.key,
+        "CascadeAuthor",
+        SPECIAL_FIELD_KEY_PREFIX,
+        author.Meta.ttl,
+    )
+    mock_pipe.expire.assert_not_called()

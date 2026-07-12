@@ -46,7 +46,7 @@ async def _apply_cascade(fake_redis_client, root):
     )
 
 
-# --- Special-field-child gap closure (01-HUMAN-UAT.md) ---
+# --- Special-field-child gap closure ---
 
 
 @pytest.mark.asyncio
@@ -80,7 +80,7 @@ async def test_cascade_apply_refreshes_special_field_child_keys_sanity(
     )
 
 
-# --- D-06/D-07 dangling-count contract ---
+# --- Dangling-count contract ---
 
 
 @pytest.mark.asyncio
@@ -178,11 +178,11 @@ async def test_shape1_chain_root_reaches_the_expected_prefix_of_the_chain_sanity
 async def test_depth0_shallow_root_extends_via_explicit_override_matches_hand_derived_expected_set(
     fake_redis_client,
 ):
-    # CR-01/WR-01 regression. CascadeShallowRoot.entry carries CascadeTTL(depth=0)
+    # Regression. CascadeShallowRoot.entry carries CascadeTTL(depth=0)
     # — the value that used to compute `depth - 1 == -1 == UNBOUNDED` and turn the
     # whole subtree unbounded. CascadeExtendingNode.onward is an explicit depth=5
-    # override that must REFRESH the budget and extend PAST the depth=0 entry
-    # (D-09), not be silenced by it. The Lua must reach EXACTLY the hand-derived
+    # override that must REFRESH the budget and extend PAST the depth=0 entry,
+    # not be silenced by it. The Lua must reach EXACTLY the hand-derived
     # expected set below for this scalar shape-1 chain (no shape-2 fakeredis
     # divergence).
     tail = await CascadeChainNode(name="tail").asave()
@@ -206,7 +206,7 @@ async def test_depth0_shallow_root_extends_via_explicit_override_matches_hand_de
 async def test_independent_sibling_depth_budgets_match_hand_derived_expected_set(
     fake_redis_client,
 ):
-    # WR-01 regression on the blanket-decrement path (distinguishes the fixed Lua
+    # Regression on the blanket-decrement path (distinguishes the fixed Lua
     # from the old off-by-one). CascadeMultiDepthRoot.short_reach=depth1 reaches
     # exactly s1,s2; long_reach=depth3 reaches the whole l-chain. Two SEPARATE
     # chains so the shared visited-set never interferes.
@@ -346,7 +346,7 @@ async def test_self_reference_cycle_does_not_error_or_infinite_loop_sanity(
     assert await fake_redis_client.ttl(b.key) > 0
 
 
-# --- 04-05: genuine self-loop + shared-child-via-two-independent-roots ---
+# --- Genuine self-loop + shared-child-via-two-independent-roots ---
 
 
 @pytest.mark.asyncio
@@ -396,11 +396,11 @@ async def test_shared_child_via_two_independent_roots_refreshed_from_either_root
     assert await fake_redis_client.ttl(child.key) > 0
 
 
-# --- WR-02: diamond with differing per-path depth budgets ---
+# --- Diamond with differing per-path depth budgets ---
 
 
 @pytest.mark.asyncio
-async def test_wr02_shared_child_own_key_always_refreshed_regardless_of_visit_order_sanity(
+async def test_shared_child_own_key_always_refreshed_regardless_of_visit_order_sanity(
     fake_redis_client,
 ):
     # Arrange: deep_path/shallow_path both point at the SAME saved
@@ -418,7 +418,7 @@ async def test_wr02_shared_child_own_key_always_refreshed_regardless_of_visit_or
 
     # Assert: the shared child's OWN key always has a positive TTL,
     # unconditionally, regardless of which sibling edge the DFS visits first
-    # (WR-02: accepted, order-dependent-but-documented semantics apply only
+    # (accepted, order-dependent-but-documented semantics apply only
     # to the child's OWN deeper descendants, not to the child itself).
     assert await fake_redis_client.ttl(root.key) > 0
     assert await fake_redis_client.ttl(shared_child.key) > 0
@@ -428,9 +428,9 @@ async def test_wr02_shared_child_own_key_always_refreshed_regardless_of_visit_or
     # branch fires before any remaining_budget inspection, so the grandchild is
     # ALWAYS refreshed regardless of which sibling edge (deep_path budget=5 or
     # shallow_path budget=1) the DFS visits first — this fixture's downstream
-    # edge cannot demonstrate D-03/D-04 order-dependence either way (see
+    # edge cannot demonstrate order-dependence either way (see
     # test_max_budget_wins_shared_child_reaches_deep_paths_full_prefix_regardless_of_visit_order_sanity
-    # below for the actual D-04 regression, which uses a genuinely
+    # below for the actual regression, which uses a genuinely
     # budget-decrementing blanket edge instead).
     assert await fake_redis_client.ttl(grandchild.key) > 0
 
@@ -444,7 +444,7 @@ async def test_max_budget_wins_shared_child_reaches_deep_paths_full_prefix_regar
     # budgets (4 vs 1). Unlike CascadeWR02SharedChild.next (an override edge),
     # CascadeChainNode.next is a BLANKET (non-override) edge that genuinely
     # decrements a real remaining_budget on every established hop, so the two
-    # differing budgets are actually distinguishable (D-03/D-04). A 4-node
+    # differing budgets are actually distinguishable. A 4-node
     # chain sits behind the shared head: shared -> c1 -> c2 -> c3 -> c4.
     c4 = await CascadeChainNode(name="c4").asave()
     c3 = await CascadeChainNode(name="c3", next=c4.key).asave()
@@ -497,7 +497,7 @@ async def test_blanket_opt_out_field_stops_traversal_despite_blanket_global(
 async def test_nested_submodel_zero_hop_does_not_consume_depth_budget(
     fake_redis_client,
 ):
-    # WR-01/D-06-shape-3 budget-non-consumption contract, ported from the
+    # Budget-non-consumption contract, ported from the
     # deleted test_nested_submodel_hop_does_not_consume_the_depth_budget
     # planner unit test. CascadeNestedDepthRoot.holder carries an explicit
     # depth=1; the zero-hop walk through .profile (a nested inline submodel,

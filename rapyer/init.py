@@ -39,59 +39,54 @@ async def init_rapyer(
 
     is_fake_redis = is_fakeredis(redis)
 
-    for model in REDIS_MODELS:
-        # D-07: unfreeze before this call's ttl (re)assignment — mirrors the
-        # D-08 unconditional-reset pattern already used for cascade_ttl below.
-        model.Meta._ttl_frozen = False
-        if redis is not None:
-            model.Meta.redis = redis
-            model.Meta.is_fake_redis = is_fake_redis
-        if ttl is not None:
-            model.Meta.ttl = ttl
-        if prefer_normal_json_dump is not None:
-            model.Meta.prefer_normal_json_dump = prefer_normal_json_dump
-        # D-08: cascade_ttl=None is itself a meaningful value ("off"), not
-        # "caller didn't pass this" — always reset, unlike ttl/prefer_normal_json_dump.
-        model.Meta.cascade_ttl = cascade_ttl
+    # Unfreeze -> (re)configure -> bake -> refreeze, wrapped so a failure mid-way
+    # (e.g. a mis-configured graph or an index error) still refreezes every model
+    # in the finally block rather than leaving Meta silently mutable.
+    try:
+        for model in REDIS_MODELS:
+            model.Meta._frozen = False
+            if redis is not None:
+                model.Meta.redis = redis
+                model.Meta.is_fake_redis = is_fake_redis
+            if ttl is not None:
+                model.Meta.ttl = ttl
+            if prefer_normal_json_dump is not None:
+                model.Meta.prefer_normal_json_dump = prefer_normal_json_dump
+            # cascade_ttl=None means "off", not "unset", so always reset it —
+            # unlike ttl/prefer_normal_json_dump which only apply when passed.
+            model.Meta.cascade_ttl = cascade_ttl
 
-        # Initialize model fields
-        model.init_class()
+            # Initialize model fields
+            model.init_class()
 
-        # Create indexes for models with indexed fields
-        if redis is not None:
-            fields = model.redis_schema()
-            if fields:
-                if override_old_idx:
-                    try:
-                        await model.adelete_index()
-                    except ResponseError as e:
-                        pass
-                try:
-                    await model.acreate_index()
-                except ResponseError as e:
+            # Create indexes for models with indexed fields
+            if redis is not None:
+                fields = model.redis_schema()
+                if fields:
                     if override_old_idx:
-                        raise
+                        try:
+                            await model.adelete_index()
+                        except ResponseError:
+                            pass
+                    try:
+                        await model.acreate_index()
+                    except ResponseError:
+                        if override_old_idx:
+                            raise
 
-    # D-08: fail fast on a mis-configured cascade graph using each model's
-    # FINAL per-call Meta.ttl/cascade_ttl (just assigned above), before any
-    # script gets registered. Pure config check — needs no Redis connection,
-    # runs unconditionally, and is allowed to raise uncaught (matches this
-    # file's existing "let startup errors propagate" convention).
-    plan = build_cascade_plan(REDIS_MODELS)
-    validate_cascade_ttl_targets(plan)
+        # Fail fast on a mis-configured cascade graph before any script is
+        # registered. Pure config check; needs no Redis connection.
+        plan = build_cascade_plan(REDIS_MODELS)
+        validate_cascade_ttl_targets(plan)
 
-    # D-05: reuse the single plan build above (no redundant traversal) to
-    # stash a per-class predicate that action-boundary methods (refresh_ttl,
-    # aset_ttl) branch on at call time — True only for classes with >=1
-    # cascade-enabled outgoing edge.
-    for model in REDIS_MODELS:
-        model._has_cascade = bool(plan[model.__name__].fks)
-
-    # D-07: refreeze every model now that the cascade plan is baked against
-    # this call's final ttl — forbids further Meta.ttl mutation until the
-    # next init_rapyer() call unfreezes it again.
-    for model in REDIS_MODELS:
-        model.Meta._ttl_frozen = True
+        # Reuse the plan to mark which classes have outgoing cascade edges.
+        for model in REDIS_MODELS:
+            model._has_cascade = bool(plan[model.__name__].fks)
+    finally:
+        # Refreeze now that the plan is baked; further Meta mutation is blocked
+        # until the next init_rapyer() call. Runs even on failure.
+        for model in REDIS_MODELS:
+            model.Meta._frozen = True
 
     if redis is not None:
         await register_scripts(redis, is_fake_redis)
@@ -103,3 +98,6 @@ async def teardown_rapyer():
         if id(model.Meta.redis) not in closed_clients:
             closed_clients.add(id(model.Meta.redis))
             await model.Meta.redis.aclose()
+        # Clear the freeze on teardown so a torn-down model doesn't leak
+        # MetaFrozenError into a later path that mutates Meta without re-init.
+        model.Meta._frozen = False

@@ -53,7 +53,7 @@ def test_cascade_author_leaf_model_has_no_cascade_ttl_fields():
     assert _field_cascade_spec(CascadeAuthor, "name") is None
 
 
-# --- COMPAT-02 regression: existing FK classification unaffected ---
+# --- Regression: existing FK classification unaffected ---
 
 
 def test_existing_fk_book_classification_remains_byte_identical():

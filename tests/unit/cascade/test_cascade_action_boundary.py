@@ -5,6 +5,7 @@ import pytest_asyncio
 
 from rapyer.cascade.planner import build_cascade_plan
 from rapyer.result import CascadeResult
+from rapyer.scripts.constants import CASCADE_TTL_APPLY_SCRIPT_NAME
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.redis_set import RedisSet
 from tests.models.cascade_types import (
@@ -18,7 +19,7 @@ from tests.models.cascade_types import (
 from tests.unit.cascade.conftest import CASCADE_PLANNER_MODELS
 
 # Deliberately different from CASCADE_FIXTURE_TTL_SECONDS so a passing test
-# proves the D-02 root-vs-child ttl split rather than a coincidental match.
+# proves the root-vs-child ttl split rather than a coincidental match.
 ROOT_TTL_SECONDS = 120
 
 
@@ -28,7 +29,7 @@ async def setup_fake_redis_for_action_boundary(setup_fake_redis_for_cascade_appl
     Composes on top of ``setup_fake_redis_for_cascade_apply`` (fakeredis
     wiring + a real ``register_scripts`` call) by additionally stashing
     ``_has_cascade`` on every class in ``CASCADE_PLANNER_MODELS``, using the
-    exact same mechanism ``init_rapyer()`` uses (D-05), so the tests in this
+    exact same mechanism ``init_rapyer()`` uses, so the tests in this
     module drive the real ``refresh_ttl``/``aset_ttl`` cascade branches in
     ``rapyer/base.py`` rather than the legacy per-key EXPIRE loop.
     """
@@ -59,7 +60,7 @@ async def test_aset_ttl_cascade_true_healthy_splits_parent_and_child_ttl_and_rep
     # Act
     result = await parent.aset_ttl(ROOT_TTL_SECONDS, cascade=True)
 
-    # Assert: CascadeResult with zero dangling counts (CASC-01/CASC-06).
+    # Assert: CascadeResult with zero dangling counts.
     assert isinstance(result, CascadeResult)
     assert result.dangling_children == 0
     assert result.dangling_special == 0
@@ -70,7 +71,7 @@ async def test_aset_ttl_cascade_true_healthy_splits_parent_and_child_ttl_and_rep
 
     # ...while the cascade-reached child (+ its own special-field keys)
     # refreshes to ITS OWN configured Meta.ttl, not the caller-supplied root
-    # ttl (D-02) -- proven by asserting the child's ttl is strictly greater
+    # ttl -- proven by asserting the child's ttl is strictly greater
     # than the root ttl and bounded by its own Meta.ttl.
     child_ttl = await fake_redis_client.ttl(child.key)
     assert ROOT_TTL_SECONDS < child_ttl <= CASCADE_FIXTURE_TTL_SECONDS
@@ -91,7 +92,7 @@ async def test_aset_ttl_cascade_true_dangling_child_reports_count_without_raisin
     # Arrange: the referenced child key is never created.
     parent = await CascadeSpecialParent(child="CascadeSpecialChild:missing").asave()
 
-    # Act: must not raise despite the dangling reference (D-06).
+    # Act: must not raise despite the dangling reference.
     result = await parent.aset_ttl(ROOT_TTL_SECONDS, cascade=True)
 
     # Assert: the parent's own write still succeeds and refreshes...
@@ -113,7 +114,7 @@ async def test_aset_ttl_without_cascade_flag_only_refreshes_parent_own_keys(
     parent = await CascadeSpecialParent(child=child.key).asave()
     await fake_redis_client.persist(child.key)
 
-    # Act: cascade omitted entirely (D-01/D-03 gate).
+    # Act: cascade omitted entirely.
     result = await parent.aset_ttl(ROOT_TTL_SECONDS)
 
     # Assert: legacy behavior -- only the parent's own key changes, the
@@ -134,7 +135,7 @@ async def test_asave_auto_cascades_child_ttl_with_no_explicit_ttl_call(
     await fake_redis_client.persist(root.key)
     await fake_redis_client.persist(node.key)
 
-    # Act: an ordinary write with no explicit ttl/cascade call anywhere (D-04).
+    # Act: an ordinary write with no explicit ttl/cascade call anywhere.
     await root.asave()
 
     # Assert: the cascade-reached node's own key was automatically re-armed.
@@ -142,14 +143,14 @@ async def test_asave_auto_cascades_child_ttl_with_no_explicit_ttl_call(
 
 
 @pytest.mark.asyncio
-async def test_asave_on_non_cascade_model_never_invokes_the_cascade_script(
+async def test_asave_on_non_cascade_model_refreshes_ttl_via_the_cascade_script(
     fake_redis_client,
 ):
-    # Arrange/Act: CascadeBookPlain carries no CascadeTTL marker anywhere, so
-    # its _has_cascade stays False -- an ordinary asave() must stay on the
-    # byte-identical legacy path (COMPAT-01 spot-check at this layer).
+    # refresh_ttl always routes through the cascade script now, so even a
+    # non-cascade model's write refreshes its own keys via the script (with no
+    # outgoing edges it simply re-arms them), rather than a per-key EXPIRE loop.
     with patch("rapyer.base.scripts_registry.run_sha") as mock_run_sha:
         await CascadeBookPlain(author="CascadeAuthor:fake").asave()
 
-    # Assert: the cascade script is never invoked for a non-cascade model.
-    assert mock_run_sha.call_count == 0
+    assert mock_run_sha.call_count == 1
+    assert mock_run_sha.call_args.args[1] == CASCADE_TTL_APPLY_SCRIPT_NAME

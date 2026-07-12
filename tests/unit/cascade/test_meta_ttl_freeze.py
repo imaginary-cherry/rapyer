@@ -4,7 +4,7 @@ import pytest
 from redis.asyncio.client import Redis
 
 from rapyer.config import RedisConfig
-from rapyer.errors import MetaTtlFrozenError
+from rapyer.errors import MetaFrozenError
 from rapyer.init import init_rapyer
 from tests.models.simple_types import TaskModel, UserModelWithTTL
 
@@ -34,10 +34,10 @@ def test_fresh_redis_config_ttl_assignment_never_raises_sanity():
 def test_frozen_redis_config_ttl_assignment_raises_and_leaves_ttl_unchanged_sanity():
     # Arrange
     config = RedisConfig(ttl=30)
-    config._ttl_frozen = True
+    config._frozen = True
 
     # Act & Assert
-    with pytest.raises(MetaTtlFrozenError):
+    with pytest.raises(MetaFrozenError):
         config.ttl = 60
     assert config.ttl == 30
 
