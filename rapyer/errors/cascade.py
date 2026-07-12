@@ -13,5 +13,5 @@ class CascadeTargetTtlMissingError(RapyerError):
         self.model_name = model_name
 
 
-class MetaTtlFrozenError(RapyerError):
-    """Raised when Meta.ttl is mutated after init_rapyer() has baked the cascade plan against it."""
+class MetaFrozenError(RapyerError):
+    """Raised when Meta config is mutated after init_rapyer() has baked the cascade plan against it."""

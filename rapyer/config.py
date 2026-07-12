@@ -17,7 +17,7 @@ from redis.commands.json import JSON
 
 from rapyer.actions import ActionGroup
 from rapyer.cascade import CascadeTTL
-from rapyer.errors import InvalidRefreshTtlError, MetaTtlFrozenError
+from rapyer.errors import InvalidRefreshTtlError, MetaFrozenError
 
 DEFAULT_CONNECTION = "redis://localhost:6379/0"
 
@@ -44,7 +44,7 @@ class RedisConfig(BaseModel):
     ]
     redis_type: dict[type, type] = Field(default_factory=create_all_types)
     ttl: int | None = None
-    # CFG-02: global TTL-cascade default, disabled unless init_rapyer(cascade_ttl=...) sets it.
+    # Global TTL-cascade default, disabled unless init_rapyer(cascade_ttl=...) sets it.
     cascade_ttl: CascadeTTL | None = None
     init_with_rapyer: bool = True
     # Enable TTL refresh on read/write operations by default.
@@ -60,9 +60,9 @@ class RedisConfig(BaseModel):
     max_delete_per_transaction: int | None = 1000
 
     _redis_json: JSON = PrivateAttr(default=None)
-    # D-07: set to True by init_rapyer() once the cascade plan is baked against
-    # this model's ttl, refusing further mutation until the next init_rapyer() call.
-    _ttl_frozen: bool = PrivateAttr(default=False)
+    # Set to True by init_rapyer() once the config is baked into the cascade
+    # plan, refusing further mutation until the next init_rapyer() call.
+    _frozen: bool = PrivateAttr(default=False)
 
     @model_validator(mode="after")
     def _build_redis_json(self):
@@ -73,16 +73,15 @@ class RedisConfig(BaseModel):
     def redis_json(self):
         return self._redis_json
 
-    def __setattr__(self, name: str, value: Any) -> None:
-        # WR-04: freeze every cascade-shaping field, not just ttl. init_rapyer()
-        # bakes both ttl AND cascade_ttl into the per-class Lua plan / _has_cascade
-        # gate; mutating cascade_ttl post-freeze would silently desync the runtime
-        # cascade from the baked plan. Reconfigure via init_rapyer() instead.
-        if name in ("ttl", "cascade_ttl") and self._ttl_frozen:
-            raise MetaTtlFrozenError(
-                f"Meta.{name} is frozen after init_rapyer() bakes the cascade "
-                f"plan against it — call init_rapyer() again to reconfigure "
-                f"instead of mutating Meta.{name} directly."
+    def __setattr__(self, name: str, value: Any):
+        # The whole config is baked into the cascade plan at init, so once frozen
+        # no public field may change until the next init_rapyer(). Private attrs
+        # (including _frozen itself) stay writable so init/teardown can toggle it.
+        if self._frozen and not name.startswith("_"):
+            raise MetaFrozenError(
+                f"Meta.{name} is frozen after init_rapyer() bakes the config "
+                f"into the cascade plan — call init_rapyer() again to "
+                f"reconfigure instead of mutating Meta.{name} directly."
             )
         super().__setattr__(name, value)
 
