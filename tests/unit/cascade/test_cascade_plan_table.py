@@ -25,7 +25,7 @@ def test_build_cascade_plan_is_importable():
 def test_every_model_gets_exactly_one_entry_even_a_plain_leaf():
     plan = build_cascade_plan([CascadeAuthor])
 
-    # D-08 (02-03): CascadeAuthor now carries CASCADE_FIXTURE_TTL_SECONDS so it
+    # CascadeAuthor now carries CASCADE_FIXTURE_TTL_SECONDS so it
     # can never fail a nil-ttl target/root check; read the ttl back off the
     # class itself rather than hardcoding a stale None.
     assert plan == {
@@ -116,8 +116,8 @@ def test_build_cascade_plan_over_redis_models_never_uses_none_as_unbounded_signa
 
 
 def test_every_cascade_fixture_has_the_shared_fixture_ttl_sanity():
-    # D-08 (02-03): every fixture 02-04 might root a real cascade-apply
-    # invocation at — not just D-08 cascade TARGETS — must carry a non-None
+    # Every fixture that might root a real cascade-apply
+    # invocation — not just cascade TARGETS — must carry a non-None
     # Meta.ttl, or the Lua write phase's `classes[<class>].ttl` lookup for
     # the root's own EXPIRE would resolve to nil (a Lua runtime error).
     for model_cls in CASCADE_PLANNER_MODELS:
@@ -134,7 +134,7 @@ def test_every_cascade_fixture_has_the_shared_fixture_ttl_sanity():
     ],
 )
 def test_flagged_invocation_root_only_fixtures_have_ttl_sanity(model_cls):
-    # The three concrete invocation roots 02-04 will exercise that D-08's
+    # The three concrete invocation roots will exercise that the
     # TARGET-only validator never required a ttl on (they're roots, never
     # someone else's cascade-enabled target).
     assert model_cls.Meta.ttl == CASCADE_FIXTURE_TTL_SECONDS

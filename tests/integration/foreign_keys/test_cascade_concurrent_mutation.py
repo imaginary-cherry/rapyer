@@ -22,9 +22,9 @@ async def setup_real_redis_for_concurrent_mutation(setup_real_redis_for_cascade_
     Mirrors setup_real_redis_for_action_boundary
     (tests/integration/foreign_keys/test_cascade_action_boundary.py): stashes
     ``_has_cascade`` on top of the already-registered real-Redis wiring, using
-    the exact same D-05 mechanism ``init_rapyer()`` uses, so
+    the exact same mechanism ``init_rapyer()`` uses, so
     ``aset_ttl(cascade=True)`` below actually fires the cascade EVALSHA
-    instead of silently no-op'ing through the byte-identical COMPAT-01
+    instead of silently no-op'ing through the byte-identical
     branch.
     """
     plan = build_cascade_plan(CASCADE_INTEGRATION_MODELS)
@@ -82,7 +82,7 @@ async def test_cascade_races_concurrent_fk_reassignment_reflects_one_consistent_
     child_b_ttl = await real_redis_client.ttl(child_b.key)
 
     # child_b is unconditionally reached: the concurrent write's own asave()
-    # call auto-cascades (D-04) inside the SAME atomic transaction as its
+    # call auto-cascades inside the SAME atomic transaction as its
     # JSON.SET of the reassigned `child` field, so once that transaction
     # commits, child_b has already been refreshed by its own cascade --
     # independent of how the explicit aset_ttl(cascade=True) call's EVALSHA

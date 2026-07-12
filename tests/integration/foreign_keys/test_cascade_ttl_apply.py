@@ -21,7 +21,7 @@ pytestmark = pytest.mark.usefixtures("setup_real_redis_for_cascade_apply")
 
 # Deliberately different from CascadeSpecialParent/Child's shared
 # CASCADE_FIXTURE_TTL_SECONDS so a passing assertion proves the caller's
-# explicit root ttl was actually applied (D-02), not a coincidental match.
+# explicit root ttl was actually applied, not a coincidental match.
 SCRIPT_FLUSH_ROOT_TTL_SECONDS = 120
 
 
@@ -30,7 +30,7 @@ async def cascade_action_boundary_after_script_flush(
     setup_real_redis_for_cascade_apply, real_redis_client
 ):
     """
-    WR-01: stashes ``_has_cascade`` (the exact D-05 mechanism ``init_rapyer()``
+    Stashes ``_has_cascade`` (the exact mechanism ``init_rapyer()``
     uses) on top of the already-registered real-Redis wiring from
     ``setup_real_redis_for_cascade_apply``, THEN flushes the server-side
     script cache -- explicit, unambiguous ordering (no reliance on
@@ -63,7 +63,7 @@ async def _apply_cascade(real_redis_client, root):
     )
 
 
-# --- Confirmatory dual-backend parity (D-05 / the retired ROADMAP 02-01 spike) ---
+# --- Confirmatory dual-backend parity ---
 
 
 @pytest.mark.asyncio
@@ -123,9 +123,9 @@ async def test_cascade_apply_refreshes_every_collection_of_fk_element_sanity(
     assert await real_redis_client.ttl(author_b.key) > 0
 
 
-# --- ROADMAP criterion #5: survives SCRIPT FLUSH via NOSCRIPT self-heal ---
+# --- Survives SCRIPT FLUSH via NOSCRIPT self-heal ---
 #
-# WR-01: the two tests below replace the previous
+# The two tests below replace the previous
 # `test_cascade_apply_survives_script_flush_via_noscript_self_heal_sanity`,
 # which only drove `arun_sha` through the standalone `_apply_cascade` helper
 # -- the ALREADY-self-healing standalone path (rapyer/scripts/registry.py's
@@ -185,7 +185,7 @@ async def test_asave_auto_cascade_survives_script_flush_via_shipped_run_sha_path
     await real_redis_client.persist(child.key)
 
     # Act & Assert: an ordinary write with no explicit ttl/cascade call
-    # anywhere (D-04's auto path) must not raise, and must still refresh
+    # anywhere (auto path) must not raise, and must still refresh
     # both the root and the cascade-reached child's TTL.
     try:
         await parent.asave()

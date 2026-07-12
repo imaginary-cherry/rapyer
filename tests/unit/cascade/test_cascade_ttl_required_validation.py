@@ -42,14 +42,14 @@ def test_raises_when_cascade_reachable_target_has_no_ttl():
 
 
 def test_does_not_raise_when_target_ttl_is_set():
-    # WR-02: the root ("A") also refreshes its own key, so it must carry a ttl
+    # The root ("A") also refreshes its own key, so it must carry a ttl
     # too — give it one here so this test isolates the TARGET-ttl-set path.
     plan = _plan(a_ttl=30, b_ttl=60)
 
     validate_cascade_ttl_targets(plan)
 
 
-def test_wr02_raises_when_cascade_root_has_edges_but_no_ttl():
+def test_raises_when_cascade_root_has_edges_but_no_ttl():
     # A root with outgoing cascade-enabled edges but Meta.ttl=None passed the
     # old TARGET-only validator, then blew up at apply time EXPIREing its own
     # key with a nil ttl. It must now be rejected up front.
@@ -60,7 +60,7 @@ def test_wr02_raises_when_cascade_root_has_edges_but_no_ttl():
     assert exc_info.value.model_name == "A"
 
 
-def test_wr03_raises_rapyer_error_when_edge_target_absent_from_partial_plan():
+def test_raises_rapyer_error_when_edge_target_absent_from_partial_plan():
     # A plan built from a subset of models can reference a target class that is
     # not itself in the plan; the lookup must raise a RapyerError, not a bare
     # KeyError.

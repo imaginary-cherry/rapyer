@@ -14,18 +14,18 @@ local root_class = ARGV[1]
 -- suffix; it is the Lua-side counterpart of special_field_key on the Python
 -- side. The prefix value and the per-class suffixes are shipped as data.
 local special_prefix = ARGV[2]
--- The root's own explicit ttl (D-02): applies ONLY to the root's own keys
--- (main + special), never to any cascade-reached child -- every child still
--- expires at its owning class's baked-in Meta.ttl (D-04/D-05, unchanged).
+-- The root's own explicit ttl: applies ONLY to the root's own keys (main +
+-- special), never to any cascade-reached child -- every child still expires at
+-- its owning class's baked-in Meta.ttl.
 local root_ttl = tonumber(ARGV[3])
 
 -- Collect-phase state: the read walk queues every key needing a refresh (deduped
 -- into refresh_order); the shell at the bottom holds the one mutation (the EXPIRE
 -- loop) so the write window stays as small as possible. Every queued entry
 -- carries its OWNING CLASS alongside the key so the write phase can look up
--- that class's own Meta.ttl (D-04) -- no single caller-supplied ttl is ever
--- used, and no GT/NX/XX flag is ever passed to EXPIRE (D-05).
--- `visited` is a best-budget-per-node map (D-03/D-04), not a boolean set: for
+-- that class's own Meta.ttl -- no single caller-supplied ttl is ever used, and
+-- no GT/NX/XX flag is ever passed to EXPIRE.
+-- `visited` is a best-budget-per-node map, not a boolean set: for
 -- each key it holds the LARGEST budget any path has offered it so far, so a
 -- shared node reached via two paths carrying different finite depth budgets
 -- is walked (and its descendants reached) at the larger of the two, regardless
@@ -103,27 +103,26 @@ local function read_reference_paths(key, paths)
     return values_by_path
 end
 
--- Runtime per-edge follow/budget decision (WR-01 contract): the Python-side
--- classifier (_classify_edge in rapyer/cascade/planner.py) only performs
--- static, single-hop classification with no budget accounting -- ALL
--- multi-hop budget bookkeeping happens here. For one edge out of a node whose
--- subtree budget is `remaining_budget` (UNBOUNDED = no cap) and whose subtree
--- is already `established`, decide whether to follow the edge and what
--- budget the child carries. Returns (follow, child_budget).
+-- Runtime per-edge follow/budget decision: the Python-side classifier only does
+-- static, single-hop classification; ALL multi-hop budget bookkeeping happens
+-- here. For one edge out of a node whose subtree budget is `remaining_budget`
+-- (UNBOUNDED = no cap) and whose subtree is already `established`, decide whether
+-- to follow the edge and what budget the child carries. Returns
+-- (follow, child_budget).
 --
--- An explicit per-field override (edge.override) is a whole-object override: it
--- ALWAYS wins and REFRESHES the child's budget to this edge's own depth,
--- ignoring any inherited remaining_budget -- this is how a deeper explicit
--- field extends past a shallower ancestor (D-09). A blanket edge instead sets
--- the budget on the first hop of a fresh subtree (not yet established) and
--- decrements it on every subsequent established hop; the visited-set stays the
--- real termination backstop, this is only the optional cap.
+-- An explicit per-field override (edge.override) always wins and REFRESHES the
+-- child's budget to this edge's own depth, ignoring any inherited
+-- remaining_budget -- this is how a deeper explicit field extends past a
+-- shallower ancestor. A blanket edge instead sets the budget on the first hop of
+-- a fresh subtree (not yet established) and decrements it on every subsequent
+-- established hop; the visited-set stays the real termination backstop, this is
+-- only the optional cap.
 --
 -- edge.depth is absent on an unbounded edge, so edge_depth stays UNBOUNDED. A
--- depth=0 edge therefore yields a child budget of 0 (reach the target, follow
--- no further BLANKET hops) -- never -1, so it can never alias the UNBOUNDED
--- sentinel (CR-01). The `remaining_budget <= 0` stop below is only ever reached
--- for a real (non-UNBOUNDED) budget, because UNBOUNDED is caught first.
+-- depth=0 edge therefore yields a child budget of 0 (reach the target, follow no
+-- further BLANKET hops) -- never -1, so it can never alias the UNBOUNDED
+-- sentinel. The `remaining_budget <= 0` stop below is only ever reached for a
+-- real (non-UNBOUNDED) budget, because UNBOUNDED is caught first.
 local function next_hop(edge, remaining_budget, established)
     local edge_depth = UNBOUNDED
     if type(edge.depth) == 'number' then
@@ -206,16 +205,16 @@ local function push_edges(parent_key, parent_class, remaining_budget, establishe
             local follow, budget = next_hop(edge, remaining_budget, established)
             if follow then
                 if not edge.recurse then
-                    -- IN-02: not-yet-exercised seam. Every edge the planner
-                    -- currently emits has recurse=true, so this branch is dead
-                    -- today. A non-recursing edge reaches (and refreshes) its
-                    -- target and yields it zero traversal budget; note that
-                    -- the target's own OVERRIDE edges can still be followed,
-                    -- since next_hop ignores budget for overrides.
+                    -- Not-yet-exercised seam: every edge the planner currently
+                    -- emits has recurse=true, so this branch is dead today. A
+                    -- non-recursing edge reaches (and refreshes) its target and
+                    -- yields it zero traversal budget; the target's own OVERRIDE
+                    -- edges can still be followed, since next_hop ignores budget
+                    -- for overrides.
                     budget = 0
                 end
                 if not edge.collection then
-                    -- Shape 1 (unchanged prototype behavior): the matched
+                    -- Scalar FK: the matched
                     -- value is a single scalar FK -- the target's key string.
                     if type(matched) == 'string' then
                         push_child(matched, edge, budget)
@@ -277,12 +276,12 @@ end
 
 -- Write phase: the only place EXPIRE appears -- issue every queued refresh now
 -- that the read walk is complete. The root's own keys (main + special) honor
--- the caller-supplied root_ttl (D-02); every other key still expires at its
--- OWNING CLASS's own baked-in Meta.ttl (D-04/D-05) -- a plain relative
--- EXPIRE, never GT/NX/XX flags. A dangling (missing) reached child's key
--- makes EXPIRE a cheap no-op (returns 0); tally those misses per D-06/D-07
--- (main vs special) so the caller can observe a graph that has drifted out
--- of sync -- the root's own keys are never counted, even if somehow absent.
+-- the caller-supplied root_ttl; every other key still expires at its OWNING
+-- CLASS's own baked-in Meta.ttl -- a plain relative EXPIRE, never GT/NX/XX
+-- flags. A dangling (missing) reached child's key makes EXPIRE a cheap no-op
+-- (returns 0); tally those misses (main vs special) so the caller can observe a
+-- graph that has drifted out of sync -- the root's own keys are never counted,
+-- even if somehow absent.
 local dangling_children_count = 0
 local dangling_special_count = 0
 for _, item in ipairs(plan_refresh_keys()) do
