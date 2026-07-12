@@ -182,6 +182,9 @@ async def test_init_rapyer_with_prefer_normal_json_dump_overrides_all_models_san
     # Assert
     assert ModelWithPreferJsonDumpConfig.Meta.prefer_normal_json_dump is False
     assert ModelWithStrEnumDefault.Meta.prefer_normal_json_dump is False
+    # init_rapyer() froze Meta; unfreeze to restore the pre-test values.
+    ModelWithPreferJsonDumpConfig.Meta._frozen = False
+    ModelWithStrEnumDefault.Meta._frozen = False
     ModelWithPreferJsonDumpConfig.Meta.prefer_normal_json_dump = original_preconfigured
     ModelWithStrEnumDefault.Meta.prefer_normal_json_dump = original_default
 
@@ -200,6 +203,9 @@ async def test_init_rapyer_without_prefer_normal_json_dump_keeps_preconfigured_v
     # Assert
     assert ModelWithPreferJsonDumpConfig.Meta.prefer_normal_json_dump is True
     assert ModelWithStrEnumDefault.Meta.prefer_normal_json_dump is False
+    # init_rapyer() froze Meta; unfreeze to restore the pre-test values.
+    ModelWithPreferJsonDumpConfig.Meta._frozen = False
+    ModelWithStrEnumDefault.Meta._frozen = False
     ModelWithPreferJsonDumpConfig.Meta.prefer_normal_json_dump = original_preconfigured
     ModelWithStrEnumDefault.Meta.prefer_normal_json_dump = original_default
 

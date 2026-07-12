@@ -1,7 +1,6 @@
 import pytest
 import pytest_asyncio
 
-from rapyer.base import REDIS_MODELS
 from rapyer.scripts import register_scripts
 from rapyer.types.relational import resolve_relational_targets
 from tests.models.cascade_types import (
@@ -61,20 +60,6 @@ CASCADE_PLANNER_MODELS = [
     CascadeWR02Root,
     CascadeMaxBudgetRoot,
 ]
-
-
-@pytest.fixture(autouse=True)
-def reset_ttl_freeze_between_cascade_tests():
-    # WR-02: _ttl_frozen is a process-global on each model's shared Meta
-    # singleton; a prior init_rapyer() in the suite leaves models frozen with
-    # no teardown, so a later test that mutates Meta.ttl / Meta.cascade_ttl
-    # directly (before its own init) would hit MetaTtlFrozenError. Unfreeze
-    # around every cascade test to keep them order-independent.
-    for model in REDIS_MODELS:
-        model.Meta._ttl_frozen = False
-    yield
-    for model in REDIS_MODELS:
-        model.Meta._ttl_frozen = False
 
 
 @pytest.fixture
