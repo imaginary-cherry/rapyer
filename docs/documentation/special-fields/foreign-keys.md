@@ -2,10 +2,13 @@
 
 <div style="background: linear-gradient(135deg, #7c4dff 0%, #b388ff 100%); color: white; padding: 16px 20px; border-radius: 8px; margin-bottom: 20px;">
   <strong style="font-size: 1.1em;">🧪 Beta Feature</strong><br>
-  <span style="opacity: 0.95;">Foreign keys are currently experimental. Cascade behavior (save / delete / duplicate / TTL) and eager loading with depth control land in follow-up releases. The API may change based on feedback.</span>
+  <span style="opacity: 0.95;">Foreign keys are currently experimental. TTL cascade is available today — see <a href="ttl-cascade.md" style="color: white; text-decoration: underline;">TTL Cascade</a>. Save/delete cascade and eager loading with depth control remain follow-up work. The API may change based on feedback.</span>
 </div>
 
 `Reference[T]` is a typed, lazy reference from one model to another. Instead of embedding the target document, the parent stores just the target's Redis key string (e.g. `"Author:abc-123"`) inline in its own JSON. The referenced model is fetched on demand.
+
+For readers who want cascade-specific behavior — propagating a TTL refresh across
+references — see [TTL Cascade](ttl-cascade.md).
 
 ```python
 from rapyer import AtomicRedisModel

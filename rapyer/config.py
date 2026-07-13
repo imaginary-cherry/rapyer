@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Union
+from typing import Annotated, Any, Union
 
 import redis
 from pydantic import (
@@ -16,7 +16,8 @@ from redis.asyncio import Redis
 from redis.commands.json import JSON
 
 from rapyer.actions import ActionGroup
-from rapyer.errors import InvalidRefreshTtlError
+from rapyer.cascade import CascadeTTL
+from rapyer.errors import InvalidRefreshTtlError, MetaTtlFrozenError
 
 DEFAULT_CONNECTION = "redis://localhost:6379/0"
 
@@ -43,6 +44,8 @@ class RedisConfig(BaseModel):
     ]
     redis_type: dict[type, type] = Field(default_factory=create_all_types)
     ttl: int | None = None
+    # CFG-02: global TTL-cascade default, disabled unless init_rapyer(cascade_ttl=...) sets it.
+    cascade_ttl: CascadeTTL | None = None
     init_with_rapyer: bool = True
     # Enable TTL refresh on read/write operations by default.
     # Accepts bool (True=all actions, False=none) or ActionGroup flag set for fine-grained control.
@@ -57,6 +60,9 @@ class RedisConfig(BaseModel):
     max_delete_per_transaction: int | None = 1000
 
     _redis_json: JSON = PrivateAttr(default=None)
+    # D-07: set to True by init_rapyer() once the cascade plan is baked against
+    # this model's ttl, refusing further mutation until the next init_rapyer() call.
+    _ttl_frozen: bool = PrivateAttr(default=False)
 
     @model_validator(mode="after")
     def _build_redis_json(self):
@@ -66,6 +72,15 @@ class RedisConfig(BaseModel):
     @property
     def redis_json(self):
         return self._redis_json
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == "ttl" and self._ttl_frozen:
+            raise MetaTtlFrozenError(
+                "Meta.ttl is frozen after init_rapyer() bakes the cascade plan "
+                "against it — call init_rapyer() again to reconfigure ttl "
+                "instead of mutating Meta.ttl directly."
+            )
+        super().__setattr__(name, value)
 
     @field_validator("refresh_ttl", mode="after")
     @classmethod
