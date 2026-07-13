@@ -169,10 +169,12 @@ async def test_init_rapyer_raises_response_error_when_acreate_index_fails_with_o
 @pytest.mark.asyncio
 async def test_init_rapyer_rebinds_all_models_before_script_registration_error():
     # Arrange
+    from rapyer.base import REDIS_MODELS as registered_redis_models
+
     mock_redis = AsyncMock(spec=Redis)
     mock_redis.ft.return_value.dropindex = AsyncMock()
     mock_redis.ft.return_value.create_index = AsyncMock()
-    registered_models = REDIS_MODELS.copy()
+    registered_models = registered_redis_models.copy()
 
     with patch(
         "rapyer.init.register_scripts",
@@ -189,10 +191,12 @@ async def test_init_rapyer_rebinds_all_models_before_script_registration_error()
 @pytest.mark.asyncio
 async def test_init_rapyer_rebinds_all_models_before_index_creation_error():
     # Arrange
+    from rapyer.base import REDIS_MODELS as registered_redis_models
+
     mock_redis = AsyncMock(spec=Redis)
     mock_redis.ft.return_value.dropindex = AsyncMock()
     mock_redis.script_load = AsyncMock(return_value="mock_sha")
-    registered_models = REDIS_MODELS.copy()
+    registered_models = registered_redis_models.copy()
 
     with patch.object(
         IndexTestModel,
