@@ -135,7 +135,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     
     - name: Cache pip packages
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: ~/.cache/pip
         key: pip-test-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('**/pyproject.toml') }}
@@ -144,7 +144,7 @@ jobs:
           pip-test-${{ runner.os }}-
 
     - name: Cache tox environments
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: .tox
         key: tox-${{ runner.os }}-py${{ matrix.python-version }}-redis${{ matrix.redis-version }}-pydantic${{ matrix.pydantic-version }}-${{ hashFiles('tox.ini', 'pyproject.toml') }}
