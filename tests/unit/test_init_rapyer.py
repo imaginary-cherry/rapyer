@@ -5,6 +5,7 @@ import pytest
 from redis import ResponseError
 from redis.asyncio.client import Redis
 
+from rapyer.base import REDIS_MODELS
 from rapyer.init import init_rapyer, teardown_rapyer
 from rapyer.result import RapyerDeleteResult
 from rapyer.scripts import SCRIPTS
@@ -34,6 +35,33 @@ def mock_redis_client():
     redis_mock.ft.return_value.create_index = AsyncMock()
     redis_mock.script_load = AsyncMock(return_value="mock_sha")
     return redis_mock
+
+
+@pytest.fixture(autouse=True)
+def restore_registered_model_init_state():
+    original_state = {
+        model: (
+            model.Meta.redis,
+            model.Meta.is_fake_redis,
+            model.Meta.ttl,
+            model.Meta.prefer_normal_json_dump,
+        )
+        for model in REDIS_MODELS
+    }
+    yield
+    for (
+        model,
+        (
+            original_redis,
+            original_is_fake_redis,
+            original_ttl,
+            original_prefer_normal_json_dump,
+        ),
+    ) in original_state.items():
+        model.Meta.redis = original_redis
+        model.Meta.is_fake_redis = original_is_fake_redis
+        model.Meta.ttl = original_ttl
+        model.Meta.prefer_normal_json_dump = original_prefer_normal_json_dump
 
 
 @pytest.fixture
@@ -143,7 +171,8 @@ async def test_teardown_rapyer_calls_aclose_once_per_unique_client_sanity():
     TaskModel.Meta.redis = mock_redis
 
     # Act
-    await teardown_rapyer()
+    with patch("rapyer.init.REDIS_MODELS", [UserModelWithTTL, TaskModel]):
+        await teardown_rapyer()
 
     # Assert
     mock_redis.aclose.assert_called_once()

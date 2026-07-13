@@ -35,8 +35,6 @@ async def init_rapyer(
         redis = redis_async.from_url(redis, decode_responses=True, max_connections=20)
 
     is_fake_redis = is_fakeredis(redis)
-    if redis is not None:
-        await register_scripts(redis, is_fake_redis)
 
     for model in REDIS_MODELS:
         if redis is not None:
@@ -46,6 +44,9 @@ async def init_rapyer(
             model.Meta.ttl = ttl
         if prefer_normal_json_dump is not None:
             model.Meta.prefer_normal_json_dump = prefer_normal_json_dump
+
+    if redis is not None:
+        await register_scripts(redis, is_fake_redis)
 
     for model in REDIS_MODELS:
         # Initialize model fields
