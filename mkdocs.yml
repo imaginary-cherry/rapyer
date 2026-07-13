@@ -55,7 +55,6 @@ nav:
       - Priority Queue: documentation/special-fields/priority-queue.md
       - Redis Set: documentation/special-fields/redis-set.md
       - Foreign Keys: documentation/special-fields/foreign-keys.md
-      - TTL Cascade: documentation/special-fields/ttl-cascade.md
     - Atomic Actions: documentation/atomic-actions.md
     - Key adjustment: documentation/setting-key-field.md
     - Indexing Fields: documentation/indexing-fields.md
