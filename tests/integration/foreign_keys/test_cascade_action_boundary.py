@@ -1,11 +1,8 @@
 import pytest
-import pytest_asyncio
 
-from rapyer.cascade.planner import build_cascade_plan
 from rapyer.result import CascadeResult
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.redis_set import RedisSet
-from tests.integration.foreign_keys.conftest import CASCADE_INTEGRATION_MODELS
 from tests.models.cascade_types import (
     CASCADE_FIXTURE_TTL_SECONDS,
     CascadeSpecialChild,
@@ -17,29 +14,7 @@ from tests.models.cascade_types import (
 ROOT_TTL_SECONDS = 120
 
 
-@pytest_asyncio.fixture
-async def setup_real_redis_for_action_boundary(setup_real_redis_for_cascade_apply):
-    """
-    Composes on top of ``setup_real_redis_for_cascade_apply`` (real-Redis
-    wiring + a real ``register_scripts`` call) by additionally stashing
-    ``_has_cascade`` on every class in ``CASCADE_INTEGRATION_MODELS``, using
-    the exact same mechanism ``init_rapyer()`` uses, so the tests in
-    this module drive the real ``refresh_ttl``/``aset_ttl`` cascade branches
-    in ``rapyer/base.py`` against actual Redis Stack rather than the legacy
-    per-key EXPIRE loop.
-    """
-    plan = build_cascade_plan(CASCADE_INTEGRATION_MODELS)
-    original = {model: model._has_cascade for model in CASCADE_INTEGRATION_MODELS}
-    for model in CASCADE_INTEGRATION_MODELS:
-        model._has_cascade = bool(plan[model.__name__].fks)
-    try:
-        yield
-    finally:
-        for model in CASCADE_INTEGRATION_MODELS:
-            model._has_cascade = original[model]
-
-
-pytestmark = pytest.mark.usefixtures("setup_real_redis_for_action_boundary")
+pytestmark = pytest.mark.usefixtures("setup_real_redis_for_cascade_apply")
 
 
 @pytest.mark.asyncio

@@ -1,10 +1,7 @@
 import asyncio
 
 import pytest
-import pytest_asyncio
 
-from rapyer.cascade.planner import build_cascade_plan
-from tests.integration.foreign_keys.conftest import CASCADE_INTEGRATION_MODELS
 from tests.models.cascade_types import (
     CASCADE_FIXTURE_TTL_SECONDS,
     CascadeSpecialChild,
@@ -16,31 +13,9 @@ pytestmark = pytest.mark.usefixtures("setup_real_redis_for_cascade_apply")
 ROOT_TTL_SECONDS = 120
 
 
-@pytest_asyncio.fixture
-async def setup_real_redis_for_concurrent_mutation(setup_real_redis_for_cascade_apply):
-    """
-    Mirrors setup_real_redis_for_action_boundary
-    (tests/integration/foreign_keys/test_cascade_action_boundary.py): stashes
-    ``_has_cascade`` on top of the already-registered real-Redis wiring, using
-    the exact same mechanism ``init_rapyer()`` uses, so
-    ``aset_ttl(cascade=True)`` below actually fires the cascade EVALSHA
-    instead of silently no-op'ing through the byte-identical
-    branch.
-    """
-    plan = build_cascade_plan(CASCADE_INTEGRATION_MODELS)
-    original = {model: model._has_cascade for model in CASCADE_INTEGRATION_MODELS}
-    for model in CASCADE_INTEGRATION_MODELS:
-        model._has_cascade = bool(plan[model.__name__].fks)
-    try:
-        yield
-    finally:
-        for model in CASCADE_INTEGRATION_MODELS:
-            model._has_cascade = original[model]
-
-
 @pytest.mark.asyncio
 async def test_cascade_races_concurrent_fk_reassignment_reflects_one_consistent_snapshot_sanity(
-    setup_real_redis_for_concurrent_mutation, real_redis_client
+    real_redis_client,
 ):
     """
     Races (1) parent.aset_ttl(ttl, cascade=True) against (2) a concurrent

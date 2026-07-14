@@ -76,12 +76,7 @@ async def init_rapyer(
 
         # Fail fast on a mis-configured cascade graph before any script is
         # registered. Pure config check; needs no Redis connection.
-        plan = build_cascade_plan(REDIS_MODELS)
-        validate_cascade_ttl_targets(plan)
-
-        # Reuse the plan to mark which classes have outgoing cascade edges.
-        for model in REDIS_MODELS:
-            model._has_cascade = bool(plan[model.__name__].fks)
+        validate_cascade_ttl_targets(build_cascade_plan(REDIS_MODELS))
     finally:
         # Refreeze now that the plan is baked; further Meta mutation is blocked
         # until the next init_rapyer() call. Runs even on failure.

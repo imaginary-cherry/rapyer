@@ -1,9 +1,7 @@
 from unittest.mock import patch
 
 import pytest
-import pytest_asyncio
 
-from rapyer.cascade.planner import build_cascade_plan
 from rapyer.result import CascadeResult
 from rapyer.scripts.constants import CASCADE_TTL_APPLY_SCRIPT_NAME
 from rapyer.types.priority_queue import RedisPriorityQueue
@@ -16,35 +14,13 @@ from tests.models.cascade_types import (
     CascadeSpecialChild,
     CascadeSpecialParent,
 )
-from tests.unit.cascade.conftest import CASCADE_PLANNER_MODELS
 
 # Deliberately different from CASCADE_FIXTURE_TTL_SECONDS so a passing test
 # proves the root-vs-child ttl split rather than a coincidental match.
 ROOT_TTL_SECONDS = 120
 
 
-@pytest_asyncio.fixture
-async def setup_fake_redis_for_action_boundary(setup_fake_redis_for_cascade_apply):
-    """
-    Composes on top of ``setup_fake_redis_for_cascade_apply`` (fakeredis
-    wiring + a real ``register_scripts`` call) by additionally stashing
-    ``_has_cascade`` on every class in ``CASCADE_PLANNER_MODELS``, using the
-    exact same mechanism ``init_rapyer()`` uses, so the tests in this
-    module drive the real ``refresh_ttl``/``aset_ttl`` cascade branches in
-    ``rapyer/base.py`` rather than the legacy per-key EXPIRE loop.
-    """
-    plan = build_cascade_plan(CASCADE_PLANNER_MODELS)
-    original = {model: model._has_cascade for model in CASCADE_PLANNER_MODELS}
-    for model in CASCADE_PLANNER_MODELS:
-        model._has_cascade = bool(plan[model.__name__].fks)
-    try:
-        yield
-    finally:
-        for model in CASCADE_PLANNER_MODELS:
-            model._has_cascade = original[model]
-
-
-pytestmark = pytest.mark.usefixtures("setup_fake_redis_for_action_boundary")
+pytestmark = pytest.mark.usefixtures("setup_fake_redis_for_cascade_apply")
 
 
 @pytest.mark.asyncio
@@ -115,7 +91,7 @@ async def test_aset_ttl_without_cascade_flag_only_refreshes_parent_own_keys(
     fake_redis_client,
 ):
     # Arrange
-    # A healthy _has_cascade=True parent -> child, with the child's
+    # A healthy parent -> child, with the child's
     # ttl reset to a known "-1" baseline before the action under test.
     child = await CascadeSpecialChild().asave()
     parent = await CascadeSpecialParent(child=child.key).asave()
