@@ -53,7 +53,8 @@ async def _apply_cascade(fake_redis_client, root):
 async def test_cascade_apply_refreshes_special_field_child_keys_sanity(
     fake_redis_client,
 ):
-    # Arrange: a saved child with BOTH special-field kinds actually populated,
+    # Arrange
+    # A saved child with BOTH special-field kinds actually populated,
     # so their Redis keys exist and can carry a TTL.
     child = await CascadeSpecialChild().asave()
     await child.tags.aadd("x")
@@ -65,7 +66,8 @@ async def test_cascade_apply_refreshes_special_field_child_keys_sanity(
     # Act
     await _apply_cascade(fake_redis_client, parent)
 
-    # Assert: root's own key + the reached child's main key AND both of the
+    # Assert
+    # Root's own key + the reached child's main key AND both of the
     # child's own special-field keys all carry a positive TTL.
     assert await fake_redis_client.ttl(parent.key) > 0
     assert await fake_redis_client.ttl(child.key) > 0
@@ -87,7 +89,8 @@ async def test_cascade_apply_refreshes_special_field_child_keys_sanity(
 async def test_cascade_apply_returns_zero_dangling_counts_when_everything_exists(
     fake_redis_client,
 ):
-    # Arrange: identical arrangement to the sanity test above — both special
+    # Arrange
+    # Identical arrangement to the sanity test above — both special
     # fields on the reached child are actually populated, so nothing is
     # dangling.
     child = await CascadeSpecialChild().asave()
@@ -100,7 +103,8 @@ async def test_cascade_apply_returns_zero_dangling_counts_when_everything_exists
     # Act
     result = await _apply_cascade(fake_redis_client, parent)
 
-    # Assert: no dangling children, no dangling special keys.
+    # Assert
+    # No dangling children, no dangling special keys.
     assert result == [0, 0]
 
 
@@ -108,7 +112,8 @@ async def test_cascade_apply_returns_zero_dangling_counts_when_everything_exists
 async def test_cascade_apply_counts_fully_dangling_child_and_its_special_keys(
     fake_redis_client,
 ):
-    # Arrange: the referenced child key is never created — its main key AND
+    # Arrange
+    # The referenced child key is never created — its main key AND
     # both of CascadeSpecialChild's special-field keys (tags, scores) are all
     # dangling.
     parent = await CascadeSpecialParent(
@@ -119,7 +124,8 @@ async def test_cascade_apply_counts_fully_dangling_child_and_its_special_keys(
     # Act
     result = await _apply_cascade(fake_redis_client, parent)
 
-    # Assert: one dangling main key, two dangling special keys.
+    # Assert
+    # One dangling main key, two dangling special keys.
     assert result == [1, 2]
 
 
@@ -127,7 +133,8 @@ async def test_cascade_apply_counts_fully_dangling_child_and_its_special_keys(
 async def test_cascade_apply_counts_dangling_special_keys_on_an_existing_child(
     fake_redis_client,
 ):
-    # Arrange: the child's main key exists but neither special field was ever
+    # Arrange
+    # The child's main key exists but neither special field was ever
     # populated, so only its two special-field keys are dangling.
     child = await CascadeSpecialChild().asave()
     parent = await CascadeSpecialParent(child=child.key).asave()
@@ -137,7 +144,8 @@ async def test_cascade_apply_counts_dangling_special_keys_on_an_existing_child(
     # Act
     result = await _apply_cascade(fake_redis_client, parent)
 
-    # Assert: child main key present (not dangling), both special keys dangling.
+    # Assert
+    # Child main key present (not dangling), both special keys dangling.
     assert result == [0, 2]
 
 
@@ -148,7 +156,8 @@ async def test_cascade_apply_counts_dangling_special_keys_on_an_existing_child(
 async def test_shape1_chain_root_reaches_the_expected_prefix_of_the_chain_sanity(
     fake_redis_client,
 ):
-    # Arrange: CascadeChainRoot.head carries CascadeTTL(depth=2); a->b->c->d chain.
+    # Arrange
+    # CascadeChainRoot.head carries CascadeTTL(depth=2); a->b->c->d chain.
     # depth=2 is the child subtree's budget: root->a (fresh budget 2), a->b
     # (blanket, budget 1), b->c (blanket, budget 0), c->d (budget exhausted).
     # CascadeChainRoot.head carries an explicit depth=2 override (refreshes
@@ -167,7 +176,8 @@ async def test_shape1_chain_root_reaches_the_expected_prefix_of_the_chain_sanity
     # Act
     await _apply_cascade(fake_redis_client, root)
 
-    # Assert: the Lua refresh set matches the hand-derived expected set —
+    # Assert
+    # The Lua refresh set matches the hand-derived expected set —
     # root, a, b, c refreshed; d (beyond the depth-2 budget) left untouched.
     refreshed = {key for key in all_keys if await fake_redis_client.ttl(key) > 0}
     assert refreshed == {root.key, a.key, b.key, c.key}
@@ -196,7 +206,8 @@ async def test_depth0_shallow_root_extends_via_explicit_override_matches_hand_de
     # Act
     await _apply_cascade(fake_redis_client, root)
 
-    # Assert: the depth=0 entry did extend the full chain via the explicit
+    # Assert
+    # The depth=0 entry did extend the full chain via the explicit
     # override (all four keys), not by an unbounded walk of a mis-cast sentinel.
     refreshed = {key for key in all_keys if await fake_redis_client.ttl(key) > 0}
     assert refreshed == set(all_keys)
@@ -245,7 +256,8 @@ async def test_independent_sibling_depth_budgets_match_hand_derived_expected_set
 async def test_shape2_collection_of_fk_root_always_refreshes_sanity(
     fake_redis_client,
 ):
-    # Arrange: CascadeBookCollection.co_authors carries CascadeTTL() (unbounded).
+    # Arrange
+    # CascadeBookCollection.co_authors carries CascadeTTL() (unbounded).
     #
     # KNOWN FAKEREDIS DIVERGENCE (discovered writing this test, see CONCERNS.md):
     # real Redis Stack's `JSON.GET key $.path` for a SINGLE path whose match is
@@ -256,7 +268,7 @@ async def test_shape2_collection_of_fk_root_always_refreshes_sanity(
     # shape (verified directly against both backends). The script's
     # single-path branch (`local match = decoded[1]`) then reads only the
     # FIRST co-author's key string rather than the whole array, so
-    # `push_edges`'s `edge.collection` branch (which requires a Lua *table*)
+    # `push_edges`'s `edge.is_collection` branch (which requires a Lua *table*)
     # never fires under fakeredis for a class with exactly one collection-of-FK
     # edge — the elements are silently not reached. This does NOT reproduce
     # on real Redis (see the confirmatory
@@ -272,10 +284,12 @@ async def test_shape2_collection_of_fk_root_always_refreshes_sanity(
     for key in (author_a.key, author_b.key, book.key):
         await fake_redis_client.persist(key)
 
-    # Act: must not error despite the collection-shape read quirk above.
+    # Act
+    # Must not error despite the collection-shape read quirk above.
     await _apply_cascade(fake_redis_client, book)
 
-    # Assert: the root itself is always fully refreshed regardless of the
+    # Assert
+    # The root itself is always fully refreshed regardless of the
     # fakeredis JSON.GET quirk documented above.
     assert await fake_redis_client.ttl(book.key) > 0
 
@@ -284,7 +298,8 @@ async def test_shape2_collection_of_fk_root_always_refreshes_sanity(
 async def test_shape3_nested_submodel_fk_reaches_the_targets_own_ttl_sanity(
     fake_redis_client,
 ):
-    # Arrange: CascadeBookNested.profile is a nested submodel whose OWN field
+    # Arrange
+    # CascadeBookNested.profile is a nested submodel whose OWN field
     # (CascadeProfile.mentor) carries the cascade marker (zero-hop nesting).
     author = await CascadeAuthor(name="mentor").asave()
     profile = CascadeProfile(mentor=author.key)
@@ -295,7 +310,8 @@ async def test_shape3_nested_submodel_fk_reaches_the_targets_own_ttl_sanity(
     # Act
     await _apply_cascade(fake_redis_client, book)
 
-    # Assert: the outer holder (root) and the FK target reached through the
+    # Assert
+    # The outer holder (root) and the FK target reached through the
     # nested submodel are both refreshed; the nested submodel itself has no
     # key of its own (same RedisJSON document as book).
     assert await fake_redis_client.ttl(book.key) > 0
@@ -309,13 +325,15 @@ async def test_shape3_nested_submodel_fk_reaches_the_targets_own_ttl_sanity(
 async def test_diamond_shared_child_refreshed_exactly_once_via_either_edge_sanity(
     fake_redis_client,
 ):
-    # Arrange: CascadeDiamondRoot.left/right both point at the SAME child.
+    # Arrange
+    # CascadeDiamondRoot.left/right both point at the SAME child.
     child = await CascadeDiamondChild(name="shared").asave()
     root = await CascadeDiamondRoot(left=child.key, right=child.key).asave()
     await fake_redis_client.persist(child.key)
     await fake_redis_client.persist(root.key)
 
-    # Act: must not error from the double-visit (visited-set dedup).
+    # Act
+    # Must not error from the double-visit (visited-set dedup).
     await _apply_cascade(fake_redis_client, root)
 
     # Assert
@@ -330,7 +348,8 @@ async def test_diamond_shared_child_refreshed_exactly_once_via_either_edge_sanit
 async def test_self_reference_cycle_does_not_error_or_infinite_loop_sanity(
     fake_redis_client,
 ):
-    # Arrange: a -> b -> a (cycle).
+    # Arrange
+    # a -> b -> a (cycle).
     a = await CascadeChainNode(name="a").asave()
     b = await CascadeChainNode(name="b", next=a.key).asave()
     a.next = b.key
@@ -338,7 +357,8 @@ async def test_self_reference_cycle_does_not_error_or_infinite_loop_sanity(
     await fake_redis_client.persist(a.key)
     await fake_redis_client.persist(b.key)
 
-    # Act: bounded by the visited-set; must complete without hanging/erroring.
+    # Act
+    # Bounded by the visited-set; must complete without hanging/erroring.
     await _apply_cascade(fake_redis_client, a)
 
     # Assert
@@ -353,7 +373,8 @@ async def test_self_reference_cycle_does_not_error_or_infinite_loop_sanity(
 async def test_genuine_single_node_self_loop_does_not_hang_or_error_sanity(
     fake_redis_client,
 ):
-    # Arrange: a genuine single-node self-loop (distinct from the two-node
+    # Arrange
+    # A genuine single-node self-loop (distinct from the two-node
     # a<->b cycle above) -- node.next set to its OWN key after an initial
     # save, then re-saved.
     node = await CascadeChainNode(name="solo").asave()
@@ -361,7 +382,8 @@ async def test_genuine_single_node_self_loop_does_not_hang_or_error_sanity(
     await node.asave()
     await fake_redis_client.persist(node.key)
 
-    # Act: bounded by the visited-set; must complete without hanging/erroring.
+    # Act
+    # Bounded by the visited-set; must complete without hanging/erroring.
     await _apply_cascade(fake_redis_client, node)
 
     # Assert
@@ -372,7 +394,8 @@ async def test_genuine_single_node_self_loop_does_not_hang_or_error_sanity(
 async def test_shared_child_via_two_independent_roots_refreshed_from_either_root_sanity(
     fake_redis_client,
 ):
-    # Arrange: TWO separately-saved CascadeSpecialParent instances that both
+    # Arrange
+    # TWO separately-saved CascadeSpecialParent instances that both
     # point their child field at the SAME saved CascadeSpecialChild instance
     # -- distinct from test_diamond_shared_child_refreshed_exactly_once_via_either_edge_sanity
     # above, which uses a SINGLE root with two fields, not two independent
@@ -383,7 +406,8 @@ async def test_shared_child_via_two_independent_roots_refreshed_from_either_root
     for key in (child.key, root_a.key, root_b.key):
         await fake_redis_client.persist(key)
 
-    # Act: apply cascade from EACH root independently.
+    # Act
+    # Apply cascade from EACH root independently.
     await _apply_cascade(fake_redis_client, root_a)
     assert await fake_redis_client.ttl(root_a.key) > 0
     assert await fake_redis_client.ttl(child.key) > 0
@@ -391,7 +415,8 @@ async def test_shared_child_via_two_independent_roots_refreshed_from_either_root
     await fake_redis_client.persist(child.key)
     await _apply_cascade(fake_redis_client, root_b)
 
-    # Assert: the shared child refreshes from either independent root.
+    # Assert
+    # The shared child refreshes from either independent root.
     assert await fake_redis_client.ttl(root_b.key) > 0
     assert await fake_redis_client.ttl(child.key) > 0
 
@@ -403,7 +428,8 @@ async def test_shared_child_via_two_independent_roots_refreshed_from_either_root
 async def test_shared_child_own_key_always_refreshed_regardless_of_visit_order_sanity(
     fake_redis_client,
 ):
-    # Arrange: deep_path/shallow_path both point at the SAME saved
+    # Arrange
+    # deep_path/shallow_path both point at the SAME saved
     # CascadeWR02SharedChild instance, with differing depth budgets.
     grandchild = await CascadeWR02Grandchild().asave()
     shared_child = await CascadeWR02SharedChild(next=grandchild.key).asave()
@@ -416,7 +442,8 @@ async def test_shared_child_own_key_always_refreshed_regardless_of_visit_order_s
     # Act
     await _apply_cascade(fake_redis_client, root)
 
-    # Assert: the shared child's OWN key always has a positive TTL,
+    # Assert
+    # The shared child's OWN key always has a positive TTL,
     # unconditionally, regardless of which sibling edge the DFS visits first
     # (accepted, order-dependent-but-documented semantics apply only
     # to the child's OWN deeper descendants, not to the child itself).
@@ -424,9 +451,10 @@ async def test_shared_child_own_key_always_refreshed_regardless_of_visit_order_s
     assert await fake_redis_client.ttl(shared_child.key) > 0
 
     # The grandchild is reached deterministically via CascadeWR02SharedChild.next,
-    # an explicit per-field CascadeTTL() override edge: next_hop's edge.override
-    # branch fires before any remaining_budget inspection, so the grandchild is
-    # ALWAYS refreshed regardless of which sibling edge (deep_path budget=5 or
+    # an explicit per-field CascadeTTL() override edge: next_hop's
+    # edge.resets_depth_budget branch fires before any remaining_budget
+    # inspection, so the grandchild is ALWAYS refreshed regardless of which
+    # sibling edge (deep_path budget=5 or
     # shallow_path budget=1) the DFS visits first — this fixture's downstream
     # edge cannot demonstrate order-dependence either way (see
     # test_max_budget_wins_shared_child_reaches_deep_paths_full_prefix_regardless_of_visit_order_sanity
@@ -439,7 +467,8 @@ async def test_shared_child_own_key_always_refreshed_regardless_of_visit_order_s
 async def test_max_budget_wins_shared_child_reaches_deep_paths_full_prefix_regardless_of_visit_order_sanity(
     fake_redis_client,
 ):
-    # Arrange: CascadeMaxBudgetRoot.deep_path/shallow_path both point at the
+    # Arrange
+    # CascadeMaxBudgetRoot.deep_path/shallow_path both point at the
     # SAME saved CascadeChainNode head ("shared"), with differing finite depth
     # budgets (4 vs 1). Unlike CascadeWR02SharedChild.next (an override edge),
     # CascadeChainNode.next is a BLANKET (non-override) edge that genuinely
@@ -461,7 +490,8 @@ async def test_max_budget_wins_shared_child_reaches_deep_paths_full_prefix_regar
     # Act
     await _apply_cascade(fake_redis_client, root)
 
-    # Assert: the full reach the LARGER (depth=4) budget grants is refreshed —
+    # Assert
+    # The full reach the LARGER (depth=4) budget grants is refreshed —
     # root, shared, c1, c2, c3, c4 — deterministically, regardless of which of
     # the two root fields the Lua DFS processes/pops first. Under the old
     # first-processed-wins bug, this set would be order-dependent (sometimes
@@ -477,7 +507,8 @@ async def test_max_budget_wins_shared_child_reaches_deep_paths_full_prefix_regar
 async def test_blanket_opt_out_field_stops_traversal_despite_blanket_global(
     fake_redis_client,
 ):
-    # Arrange: CascadeBlanketOptOut.child carries an explicit
+    # Arrange
+    # CascadeBlanketOptOut.child carries an explicit
     # CascadeTTL(enabled=False), overriding an otherwise-blanket-enabled
     # Meta.cascade_ttl(depth=2) — the explicit per-field opt-out wins.
     leaf = await CascadeBlanketLeaf(name="leaf").asave()
@@ -488,7 +519,8 @@ async def test_blanket_opt_out_field_stops_traversal_despite_blanket_global(
     # Act
     await _apply_cascade(fake_redis_client, root)
 
-    # Assert: root refreshed, leaf never reached.
+    # Assert
+    # Root refreshed, leaf never reached.
     assert await fake_redis_client.ttl(root.key) > 0
     assert await fake_redis_client.ttl(leaf.key) in (-1, -2)
 
@@ -516,7 +548,8 @@ async def test_nested_submodel_zero_hop_does_not_consume_depth_budget(
     # Act
     await _apply_cascade(fake_redis_client, root)
 
-    # Assert: reached despite only a depth=1 budget on the outer field —
+    # Assert
+    # Reached despite only a depth=1 budget on the outer field —
     # proving the zero-hop `profile` field never decremented the depth=1
     # budget inherited by `holder`, so the real FK hop into `mentor` still
     # saw the untouched budget and was followed.

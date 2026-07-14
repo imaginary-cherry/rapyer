@@ -44,7 +44,7 @@ async def init_rapyer(
     # in the finally block rather than leaving Meta silently mutable.
     try:
         for model in REDIS_MODELS:
-            model.Meta._frozen = False
+            model.Meta._meta_locked = False
             if redis is not None:
                 model.Meta.redis = redis
                 model.Meta.is_fake_redis = is_fake_redis
@@ -86,7 +86,7 @@ async def init_rapyer(
         # Refreeze now that the plan is baked; further Meta mutation is blocked
         # until the next init_rapyer() call. Runs even on failure.
         for model in REDIS_MODELS:
-            model.Meta._frozen = True
+            model.Meta._meta_locked = True
 
     if redis is not None:
         await register_scripts(redis, is_fake_redis)
@@ -100,4 +100,4 @@ async def teardown_rapyer():
             await model.Meta.redis.aclose()
         # Clear the freeze on teardown so a torn-down model doesn't leak
         # MetaFrozenError into a later path that mutates Meta without re-init.
-        model.Meta._frozen = False
+        model.Meta._meta_locked = False

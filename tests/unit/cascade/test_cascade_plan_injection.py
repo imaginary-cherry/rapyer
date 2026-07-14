@@ -53,11 +53,11 @@ def test_inject_cascade_plan_serializes_bool_int_and_omits_absent_depth():
                 CascadeEdge(
                     path="$.author",
                     target="Author",
-                    collection=False,
-                    recurse=True,
-                    ttl=True,
-                    special=True,
-                    override=False,
+                    is_collection=False,
+                    recurse_into_target=True,
+                    refresh_target_ttl=True,
+                    refresh_target_special_keys=True,
+                    resets_depth_budget=False,
                 )
             ],
         )
@@ -68,7 +68,10 @@ def test_inject_cascade_plan_serializes_bool_int_and_omits_absent_depth():
     assert "CASCADE_PLAN['Foo']" in injected
     assert "true" in injected
     assert "false" in injected
-    assert "depth" not in injected
+    # A bare "depth" substring check would false-positive on the
+    # resets_depth_budget field name; assert the absent-when-None depth KEY
+    # itself is omitted, matching _lua_literal's dict-key serialization shape.
+    assert "['depth']" not in injected
 
 
 @pytest.mark.asyncio

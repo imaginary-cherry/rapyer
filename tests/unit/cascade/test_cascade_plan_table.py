@@ -51,10 +51,10 @@ def test_shape1_blanket_enabled_produces_one_edge_with_global_depth():
     edge = edges[0]
     assert edge.path == "$.child"
     assert edge.target == "CascadeBlanketLeaf"
-    assert edge.collection is False
-    assert edge.recurse is True
-    assert edge.ttl is True
-    assert edge.special is True
+    assert edge.is_collection is False
+    assert edge.recurse_into_target is True
+    assert edge.refresh_target_ttl is True
+    assert edge.refresh_target_special_keys is True
     assert edge.depth == 2
 
 
@@ -63,7 +63,7 @@ def test_shape2_collection_of_fk_produces_exactly_one_edge_marked_collection():
 
     edges = plan["CascadeBookCollection"].fks
     assert len(edges) == 1
-    assert edges[0].collection is True
+    assert edges[0].is_collection is True
     assert edges[0].target == "CascadeAuthor"
     assert edges[0].path == "$.co_authors"
 

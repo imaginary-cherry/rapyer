@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+import dataclasses
 from typing import TYPE_CHECKING, Any, get_origin
 
 from rapyer.cascade.ttl import CascadeTTL
@@ -36,38 +36,54 @@ def _unwrap_relational_target(annotation: Any) -> Any | None:
     return None
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class CascadeEdge:
     """
     One FK edge out of a class in the cascade plan table.
 
     depth=None means unbounded; _lua_literal omits None-valued fields, so the
     Lua table carries no depth key for these.
+
+    recurse_into_target / refresh_target_ttl / refresh_target_special_keys are
+    always True today: every edge the planner currently emits follows the
+    target, refreshes its ttl, and refreshes its special keys. They are
+    forward-looking per-edge hooks for future delete/save-cascade work — the
+    Lua keeps a documented dead branch for the non-recursing case so it is
+    ready when a planner-side reason to set them False shows up.
+    resets_depth_budget means an explicit per-field CascadeTTL() spec resets
+    the child's depth budget to this edge's own depth instead of decrementing
+    the budget inherited from the parent.
     """
 
     path: str
     target: str
-    collection: bool
-    recurse: bool
-    ttl: bool
-    special: bool
-    override: bool
+    is_collection: bool
+    recurse_into_target: bool
+    refresh_target_ttl: bool
+    refresh_target_special_keys: bool
+    resets_depth_budget: bool
     depth: int | None = None
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class CascadePlanEntry:
     """One class's full entry in the cascade plan table."""
 
     ttl: int | None
+    # Special fields live under their own Redis key (SF: RedisSet,
+    # RedisPriorityQueue), separate from the main JSON document; the Lua must
+    # EXPIRE each of these suffixed keys alongside the main key whenever it
+    # refreshes this class's key.
     special_suffixes: list[str]
     fks: list[CascadeEdge]
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class EdgeClassification:
-    """Result of classifying a single FK-shaped field: enabled, its depth, and
-    whether an explicit per-field spec overrode the global default."""
+    """
+    Result of classifying a single FK-shaped field: enabled, its depth, and
+    whether an explicit per-field spec overrode the global default.
+    """
 
     enabled: bool
     depth: int | None
@@ -105,7 +121,8 @@ def _unwrap_nested_model_cls(annotation: Any) -> Any | None:
 
 
 def _static_walk_fk_edges(model_cls: Any, parent_path: str, fks: list[CascadeEdge]):
-    """Append every enabled FK edge reachable from model_cls's own fields.
+    """
+    Append every enabled FK edge reachable from model_cls's own fields.
 
     Direct and collection FK fields become edges here; nested inline sub-models
     are walked recursively. Each edge carries its own declared depth (field
@@ -125,11 +142,11 @@ def _static_walk_fk_edges(model_cls: Any, parent_path: str, fks: list[CascadeEdg
             CascadeEdge(
                 path=f"{parent_path}.{field_name}",
                 target=target_cls.__name__,
-                collection=False,
-                recurse=True,
-                ttl=True,
-                special=True,
-                override=edge.override,
+                is_collection=False,
+                recurse_into_target=True,
+                refresh_target_ttl=True,
+                refresh_target_special_keys=True,
+                resets_depth_budget=edge.override,
                 depth=edge.depth,
             )
         )
@@ -156,19 +173,21 @@ def _static_walk_fk_edges(model_cls: Any, parent_path: str, fks: list[CascadeEdg
             CascadeEdge(
                 path=f"{parent_path}.{field_name}",
                 target=target_cls.__name__,
-                collection=True,
-                recurse=True,
-                ttl=True,
-                special=True,
-                override=edge.override,
+                is_collection=True,
+                recurse_into_target=True,
+                refresh_target_ttl=True,
+                refresh_target_special_keys=True,
+                resets_depth_budget=edge.override,
                 depth=edge.depth,
             )
         )
 
 
 def _static_walk_special_suffixes(model_cls: Any, parent_path: str = "") -> list[str]:
-    """Derive the dotted-path special-field suffixes for model_cls, recursing
-    into nested sub-models that themselves hold special fields."""
+    """
+    Derive the dotted-path special-field suffixes for model_cls, recursing
+    into nested sub-models that themselves hold special fields.
+    """
     from rapyer.base import AtomicRedisModel
 
     suffixes: list[str] = []
@@ -176,7 +195,12 @@ def _static_walk_special_suffixes(model_cls: Any, parent_path: str = "") -> list
         field_path = f"{parent_path}.{field_name}"
         suffixes.append(field_path.lstrip("."))
     for field_name in model_cls._contain_sf:
-        field_cls = model_cls.model_fields[field_name].annotation
+        annotation = model_cls.model_fields[field_name].annotation
+        # Unwrap Optional[...]/generic origins the same way
+        # _unwrap_nested_model_cls does, so a nested model hidden behind
+        # Optional[...] or a generic alias is still recognized.
+        stripped = strip_optional(annotation)
+        field_cls = get_origin(stripped) or stripped
         # Container-of-special-field shapes (e.g. list[RedisSet]) have no
         # per-class suffix set to enumerate; only nested models with their own
         # special fields do.
@@ -192,7 +216,8 @@ def _static_walk_special_suffixes(model_cls: Any, parent_path: str = "") -> list
 def build_cascade_plan(
     models: list[type["AtomicRedisModel"]],
 ) -> dict[str, CascadePlanEntry]:
-    """Build the static, per-class cascade plan table baked into the Lua script.
+    """
+    Build the static, per-class cascade plan table baked into the Lua script.
 
     Every model gets one entry keyed by its class name, covering its FK edges,
     special-field suffixes, and own Meta.ttl. Pure annotation introspection;
@@ -211,7 +236,8 @@ def build_cascade_plan(
 
 
 def validate_cascade_ttl_targets(plan: dict[str, CascadePlanEntry]):
-    """Raise CascadeTargetTtlMissingError when a cascade participant lacks a ttl.
+    """
+    Raise CascadeTargetTtlMissingError when a cascade participant lacks a ttl.
 
     The Lua write phase EXPIREs every reached key with its owning class's ttl, so
     a None ttl would become a nil-arg runtime error. Both an edge's target and a

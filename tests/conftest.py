@@ -50,10 +50,10 @@ def reset_meta_freeze():
     # so a prior init can't leak MetaFrozenError into a later test that mutates
     # Meta directly (tests own their other Meta cleanup, as they already did).
     for model in REDIS_MODELS:
-        model.Meta._frozen = False
+        model.Meta._meta_locked = False
     yield
     for model in REDIS_MODELS:
-        model.Meta._frozen = False
+        model.Meta._meta_locked = False
 
 
 @pytest.fixture

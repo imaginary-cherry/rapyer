@@ -51,7 +51,8 @@ pytestmark = pytest.mark.usefixtures("setup_fake_redis_for_action_boundary")
 async def test_aset_ttl_cascade_true_healthy_splits_parent_and_child_ttl_and_reports_no_dangling(
     fake_redis_client,
 ):
-    # Arrange: a healthy parent -> child, child's special fields populated.
+    # Arrange
+    # A healthy parent -> child, child's special fields populated.
     child = await CascadeSpecialChild().asave()
     await child.tags.aadd("x")
     await child.scores.apush(1.0, priority=1.0)
@@ -60,12 +61,14 @@ async def test_aset_ttl_cascade_true_healthy_splits_parent_and_child_ttl_and_rep
     # Act
     result = await parent.aset_ttl(ROOT_TTL_SECONDS, cascade=True)
 
-    # Assert: CascadeResult with zero dangling counts.
+    # Assert
+    # CascadeResult with zero dangling counts.
     assert isinstance(result, CascadeResult)
     assert result.dangling_children == 0
     assert result.dangling_special == 0
 
-    # Assert: the parent's own key refreshes to the caller-supplied root ttl...
+    # Assert
+    # The parent's own key refreshes to the caller-supplied root ttl...
     parent_ttl = await fake_redis_client.ttl(parent.key)
     assert 0 < parent_ttl <= ROOT_TTL_SECONDS
 
@@ -89,13 +92,16 @@ async def test_aset_ttl_cascade_true_healthy_splits_parent_and_child_ttl_and_rep
 async def test_aset_ttl_cascade_true_dangling_child_reports_count_without_raising(
     fake_redis_client,
 ):
-    # Arrange: the referenced child key is never created.
+    # Arrange
+    # The referenced child key is never created.
     parent = await CascadeSpecialParent(child="CascadeSpecialChild:missing").asave()
 
-    # Act: must not raise despite the dangling reference.
+    # Act
+    # Must not raise despite the dangling reference.
     result = await parent.aset_ttl(ROOT_TTL_SECONDS, cascade=True)
 
-    # Assert: the parent's own write still succeeds and refreshes...
+    # Assert
+    # The parent's own write still succeeds and refreshes...
     assert await fake_redis_client.ttl(parent.key) > 0
     # ...and the dangling child (+ its two special-field keys) are reported,
     # never raised.
@@ -108,16 +114,19 @@ async def test_aset_ttl_cascade_true_dangling_child_reports_count_without_raisin
 async def test_aset_ttl_without_cascade_flag_only_refreshes_parent_own_keys(
     fake_redis_client,
 ):
-    # Arrange: a healthy _has_cascade=True parent -> child, with the child's
+    # Arrange
+    # A healthy _has_cascade=True parent -> child, with the child's
     # ttl reset to a known "-1" baseline before the action under test.
     child = await CascadeSpecialChild().asave()
     parent = await CascadeSpecialParent(child=child.key).asave()
     await fake_redis_client.persist(child.key)
 
-    # Act: cascade omitted entirely.
+    # Act
+    # Cascade omitted entirely.
     result = await parent.aset_ttl(ROOT_TTL_SECONDS)
 
-    # Assert: legacy behavior -- only the parent's own key changes, the
+    # Assert
+    # Legacy behavior -- only the parent's own key changes, the
     # child is never touched, and no CascadeResult is produced.
     assert result is None
     assert await fake_redis_client.ttl(parent.key) > 0
@@ -128,17 +137,20 @@ async def test_aset_ttl_without_cascade_flag_only_refreshes_parent_own_keys(
 async def test_asave_auto_cascades_child_ttl_with_no_explicit_ttl_call(
     fake_redis_client,
 ):
-    # Arrange: a saved CascadeChainRoot -> CascadeChainNode pair, ttls reset
+    # Arrange
+    # A saved CascadeChainRoot -> CascadeChainNode pair, ttls reset
     # to a known "-1" baseline before the action under test.
     node = await CascadeChainNode(name="child").asave()
     root = await CascadeChainRoot(head=node.key).asave()
     await fake_redis_client.persist(root.key)
     await fake_redis_client.persist(node.key)
 
-    # Act: an ordinary write with no explicit ttl/cascade call anywhere.
+    # Act
+    # An ordinary write with no explicit ttl/cascade call anywhere.
     await root.asave()
 
-    # Assert: the cascade-reached node's own key was automatically re-armed.
+    # Assert
+    # The cascade-reached node's own key was automatically re-armed.
     assert await fake_redis_client.ttl(node.key) > 0
 
 

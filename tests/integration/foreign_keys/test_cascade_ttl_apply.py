@@ -141,7 +141,8 @@ async def test_aset_ttl_cascade_survives_script_flush_via_shipped_run_sha_path_s
     cascade_action_boundary_after_script_flush,
     real_redis_client,
 ):
-    # Arrange: a healthy parent -> child pair (child's special fields
+    # Arrange
+    # A healthy parent -> child pair (child's special fields
     # populated so dangling_special has a real zero to prove, not a
     # trivially-empty one), saved AFTER the script cache was flushed
     # (fixture ordering), so the very first cascade EVALSHA this test
@@ -151,7 +152,8 @@ async def test_aset_ttl_cascade_survives_script_flush_via_shipped_run_sha_path_s
     await child.scores.apush(1.0, priority=1.0)
     parent = await CascadeSpecialParent(child=child.key).asave()
 
-    # Act & Assert: the opt-in `aset_ttl(cascade=True)` path -- must not
+    # Act & Assert
+    # The opt-in `aset_ttl(cascade=True)` path -- must not
     # raise NoScriptError/PersistentNoScriptError, and must still return a
     # decoded CascadeResult (proving the retry path preserves the return
     # value, not just "didn't crash").
@@ -166,7 +168,10 @@ async def test_aset_ttl_cascade_survives_script_flush_via_shipped_run_sha_path_s
     assert isinstance(result, CascadeResult)
     assert result.dangling_children == 0
     assert result.dangling_special == 0
-    assert await real_redis_client.ttl(parent.key) > 0
+    # Bounded above by SCRIPT_FLUSH_ROOT_TTL_SECONDS: proves the root's
+    # explicit ttl was actually applied, not just that SOME positive ttl
+    # (e.g. a stale Meta.ttl from an earlier auto-refresh) survived.
+    assert 0 < await real_redis_client.ttl(parent.key) <= SCRIPT_FLUSH_ROOT_TTL_SECONDS
     assert await real_redis_client.ttl(child.key) > 0
 
 
@@ -175,7 +180,8 @@ async def test_asave_auto_cascade_survives_script_flush_via_shipped_run_sha_path
     cascade_action_boundary_after_script_flush,
     real_redis_client,
 ):
-    # Arrange: a healthy parent -> child pair, saved AFTER the script cache
+    # Arrange
+    # A healthy parent -> child pair, saved AFTER the script cache
     # was flushed, so refresh_ttl's automatic cascade branch (riding
     # flush_action_targets' ensure_pipeline inside a plain asave()) is the
     # first caller to hit the flushed cascade SHA.
@@ -184,7 +190,8 @@ async def test_asave_auto_cascade_survives_script_flush_via_shipped_run_sha_path
     await real_redis_client.persist(parent.key)
     await real_redis_client.persist(child.key)
 
-    # Act & Assert: an ordinary write with no explicit ttl/cascade call
+    # Act & Assert
+    # An ordinary write with no explicit ttl/cascade call
     # anywhere (auto path) must not raise, and must still refresh
     # both the root and the cascade-reached child's TTL.
     try:

@@ -70,7 +70,8 @@ async def test_cascade_races_concurrent_fk_reassignment_reflects_one_consistent_
         _reassign_child_and_save(),
     )
 
-    # Assert: the explicit cascade never resolved to a dangling/garbage
+    # Assert
+    # The explicit cascade never resolved to a dangling/garbage
     # reference -- whichever consistent snapshot of parent.child it observed
     # (the old graph, child_a, or the already-reassigned new graph, child_b),
     # that child genuinely existed. A torn/mixed read spanning both graphs

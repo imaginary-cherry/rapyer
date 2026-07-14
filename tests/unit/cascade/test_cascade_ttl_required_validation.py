@@ -17,11 +17,11 @@ def _plan(a_ttl, b_ttl, edge_target="B"):
                 CascadeEdge(
                     path="$.b",
                     target=edge_target,
-                    collection=False,
-                    recurse=True,
-                    ttl=True,
-                    special=True,
-                    override=False,
+                    is_collection=False,
+                    recurse_into_target=True,
+                    refresh_target_ttl=True,
+                    refresh_target_special_keys=True,
+                    resets_depth_budget=False,
                 )
             ],
         ),
@@ -72,11 +72,11 @@ def test_raises_rapyer_error_when_edge_target_absent_from_partial_plan():
                 CascadeEdge(
                     path="$.b",
                     target="MissingTarget",
-                    collection=False,
-                    recurse=True,
-                    ttl=True,
-                    special=True,
-                    override=False,
+                    is_collection=False,
+                    recurse_into_target=True,
+                    refresh_target_ttl=True,
+                    refresh_target_special_keys=True,
+                    resets_depth_budget=False,
                 )
             ],
         )
@@ -104,11 +104,11 @@ def test_raises_on_first_violation_deterministically_sorted_by_class_name():
                 CascadeEdge(
                     path="$.z",
                     target="Z",
-                    collection=False,
-                    recurse=True,
-                    ttl=True,
-                    special=True,
-                    override=False,
+                    is_collection=False,
+                    recurse_into_target=True,
+                    refresh_target_ttl=True,
+                    refresh_target_special_keys=True,
+                    resets_depth_budget=False,
                 )
             ],
         ),
@@ -119,11 +119,11 @@ def test_raises_on_first_violation_deterministically_sorted_by_class_name():
                 CascadeEdge(
                     path="$.y",
                     target="Y",
-                    collection=False,
-                    recurse=True,
-                    ttl=True,
-                    special=True,
-                    override=False,
+                    is_collection=False,
+                    recurse_into_target=True,
+                    refresh_target_ttl=True,
+                    refresh_target_special_keys=True,
+                    resets_depth_budget=False,
                 )
             ],
         ),

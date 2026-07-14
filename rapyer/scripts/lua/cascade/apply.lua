@@ -76,7 +76,7 @@ end
 -- Either way a match is the first array element. A live reference is either a
 -- single target-key string (shape 1) or a table of target-key strings/objects
 -- (shape 2, collection-of-FK); push_edges below does the type-specific
--- filtering per edge.collection -- this function only strips absent/null
+-- filtering per edge.is_collection -- this function only strips absent/null
 -- matches so both shapes reach push_edges intact.
 local function read_reference_paths(key, paths)
     -- unpack is the Lua 5.1 global redis runs on; spreads the paths as args.
@@ -110,8 +110,8 @@ end
 -- to follow the edge and what budget the child carries. Returns
 -- (follow, child_budget).
 --
--- An explicit per-field override (edge.override) always wins and REFRESHES the
--- child's budget to this edge's own depth, ignoring any inherited
+-- An explicit per-field override (edge.resets_depth_budget) always wins and
+-- REFRESHES the child's budget to this edge's own depth, ignoring any inherited
 -- remaining_budget -- this is how a deeper explicit field extends past a
 -- shallower ancestor. A blanket edge instead sets the budget on the first hop of
 -- a fresh subtree (not yet established) and decrements it on every subsequent
@@ -128,7 +128,7 @@ local function next_hop(edge, remaining_budget, established)
     if type(edge.depth) == 'number' then
         edge_depth = edge.depth
     end
-    if edge.override then
+    if edge.resets_depth_budget then
         return true, edge_depth
     end
     if not established then
@@ -185,9 +185,9 @@ end
 -- remaining BLANKET hops still allowed out of `key` (UNBOUNDED = no cap), and
 -- established marks whether `key`'s subtree was already entered via cascade. The
 -- per-edge follow/budget decision lives entirely in next_hop; a node whose own
--- budget is 0 can still follow its explicit-override edges (which refresh),
--- matching the field-over-global override precedence _classify_edge bakes
--- into the plan.
+-- budget is 0 can still follow its explicit-override (resets_depth_budget)
+-- edges (which refresh), matching the field-over-global override precedence
+-- _classify_edge bakes into the plan.
 local function push_edges(parent_key, parent_class, remaining_budget, established)
     local edges = fk_edges(parent_class)
     if #edges == 0 then
@@ -204,22 +204,22 @@ local function push_edges(parent_key, parent_class, remaining_budget, establishe
         if matched ~= nil then
             local follow, budget = next_hop(edge, remaining_budget, established)
             if follow then
-                if not edge.recurse then
+                if not edge.recurse_into_target then
                     -- Not-yet-exercised seam: every edge the planner currently
-                    -- emits has recurse=true, so this branch is dead today. A
-                    -- non-recursing edge reaches (and refreshes) its target and
-                    -- yields it zero traversal budget; the target's own OVERRIDE
-                    -- edges can still be followed, since next_hop ignores budget
-                    -- for overrides.
+                    -- emits has recurse_into_target=true, so this branch is
+                    -- dead today. A non-recursing edge reaches (and refreshes)
+                    -- its target and yields it zero traversal budget; the
+                    -- target's own OVERRIDE edges can still be followed, since
+                    -- next_hop ignores budget for overrides.
                     budget = 0
                 end
-                if not edge.collection then
+                if not edge.is_collection then
                     -- Scalar FK: the matched
                     -- value is a single scalar FK -- the target's key string.
                     if type(matched) == 'string' then
                         push_child(matched, edge, budget)
                     end
-                elseif edge.collection then
+                elseif edge.is_collection then
                     -- Shape 2: list[Reference[T]]/dict[K, Reference[T]] -- the
                     -- matched value is a JSON array (1-indexed Lua sequence) or
                     -- a JSON object (string-keyed Lua table); either way `pairs`
@@ -261,10 +261,10 @@ local function plan_refresh_keys()
         -- push) and is skipped as a no-op.
         if item.budget == visited[key] then
             local edge = item.edge
-            if edge.ttl then
+            if edge.refresh_target_ttl then
                 queue_refresh(key, item.class)
             end
-            if edge.special then
+            if edge.refresh_target_special_keys then
                 queue_special_refresh(key, item.class)
             end
             push_edges(key, item.class, item.budget, item.established)

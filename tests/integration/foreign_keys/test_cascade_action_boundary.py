@@ -46,7 +46,8 @@ pytestmark = pytest.mark.usefixtures("setup_real_redis_for_action_boundary")
 async def test_aset_ttl_cascade_true_healthy_splits_parent_and_child_ttl_and_reports_no_dangling(
     real_redis_client,
 ):
-    # Arrange: a healthy parent -> child, child's special fields populated.
+    # Arrange
+    # A healthy parent -> child, child's special fields populated.
     child = await CascadeSpecialChild().asave()
     await child.tags.aadd("x")
     await child.scores.apush(1.0, priority=1.0)
@@ -55,13 +56,15 @@ async def test_aset_ttl_cascade_true_healthy_splits_parent_and_child_ttl_and_rep
     # Act
     result = await parent.aset_ttl(ROOT_TTL_SECONDS, cascade=True)
 
-    # Assert: CascadeResult with zero dangling counts,
+    # Assert
+    # CascadeResult with zero dangling counts,
     # proven end-to-end against real Redis Stack, not just fakeredis.
     assert isinstance(result, CascadeResult)
     assert result.dangling_children == 0
     assert result.dangling_special == 0
 
-    # Assert: the parent's own key refreshes to the caller-supplied root ttl...
+    # Assert
+    # The parent's own key refreshes to the caller-supplied root ttl...
     parent_ttl = await real_redis_client.ttl(parent.key)
     assert 0 < parent_ttl <= ROOT_TTL_SECONDS
 
@@ -84,15 +87,18 @@ async def test_aset_ttl_cascade_true_healthy_splits_parent_and_child_ttl_and_rep
 async def test_asave_auto_cascades_child_ttl_with_no_explicit_ttl_call(
     real_redis_client,
 ):
-    # Arrange: a saved CascadeSpecialParent -> CascadeSpecialChild pair,
+    # Arrange
+    # A saved CascadeSpecialParent -> CascadeSpecialChild pair,
     # ttls reset to a known "-1" baseline before the action under test.
     child = await CascadeSpecialChild().asave()
     parent = await CascadeSpecialParent(child=child.key).asave()
     await real_redis_client.persist(parent.key)
     await real_redis_client.persist(child.key)
 
-    # Act: an ordinary write with no explicit ttl/cascade call anywhere.
+    # Act
+    # An ordinary write with no explicit ttl/cascade call anywhere.
     await parent.asave()
 
-    # Assert: the cascade-reached child's own key was automatically re-armed.
+    # Assert
+    # The cascade-reached child's own key was automatically re-armed.
     assert await real_redis_client.ttl(child.key) > 0

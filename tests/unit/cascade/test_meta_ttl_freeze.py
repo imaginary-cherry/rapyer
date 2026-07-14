@@ -34,7 +34,7 @@ def test_fresh_redis_config_ttl_assignment_never_raises_sanity():
 def test_frozen_redis_config_ttl_assignment_raises_and_leaves_ttl_unchanged_sanity():
     # Arrange
     config = RedisConfig(ttl=30)
-    config._frozen = True
+    config._meta_locked = True
 
     # Act & Assert
     with pytest.raises(MetaFrozenError):
@@ -46,7 +46,8 @@ def test_frozen_redis_config_ttl_assignment_raises_and_leaves_ttl_unchanged_sani
 async def test_two_sequential_init_rapyer_calls_with_different_ttls_both_succeed_sanity(
     mock_redis_client, cascade_models
 ):
-    # Arrange: scope to two edge-free fixtures so build_cascade_plan's
+    # Arrange
+    # Scope to two edge-free fixtures so build_cascade_plan's
     # validate_cascade_ttl_targets is trivially satisfied, matching the
     # pattern in test_init_rapyer_cascade_ttl.py.
     with patch("rapyer.init.REDIS_MODELS", cascade_models):

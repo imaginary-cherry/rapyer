@@ -62,7 +62,7 @@ class RedisConfig(BaseModel):
     _redis_json: JSON = PrivateAttr(default=None)
     # Set to True by init_rapyer() once the config is baked into the cascade
     # plan, refusing further mutation until the next init_rapyer() call.
-    _frozen: bool = PrivateAttr(default=False)
+    _meta_locked: bool = PrivateAttr(default=False)
 
     @model_validator(mode="after")
     def _build_redis_json(self):
@@ -76,8 +76,9 @@ class RedisConfig(BaseModel):
     def __setattr__(self, name: str, value: Any):
         # The whole config is baked into the cascade plan at init, so once frozen
         # no public field may change until the next init_rapyer(). Private attrs
-        # (including _frozen itself) stay writable so init/teardown can toggle it.
-        if self._frozen and not name.startswith("_"):
+        # (including _meta_locked itself) stay writable so init/teardown can
+        # toggle it.
+        if self._meta_locked and not name.startswith("_"):
             raise MetaFrozenError(
                 f"Meta.{name} is frozen after init_rapyer() bakes the config "
                 f"into the cascade plan — call init_rapyer() again to "
