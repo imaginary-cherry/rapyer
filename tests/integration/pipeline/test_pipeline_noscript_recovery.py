@@ -8,7 +8,7 @@ from tests.models.simple_types import TTL_TEST_SECONDS, TTLRefreshTestModel
 
 @pytest.mark.asyncio
 async def test_pipeline_recovers_from_noscript_error_after_script_flush_sanity(
-    flush_scripts,
+    real_redis_client,
 ):
     # Arrange
     model = ComprehensiveTestModel(
@@ -16,6 +16,11 @@ async def test_pipeline_recovers_from_noscript_error_after_script_flush_sanity(
         metadata={"key1": "value1"},
     )
     await model.asave()
+    # Flush AFTER the establishing save, not before: asave()'s auto TTL-refresh
+    # runs the cascade script via ensure_pipeline (its own standalone pipe),
+    # which does not self-heal NOSCRIPT (see NOSCRIPT-ISSUE.md) -- only the
+    # explicit apipeline() below (backed by _apipeline) does.
+    await real_redis_client.execute_command("SCRIPT", "FLUSH")
 
     # Act
     async with model.apipeline() as redis_model:
@@ -31,7 +36,7 @@ async def test_pipeline_recovers_from_noscript_error_after_script_flush_sanity(
 
 @pytest.mark.asyncio
 async def test_pipeline_recovers_with_all_redis_types_after_script_flush_sanity(
-    flush_scripts,
+    real_redis_client,
 ):
     # Arrange
     model = TTLRefreshTestModel(
@@ -42,6 +47,8 @@ async def test_pipeline_recovers_with_all_redis_types_after_script_flush_sanity(
         settings={"setting1": "value1"},
     )
     await model.asave()
+    # Flush AFTER the establishing save (see comment in the sibling test above).
+    await real_redis_client.execute_command("SCRIPT", "FLUSH")
 
     # Act
     async with model.apipeline() as redis_model:

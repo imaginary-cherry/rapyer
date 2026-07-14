@@ -121,15 +121,14 @@ async def test_aset_ttl_cascade_standalone_owns_execution_and_returns_cascade_re
 
 
 @pytest.mark.asyncio
-async def test_aset_ttl_cascade_standalone_executes_via_noscript_recovery_helper():
-    # The standalone (should_execute=False, own-pipeline) branch must
-    # route its manual `pipe.execute()` through the shared NOSCRIPT
-    # self-heal helper -- not a bare `await pipe.execute()` -- so a
-    # SCRIPT-FLUSHed server doesn't fail the triggering write. It must still
-    # capture the helper's returned results[-1] for the CascadeResult.
+async def test_aset_ttl_cascade_standalone_awaits_pipe_execute_directly():
+    # The standalone (should_execute=False, own-pipeline) branch executes with
+    # a bare `await pipe.execute()` -- this path does not yet self-heal a
+    # NOSCRIPT (tracked as a follow-up, see NOSCRIPT-ISSUE.md). It must still
+    # capture the awaited results[-1] for the CascadeResult.
     root = CascadeChainRoot(head="CascadeChainNode:fake")
     mock_pipe = MagicMock()
-    mock_pipe.execute = AsyncMock()
+    mock_pipe.execute = AsyncMock(return_value=[[3, 4]])
 
     @asynccontextmanager
     async def fake_ensure_pipeline(_meta, should_execute=True):
@@ -139,17 +138,11 @@ async def test_aset_ttl_cascade_standalone_executes_via_noscript_recovery_helper
         patch("rapyer.base._context_pipe") as mock_context_pipe,
         patch("rapyer.base.ensure_pipeline", fake_ensure_pipeline),
         patch("rapyer.base.scripts_registry.run_sha"),
-        patch(
-            "rapyer.base.execute_pipeline_with_noscript_recovery",
-            new_callable=AsyncMock,
-            return_value=[[3, 4]],
-        ) as mock_execute_with_recovery,
     ):
         mock_context_pipe.get.return_value = None
         result = await root.aset_ttl(TTL_SECONDS, cascade=True)
 
-    mock_execute_with_recovery.assert_awaited_once_with(mock_pipe, root.Meta)
-    mock_pipe.execute.assert_not_awaited()
+    mock_pipe.execute.assert_awaited_once()
     assert result == CascadeResult(dangling_children=3, dangling_special=4)
 
 

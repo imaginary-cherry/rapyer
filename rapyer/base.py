@@ -24,6 +24,7 @@ from redis.asyncio.client import Pipeline
 from redis.commands.search.aggregation import AggregateRequest
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
+from redis.exceptions import NoScriptError, ResponseError
 
 from rapyer.actions import (
     ActionGroup,
@@ -38,7 +39,6 @@ from rapyer.config import RedisConfig
 from rapyer.context import (
     _context_pipe,
     ensure_pipeline,
-    execute_pipeline_with_noscript_recovery,
     get_pipe_json,
     pipeline_with_execution,
     with_pipe_context,
@@ -50,6 +50,7 @@ from rapyer.errors import (
     DuplicateModelNameError,
     KeyNotFound,
     MissingParameterError,
+    PersistentNoScriptError,
     RapyerModelDoesntExistError,
     UnsupportedArgumentTypeError,
     UnsupportedArgumentValueError,
@@ -626,9 +627,11 @@ class AtomicRedisModel(BaseModel):
             if in_outer_pipe:
                 # Outer caller owns execution; we cannot observe the result here.
                 return None
-            # Route through the shared NOSCRIPT self-heal helper so a
-            # SCRIPT-FLUSHed server doesn't fail this write with no retry.
-            results = await execute_pipeline_with_noscript_recovery(pipe, self.Meta)
+            # NOTE: bare execute -- this TTL-refresh path does not yet
+            # self-heal a NOSCRIPT (e.g. after SCRIPT FLUSH). Extending the
+            # same EVALSHA-only-replay recovery _apipeline uses to this path
+            # is tracked as a follow-up (see NOSCRIPT-ISSUE.md).
+            results = await pipe.execute()
         if not cascade:
             # Matches the old plain-EXPIRE contract: a non-cascading call
             # returns None, even though it now runs through the same script.
@@ -1388,8 +1391,42 @@ async def _apipeline(
     async with redis.pipeline(transaction=True) as pipe:
         with with_pipe_context(pipe):
             yield pipe
-            # Single shared NOSCRIPT self-heal (EVALSHA-only replay) so this
-            # path and ensure_pipeline/pipeline_with_execution cannot drift.
-            await execute_pipeline_with_noscript_recovery(
-                pipe, _meta, ignore_redis_error
-            )
+            commands_backup = list(pipe.command_stack)
+            noscript_on_first_attempt = False
+            noscript_on_retry = False
+
+            try:
+                await pipe.execute()
+            except NoScriptError:
+                noscript_on_first_attempt = True
+            except ResponseError as exc:
+                if ignore_redis_error:
+                    logger.warning(
+                        "Swallowed ResponseError during pipeline.execute() with "
+                        "ignore_redis_error=True: %s",
+                        exc,
+                    )
+                else:
+                    raise
+
+            if noscript_on_first_attempt:
+                await scripts_registry.handle_noscript_error(redis, _meta)
+                evalsha_commands = [
+                    (args, options)
+                    for args, options in commands_backup
+                    if args[0] == "EVALSHA"
+                ]
+                # Retry execute the pipeline actions
+                async with redis.pipeline(transaction=True) as retry_pipe:
+                    for args, options in evalsha_commands:
+                        retry_pipe.execute_command(*args, **options)
+                    try:
+                        await retry_pipe.execute()
+                    except NoScriptError:
+                        noscript_on_retry = True
+
+            if noscript_on_retry:
+                raise PersistentNoScriptError(
+                    "NOSCRIPT error persisted after re-registering scripts. "
+                    "This indicates a server-side problem with Redis."
+                )

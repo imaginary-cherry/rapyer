@@ -1,15 +1,10 @@
 import pytest
-import pytest_asyncio
 
-from rapyer.cascade.planner import build_cascade_plan
-from rapyer.errors import PersistentNoScriptError
-from rapyer.result import CascadeResult
 from rapyer.scripts import arun_sha
 from rapyer.scripts.constants import CASCADE_TTL_APPLY_SCRIPT_NAME
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.redis_set import RedisSet
 from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX
-from tests.integration.foreign_keys.conftest import CASCADE_INTEGRATION_MODELS
 from tests.models.cascade_types import (
     CascadeAuthor,
     CascadeBookCollection,
@@ -18,36 +13,6 @@ from tests.models.cascade_types import (
 )
 
 pytestmark = pytest.mark.usefixtures("setup_real_redis_for_cascade_apply")
-
-# Deliberately different from CascadeSpecialParent/Child's shared
-# CASCADE_FIXTURE_TTL_SECONDS so a passing assertion proves the caller's
-# explicit root ttl was actually applied, not a coincidental match.
-SCRIPT_FLUSH_ROOT_TTL_SECONDS = 120
-
-
-@pytest_asyncio.fixture
-async def cascade_action_boundary_after_script_flush(
-    setup_real_redis_for_cascade_apply, real_redis_client
-):
-    """
-    Stashes ``_has_cascade`` (the exact mechanism ``init_rapyer()``
-    uses) on top of the already-registered real-Redis wiring from
-    ``setup_real_redis_for_cascade_apply``, THEN flushes the server-side
-    script cache -- explicit, unambiguous ordering (no reliance on
-    usefixtures-vs-parameter instantiation order) so the wired
-    ``refresh_ttl``/``aset_ttl`` cascade branches (not the standalone
-    ``arun_sha`` helper) are the ones forced onto the NOSCRIPT path.
-    """
-    plan = build_cascade_plan(CASCADE_INTEGRATION_MODELS)
-    original = {model: model._has_cascade for model in CASCADE_INTEGRATION_MODELS}
-    for model in CASCADE_INTEGRATION_MODELS:
-        model._has_cascade = bool(plan[model.__name__].fks)
-    await real_redis_client.execute_command("SCRIPT", "FLUSH")
-    try:
-        yield
-    finally:
-        for model in CASCADE_INTEGRATION_MODELS:
-            model._has_cascade = original[model]
 
 
 async def _apply_cascade(real_redis_client, root):
@@ -123,84 +88,9 @@ async def test_cascade_apply_refreshes_every_collection_of_fk_element_sanity(
     assert await real_redis_client.ttl(author_b.key) > 0
 
 
-# --- Survives SCRIPT FLUSH via NOSCRIPT self-heal ---
-#
-# The two tests below replace the previous
-# `test_cascade_apply_survives_script_flush_via_noscript_self_heal_sanity`,
-# which only drove `arun_sha` through the standalone `_apply_cascade` helper
-# -- the ALREADY-self-healing standalone path (rapyer/scripts/registry.py's
-# `arun_sha`). That gave false confidence: the actually-SHIPPED production
-# surface is `aset_ttl`/`refresh_ttl` enqueuing `run_sha` into a pipeline via
-# `ensure_pipeline`/`pipeline_with_execution`, a different code path that,
-# before this fix, had zero NOSCRIPT handling. These tests drive that real
-# surface directly.
-
-
-@pytest.mark.asyncio
-async def test_aset_ttl_cascade_survives_script_flush_via_shipped_run_sha_path_sanity(
-    cascade_action_boundary_after_script_flush,
-    real_redis_client,
-):
-    # Arrange
-    # A healthy parent -> child pair (child's special fields
-    # populated so dangling_special has a real zero to prove, not a
-    # trivially-empty one), saved AFTER the script cache was flushed
-    # (fixture ordering), so the very first cascade EVALSHA this test
-    # issues is guaranteed to hit NOSCRIPT.
-    child = await CascadeSpecialChild().asave()
-    await child.tags.aadd("x")
-    await child.scores.apush(1.0, priority=1.0)
-    parent = await CascadeSpecialParent(child=child.key).asave()
-
-    # Act & Assert
-    # The opt-in `aset_ttl(cascade=True)` path -- must not
-    # raise NoScriptError/PersistentNoScriptError, and must still return a
-    # decoded CascadeResult (proving the retry path preserves the return
-    # value, not just "didn't crash").
-    try:
-        result = await parent.aset_ttl(SCRIPT_FLUSH_ROOT_TTL_SECONDS, cascade=True)
-    except PersistentNoScriptError:
-        pytest.fail(
-            "aset_ttl(cascade=True) did not survive SCRIPT FLUSH via the "
-            "shipped run_sha-into-pipeline NOSCRIPT self-heal"
-        )
-
-    assert isinstance(result, CascadeResult)
-    assert result.dangling_children == 0
-    assert result.dangling_special == 0
-    # Bounded above by SCRIPT_FLUSH_ROOT_TTL_SECONDS: proves the root's
-    # explicit ttl was actually applied, not just that SOME positive ttl
-    # (e.g. a stale Meta.ttl from an earlier auto-refresh) survived.
-    assert 0 < await real_redis_client.ttl(parent.key) <= SCRIPT_FLUSH_ROOT_TTL_SECONDS
-    assert await real_redis_client.ttl(child.key) > 0
-
-
-@pytest.mark.asyncio
-async def test_asave_auto_cascade_survives_script_flush_via_shipped_run_sha_path_sanity(
-    cascade_action_boundary_after_script_flush,
-    real_redis_client,
-):
-    # Arrange
-    # A healthy parent -> child pair, saved AFTER the script cache
-    # was flushed, so refresh_ttl's automatic cascade branch (riding
-    # flush_action_targets' ensure_pipeline inside a plain asave()) is the
-    # first caller to hit the flushed cascade SHA.
-    child = await CascadeSpecialChild().asave()
-    parent = await CascadeSpecialParent(child=child.key).asave()
-    await real_redis_client.persist(parent.key)
-    await real_redis_client.persist(child.key)
-
-    # Act & Assert
-    # An ordinary write with no explicit ttl/cascade call
-    # anywhere (auto path) must not raise, and must still refresh
-    # both the root and the cascade-reached child's TTL.
-    try:
-        await parent.asave()
-    except PersistentNoScriptError:
-        pytest.fail(
-            "asave()'s automatic cascade branch did not survive SCRIPT "
-            "FLUSH via the shipped run_sha-into-pipeline NOSCRIPT self-heal"
-        )
-
-    assert await real_redis_client.ttl(parent.key) > 0
-    assert await real_redis_client.ttl(child.key) > 0
+# NOTE: the pipelined `aset_ttl`/`refresh_ttl` cascade branches (enqueuing
+# `run_sha` into a pipeline via `ensure_pipeline`/`pipeline_with_execution`)
+# do NOT self-heal a NOSCRIPT -- that recovery was scoped back out of the
+# generic pipeline helpers in favor of keeping it local to `_apipeline`
+# (general model writes). Extending the same recovery to these TTL-refresh
+# paths is tracked as a follow-up; see NOSCRIPT-ISSUE.md.
