@@ -249,10 +249,13 @@ class AtomicRedisModel(BaseModel):
             return None
         pipe_context = ensure_pipeline if can_use_pipeline else pipeline_with_execution
         async with pipe_context(self.Meta) as pipe:
-            # Always go through the cascade script. With no outgoing edges it
-            # just re-arms this model's own keys to its Meta.ttl (the root has
-            # no caller-supplied ttl on the auto path). The dangling-count
-            # return is discarded, like the previous pipe.expire returns were.
+            # Always go through the cascade script, and always cascade (ARGV
+            # cascade=1): the auto-refresh path re-arms the whole reachable
+            # subtree on every action, not just this model's own keys. With no
+            # outgoing edges it just re-arms this model's own keys to its
+            # Meta.ttl (the root has no caller-supplied ttl on the auto path).
+            # The dangling-count return is discarded, like the previous
+            # pipe.expire returns were.
             scripts_registry.run_sha(
                 pipe,
                 CASCADE_TTL_APPLY_SCRIPT_NAME,
@@ -261,6 +264,7 @@ class AtomicRedisModel(BaseModel):
                 type(self).__name__,
                 SPECIAL_FIELD_KEY_PREFIX,
                 self.Meta.ttl,
+                1,
             )
             return None
 
@@ -594,18 +598,16 @@ class AtomicRedisModel(BaseModel):
         if self.is_inner_model():
             raise RuntimeError("Can only set TTL from top level model")
 
-        if not cascade or not self._has_cascade:
-            # No cascade requested (or no outgoing edges): plain per-key EXPIRE,
-            # identical to the non-cascade behavior.
-            async with ensure_pipeline(self.Meta) as pipe:
-                for key in self._ttl_keys():
-                    pipe.expire(key, ttl)
-            return None
-
-        # A non-positive ttl is passed straight to EXPIRE for the root's own
+        # Always route through the cascade script -- unified for both cascade
+        # and non-cascade calls. The `cascade` param is now a per-call ARGV
+        # flag the Lua reads (not a gate on whether the script runs at all):
+        # cascade=False refreshes only this model's own keys (main + special),
+        # following no edges; cascade=True also walks the FK graph. A
+        # non-positive ttl is passed straight to EXPIRE for the root's own
         # keys, so it deletes the root immediately (legacy EXPIRE semantics)
-        # while each cascade child is re-armed to its own positive Meta.ttl.
-        # Pass a positive ttl to keep the whole subtree alive.
+        # while each cascade child (when cascade=True) is re-armed to its own
+        # positive Meta.ttl. Pass a positive ttl to keep the whole subtree
+        # alive.
         #
         # Check for an outer pipeline BEFORE entering the pipeline context,
         # since ensure_pipeline itself pushes a pipeline into context.
@@ -619,6 +621,7 @@ class AtomicRedisModel(BaseModel):
                 type(self).__name__,
                 SPECIAL_FIELD_KEY_PREFIX,
                 ttl,
+                1 if cascade else 0,
             )
             if in_outer_pipe:
                 # Outer caller owns execution; we cannot observe the result here.
@@ -626,6 +629,10 @@ class AtomicRedisModel(BaseModel):
             # Route through the shared NOSCRIPT self-heal helper so a
             # SCRIPT-FLUSHed server doesn't fail this write with no retry.
             results = await execute_pipeline_with_noscript_recovery(pipe, self.Meta)
+        if not cascade:
+            # Matches the old plain-EXPIRE contract: a non-cascading call
+            # returns None, even though it now runs through the same script.
+            return None
         dangling_children, dangling_special = results[-1]
         return CascadeResult(
             dangling_children=dangling_children, dangling_special=dangling_special

@@ -52,6 +52,7 @@ async def test_refresh_ttl_cascade_enabled_model_calls_run_sha_not_expire():
         "CascadeChainRoot",
         SPECIAL_FIELD_KEY_PREFIX,
         root.Meta.ttl,
+        1,
     )
     mock_pipe.expire.assert_not_called()
 
@@ -82,5 +83,6 @@ async def test_refresh_ttl_non_cascade_model_also_calls_run_sha():
         "CascadeAuthor",
         SPECIAL_FIELD_KEY_PREFIX,
         author.Meta.ttl,
+        1,
     )
     mock_pipe.expire.assert_not_called()

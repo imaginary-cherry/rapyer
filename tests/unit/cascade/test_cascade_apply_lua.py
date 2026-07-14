@@ -33,7 +33,7 @@ from tests.models.cascade_types import (
 pytestmark = pytest.mark.usefixtures("setup_fake_redis_for_cascade_apply")
 
 
-async def _apply_cascade(fake_redis_client, root):
+async def _apply_cascade(fake_redis_client, root, cascade=True):
     return await arun_sha(
         fake_redis_client,
         type(root).Meta,
@@ -43,6 +43,7 @@ async def _apply_cascade(fake_redis_client, root):
         type(root).__name__,
         SPECIAL_FIELD_KEY_PREFIX,
         type(root).Meta.ttl,
+        1 if cascade else 0,
     )
 
 
@@ -80,6 +81,83 @@ async def test_cascade_apply_refreshes_special_field_child_keys_sanity(
         )
         > 0
     )
+
+
+# --- ARGV[4] cascade gate ---
+
+
+@pytest.mark.asyncio
+async def test_cascade_apply_with_cascade_false_refreshes_only_root_main_and_special_keys(
+    fake_redis_client,
+):
+    # Arrange
+    # A saved parent -> child pair with the child's special fields
+    # populated, so a wrongly-cascading call would have something to reach.
+    child = await CascadeSpecialChild().asave()
+    await child.tags.aadd("x")
+    await child.scores.apush(1.0, priority=1.0)
+    parent = await CascadeSpecialParent(child=child.key).asave()
+    await fake_redis_client.persist(parent.key)
+    await fake_redis_client.persist(child.key)
+    # aadd/apush already auto-refresh the special-field keys' own TTL (via
+    # refresh_ttl_if_needed), unrelated to the cascade call under test --
+    # persist them too so a positive TTL after Act can only be explained by
+    # a (wrongly) cascading call, not by that earlier auto-refresh.
+    await fake_redis_client.persist(RedisSet.special_field_key(child.key, "tags"))
+    await fake_redis_client.persist(
+        RedisPriorityQueue.special_field_key(child.key, "scores")
+    )
+
+    # Act
+    # ARGV[4]=0 (cascade=False): no edge is ever followed.
+    await _apply_cascade(fake_redis_client, parent, cascade=False)
+
+    # Assert
+    # The root's own key (and its own special-field keys, of which
+    # CascadeSpecialParent has none) is refreshed...
+    assert await fake_redis_client.ttl(parent.key) > 0
+    # ...but the FK-edged child (main key AND its own special-field keys)
+    # is never reached.
+    assert await fake_redis_client.ttl(child.key) in (-1, -2)
+    assert await fake_redis_client.ttl(
+        RedisSet.special_field_key(child.key, "tags")
+    ) in (-1, -2)
+    assert await fake_redis_client.ttl(
+        RedisPriorityQueue.special_field_key(child.key, "scores")
+    ) in (-1, -2)
+
+
+@pytest.mark.asyncio
+async def test_cascade_apply_with_cascade_false_still_refreshes_roots_own_special_keys(
+    fake_redis_client,
+):
+    # Arrange
+    # The root itself carries populated special fields; cascade=False must
+    # still refresh those (they belong to the root, not a cascade-reached
+    # child) even though no edge is followed.
+    child = await CascadeSpecialChild().asave()
+    await child.tags.aadd("x")
+    await child.scores.apush(1.0, priority=1.0)
+    await fake_redis_client.persist(child.key)
+
+    # Act
+    result = await _apply_cascade(fake_redis_client, child, cascade=False)
+
+    # Assert
+    # The root's own main key and its own special-field keys all refresh.
+    assert await fake_redis_client.ttl(child.key) > 0
+    assert (
+        await fake_redis_client.ttl(RedisSet.special_field_key(child.key, "tags")) > 0
+    )
+    assert (
+        await fake_redis_client.ttl(
+            RedisPriorityQueue.special_field_key(child.key, "scores")
+        )
+        > 0
+    )
+    # A leaf model has no outgoing edges either way, so the dangling counts
+    # stay zero regardless of the cascade flag.
+    assert result == [0, 0]
 
 
 # --- Dangling-count contract ---

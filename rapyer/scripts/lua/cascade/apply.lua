@@ -18,6 +18,13 @@ local special_prefix = ARGV[2]
 -- special), never to any cascade-reached child -- every child still expires at
 -- its owning class's baked-in Meta.ttl.
 local root_ttl = tonumber(ARGV[3])
+-- Per-call cascade gate: whether to follow edges out of the root at all. The
+-- root's own main + special keys ALWAYS refresh regardless of this flag --
+-- only the initial push_edges walk (and everything it would reach) is gated.
+-- ARGV[4] is new; older callers that never pass it get tonumber(nil) == nil,
+-- and nil ~= 0 is true in Lua, so a missing ARGV[4] defaults to cascading
+-- (backward-compatible with every pre-existing caller).
+local do_cascade = tonumber(ARGV[4]) ~= 0
 
 -- Collect-phase state: the read walk queues every key needing a refresh (deduped
 -- into refresh_order); the shell at the bottom holds the one mutation (the EXPIRE
@@ -249,7 +256,11 @@ local function plan_refresh_keys()
     visited[root_key] = UNBOUNDED
     -- The root frame is UNBOUNDED + not-yet-established: the very first hop
     -- out of any cascade root is always treated as entering a fresh subtree.
-    push_edges(root_key, root_class, UNBOUNDED, false)
+    -- Skipped entirely when do_cascade is false: the root's own keys (queued
+    -- above) are the only thing refreshed, and no edge is ever followed.
+    if do_cascade then
+        push_edges(root_key, root_class, UNBOUNDED, false)
+    end
 
     while #stack > 0 do
         local item = table.remove(stack)
