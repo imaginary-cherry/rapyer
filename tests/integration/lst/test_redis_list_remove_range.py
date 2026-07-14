@@ -197,16 +197,21 @@ async def test_redis_list_remove_range_without_pipeline_no_changes_sanity(
 
 
 @pytest.mark.asyncio
-async def test_remove_range_raises_scripts_not_initialized_error_when_init_rapyer_not_called_error(
-    clear_script_state,
-):
-    # Arrange
+async def test_remove_range_raises_scripts_not_initialized_error_when_init_rapyer_not_called_error():
+    # Arrange - save while scripts are loaded, then clear the registry so only
+    # the pipeline's remove_range call hits the missing script
     model = ComprehensiveTestModel(tags=["a", "b", "c", "d", "e"])
     await model.asave()
 
-    # Act & Assert
-    with pytest.raises(ScriptsNotInitializedError) as exc_info:
-        async with model.apipeline():
-            model.tags.remove_range(1, 3)
+    original_shas = _REGISTERED_SCRIPT_SHAS.copy()
+    _REGISTERED_SCRIPT_SHAS.clear()
+    try:
+        # Act & Assert
+        with pytest.raises(ScriptsNotInitializedError) as exc_info:
+            async with model.apipeline():
+                model.tags.remove_range(1, 3)
 
-    assert "init_rapyer()" in str(exc_info.value)
+        assert "init_rapyer()" in str(exc_info.value)
+    finally:
+        _REGISTERED_SCRIPT_SHAS.clear()
+        _REGISTERED_SCRIPT_SHAS.update(original_shas)

@@ -69,12 +69,14 @@ async def test_pipeline_recovers_with_all_redis_types_after_script_flush_sanity(
 
 @pytest.mark.asyncio
 async def test_pipeline_raises_persistent_noscript_error_when_scripts_keep_failing_error(
-    flush_scripts,
+    real_redis_client,
     disable_noscript_recovery,
 ):
-    # Arrange
+    # Arrange - save while scripts are loaded, then flush server-side so only
+    # the pipeline's remove_range call hits NOSCRIPT
     model = ComprehensiveTestModel(tags=["a", "b", "c"])
     await model.asave()
+    await real_redis_client.execute_command("SCRIPT", "FLUSH")
 
     # Act & Assert
     with pytest.raises(PersistentNoScriptError) as exc_info:

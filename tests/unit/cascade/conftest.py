@@ -61,19 +61,36 @@ CASCADE_PLANNER_MODELS = [
     CascadeMaxBudgetRoot,
 ]
 
+# init_rapyer() authoritatively resets Meta.cascade_ttl to None on every registered
+# model (see test_init_rapyer_cascade_ttl.py). Snapshotting here, at conftest import
+# time, captures each class's declared value before any test can call init_rapyer().
+_DECLARED_CASCADE_TTL = {
+    model: model.Meta.cascade_ttl for model in CASCADE_PLANNER_MODELS
+}
+
 
 @pytest.fixture
 def setup_fake_redis_for_cascade_models(fake_redis_client):
     original_clients = {}
     for model in CASCADE_PLANNER_MODELS:
-        original_clients[model] = (model.Meta.redis, model.Meta.is_fake_redis)
+        original_clients[model] = (
+            model.Meta.redis,
+            model.Meta.is_fake_redis,
+            model.Meta.cascade_ttl,
+        )
         model.Meta.redis = fake_redis_client
         model.Meta.is_fake_redis = True
+        model.Meta.cascade_ttl = _DECLARED_CASCADE_TTL[model]
     resolve_relational_targets(CASCADE_PLANNER_MODELS)
     yield
-    for model, (original_redis, original_is_fake) in original_clients.items():
+    for model, (
+        original_redis,
+        original_is_fake,
+        original_cascade_ttl,
+    ) in original_clients.items():
         model.Meta.redis = original_redis
         model.Meta.is_fake_redis = original_is_fake
+        model.Meta.cascade_ttl = original_cascade_ttl
 
 
 @pytest_asyncio.fixture
@@ -87,12 +104,22 @@ async def setup_fake_redis_for_cascade_apply(fake_redis_client):
     """
     original_clients = {}
     for model in CASCADE_PLANNER_MODELS:
-        original_clients[model] = (model.Meta.redis, model.Meta.is_fake_redis)
+        original_clients[model] = (
+            model.Meta.redis,
+            model.Meta.is_fake_redis,
+            model.Meta.cascade_ttl,
+        )
         model.Meta.redis = fake_redis_client
         model.Meta.is_fake_redis = True
+        model.Meta.cascade_ttl = _DECLARED_CASCADE_TTL[model]
     resolve_relational_targets(CASCADE_PLANNER_MODELS)
     await register_scripts(fake_redis_client, is_fakeredis=True)
     yield
-    for model, (original_redis, original_is_fake) in original_clients.items():
+    for model, (
+        original_redis,
+        original_is_fake,
+        original_cascade_ttl,
+    ) in original_clients.items():
         model.Meta.redis = original_redis
         model.Meta.is_fake_redis = original_is_fake
+        model.Meta.cascade_ttl = original_cascade_ttl
