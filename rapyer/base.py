@@ -249,13 +249,8 @@ class AtomicRedisModel(BaseModel):
             return None
         pipe_context = ensure_pipeline if can_use_pipeline else pipeline_with_execution
         async with pipe_context(self.Meta) as pipe:
-            # Always go through the cascade script, and always cascade (ARGV
-            # cascade=1): the auto-refresh path re-arms the whole reachable
-            # subtree on every action, not just this model's own keys. With no
-            # outgoing edges it just re-arms this model's own keys to its
-            # Meta.ttl (the root has no caller-supplied ttl on the auto path).
-            # The dangling-count return is discarded, like the previous
-            # pipe.expire returns were.
+            # Always cascade (ARGV cascade=1): re-arms the whole reachable
+            # subtree; with no outgoing edges it just re-arms this model's own keys.
             scripts_registry.run_sha(
                 pipe,
                 CASCADE_TTL_APPLY_SCRIPT_NAME,
@@ -598,17 +593,9 @@ class AtomicRedisModel(BaseModel):
         if self.is_inner_model():
             raise RuntimeError("Can only set TTL from top level model")
 
-        # Always route through the cascade script -- unified for both cascade
-        # and non-cascade calls. The `cascade` param is now a per-call ARGV
-        # flag the Lua reads (not a gate on whether the script runs at all):
-        # cascade=False refreshes only this model's own keys (main + special),
-        # following no edges; cascade=True also walks the FK graph. A
-        # non-positive ttl is passed straight to EXPIRE for the root's own
-        # keys, so it deletes the root immediately (legacy EXPIRE semantics)
-        # while each cascade child (when cascade=True) is re-armed to its own
-        # positive Meta.ttl. Pass a positive ttl to keep the whole subtree
-        # alive.
-        #
+        # aset_ttl always routes through the cascade script, and `cascade` is a
+        # per-call ARGV (0 = root's own keys only, 1 = walk the FK graph).
+
         # Check for an outer pipeline BEFORE entering the pipeline context,
         # since ensure_pipeline itself pushes a pipeline into context.
         in_outer_pipe = _context_pipe.get() is not None
@@ -626,10 +613,7 @@ class AtomicRedisModel(BaseModel):
             if in_outer_pipe:
                 # Outer caller owns execution; we cannot observe the result here.
                 return None
-            # NOTE: bare execute -- this TTL-refresh path does not yet
-            # self-heal a NOSCRIPT (e.g. after SCRIPT FLUSH). Extending the
-            # same EVALSHA-only-replay recovery _apipeline uses to this path
-            # is tracked as a follow-up (see NOSCRIPT-ISSUE.md).
+            # NOTE: bare execute -- no NOSCRIPT self-heal yet here (tracked follow-up in issue #284).
             results = await pipe.execute()
         if not cascade:
             # Matches the old plain-EXPIRE contract: a non-cascading call
