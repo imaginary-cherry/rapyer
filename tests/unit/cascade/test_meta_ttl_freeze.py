@@ -24,7 +24,8 @@ def cascade_models():
 
 
 def test_fresh_redis_config_ttl_assignment_never_raises_sanity():
-    # Arrange & Act
+    # Arrange
+    # Act
     config = RedisConfig(ttl=30)
 
     # Assert
@@ -36,9 +37,11 @@ def test_frozen_redis_config_ttl_assignment_raises_and_leaves_ttl_unchanged_sani
     config = RedisConfig(ttl=30)
     config._meta_locked = True
 
-    # Act & Assert
+    # Act
     with pytest.raises(MetaFrozenError):
         config.ttl = 60
+
+    # Assert
     assert config.ttl == 30
 
 

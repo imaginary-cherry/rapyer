@@ -17,7 +17,8 @@ def test_cascade_ttl_default_values_sanity():
 
 
 def test_cascade_ttl_defaults_match_explicit_construction_sanity():
-    # Act & Assert
+    # Act
+    # Assert
     assert CascadeTTL() == CascadeTTL(
         enabled=True, depth=None, mode=TTLCascadeMode.EXTEND
     )
@@ -27,7 +28,8 @@ def test_cascade_ttl_is_frozen_dataclass_sanity():
     # Arrange
     cascade_ttl = CascadeTTL()
 
-    # Act & Assert
+    # Act
+    # Assert
     assert dataclasses.is_dataclass(cascade_ttl)
     with pytest.raises(dataclasses.FrozenInstanceError):
         cascade_ttl.enabled = False
@@ -35,7 +37,8 @@ def test_cascade_ttl_is_frozen_dataclass_sanity():
 
 @pytest.mark.parametrize(["depth"], [[-1], [-10]])
 def test_cascade_ttl_negative_depth_raises_sanity(depth):
-    # Act & Assert
+    # Act
+    # Assert
     with pytest.raises(InvalidCascadeDepthError):
         CascadeTTL(depth=depth)
 
@@ -55,11 +58,13 @@ def test_cascade_spec_negative_depth_raises_sanity():
     class ConcreteCascadeSpec(CascadeSpec):
         pass
 
-    # Act & Assert
+    # Act
+    # Assert
     with pytest.raises(InvalidCascadeDepthError):
         ConcreteCascadeSpec(depth=-1)
 
 
 def test_ttl_cascade_mode_has_extend_member_sanity():
-    # Act & Assert
+    # Act
+    # Assert
     assert TTLCascadeMode.EXTEND.value == "extend"

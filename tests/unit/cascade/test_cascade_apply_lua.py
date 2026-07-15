@@ -266,6 +266,7 @@ async def test_shape1_chain_root_reaches_the_expected_prefix_of_the_chain_sanity
 async def test_depth0_shallow_root_extends_via_explicit_override_matches_hand_derived_expected_set(
     fake_redis_client,
 ):
+    # Arrange
     # Regression. CascadeShallowRoot.entry carries CascadeTTL(depth=0)
     # — the value that used to compute `depth - 1 == -1 == UNBOUNDED` and turn the
     # whole subtree unbounded. CascadeExtendingNode.onward is an explicit depth=5
@@ -295,6 +296,7 @@ async def test_depth0_shallow_root_extends_via_explicit_override_matches_hand_de
 async def test_independent_sibling_depth_budgets_match_hand_derived_expected_set(
     fake_redis_client,
 ):
+    # Arrange
     # Regression on the blanket-decrement path (distinguishes the fixed Lua
     # from the old off-by-one). CascadeMultiDepthRoot.short_reach=depth1 reaches
     # exactly s1,s2; long_reach=depth3 reaches the whole l-chain. Two SEPARATE
@@ -607,6 +609,7 @@ async def test_blanket_opt_out_field_stops_traversal_despite_blanket_global(
 async def test_nested_submodel_zero_hop_does_not_consume_depth_budget(
     fake_redis_client,
 ):
+    # Arrange
     # Budget-non-consumption contract, ported from the
     # deleted test_nested_submodel_hop_does_not_consume_the_depth_budget
     # planner unit test. CascadeNestedDepthRoot.holder carries an explicit

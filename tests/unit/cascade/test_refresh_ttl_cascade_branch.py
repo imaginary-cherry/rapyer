@@ -10,6 +10,7 @@ from tests.models.cascade_types import CascadeAuthor, CascadeChainRoot
 
 @pytest.mark.asyncio
 async def test_refresh_ttl_cascade_enabled_model_calls_run_sha_not_expire():
+    # Arrange
     root = CascadeChainRoot(head="CascadeChainNode:fake")
     mock_pipe = MagicMock()
 
@@ -21,8 +22,10 @@ async def test_refresh_ttl_cascade_enabled_model_calls_run_sha_not_expire():
         patch("rapyer.base.ensure_pipeline", fake_ensure_pipeline),
         patch("rapyer.base.scripts_registry.run_sha") as mock_run_sha,
     ):
+        # Act
         await root.refresh_ttl(can_use_pipeline=True)
 
+    # Assert
     mock_run_sha.assert_called_once_with(
         mock_pipe,
         CASCADE_TTL_APPLY_SCRIPT_NAME,
@@ -38,6 +41,7 @@ async def test_refresh_ttl_cascade_enabled_model_calls_run_sha_not_expire():
 
 @pytest.mark.asyncio
 async def test_refresh_ttl_non_cascade_model_also_calls_run_sha():
+    # Arrange
     # refresh_ttl always routes through the cascade script; a model with no
     # outgoing edges just re-arms its own keys via the script, never expire.
     author = CascadeAuthor()
@@ -51,8 +55,10 @@ async def test_refresh_ttl_non_cascade_model_also_calls_run_sha():
         patch("rapyer.base.ensure_pipeline", fake_ensure_pipeline),
         patch("rapyer.base.scripts_registry.run_sha") as mock_run_sha,
     ):
+        # Act
         await author.refresh_ttl(can_use_pipeline=True)
 
+    # Assert
     mock_run_sha.assert_called_once_with(
         mock_pipe,
         CASCADE_TTL_APPLY_SCRIPT_NAME,

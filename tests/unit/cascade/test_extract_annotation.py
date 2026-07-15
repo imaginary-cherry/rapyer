@@ -37,7 +37,8 @@ def test_wrong_annotation_type_returns_none():
 
 
 def test_non_annotated_field_returns_none():
-    # Arrange / Act
+    # Arrange
+    # Act
     result = extract_annotation(int, CascadeTTL)
 
     # Assert

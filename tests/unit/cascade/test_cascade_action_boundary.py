@@ -137,8 +137,11 @@ async def test_asave_on_non_cascade_model_refreshes_ttl_via_the_cascade_script(
     # refresh_ttl always routes through the cascade script now, so even a
     # non-cascade model's write refreshes its own keys via the script (with no
     # outgoing edges it simply re-arms them), rather than a per-key EXPIRE loop.
+
+    # Act
     with patch("rapyer.base.scripts_registry.run_sha") as mock_run_sha:
         await CascadeBookPlain(author="CascadeAuthor:fake").asave()
 
+    # Assert
     assert mock_run_sha.call_count == 1
     assert mock_run_sha.call_args.args[1] == CASCADE_TTL_APPLY_SCRIPT_NAME
