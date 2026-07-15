@@ -640,3 +640,38 @@ async def test_nested_submodel_zero_hop_does_not_consume_depth_budget(
         if await fake_redis_client.ttl(key) > 0
     }
     assert refreshed == {root.key, holder.key, mentor.key}
+
+
+@pytest.mark.asyncio
+async def test_node_beyond_nested_depth_budget_is_never_reached_sanity(
+    fake_redis_client,
+):
+    # Arrange
+    # Extends the sibling zero-hop test one hop further via
+    # CascadeBlanketLeaf.onward. Budget arithmetic: root's depth=1 override
+    # enters holder at budget=1; the zero-hop .profile field doesn't consume
+    # it; the real hop into .mentor (via CascadeBlanketNestedProfile's own
+    # blanket depth=2) decrements 1->0; mentor's own blanket onward edge is
+    # therefore evaluated at budget=0 and never followed.
+    beyond = await CascadeBlanketLeaf(name="beyond").asave()
+    mentor = await CascadeBlanketLeaf(name="mentor", onward=beyond.key).asave()
+    holder = await CascadeBlanketNestedHolder(
+        profile=CascadeBlanketNestedProfile(mentor=mentor.key)
+    ).asave()
+    root = await CascadeNestedDepthRoot(holder=holder.key).asave()
+    await fake_redis_client.persist(root.key)
+    await fake_redis_client.persist(holder.key)
+    await fake_redis_client.persist(mentor.key)
+    await fake_redis_client.persist(beyond.key)
+
+    # Act
+    await _apply_cascade(fake_redis_client, root)
+
+    # Assert
+    refreshed = {
+        key
+        for key in (root.key, holder.key, mentor.key)
+        if await fake_redis_client.ttl(key) > 0
+    }
+    assert refreshed == {root.key, holder.key, mentor.key}
+    assert await fake_redis_client.ttl(beyond.key) in (-1, -2)

@@ -151,11 +151,16 @@ class CascadeMultiDepthRoot(AtomicRedisModel):
 
 
 class CascadeBlanketLeaf(AtomicRedisModel):
-    """Plain leaf reached purely via a blanket-enabled global default."""
+    """Plain leaf reached purely via a blanket-enabled global default; also
+    carries an onward blanket edge so a node reached at budget=0 (via
+    another class's blanket decrement) proves depth-budget truncation."""
 
     name: str = "leaf"
+    onward: Optional[Reference["CascadeBlanketLeaf"]] = None
 
-    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+    Meta: ClassVar[RedisConfig] = RedisConfig(
+        cascade_ttl=CascadeTTL(), ttl=CASCADE_FIXTURE_TTL_SECONDS
+    )
 
 
 class CascadeBlanketRoot(AtomicRedisModel):
