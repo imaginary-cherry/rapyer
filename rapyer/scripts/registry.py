@@ -143,7 +143,7 @@ def _inject_cascade_plan(template: str, plan: dict[str, "CascadePlanEntry"]) -> 
     return template.replace(CASCADE_PLAN_PLACEHOLDER, "\n".join(lines))
 
 
-async def register_scripts(redis_client, is_fakeredis: bool = False) -> None:
+def build_script_texts(is_fakeredis: bool = False) -> dict[str, str]:
     # Late imports: SpecialFieldType lives under rapyer.types, and REDIS_MODELS/
     # build_cascade_plan live under rapyer.base/rapyer.cascade, both of which
     # depend on this module via the SCRIPT_REGISTRY constants. Importing at
@@ -163,6 +163,11 @@ async def register_scripts(redis_client, is_fakeredis: bool = False) -> None:
         scripts[name] = _inject_sf_dispatch(script_text, SpecialFieldType)
     for name, script_text in scripts.items():
         scripts[name] = _inject_cascade_plan(script_text, cascade_plan)
+    return scripts
+
+
+async def register_scripts(redis_client, is_fakeredis: bool = False) -> None:
+    scripts = build_script_texts(is_fakeredis=is_fakeredis)
     for name, script_text in scripts.items():
         sha = await redis_client.script_load(script_text)
         _REGISTERED_SCRIPT_SHAS[name] = sha

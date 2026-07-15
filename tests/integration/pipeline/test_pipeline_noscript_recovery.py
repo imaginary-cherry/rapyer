@@ -2,8 +2,20 @@ import pytest
 
 from rapyer.context import _context_pipe
 from rapyer.errors import PersistentNoScriptError
+from rapyer.scripts.constants import CASCADE_TTL_APPLY_SCRIPT_NAME
+from rapyer.scripts.registry import build_script_texts
 from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.simple_types import TTL_TEST_SECONDS, TTLRefreshTestModel
+
+
+async def _flush_all_but_cascade(redis_client):
+    # Redis has no selective SCRIPT FLUSH, so flush everything then reload only
+    # the cascade TTL script's SHA -- this leaves every data-op script (list/
+    # dict/numeric/atomic) missing (exercising _apipeline's NOSCRIPT self-heal)
+    # while TTL-refresh (which routes through the cascade script) keeps working
+    # uninterrupted.
+    await redis_client.execute_command("SCRIPT", "FLUSH")
+    await redis_client.script_load(build_script_texts()[CASCADE_TTL_APPLY_SCRIPT_NAME])
 
 
 @pytest.mark.asyncio
@@ -16,11 +28,7 @@ async def test_pipeline_recovers_from_noscript_error_after_script_flush_sanity(
         metadata={"key1": "value1"},
     )
     await model.asave()
-    # Flush AFTER the establishing save, not before: asave()'s auto TTL-refresh
-    # runs the cascade script via ensure_pipeline (its own standalone pipe),
-    # which does not self-heal NOSCRIPT (see NOSCRIPT-ISSUE.md) -- only the
-    # explicit apipeline() below (backed by _apipeline) does.
-    await real_redis_client.execute_command("SCRIPT", "FLUSH")
+    await _flush_all_but_cascade(real_redis_client)
 
     # Act
     async with model.apipeline() as redis_model:
@@ -47,8 +55,7 @@ async def test_pipeline_recovers_with_all_redis_types_after_script_flush_sanity(
         settings={"setting1": "value1"},
     )
     await model.asave()
-    # Flush AFTER the establishing save (see comment in the sibling test above).
-    await real_redis_client.execute_command("SCRIPT", "FLUSH")
+    await _flush_all_but_cascade(real_redis_client)
 
     # Act
     async with model.apipeline() as redis_model:
@@ -83,7 +90,7 @@ async def test_pipeline_raises_persistent_noscript_error_when_scripts_keep_faili
     # the pipeline's remove_range call hits NOSCRIPT
     model = ComprehensiveTestModel(tags=["a", "b", "c"])
     await model.asave()
-    await real_redis_client.execute_command("SCRIPT", "FLUSH")
+    await _flush_all_but_cascade(real_redis_client)
 
     # Act & Assert
     with pytest.raises(PersistentNoScriptError) as exc_info:
