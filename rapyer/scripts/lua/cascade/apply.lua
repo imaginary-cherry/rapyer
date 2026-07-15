@@ -87,12 +87,22 @@ end
 -- matches so both shapes reach push_edges intact.
 local function read_reference_paths(key, paths)
     -- unpack is the Lua 5.1 global redis runs on; spreads the paths as args.
-    local raw = redis.call('JSON.GET', key, unpack(paths))
+    -- redis.pcall (unlike redis.call) returns an error table instead of raising
+    -- on a Redis-level error such as WRONGTYPE -- a corrupt/WRONGTYPE reached
+    -- target becomes a dead end for further traversal, not an aborted cascade;
+    -- its own key was already queued for refresh by the caller.
+    local raw = redis.pcall('JSON.GET', key, unpack(paths))
     local values_by_path = {}
+    if type(raw) == 'table' and raw.err then
+        return values_by_path
+    end
     if not raw or raw == '' then
         return values_by_path
     end
-    local decoded = cjson.decode(raw)
+    local ok, decoded = pcall(cjson.decode, raw)
+    if not ok then
+        return values_by_path
+    end
     if #paths == 1 then  -- single-path JSON.GET returns a bare array, not an object
         local match = decoded[1]
         if match ~= nil and match ~= cjson.null then

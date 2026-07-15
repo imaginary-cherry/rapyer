@@ -8,6 +8,7 @@ from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX
 from tests.models.cascade_types import (
     CascadeAuthor,
     CascadeBookCollection,
+    CascadeChainRoot,
     CascadeDictCollectionRoot,
     CascadeSpecialChild,
     CascadeSpecialParent,
@@ -114,6 +115,27 @@ async def test_cascade_apply_refreshes_every_dict_value_fk_element_sanity(
     assert await real_redis_client.ttl(book.key) > 0
     assert await real_redis_client.ttl(author_a.key) > 0
     assert await real_redis_client.ttl(author_b.key) > 0
+
+
+@pytest.mark.asyncio
+async def test_cascade_apply_skips_corrupt_wrongtype_reached_target_sanity(
+    real_redis_client,
+):
+    # Arrange
+    # This is the SOLE regression guard for the WRONGTYPE-degradation fix in
+    # apply.lua::read_reference_paths -- fakeredis's JSON.GET does not emulate
+    # WRONGTYPE (see CONCERNS.md), so only real Redis Stack can prove this.
+    await real_redis_client.set("CascadeChainNode:corrupt", "garbage")
+    root = await CascadeChainRoot(head="CascadeChainNode:corrupt").asave()
+    await real_redis_client.persist(root.key)
+    await real_redis_client.persist("CascadeChainNode:corrupt")
+
+    # Act - before the Lua fix this raises (RED); after the fix it must not (GREEN)
+    await _apply_cascade(real_redis_client, root)
+
+    # Assert
+    assert await real_redis_client.ttl(root.key) > 0
+    assert await real_redis_client.ttl("CascadeChainNode:corrupt") > 0
 
 
 # NOTE: the pipelined `aset_ttl`/`refresh_ttl` cascade branches (enqueuing
