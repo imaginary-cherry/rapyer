@@ -39,6 +39,7 @@ async def test_multi_level_chain_reaches_expected_prefix_sanity(real_redis_clien
     identical scenario/assertions, proving JSON.GET output-shape parity for
     this scenario by construction, not by comment.
     """
+    # Arrange
     d = await CascadeChainNode(name="d").asave()
     c = await CascadeChainNode(name="c", next=d.key).asave()
     b = await CascadeChainNode(name="b", next=c.key).asave()
@@ -69,6 +70,7 @@ async def test_cyclic_two_node_cycle_does_not_hang_or_error_sanity(real_redis_cl
     identical scenario/assertions, proving JSON.GET output-shape parity for
     this scenario by construction, not by comment.
     """
+    # Arrange
     a = await CascadeChainNode(name="a").asave()
     b = await CascadeChainNode(name="b", next=a.key).asave()
     a.next = b.key
@@ -99,6 +101,7 @@ async def test_genuine_single_node_self_loop_does_not_hang_or_error_sanity(
     identical scenario/assertions, proving JSON.GET output-shape parity for
     this scenario by construction, not by comment.
     """
+    # Arrange
     node = await CascadeChainNode(name="solo").asave()
     node.next = node.key
     await node.asave()
@@ -125,6 +128,7 @@ async def test_diamond_shared_child_refreshed_exactly_once_via_either_edge_sanit
     identical scenario/assertions, proving JSON.GET output-shape parity for
     this scenario by construction, not by comment.
     """
+    # Arrange
     child = await CascadeDiamondChild(name="shared").asave()
     root = await CascadeDiamondRoot(left=child.key, right=child.key).asave()
     await real_redis_client.persist(child.key)
@@ -153,6 +157,7 @@ async def test_shared_child_via_two_independent_roots_refreshed_from_either_root
     identical scenario/assertions, proving JSON.GET output-shape parity for
     this scenario by construction, not by comment.
     """
+    # Arrange
     child = await CascadeSpecialChild().asave()
     root_a = await CascadeSpecialParent(child=child.key).asave()
     root_b = await CascadeSpecialParent(child=child.key).asave()

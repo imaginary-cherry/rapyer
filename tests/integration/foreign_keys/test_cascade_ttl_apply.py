@@ -35,6 +35,7 @@ async def _apply_cascade(real_redis_client, root):
 async def test_cascade_apply_refreshes_special_field_child_keys_sanity(
     real_redis_client,
 ):
+    # Arrange
     # Identical scenario/assertions to the fakeredis version in
     # tests/unit/cascade/test_cascade_apply_lua.py — proving JSON.GET
     # output-shape parity for this scenario by construction, not by comment.
@@ -66,6 +67,7 @@ async def test_cascade_apply_refreshes_special_field_child_keys_sanity(
 async def test_cascade_apply_refreshes_every_collection_of_fk_element_sanity(
     real_redis_client,
 ):
+    # Arrange
     # On REAL Redis, JSON.GET's single-path response for an array-valued
     # match is correctly double-wrapped (verified directly against Redis
     # Stack), so this shape-2 scenario refreshes every element — unlike the

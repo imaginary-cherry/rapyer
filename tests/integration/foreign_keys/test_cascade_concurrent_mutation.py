@@ -26,6 +26,7 @@ async def test_cascade_races_concurrent_fk_reassignment_reflects_one_consistent_
     ensure_pipeline action-boundary wiring. It does NOT prove Redis itself
     needed proving; Redis's own atomicity is a given.
     """
+    # Arrange
     child_a = await CascadeSpecialChild().asave()
     await child_a.tags.aadd("x")
     await child_a.scores.apush(1.0, priority=1.0)
@@ -36,6 +37,7 @@ async def test_cascade_races_concurrent_fk_reassignment_reflects_one_consistent_
     for key in (child_a.key, child_b.key, parent.key):
         await real_redis_client.persist(key)
 
+    # Act
     async def _reassign_child_and_save():
         parent.child = child_b.key
         await parent.asave()
