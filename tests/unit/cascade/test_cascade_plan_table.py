@@ -10,6 +10,7 @@ from tests.models.cascade_types import (
     CascadeBookCollection,
     CascadeBookDirect,
     CascadeBookNested,
+    CascadeDictCollectionRoot,
     CascadeProfile,
 )
 from tests.models.special_types import PQContainerModel, PriorityQueueModel
@@ -70,6 +71,18 @@ def test_shape2_collection_of_fk_produces_exactly_one_edge_marked_collection():
 
     # Assert
     edges = plan["CascadeBookCollection"].fks
+    assert len(edges) == 1
+    assert edges[0].is_collection is True
+    assert edges[0].target == "CascadeAuthor"
+    assert edges[0].path == "$.co_authors"
+
+
+def test_shape2_dict_of_fk_produces_exactly_one_edge_marked_collection():
+    # Act
+    plan = build_cascade_plan([CascadeDictCollectionRoot, CascadeAuthor])
+
+    # Assert
+    edges = plan["CascadeDictCollectionRoot"].fks
     assert len(edges) == 1
     assert edges[0].is_collection is True
     assert edges[0].target == "CascadeAuthor"

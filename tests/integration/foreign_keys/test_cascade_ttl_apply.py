@@ -8,6 +8,7 @@ from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX
 from tests.models.cascade_types import (
     CascadeAuthor,
     CascadeBookCollection,
+    CascadeDictCollectionRoot,
     CascadeSpecialChild,
     CascadeSpecialParent,
 )
@@ -77,6 +78,31 @@ async def test_cascade_apply_refreshes_every_collection_of_fk_element_sanity(
     author_b = await CascadeAuthor(name="b").asave()
     book = await CascadeBookCollection(
         title="anthology", co_authors=[author_a.key, author_b.key]
+    ).asave()
+    for key in (author_a.key, author_b.key, book.key):
+        await real_redis_client.persist(key)
+
+    # Act
+    await _apply_cascade(real_redis_client, book)
+
+    # Assert
+    assert await real_redis_client.ttl(book.key) > 0
+    assert await real_redis_client.ttl(author_a.key) > 0
+    assert await real_redis_client.ttl(author_b.key) > 0
+
+
+@pytest.mark.asyncio
+async def test_cascade_apply_refreshes_every_dict_value_fk_element_sanity(
+    real_redis_client,
+):
+    # Arrange
+    # Dict-value counterpart of the list-based test above -- proves JSON.GET's
+    # pairs()-based element iteration in push_edges works identically for a
+    # JSON-object-shaped match as for a JSON-array one.
+    author_a = await CascadeAuthor(name="a").asave()
+    author_b = await CascadeAuthor(name="b").asave()
+    book = await CascadeDictCollectionRoot(
+        title="anthology", co_authors={"a": author_a.key, "b": author_b.key}
     ).asave()
     for key in (author_a.key, author_b.key, book.key):
         await real_redis_client.persist(key)

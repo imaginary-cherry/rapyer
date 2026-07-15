@@ -9,6 +9,7 @@ from tests.models.cascade_types import (
     CascadeChainRoot,
     CascadeDiamondChild,
     CascadeDiamondRoot,
+    CascadeDictCollectionRoot,
     CascadeSpecialChild,
     CascadeSpecialParent,
 )
@@ -31,6 +32,7 @@ MISSING_PUBLISHER_KEY = "FkPublisher:missing"
 CASCADE_INTEGRATION_MODELS = [
     CascadeAuthor,
     CascadeBookCollection,
+    CascadeDictCollectionRoot,
     CascadeSpecialChild,
     CascadeSpecialParent,
     CascadeChainNode,

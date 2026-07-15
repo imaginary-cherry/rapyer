@@ -41,6 +41,17 @@ class CascadeBookCollection(AtomicRedisModel):
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
 
 
+class CascadeDictCollectionRoot(AtomicRedisModel):
+    """Shape 2 variant: dict[K, Reference] carries the marker on the collection itself."""
+
+    title: str = "untitled"
+    co_authors: Annotated[dict[str, Reference[CascadeAuthor]], CascadeTTL()] = Field(
+        default_factory=dict
+    )
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
 class CascadeProfile(AtomicRedisModel):
     """Nested submodel whose own field carries the cascade marker (shape 3)."""
 
