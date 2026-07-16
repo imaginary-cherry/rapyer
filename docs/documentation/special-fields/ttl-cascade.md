@@ -6,6 +6,18 @@ reached child to **its own** `Meta.ttl`. This is a **per-child cascading refresh
 propagation of the parent's TTL value onto its children — a child with a shorter
 `Meta.ttl` than its parent still expires on its own schedule.
 
+!!! warning "Requires real Redis 7+ (Redis Functions)"
+    TTL cascade **traversal** is implemented as a Redis Functions library
+    (`FUNCTION LOAD` + `FCALL`) and requires a real Redis 7 or newer. It is **not**
+    supported under `fakeredis`, which has no Redis Functions.
+
+    On `fakeredis`, a cascade-enabled model still refreshes its **own** main +
+    special-field keys per `Meta.ttl` / `refresh_ttl`, but **edges are not
+    followed** (no traversal). In particular, `aset_ttl(cascade=True)` on
+    `fakeredis` refreshes only the root's own keys and reports zero danglings
+    (`CascadeResult(0, 0)`). Non-cascade `Meta.ttl` / `refresh_ttl` behavior is
+    unchanged on both backends.
+
 ## Enabling Cascade
 
 Cascade is opt-in and disabled by default. There are two ways to enable it:
@@ -91,8 +103,9 @@ In both cases:
   The child's TTL is never overwritten with the root's TTL.
 
 The whole operation — traversal and every `EXPIRE` — runs as a single atomic,
-server-side Lua script. There is no read-then-branch gap between discovering the graph
-and applying the refresh.
+server-side Redis Function (`FCALL`), with the cascade plan baked into the loaded
+library and decoded once. There is no read-then-branch gap between discovering the
+graph and applying the refresh.
 
 `aset_ttl(ttl, cascade=True)` returns a `CascadeResult(dangling_children, dangling_special)`
 describing how many reached keys no longer exist (a dangling reference whose target was
