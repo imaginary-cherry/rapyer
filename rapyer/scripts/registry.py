@@ -1,4 +1,3 @@
-from dataclasses import asdict
 from typing import TYPE_CHECKING
 
 from redis.exceptions import NoScriptError
@@ -25,7 +24,6 @@ from rapyer.scripts.constants import (
 from rapyer.scripts.loader import load_script
 
 if TYPE_CHECKING:
-    from rapyer.cascade.planner import CascadePlanEntry
     from rapyer.config import RedisConfig
 
 SCRIPT_REGISTRY: list[tuple[str, str, str]] = [
@@ -48,7 +46,6 @@ SCRIPT_REGISTRY: list[tuple[str, str, str]] = [
 _REGISTERED_SCRIPT_SHAS: dict[str, str] = {}
 
 SF_DISPATCH_PLACEHOLDER = "--[[SF_DISPATCH_TABLE]]"
-CASCADE_PLAN_PLACEHOLDER = "--[[CASCADE_PLAN_TABLE]]"
 
 
 def _build_scripts(variant: str) -> dict[str, str]:
@@ -87,82 +84,19 @@ def _inject_sf_dispatch(template: str, sf_base) -> str:
     return template.replace(SF_DISPATCH_PLACEHOLDER, "\n".join(lines))
 
 
-def _lua_literal(value) -> str:
-    """
-    Serialize a Python value (``dict``/``list``/``str``/``bool``/``int``) into
-    a Lua table-literal fragment for embedding into a script template at
-    ``SCRIPT LOAD`` time. ``dict`` values that are ``None`` are omitted
-    entirely (mirrors ``build_cascade_plan``'s depth-absent-when-unbounded
-    convention). Strings are single-quoted with ``\\``/``'`` escaped first —
-    this is the injection-mitigation boundary; never raw-interpolate an
-    unescaped string into Lua source.
-    """
-    if isinstance(value, dict):
-        parts = [
-            f"[{_lua_literal(key)}] = {_lua_literal(inner)}"
-            for key, inner in value.items()
-            if inner is not None
-        ]
-        return "{" + ", ".join(parts) + "}"
-    if isinstance(value, list):
-        return "{" + ", ".join(_lua_literal(item) for item in value) + "}"
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, int):
-        return str(value)
-    if isinstance(value, str):
-        # Also escape newlines/CR so a stray control char in an injected literal
-        # (class name, field path, special suffix) yields valid Lua at SCRIPT
-        # LOAD rather than a silently broken script body. Backslash first.
-        escaped = (
-            value.replace("\\", "\\\\")
-            .replace("'", "\\'")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-        )
-        return f"'{escaped}'"
-    raise TypeError(f"Unsupported cascade-plan Lua literal type: {type(value)!r}")
-
-
-def _inject_cascade_plan(template: str, plan: dict[str, "CascadePlanEntry"]) -> str:
-    """
-    Replace ``--[[CASCADE_PLAN_TABLE]]`` in ``template`` with one
-    ``CASCADE_PLAN['ClassName'] = {...}`` assignment line per class in
-    ``plan`` (``build_cascade_plan``'s output shape). Models-only: every
-    entry is a ``CascadePlanEntry`` (no plain-dict acceptance path) and is
-    always converted via ``dataclasses.asdict`` before ``_lua_literal``
-    serializes the resulting nested-dict shape. No-ops when the placeholder
-    is absent, mirroring ``_inject_sf_dispatch``.
-    """
-    if CASCADE_PLAN_PLACEHOLDER not in template:
-        return template
-    lines = [
-        f"CASCADE_PLAN[{_lua_literal(name)}] = {_lua_literal(asdict(entry))}"
-        for name, entry in plan.items()
-    ]
-    return template.replace(CASCADE_PLAN_PLACEHOLDER, "\n".join(lines))
-
-
 def build_script_texts(is_fakeredis: bool = False) -> dict[str, str]:
-    # Late imports: SpecialFieldType lives under rapyer.types, and REDIS_MODELS/
-    # build_cascade_plan live under rapyer.base/rapyer.cascade, both of which
-    # depend on this module via the SCRIPT_REGISTRY constants. Importing at
-    # call time avoids the circular import while still letting __subclasses__()/
-    # REDIS_MODELS see every type/model that was loaded before init_rapyer() ran.
-    from rapyer.base import REDIS_MODELS
-    from rapyer.cascade.planner import build_cascade_plan
+    # Late import: SpecialFieldType lives under rapyer.types, which depends on
+    # this module via the SCRIPT_REGISTRY constants. Importing at call time
+    # avoids the circular import while still letting __subclasses__() see every
+    # type that was loaded before init_rapyer() ran.
     from rapyer.types.special import SpecialFieldType
 
     variant = FAKEREDIS_VARIANT if is_fakeredis else REDIS_VARIANT
     scripts = _build_scripts(variant)
-    cascade_plan = build_cascade_plan(REDIS_MODELS)
-    # Any script in the registry may opt into SF dispatch / cascade-plan
-    # injection by including the respective placeholder; templates without it
-    # pass through unchanged (each helper short-circuits).
+    # Any script in the registry may opt into SF dispatch injection by including
+    # the placeholder; templates without it pass through unchanged.
     for name, script_text in scripts.items():
         scripts[name] = _inject_sf_dispatch(script_text, SpecialFieldType)
-    for name, script_text in scripts.items():
-        scripts[name] = _inject_cascade_plan(script_text, cascade_plan)
     return scripts
 
 

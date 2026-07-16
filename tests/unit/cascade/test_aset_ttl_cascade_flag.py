@@ -55,6 +55,7 @@ async def test_aset_ttl_default_cascade_false_runs_the_script_with_cascade_argv_
         SPECIAL_FIELD_KEY_PREFIX,
         TTL_SECONDS,
         0,
+        type(root)._cascade_plan_arg,
     )
     # A non-cascading call preserves the old None-return contract, even
     # though it now runs through the same script as cascade=True.
@@ -91,6 +92,7 @@ async def test_aset_ttl_cascade_true_runs_the_script_with_cascade_argv_one():
         SPECIAL_FIELD_KEY_PREFIX,
         TTL_SECONDS,
         1,
+        type(root)._cascade_plan_arg,
     )
     assert result == CascadeResult(dangling_children=0, dangling_special=0)
 
@@ -127,6 +129,7 @@ async def test_aset_ttl_cascade_standalone_owns_execution_and_returns_cascade_re
         SPECIAL_FIELD_KEY_PREFIX,
         TTL_SECONDS,
         1,
+        type(root)._cascade_plan_arg,
     )
     mock_pipe.execute.assert_awaited_once()
     assert result == CascadeResult(dangling_children=1, dangling_special=2)

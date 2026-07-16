@@ -170,6 +170,10 @@ class AtomicRedisModel(BaseModel):
     _redis_link_field_names: ClassVar[set[str]] = set()
     _contain_sf: ClassVar[set[str]] = set()
     _contain_fk: ClassVar[set[str]] = set()
+    # Reachable-plan subset JSON shipped per call as the cascade script's
+    # ARGV[5]; init_rapyer caches it. Default "{}" degrades a pre-init model to
+    # a root-own-keys-only refresh instead of raising.
+    _cascade_plan_arg: ClassVar[str] = "{}"
     _field_name: str = PrivateAttr(default="")
     model_config = ConfigDict(validate_assignment=True, validate_default=True)
 
@@ -260,6 +264,9 @@ class AtomicRedisModel(BaseModel):
                 SPECIAL_FIELD_KEY_PREFIX,
                 self.Meta.ttl,
                 1,
+                # Reachable-plan subset shipped per call (ARGV[5]) instead of
+                # baked into the script at SCRIPT LOAD.
+                self._cascade_plan_arg,
             )
             return None
 
@@ -609,6 +616,7 @@ class AtomicRedisModel(BaseModel):
                 SPECIAL_FIELD_KEY_PREFIX,
                 ttl,
                 1 if cascade else 0,
+                self._cascade_plan_arg,
             )
             if in_outer_pipe:
                 # Outer caller owns execution; we cannot observe the result here.

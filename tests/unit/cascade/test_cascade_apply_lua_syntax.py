@@ -9,7 +9,8 @@ async def test_cascade_apply_lua_is_syntactically_valid(fake_redis_client):
     text = _load_template("cascade", "apply")
 
     # Assert
-    assert "--[[CASCADE_PLAN_TABLE]]" in text
+    assert "--[[CASCADE_PLAN_TABLE]]" not in text
+    assert "cjson.decode(ARGV[5]" in text
 
     # Act
     sha = await fake_redis_client.script_load(text)

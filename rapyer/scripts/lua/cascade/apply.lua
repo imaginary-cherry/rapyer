@@ -1,10 +1,12 @@
 -- An unbounded recursion budget: keep following edges with no depth cap.
 local UNBOUNDED = -1
 
-local CASCADE_PLAN = {}
---[[CASCADE_PLAN_TABLE]]
--- The per-class cascade data (special-key suffixes + FK edges) is baked into the
--- script at SCRIPT LOAD via the placeholder above; the body indexes it by class.
+-- The reachable-plan subset for THIS root is shipped per call as JSON in
+-- ARGV[5] (root + its transitively reachable classes, precomputed at
+-- init_rapyer), decoded once here -- replacing the SCRIPT-LOAD-time bake of
+-- every registered model's plan. `or '{}'` degrades a missing arg to a
+-- root-own-keys-only refresh.
+local CASCADE_PLAN = cjson.decode(ARGV[5] or '{}')
 local classes = CASCADE_PLAN
 
 local root_key = KEYS[1]

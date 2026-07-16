@@ -8,6 +8,11 @@ import pytest_asyncio
 
 import rapyer
 from rapyer.base import REDIS_MODELS
+from rapyer.cascade.planner import (
+    build_cascade_plan,
+    cascade_plan_json,
+    reachable_plan_subset,
+)
 from rapyer.result import resolve_forward_refs
 from rapyer.scripts import register_scripts
 from rapyer.types.relational import resolve_relational_targets
@@ -45,6 +50,15 @@ async def real_redis_client(redis_client):
     # Configure Redis client for all models
     for model in TESTED_REDIS_MODELS:
         model.Meta.redis = redis_client
+
+    # The cascade plan is no longer baked into the SHA; each model ships its
+    # reachable subset per call via _cascade_plan_arg, so emulate init_rapyer's
+    # caching here (this fixture stands in for init_rapyer in these tests).
+    plan = build_cascade_plan(REDIS_MODELS)
+    for model in REDIS_MODELS:
+        model._cascade_plan_arg = cascade_plan_json(
+            reachable_plan_subset(plan, model.__name__)
+        )
 
     # Register Lua scripts
     await register_scripts(redis_client)

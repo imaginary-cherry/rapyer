@@ -25,6 +25,8 @@ async def _apply_cascade(real_redis_client, root):
         type(root).__name__,
         SPECIAL_FIELD_KEY_PREFIX,
         type(root).Meta.ttl,
+        1,
+        type(root)._cascade_plan_arg,
     )
 
 

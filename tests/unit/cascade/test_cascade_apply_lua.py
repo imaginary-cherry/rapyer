@@ -44,6 +44,7 @@ async def _apply_cascade(fake_redis_client, root, cascade=True):
         SPECIAL_FIELD_KEY_PREFIX,
         type(root).Meta.ttl,
         1 if cascade else 0,
+        type(root)._cascade_plan_arg,
     )
 
 

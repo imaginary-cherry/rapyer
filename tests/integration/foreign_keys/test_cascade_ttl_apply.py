@@ -6,6 +6,7 @@ from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.redis_set import RedisSet
 from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX
 from tests.models.cascade_types import (
+    CASCADE_FIXTURE_TTL_SECONDS,
     CascadeAuthor,
     CascadeBookCollection,
     CascadeChainRoot,
@@ -13,6 +14,8 @@ from tests.models.cascade_types import (
     CascadeSpecialChild,
     CascadeSpecialParent,
 )
+
+ROOT_TTL_SECONDS = 120
 
 pytestmark = pytest.mark.usefixtures("setup_real_redis_for_cascade_apply")
 
@@ -27,6 +30,8 @@ async def _apply_cascade(real_redis_client, root):
         type(root).__name__,
         SPECIAL_FIELD_KEY_PREFIX,
         type(root).Meta.ttl,
+        1,
+        type(root)._cascade_plan_arg,
     )
 
 
@@ -136,6 +141,51 @@ async def test_cascade_apply_skips_corrupt_wrongtype_reached_target_sanity(
     # Assert
     assert await real_redis_client.ttl(root.key) > 0
     assert await real_redis_client.ttl("CascadeChainNode:corrupt") > 0
+
+
+@pytest.mark.asyncio
+async def test_per_call_plan_refreshes_whole_reachable_subtree_with_root_child_split(
+    real_redis_client,
+):
+    # Arrange
+    # No TTL on the child or its special keys before the action -- only the
+    # per-call plan shipped as ARGV[5] can bring the whole reachable subtree
+    # back to life, so a passing split proves the plan flowed per call rather
+    # than from a baked-in table.
+    child = await CascadeSpecialChild().asave()
+    await child.tags.aadd("x")
+    await child.scores.apush(1.0, priority=1.0)
+    parent = await CascadeSpecialParent(child=child.key).asave()
+    tags_key = RedisSet.special_field_key(child.key, "tags")
+    scores_key = RedisPriorityQueue.special_field_key(child.key, "scores")
+    for key in (parent.key, child.key, tags_key, scores_key):
+        await real_redis_client.persist(key)
+
+    # Act
+    # A distinct root ttl so the assertion proves the root-vs-child split, not a
+    # coincidental match with the child's own Meta.ttl.
+    await arun_sha(
+        real_redis_client,
+        type(parent).Meta,
+        CASCADE_TTL_APPLY_SCRIPT_NAME,
+        1,
+        parent.key,
+        type(parent).__name__,
+        SPECIAL_FIELD_KEY_PREFIX,
+        ROOT_TTL_SECONDS,
+        1,
+        type(parent)._cascade_plan_arg,
+    )
+
+    # Assert
+    # The root honors the caller-supplied root ttl...
+    parent_ttl = await real_redis_client.ttl(parent.key)
+    assert 0 < parent_ttl <= ROOT_TTL_SECONDS
+    # ...while every reachable child key (main + special) refreshes to the
+    # child's OWN Meta.ttl, strictly above the root ttl.
+    for key in (child.key, tags_key, scores_key):
+        child_ttl = await real_redis_client.ttl(key)
+        assert ROOT_TTL_SECONDS < child_ttl <= CASCADE_FIXTURE_TTL_SECONDS
 
 
 # NOTE: the pipelined `aset_ttl`/`refresh_ttl` cascade branches (enqueuing

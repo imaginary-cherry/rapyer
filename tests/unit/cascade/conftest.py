@@ -1,6 +1,11 @@
 import pytest
 import pytest_asyncio
 
+from rapyer.cascade.planner import (
+    build_cascade_plan,
+    cascade_plan_json,
+    reachable_plan_subset,
+)
 from rapyer.scripts import register_scripts
 from rapyer.types.relational import resolve_relational_targets
 from tests.models.cascade_types import (
@@ -115,6 +120,13 @@ async def setup_fake_redis_for_cascade_apply(fake_redis_client):
         model.Meta.is_fake_redis = True
         model.Meta.cascade_ttl = _DECLARED_CASCADE_TTL[model]
     resolve_relational_targets(CASCADE_PLANNER_MODELS)
+    # The plan is no longer baked into the SHA; each model ships its reachable
+    # subset per call via _cascade_plan_arg, so emulate init_rapyer's caching.
+    plan = build_cascade_plan(CASCADE_PLANNER_MODELS)
+    for model in CASCADE_PLANNER_MODELS:
+        model._cascade_plan_arg = cascade_plan_json(
+            reachable_plan_subset(plan, model.__name__)
+        )
     await register_scripts(fake_redis_client, is_fakeredis=True)
     yield
     for model, (

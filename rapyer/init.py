@@ -6,7 +6,12 @@ from redis.asyncio.client import Redis
 
 from rapyer.base import REDIS_MODELS
 from rapyer.cascade import CascadeTTL
-from rapyer.cascade.planner import build_cascade_plan, validate_cascade_ttl_targets
+from rapyer.cascade.planner import (
+    build_cascade_plan,
+    cascade_plan_json,
+    reachable_plan_subset,
+    validate_cascade_ttl_targets,
+)
 from rapyer.result import resolve_forward_refs
 from rapyer.scripts import register_scripts
 from rapyer.types.relational import resolve_relational_targets
@@ -76,7 +81,14 @@ async def init_rapyer(
 
         # Fail fast on a mis-configured cascade graph before any script is
         # registered. Pure config check; needs no Redis connection.
-        validate_cascade_ttl_targets(build_cascade_plan(REDIS_MODELS))
+        plan = build_cascade_plan(REDIS_MODELS)
+        validate_cascade_ttl_targets(plan)
+        # Cache each root's reachable-plan subset so the hot TTL path ships only
+        # O(reachable) classes per call instead of baking the full plan.
+        for model in REDIS_MODELS:
+            model._cascade_plan_arg = cascade_plan_json(
+                reachable_plan_subset(plan, model.__name__)
+            )
     finally:
         # Refreeze now that the plan is baked; further Meta mutation is blocked
         # until the next init_rapyer() call. Runs even on failure.
