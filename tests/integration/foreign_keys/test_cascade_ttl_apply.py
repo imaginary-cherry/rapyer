@@ -125,7 +125,7 @@ async def test_cascade_apply_skips_corrupt_wrongtype_reached_target_sanity(
 ):
     # Arrange
     # This is the SOLE regression guard for the WRONGTYPE-degradation fix in
-    # apply.lua::read_reference_paths -- fakeredis's JSON.GET does not emulate
+    # library.lua::read_reference_paths -- fakeredis's JSON.GET does not emulate
     # WRONGTYPE (see CONCERNS.md), so only real Redis Stack can prove this.
     await real_redis_client.set("CascadeChainNode:corrupt", "garbage")
     root = await CascadeChainRoot(head="CascadeChainNode:corrupt").asave()
