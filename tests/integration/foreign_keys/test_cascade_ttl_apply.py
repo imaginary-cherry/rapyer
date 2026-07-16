@@ -1,12 +1,9 @@
-import json
-
 import pytest
 
-from rapyer.scripts import arun_sha
-from rapyer.scripts.constants import CASCADE_TTL_APPLY_SCRIPT_NAME
+from rapyer.scripts import arun_fcall
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.redis_set import RedisSet
-from rapyer.types.special import CASCADE_PLAN_KEY, SPECIAL_FIELD_KEY_PREFIX
+from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX
 from tests.models.cascade_types import (
     CASCADE_FIXTURE_TTL_SECONDS,
     CascadeAuthor,
@@ -23,17 +20,15 @@ pytestmark = pytest.mark.usefixtures("setup_real_redis_for_cascade_apply")
 
 
 async def _apply_cascade(real_redis_client, root):
-    return await arun_sha(
+    return await arun_fcall(
         real_redis_client,
         type(root).Meta,
-        CASCADE_TTL_APPLY_SCRIPT_NAME,
         1,
         root.key,
         type(root).__name__,
         SPECIAL_FIELD_KEY_PREFIX,
         type(root).Meta.ttl,
         1,
-        CASCADE_PLAN_KEY,
     )
 
 
@@ -146,14 +141,12 @@ async def test_cascade_apply_skips_corrupt_wrongtype_reached_target_sanity(
 
 
 @pytest.mark.asyncio
-async def test_per_call_plan_refreshes_whole_reachable_subtree_with_root_child_split(
+async def test_baked_plan_refreshes_whole_reachable_subtree_with_root_child_split(
     real_redis_client,
 ):
     # Arrange
     # No TTL on the child or its special keys before the action -- only the
-    # per-call plan shipped as ARGV[5] can bring the whole reachable subtree
-    # back to life, so a passing split proves the plan flowed per call rather
-    # than from a baked-in table.
+    # baked cascade plan can bring the whole reachable subtree back to life.
     child = await CascadeSpecialChild().asave()
     await child.tags.aadd("x")
     await child.scores.apush(1.0, priority=1.0)
@@ -164,19 +157,16 @@ async def test_per_call_plan_refreshes_whole_reachable_subtree_with_root_child_s
         await real_redis_client.persist(key)
 
     # Act
-    # A distinct root ttl so the assertion proves the root-vs-child split, not a
-    # coincidental match with the child's own Meta.ttl.
-    await arun_sha(
+    # A distinct root ttl so the assertion proves the root-vs-child split.
+    await arun_fcall(
         real_redis_client,
         type(parent).Meta,
-        CASCADE_TTL_APPLY_SCRIPT_NAME,
         1,
         parent.key,
         type(parent).__name__,
         SPECIAL_FIELD_KEY_PREFIX,
         ROOT_TTL_SECONDS,
         1,
-        CASCADE_PLAN_KEY,
     )
 
     # Assert
@@ -190,39 +180,8 @@ async def test_per_call_plan_refreshes_whole_reachable_subtree_with_root_child_s
         assert ROOT_TTL_SECONDS < child_ttl <= CASCADE_FIXTURE_TTL_SECONDS
 
 
-@pytest.mark.asyncio
-async def test_cascade_plan_key_written_at_init_and_drives_subtree_refresh(
-    real_redis_client,
-):
-    # Arrange
-    # The init-emulating fixture wrote the full plan to CASCADE_PLAN_KEY; the
-    # cascade sources its traversal from that one server-side key.
-    child = await CascadeSpecialChild().asave()
-    await child.tags.aadd("x")
-    await child.scores.apush(1.0, priority=1.0)
-    parent = await CascadeSpecialParent(child=child.key).asave()
-    tags_key = RedisSet.special_field_key(child.key, "tags")
-    scores_key = RedisPriorityQueue.special_field_key(child.key, "scores")
-    for key in (parent.key, child.key, tags_key, scores_key):
-        await real_redis_client.persist(key)
-
-    # Act
-    plan_raw = await real_redis_client.get(CASCADE_PLAN_KEY)
-    decoded = json.loads(plan_raw)
-    await _apply_cascade(real_redis_client, parent)
-
-    # Assert
-    # The one plan key holds every participant class...
-    assert CascadeSpecialParent.__name__ in decoded
-    assert CascadeSpecialChild.__name__ in decoded
-    # ...and the root refreshes its whole reachable subtree sourced from it.
-    for key in (parent.key, child.key, tags_key, scores_key):
-        assert await real_redis_client.ttl(key) > 0
-
-
 # NOTE: the pipelined `aset_ttl`/`refresh_ttl` cascade branches (enqueuing
-# `run_sha` into a pipeline via `ensure_pipeline`/`pipeline_with_execution`)
-# do NOT self-heal a NOSCRIPT -- that recovery was scoped back out of the
-# generic pipeline helpers in favor of keeping it local to `_apipeline`
-# (general model writes). Extending the same recovery to these TTL-refresh
-# paths is tracked as a follow-up; see NOSCRIPT-ISSUE.md.
+# `run_fcall` into a pipeline via `ensure_pipeline`/`pipeline_with_execution`)
+# do NOT self-heal a missing function -- only the direct `arun_fcall` path does.
+# Extending recovery to these pipelined TTL-refresh paths is a follow-up
+# (issue #284); see NOSCRIPT-ISSUE.md.

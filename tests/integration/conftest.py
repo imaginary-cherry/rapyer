@@ -13,9 +13,8 @@ from rapyer.cascade.planner import (
     cascade_plan_json,
 )
 from rapyer.result import resolve_forward_refs
-from rapyer.scripts import register_scripts
+from rapyer.scripts import register_cascade_function, register_scripts
 from rapyer.types.relational import resolve_relational_targets
-from rapyer.types.special import CASCADE_PLAN_KEY
 from tests.models.registry import TESTED_REDIS_MODELS
 from tests.models.simple_types import TTLRefreshDisabledModel, TTLRefreshTestModel
 
@@ -42,6 +41,14 @@ async def redis_client():
     await redis.flushdb()
 
 
+@pytest_asyncio.fixture
+async def requires_redis_functions(redis_client):
+    info = await redis_client.info("server")
+    major = int(str(info.get("redis_version", "0")).split(".")[0])
+    if major < 7:
+        pytest.skip("TTL cascade requires Redis 7+ (Redis Functions)")
+
+
 @pytest_asyncio.fixture(autouse=True)
 async def real_redis_client(redis_client):
     resolve_forward_refs()
@@ -54,11 +61,9 @@ async def real_redis_client(redis_client):
     # Register Lua scripts
     await register_scripts(redis_client)
 
-    # The cascade plan lives in one Redis key read server-side; emulate
-    # init_rapyer by writing the full plan after register_scripts (this fixture
-    # stands in for init_rapyer in these tests).
-    await redis_client.set(
-        CASCADE_PLAN_KEY, cascade_plan_json(build_cascade_plan(REDIS_MODELS))
+    # Emulate init_rapyer: load the cascade Redis Function for refresh_ttl's FCALL path.
+    await register_cascade_function(
+        redis_client, cascade_plan_json(build_cascade_plan(REDIS_MODELS))
     )
 
     yield redis_client

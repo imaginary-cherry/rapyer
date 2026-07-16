@@ -15,3 +15,11 @@ class CascadeTargetTtlMissingError(RapyerError):
 
 class MetaFrozenError(RapyerError):
     """Raised when Meta config is mutated after init_rapyer() has baked the cascade plan against it."""
+
+
+class CascadeLuaLiteralError(RapyerError):
+    """Raised when a cascade plan cannot be safely embedded as a Lua long-bracket literal."""
+
+
+class PersistentCascadeFunctionError(RapyerError):
+    """Raised when the cascade Redis Function is still missing after a re-load + retry."""

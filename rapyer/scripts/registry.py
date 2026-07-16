@@ -1,11 +1,15 @@
 from typing import TYPE_CHECKING
 
-from redis.exceptions import NoScriptError
+from redis.exceptions import NoScriptError, ResponseError
 
-from rapyer.errors import PersistentNoScriptError, ScriptsNotInitializedError
+from rapyer.cascade.planner import build_cascade_plan, cascade_plan_json
+from rapyer.errors import (
+    PersistentCascadeFunctionError,
+    PersistentNoScriptError,
+    ScriptsNotInitializedError,
+)
 from rapyer.scripts.constants import (
     ATOMIC_GET_OR_CREATE_SCRIPT_NAME,
-    CASCADE_TTL_APPLY_SCRIPT_NAME,
     DATETIME_ADD_SCRIPT_NAME,
     DICT_POP_SCRIPT_NAME,
     DICT_POPITEM_SCRIPT_NAME,
@@ -21,7 +25,7 @@ from rapyer.scripts.constants import (
     STR_APPEND_SCRIPT_NAME,
     STR_MUL_SCRIPT_NAME,
 )
-from rapyer.scripts.loader import load_script
+from rapyer.scripts.loader import build_cascade_library, load_script
 
 if TYPE_CHECKING:
     from rapyer.config import RedisConfig
@@ -40,7 +44,6 @@ SCRIPT_REGISTRY: list[tuple[str, str, str]] = [
     ("dict", "pop", DICT_POP_SCRIPT_NAME),
     ("dict", "popitem", DICT_POPITEM_SCRIPT_NAME),
     ("atomic", "get_or_create", ATOMIC_GET_OR_CREATE_SCRIPT_NAME),
-    ("cascade", "apply", CASCADE_TTL_APPLY_SCRIPT_NAME),
 ]
 
 _REGISTERED_SCRIPT_SHAS: dict[str, str] = {}
@@ -143,3 +146,57 @@ async def arun_sha(
 
 async def handle_noscript_error(redis_client, redis_config: "RedisConfig"):
     await register_scripts(redis_client, is_fakeredis=redis_config.is_fake_redis)
+
+
+# Registered cascade function name (plan-hashed); server-global, so FCALL targets it.
+_CASCADE_FUNCTION_NAME: str | None = None
+
+
+async def register_cascade_function(redis_client, plan_json: str) -> None:
+    global _CASCADE_FUNCTION_NAME
+    _library_name, function_name, source = build_cascade_library(plan_json)
+    # REPLACE makes re-init idempotent for the same plan and refreshes a changed one.
+    await redis_client.function_load(source, replace=True)
+    _CASCADE_FUNCTION_NAME = function_name
+
+
+def get_cascade_function_name() -> str:
+    if _CASCADE_FUNCTION_NAME is None:
+        raise ScriptsNotInitializedError(
+            "Cascade function not loaded. Did you forget to call init_rapyer()?"
+        )
+    return _CASCADE_FUNCTION_NAME
+
+
+def run_fcall(pipeline, keys: int, *args):
+    # No self-heal in-pipeline, matching the EVALSHA path (see issue #284 note in aset_ttl).
+    pipeline.fcall(get_cascade_function_name(), keys, *args)
+
+
+async def arun_fcall(client, redis_config: "RedisConfig", keys: int, *args):
+    name = get_cascade_function_name()
+    try:
+        return await client.fcall(name, keys, *args)
+    except ResponseError as e:
+        if "function not found" not in str(e).lower():
+            raise
+
+    await handle_missing_function(client, redis_config)
+    name = get_cascade_function_name()
+    try:
+        return await client.fcall(name, keys, *args)
+    except ResponseError as e:
+        raise PersistentCascadeFunctionError(
+            "Cascade function still missing after re-loading. "
+            "This indicates a server-side problem with Redis."
+        ) from e
+
+
+async def handle_missing_function(redis_client, redis_config: "RedisConfig"):
+    if redis_config.is_fake_redis:
+        return
+    # Inline import solely to break the base -> scripts -> base cycle.
+    from rapyer.base import REDIS_MODELS
+
+    plan = build_cascade_plan(REDIS_MODELS)
+    await register_cascade_function(redis_client, cascade_plan_json(plan))

@@ -106,18 +106,18 @@ async def test_refresh_ttl_if_needed_honors_action_groups(
 
     model = TTLRefreshTestModel(name="action-matrix")
 
-    # refresh_ttl always routes through the cascade script, so a refresh shows up
-    # as a run_sha call rather than a pipe.expire.
+    # On real Redis refresh_ttl routes through the cascade FCALL, so a refresh
+    # shows up as a run_fcall call rather than a pipe.expire.
     with (
         patch("rapyer.base.pipeline_with_execution", fake_pipeline),
-        patch("rapyer.base.scripts_registry.run_sha") as mock_run_sha,
+        patch("rapyer.base.scripts_registry.run_fcall") as mock_run_fcall,
     ):
         await model.refresh_ttl_if_needed(action=action)
 
-    assert mock_run_sha.called is expected_refresh, (
+    assert mock_run_fcall.called is expected_refresh, (
         f"refresh_ttl={refresh_ttl!r} action={action!r}: "
-        f"expected run_sha.called={expected_refresh}, "
-        f"got call_count={mock_run_sha.call_count}"
+        f"expected run_fcall.called={expected_refresh}, "
+        f"got call_count={mock_run_fcall.call_count}"
     )
 
 

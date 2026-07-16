@@ -2,20 +2,15 @@ import pytest
 
 from rapyer.context import _context_pipe
 from rapyer.errors import PersistentNoScriptError
-from rapyer.scripts.constants import CASCADE_TTL_APPLY_SCRIPT_NAME
-from rapyer.scripts.registry import build_script_texts
 from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.simple_types import TTL_TEST_SECONDS, TTLRefreshTestModel
 
 
 async def _flush_all_but_cascade(redis_client):
-    # Redis has no selective SCRIPT FLUSH, so flush everything then reload only
-    # the cascade TTL script's SHA -- this leaves every data-op script (list/
-    # dict/numeric/atomic) missing (exercising _apipeline's NOSCRIPT self-heal)
-    # while TTL-refresh (which routes through the cascade script) keeps working
-    # uninterrupted.
+    # SCRIPT FLUSH drops every EVALSHA data-op script (exercising _apipeline's
+    # NOSCRIPT self-heal) but leaves Redis Functions intact, so TTL-refresh
+    # (which now routes through FCALL) keeps working uninterrupted.
     await redis_client.execute_command("SCRIPT", "FLUSH")
-    await redis_client.script_load(build_script_texts()[CASCADE_TTL_APPLY_SCRIPT_NAME])
 
 
 @pytest.mark.asyncio
