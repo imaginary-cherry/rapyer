@@ -14,11 +14,15 @@ from rapyer.scripts.constants import (
 )
 from rapyer.scripts.registry import (
     _REGISTERED_SCRIPT_SHAS,
+    arun_fcall,
     arun_sha,
+    get_cascade_function_name,
     get_scripts,
     get_scripts_fakeredis,
     handle_noscript_error,
+    register_cascade_function,
     register_scripts,
+    run_fcall,
     run_sha,
 )
 
@@ -41,8 +45,12 @@ __all__ = [
     "SCRIPTS_FAKEREDIS",
     "STR_APPEND_SCRIPT_NAME",
     "STR_MUL_SCRIPT_NAME",
+    "arun_fcall",
     "arun_sha",
+    "get_cascade_function_name",
     "handle_noscript_error",
+    "register_cascade_function",
     "register_scripts",
+    "run_fcall",
     "run_sha",
 ]
