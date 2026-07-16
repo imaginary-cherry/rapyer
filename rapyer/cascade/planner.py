@@ -1,9 +1,11 @@
 import dataclasses
+import hashlib
 import json
 from typing import TYPE_CHECKING, Any, get_origin
 
 from rapyer.cascade.ttl import CascadeTTL
-from rapyer.errors.cascade import CascadeTargetTtlMissingError
+from rapyer.errors.cascade import CascadeLuaLiteralError, CascadeTargetTtlMissingError
+from rapyer.scripts.constants import CASCADE_FUNCTION_PREFIX, CASCADE_LIBRARY_PREFIX
 from rapyer.types.relational import RelationalFieldType
 from rapyer.utils.annotation import strip_optional
 from rapyer.utils.pythonic import resolve_generic_args, safe_issubclass
@@ -302,3 +304,37 @@ def cascade_plan_json(plan: dict[str, CascadePlanEntry]) -> str:
         for name, entry in plan.items()
     }
     return json.dumps(payload, separators=(",", ":"))
+
+
+def cascade_plan_hash(plan_json: str) -> str:
+    """Short, stable hex digest of a compact plan JSON; deterministic across processes."""
+    return hashlib.sha1(plan_json.encode()).hexdigest()[:16]  # nosec B324
+
+
+def cascade_names(plan_json: str) -> tuple[str, str]:
+    """Deterministic (library_name, function_name) for a plan, both carrying the plan hash."""
+    # Redis Function NAMES are server-GLOBAL, not per-library: two libraries
+    # cannot both register a function named "cascade_apply" (the second FUNCTION
+    # LOAD errors). Baking the plan hash into BOTH the library AND the function
+    # name lets two rapyer processes with different model sets (e.g. CI workers)
+    # coexist on one server instead of clobbering each other's baked plan;
+    # identical plans hash-collide to the same names so FUNCTION LOAD REPLACE is
+    # idempotent. FCALL therefore targets the hashed function name.
+    plan_hash = cascade_plan_hash(plan_json)
+    return (
+        f"{CASCADE_LIBRARY_PREFIX}_{plan_hash}",
+        f"{CASCADE_FUNCTION_PREFIX}_{plan_hash}",
+    )
+
+
+def cascade_plan_lua_literal(plan_json: str) -> str:
+    """Wrap the compact plan JSON in a Lua long-bracket literal so it embeds verbatim."""
+    # The plan JSON is identifier/path/suffix data only (class names, dotted
+    # $-paths, special-field suffixes) — none can contain ]==]. Guard anyway
+    # rather than trust that invariant, since this bakes into executable source.
+    if "]==]" in plan_json:
+        raise CascadeLuaLiteralError(
+            "cascade plan JSON contains the Lua long-bracket delimiter ']==]', "
+            "which would break out of the embedded literal"
+        )
+    return f"[==[{plan_json}]==]"

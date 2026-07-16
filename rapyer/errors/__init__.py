@@ -14,9 +14,11 @@ from rapyer.errors.base import (
     UpdateAtomicModelError,
 )
 from rapyer.errors.cascade import (
+    CascadeLuaLiteralError,
     CascadeTargetTtlMissingError,
     InvalidCascadeDepthError,
     MetaFrozenError,
+    PersistentCascadeFunctionError,
 )
 from rapyer.errors.delete import BadDeleteActionError
 from rapyer.errors.find import (
@@ -46,6 +48,7 @@ __all__ = [
     "BadDeleteActionError",
     "BadFilterError",
     "CantSerializeRedisValueError",
+    "CascadeLuaLiteralError",
     "CascadeTargetTtlMissingError",
     "CorruptedModelError",
     "DuplicateModelNameError",
@@ -56,6 +59,7 @@ __all__ = [
     "MetaFrozenError",
     "MissingParameterError",
     "NotResolvedError",
+    "PersistentCascadeFunctionError",
     "PersistentNoScriptError",
     "RapyerError",
     "RapyerModelDoesntExistError",
