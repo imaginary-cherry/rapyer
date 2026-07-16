@@ -14,6 +14,7 @@ def mock_redis_client():
     redis_mock.ft.return_value.dropindex = AsyncMock()
     redis_mock.ft.return_value.create_index = AsyncMock()
     redis_mock.script_load = AsyncMock(return_value="mock_sha")
+    redis_mock.function_load = AsyncMock(return_value="mock_lib")
     redis_mock.set = AsyncMock()
     return redis_mock
 

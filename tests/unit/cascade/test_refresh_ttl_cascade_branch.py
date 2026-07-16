@@ -3,8 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from rapyer.scripts.constants import CASCADE_TTL_APPLY_SCRIPT_NAME
-from rapyer.types.special import CASCADE_PLAN_KEY, SPECIAL_FIELD_KEY_PREFIX
+from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX
 from tests.models.cascade_types import CascadeAuthor, CascadeChainRoot
 
 
@@ -20,22 +19,20 @@ async def test_refresh_ttl_cascade_enabled_model_calls_run_sha_not_expire():
 
     with (
         patch("rapyer.base.ensure_pipeline", fake_ensure_pipeline),
-        patch("rapyer.base.scripts_registry.run_sha") as mock_run_sha,
+        patch("rapyer.base.scripts_registry.run_fcall") as mock_run_fcall,
     ):
         # Act
         await root.refresh_ttl(can_use_pipeline=True)
 
     # Assert
-    mock_run_sha.assert_called_once_with(
+    mock_run_fcall.assert_called_once_with(
         mock_pipe,
-        CASCADE_TTL_APPLY_SCRIPT_NAME,
         1,
         root.key,
         "CascadeChainRoot",
         SPECIAL_FIELD_KEY_PREFIX,
         root.Meta.ttl,
         1,
-        CASCADE_PLAN_KEY,
     )
     mock_pipe.expire.assert_not_called()
 
@@ -54,21 +51,19 @@ async def test_refresh_ttl_non_cascade_model_also_calls_run_sha():
 
     with (
         patch("rapyer.base.ensure_pipeline", fake_ensure_pipeline),
-        patch("rapyer.base.scripts_registry.run_sha") as mock_run_sha,
+        patch("rapyer.base.scripts_registry.run_fcall") as mock_run_fcall,
     ):
         # Act
         await author.refresh_ttl(can_use_pipeline=True)
 
     # Assert
-    mock_run_sha.assert_called_once_with(
+    mock_run_fcall.assert_called_once_with(
         mock_pipe,
-        CASCADE_TTL_APPLY_SCRIPT_NAME,
         1,
         author.key,
         "CascadeAuthor",
         SPECIAL_FIELD_KEY_PREFIX,
         author.Meta.ttl,
         1,
-        CASCADE_PLAN_KEY,
     )
     mock_pipe.expire.assert_not_called()

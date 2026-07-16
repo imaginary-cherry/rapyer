@@ -8,10 +8,7 @@ from rapyer.cascade.planner import (
     build_cascade_plan,
     cascade_plan_json,
 )
-from rapyer.scripts.constants import (
-    ATOMIC_GET_OR_CREATE_SCRIPT_NAME,
-    CASCADE_TTL_APPLY_SCRIPT_NAME,
-)
+from rapyer.scripts.constants import ATOMIC_GET_OR_CREATE_SCRIPT_NAME
 from rapyer.scripts.registry import (
     _REGISTERED_SCRIPT_SHAS,
     SCRIPT_REGISTRY,
@@ -40,16 +37,9 @@ def _entry(*targets: str, ttl: int | None = 10, suffixes=None) -> CascadePlanEnt
     )
 
 
-def test_cascade_ttl_apply_script_name_is_registered_constant():
-    # Act
-    # Assert
-    assert CASCADE_TTL_APPLY_SCRIPT_NAME == "cascade_ttl_apply"
-
-
-def test_cascade_registry_entry_present():
-    # Act
-    # Assert
-    assert ("cascade", "apply", CASCADE_TTL_APPLY_SCRIPT_NAME) in SCRIPT_REGISTRY
+def test_cascade_is_not_an_evalsha_script():
+    # Cascade moved to a Redis Functions library, out of the EVALSHA registry.
+    assert not any(category == "cascade" for category, _, _ in SCRIPT_REGISTRY)
 
 
 def test_cascade_plan_json_omits_none_depth_and_ttl():
@@ -107,15 +97,6 @@ def test_cascade_plan_json_covers_every_built_class(setup_fake_redis_for_cascade
     # Assert
     for model in CASCADE_PLANNER_MODELS:
         assert model.__name__ in decoded
-
-
-@pytest.mark.asyncio
-async def test_register_scripts_registers_cascade_ttl_apply(fake_redis_client):
-    # Act
-    await register_scripts(fake_redis_client, is_fakeredis=True)
-
-    # Assert
-    assert CASCADE_TTL_APPLY_SCRIPT_NAME in _REGISTERED_SCRIPT_SHAS
 
 
 @pytest.mark.asyncio

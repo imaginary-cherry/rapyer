@@ -311,3 +311,35 @@ class CascadeMaxBudgetRoot(AtomicRedisModel):
     shallow_path: Annotated[Reference[CascadeChainNode], CascadeTTL(depth=1)]
 
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+# Full cascade-model set shared by unit and integration cascade fixtures.
+ALL_CASCADE_MODELS = [
+    CascadeAuthor,
+    CascadeBookDirect,
+    CascadeBookCollection,
+    CascadeDictCollectionRoot,
+    CascadeProfile,
+    CascadeBookNested,
+    CascadeBookPlain,
+    CascadeChainNode,
+    CascadeChainRoot,
+    CascadeExtendingNode,
+    CascadeShallowRoot,
+    CascadeDiamondChild,
+    CascadeDiamondRoot,
+    CascadeMultiDepthRoot,
+    CascadeBlanketLeaf,
+    CascadeBlanketRoot,
+    CascadeBlanketOptOut,
+    CascadeBlanketCollectionRoot,
+    CascadeBlanketNestedProfile,
+    CascadeBlanketNestedHolder,
+    CascadeNestedDepthRoot,
+    CascadeSpecialChild,
+    CascadeSpecialParent,
+    CascadeWR02Grandchild,
+    CascadeWR02SharedChild,
+    CascadeWR02Root,
+    CascadeMaxBudgetRoot,
+]

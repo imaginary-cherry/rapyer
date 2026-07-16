@@ -10,10 +10,13 @@
 -- An unbounded recursion budget: keep following edges with no depth cap.
 local UNBOUNDED = -1
 
--- The full cascade plan, decoded ONCE at load and captured as an upvalue. The
--- RAPYER_CASCADE_PLAN_LITERAL token is replaced by a Lua long-bracket literal
--- holding the compact plan JSON, so it embeds verbatim with no escaping.
-local CASCADE_PLAN = cjson.decode(RAPYER_CASCADE_PLAN_LITERAL)
+-- The baked plan as a raw JSON string upvalue. RAPYER_CASCADE_PLAN_LITERAL is
+-- replaced by a Lua long-bracket literal holding the compact plan JSON, so it
+-- embeds verbatim with no escaping. cjson is NOT available at library-load
+-- scope (that phase only registers functions), so the decode is deferred to the
+-- first call and memoized into CASCADE_PLAN below.
+local CASCADE_PLAN_JSON = RAPYER_CASCADE_PLAN_LITERAL
+local CASCADE_PLAN = nil
 
 -- Pure, per-call-state-free helpers may live at library scope: they take params
 -- and read only the CASCADE_PLAN upvalue, never mutable per-call state.
@@ -135,6 +138,11 @@ end
 -- args[1]=root_class, args[2]=special_prefix, args[3]=root_ttl,
 -- args[4]=do_cascade. The old plan-key ARGV is GONE (no per-call GET+decode).
 local function cascade_apply(keys, args)
+    -- Decode the baked plan on first call and memoize it; cjson is available at
+    -- execution scope (unlike load scope). Read-only, so sharing across calls is safe.
+    if CASCADE_PLAN == nil then
+        CASCADE_PLAN = cjson.decode(CASCADE_PLAN_JSON)
+    end
     local root_key = keys[1]
     local root_class = args[1]
     -- The bare special-key prefix (no separators). This callback owns the ':'

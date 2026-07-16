@@ -1,8 +1,7 @@
 import pytest
 
-from rapyer.scripts import arun_sha
-from rapyer.scripts.constants import CASCADE_TTL_APPLY_SCRIPT_NAME
-from rapyer.types.special import CASCADE_PLAN_KEY, SPECIAL_FIELD_KEY_PREFIX
+from rapyer.scripts import arun_fcall
+from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX
 from tests.models.cascade_types import (
     CascadeChainNode,
     CascadeChainRoot,
@@ -16,17 +15,15 @@ pytestmark = pytest.mark.usefixtures("setup_real_redis_for_cascade_apply")
 
 
 async def _apply_cascade(real_redis_client, root):
-    return await arun_sha(
+    return await arun_fcall(
         real_redis_client,
         type(root).Meta,
-        CASCADE_TTL_APPLY_SCRIPT_NAME,
         1,
         root.key,
         type(root).__name__,
         SPECIAL_FIELD_KEY_PREFIX,
         type(root).Meta.ttl,
         1,
-        CASCADE_PLAN_KEY,
     )
 
 

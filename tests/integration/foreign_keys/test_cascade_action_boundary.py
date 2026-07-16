@@ -59,6 +59,25 @@ async def test_aset_ttl_cascade_true_healthy_splits_parent_and_child_ttl_and_rep
 
 
 @pytest.mark.asyncio
+async def test_aset_ttl_cascade_true_dangling_child_reports_count_without_raising(
+    real_redis_client,
+):
+    # Arrange
+    # The referenced child key is never created.
+    parent = await CascadeSpecialParent(child="CascadeSpecialChild:missing").asave()
+    await real_redis_client.persist(parent.key)
+
+    # Act
+    result = await parent.aset_ttl(ROOT_TTL_SECONDS, cascade=True)
+
+    # Assert
+    assert await real_redis_client.ttl(parent.key) > 0
+    assert isinstance(result, CascadeResult)
+    assert result.dangling_children == 1
+    assert result.dangling_special == 2
+
+
+@pytest.mark.asyncio
 async def test_asave_auto_cascades_child_ttl_with_no_explicit_ttl_call(
     real_redis_client,
 ):

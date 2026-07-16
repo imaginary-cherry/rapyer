@@ -1,21 +1,20 @@
-import pytest
+from rapyer.cascade.planner import build_cascade_plan, cascade_plan_json
+from rapyer.scripts.loader import build_cascade_library
+from tests.models.cascade_types import ALL_CASCADE_MODELS
 
-from rapyer.scripts.loader import _load_template
 
-
-@pytest.mark.asyncio
-async def test_cascade_apply_lua_is_syntactically_valid(fake_redis_client):
-    # Act
-    text = _load_template("cascade", "apply")
-
-    # Assert
-    assert "--[[CASCADE_PLAN_TABLE]]" not in text
-    assert "redis.call('GET', ARGV[5])" in text
-    assert "cjson.decode(plan_raw)" in text
+def test_cascade_library_source_has_all_tokens_substituted():
+    # Arrange
+    plan_json = cascade_plan_json(build_cascade_plan(ALL_CASCADE_MODELS))
 
     # Act
-    sha = await fake_redis_client.script_load(text)
+    library_name, function_name, source = build_cascade_library(plan_json)
 
     # Assert
-    assert isinstance(sha, str)
-    assert sha
+    # Real FUNCTION LOAD validation lives in the integration suite.
+    assert source.splitlines()[0] == f"#!lua name={library_name}"
+    assert "RAPYER_CASCADE_PLAN_LITERAL" not in source
+    assert "RAPYER_CASCADE_LIB" not in source
+    assert "RAPYER_CASCADE_FN" not in source
+    assert function_name in source
+    assert "register_function" in source

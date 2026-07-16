@@ -6,8 +6,7 @@ import pytest
 
 from rapyer.base import AtomicRedisModel
 from rapyer.result import CascadeResult
-from rapyer.scripts.constants import CASCADE_TTL_APPLY_SCRIPT_NAME
-from rapyer.types.special import CASCADE_PLAN_KEY, SPECIAL_FIELD_KEY_PREFIX
+from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX
 from tests.models.cascade_types import CascadeChainNode, CascadeChainRoot
 
 TTL_SECONDS = 120
@@ -39,23 +38,21 @@ async def test_aset_ttl_default_cascade_false_runs_the_script_with_cascade_argv_
     with (
         patch("rapyer.base._context_pipe") as mock_context_pipe,
         patch("rapyer.base.ensure_pipeline", fake_ensure_pipeline),
-        patch("rapyer.base.scripts_registry.run_sha") as mock_run_sha,
+        patch("rapyer.base.scripts_registry.run_fcall") as mock_run_fcall,
     ):
         mock_context_pipe.get.return_value = None
         # Act
         result = await root.aset_ttl(TTL_SECONDS)
 
     # Assert
-    mock_run_sha.assert_called_once_with(
+    mock_run_fcall.assert_called_once_with(
         mock_pipe,
-        CASCADE_TTL_APPLY_SCRIPT_NAME,
         1,
         root.key,
         "CascadeChainRoot",
         SPECIAL_FIELD_KEY_PREFIX,
         TTL_SECONDS,
         0,
-        CASCADE_PLAN_KEY,
     )
     # A non-cascading call preserves the old None-return contract, even
     # though it now runs through the same script as cascade=True.
@@ -76,23 +73,21 @@ async def test_aset_ttl_cascade_true_runs_the_script_with_cascade_argv_one():
     with (
         patch("rapyer.base._context_pipe") as mock_context_pipe,
         patch("rapyer.base.ensure_pipeline", fake_ensure_pipeline),
-        patch("rapyer.base.scripts_registry.run_sha") as mock_run_sha,
+        patch("rapyer.base.scripts_registry.run_fcall") as mock_run_fcall,
     ):
         mock_context_pipe.get.return_value = None
         # Act
         result = await root.aset_ttl(TTL_SECONDS, cascade=True)
 
     # Assert
-    mock_run_sha.assert_called_once_with(
+    mock_run_fcall.assert_called_once_with(
         mock_pipe,
-        CASCADE_TTL_APPLY_SCRIPT_NAME,
         1,
         root.key,
         "CascadeChainRoot",
         SPECIAL_FIELD_KEY_PREFIX,
         TTL_SECONDS,
         1,
-        CASCADE_PLAN_KEY,
     )
     assert result == CascadeResult(dangling_children=0, dangling_special=0)
 
@@ -113,23 +108,21 @@ async def test_aset_ttl_cascade_standalone_owns_execution_and_returns_cascade_re
     with (
         patch("rapyer.base._context_pipe") as mock_context_pipe,
         patch("rapyer.base.ensure_pipeline", fake_ensure_pipeline),
-        patch("rapyer.base.scripts_registry.run_sha") as mock_run_sha,
+        patch("rapyer.base.scripts_registry.run_fcall") as mock_run_fcall,
     ):
         mock_context_pipe.get.return_value = None
         # Act
         result = await root.aset_ttl(TTL_SECONDS, cascade=True)
 
     # Assert
-    mock_run_sha.assert_called_once_with(
+    mock_run_fcall.assert_called_once_with(
         mock_pipe,
-        CASCADE_TTL_APPLY_SCRIPT_NAME,
         1,
         root.key,
         "CascadeChainRoot",
         SPECIAL_FIELD_KEY_PREFIX,
         TTL_SECONDS,
         1,
-        CASCADE_PLAN_KEY,
     )
     mock_pipe.execute.assert_awaited_once()
     assert result == CascadeResult(dangling_children=1, dangling_special=2)
@@ -153,7 +146,7 @@ async def test_aset_ttl_cascade_standalone_awaits_pipe_execute_directly():
     with (
         patch("rapyer.base._context_pipe") as mock_context_pipe,
         patch("rapyer.base.ensure_pipeline", fake_ensure_pipeline),
-        patch("rapyer.base.scripts_registry.run_sha"),
+        patch("rapyer.base.scripts_registry.run_fcall"),
     ):
         mock_context_pipe.get.return_value = None
         # Act
@@ -180,14 +173,14 @@ async def test_aset_ttl_cascade_inside_outer_pipeline_returns_none_without_execu
     with (
         patch("rapyer.base._context_pipe") as mock_context_pipe,
         patch("rapyer.base.ensure_pipeline", fake_ensure_pipeline),
-        patch("rapyer.base.scripts_registry.run_sha") as mock_run_sha,
+        patch("rapyer.base.scripts_registry.run_fcall") as mock_run_fcall,
     ):
         mock_context_pipe.get.return_value = mock_pipe
         # Act
         result = await root.aset_ttl(TTL_SECONDS, cascade=True)
 
     # Assert
-    mock_run_sha.assert_called_once()
+    mock_run_fcall.assert_called_once()
     mock_pipe.execute.assert_not_awaited()
     assert result is None
 

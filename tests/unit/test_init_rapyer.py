@@ -1,4 +1,3 @@
-import json
 import logging
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -13,7 +12,7 @@ from rapyer.scripts.registry import (
     SF_DISPATCH_PLACEHOLDER,
     _inject_sf_dispatch,
 )
-from rapyer.types.special import CASCADE_PLAN_KEY, SpecialFieldType
+from rapyer.types.special import SpecialFieldType
 from tests.models.collection_types import IntListModel, ProductListModel, StrListModel
 from tests.models.index_types import IndexTestModel
 from tests.models.simple_types import (
@@ -34,6 +33,7 @@ def mock_redis_client():
     redis_mock.ft.return_value.dropindex = AsyncMock()
     redis_mock.ft.return_value.create_index = AsyncMock()
     redis_mock.script_load = AsyncMock(return_value="mock_sha")
+    redis_mock.function_load = AsyncMock(return_value="mock_lib")
     redis_mock.set = AsyncMock()
     return redis_mock
 
@@ -122,6 +122,7 @@ async def test_init_rapyer_override_existing_redis_and_ttl_sanity(
     old_redis_client.ft.return_value.dropindex = AsyncMock()
     old_redis_client.ft.return_value.create_index = AsyncMock()
     old_redis_client.script_load = AsyncMock(return_value="mock_sha")
+    old_redis_client.function_load = AsyncMock(return_value="mock_lib")
     old_redis_client.set = AsyncMock()
     old_ttl = 60
     new_ttl = 240
@@ -253,22 +254,22 @@ async def test_init_rapyer_loads_sf_injected_scripts_sanity(
 
 
 @pytest.mark.asyncio
-async def test_init_rapyer_writes_full_cascade_plan_key_sanity(
+async def test_init_rapyer_loads_cascade_function_with_full_plan_sanity(
     mock_redis_client, redis_models
 ):
     # Act
     await init_rapyer(mock_redis_client)
 
     # Assert
-    # init_rapyer writes the full plan once to CASCADE_PLAN_KEY; find that set
-    # call and confirm it holds every registered class (not a per-root subset).
-    set_calls = (
-        mock_redis_client.set.await_args_list or mock_redis_client.set.call_args_list
+    # init_rapyer bakes the full plan into the cascade Redis Function and loads
+    # it once; the baked source must mention every registered class.
+    load_calls = (
+        mock_redis_client.function_load.await_args_list
+        or mock_redis_client.function_load.call_args_list
     )
-    plan_call = next(c for c in set_calls if c.args[0] == CASCADE_PLAN_KEY)
-    decoded = json.loads(plan_call.args[1])
+    source = load_calls[0].args[0]
     for model in redis_models:
-        assert model.__name__ in decoded
+        assert model.__name__ in source
 
 
 @pytest.mark.asyncio
