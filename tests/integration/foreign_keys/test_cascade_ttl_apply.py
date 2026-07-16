@@ -1,10 +1,12 @@
+import json
+
 import pytest
 
 from rapyer.scripts import arun_sha
 from rapyer.scripts.constants import CASCADE_TTL_APPLY_SCRIPT_NAME
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.redis_set import RedisSet
-from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX
+from rapyer.types.special import CASCADE_PLAN_KEY, SPECIAL_FIELD_KEY_PREFIX
 from tests.models.cascade_types import (
     CASCADE_FIXTURE_TTL_SECONDS,
     CascadeAuthor,
@@ -31,7 +33,7 @@ async def _apply_cascade(real_redis_client, root):
         SPECIAL_FIELD_KEY_PREFIX,
         type(root).Meta.ttl,
         1,
-        type(root)._cascade_plan_arg,
+        CASCADE_PLAN_KEY,
     )
 
 
@@ -174,7 +176,7 @@ async def test_per_call_plan_refreshes_whole_reachable_subtree_with_root_child_s
         SPECIAL_FIELD_KEY_PREFIX,
         ROOT_TTL_SECONDS,
         1,
-        type(parent)._cascade_plan_arg,
+        CASCADE_PLAN_KEY,
     )
 
     # Assert
@@ -186,6 +188,36 @@ async def test_per_call_plan_refreshes_whole_reachable_subtree_with_root_child_s
     for key in (child.key, tags_key, scores_key):
         child_ttl = await real_redis_client.ttl(key)
         assert ROOT_TTL_SECONDS < child_ttl <= CASCADE_FIXTURE_TTL_SECONDS
+
+
+@pytest.mark.asyncio
+async def test_cascade_plan_key_written_at_init_and_drives_subtree_refresh(
+    real_redis_client,
+):
+    # Arrange
+    # The init-emulating fixture wrote the full plan to CASCADE_PLAN_KEY; the
+    # cascade sources its traversal from that one server-side key.
+    child = await CascadeSpecialChild().asave()
+    await child.tags.aadd("x")
+    await child.scores.apush(1.0, priority=1.0)
+    parent = await CascadeSpecialParent(child=child.key).asave()
+    tags_key = RedisSet.special_field_key(child.key, "tags")
+    scores_key = RedisPriorityQueue.special_field_key(child.key, "scores")
+    for key in (parent.key, child.key, tags_key, scores_key):
+        await real_redis_client.persist(key)
+
+    # Act
+    plan_raw = await real_redis_client.get(CASCADE_PLAN_KEY)
+    decoded = json.loads(plan_raw)
+    await _apply_cascade(real_redis_client, parent)
+
+    # Assert
+    # The one plan key holds every participant class...
+    assert CascadeSpecialParent.__name__ in decoded
+    assert CascadeSpecialChild.__name__ in decoded
+    # ...and the root refreshes its whole reachable subtree sourced from it.
+    for key in (parent.key, child.key, tags_key, scores_key):
+        assert await real_redis_client.ttl(key) > 0
 
 
 # NOTE: the pipelined `aset_ttl`/`refresh_ttl` cascade branches (enqueuing

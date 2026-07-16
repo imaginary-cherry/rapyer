@@ -13,7 +13,7 @@ from rapyer.scripts.registry import (
     SF_DISPATCH_PLACEHOLDER,
     _inject_sf_dispatch,
 )
-from rapyer.types.special import SpecialFieldType
+from rapyer.types.special import CASCADE_PLAN_KEY, SpecialFieldType
 from tests.models.collection_types import IntListModel, ProductListModel, StrListModel
 from tests.models.index_types import IndexTestModel
 from tests.models.simple_types import (
@@ -34,6 +34,7 @@ def mock_redis_client():
     redis_mock.ft.return_value.dropindex = AsyncMock()
     redis_mock.ft.return_value.create_index = AsyncMock()
     redis_mock.script_load = AsyncMock(return_value="mock_sha")
+    redis_mock.set = AsyncMock()
     return redis_mock
 
 
@@ -121,6 +122,7 @@ async def test_init_rapyer_override_existing_redis_and_ttl_sanity(
     old_redis_client.ft.return_value.dropindex = AsyncMock()
     old_redis_client.ft.return_value.create_index = AsyncMock()
     old_redis_client.script_load = AsyncMock(return_value="mock_sha")
+    old_redis_client.set = AsyncMock()
     old_ttl = 60
     new_ttl = 240
 
@@ -251,32 +253,22 @@ async def test_init_rapyer_loads_sf_injected_scripts_sanity(
 
 
 @pytest.mark.asyncio
-async def test_init_rapyer_caches_valid_cascade_plan_arg_per_model_sanity(
+async def test_init_rapyer_writes_full_cascade_plan_key_sanity(
     mock_redis_client, redis_models
 ):
     # Act
     await init_rapyer(mock_redis_client)
 
     # Assert
-    # Every model carries valid-JSON reachable-plan subset that at least holds
-    # its own class entry (its own special_suffixes must be reachable).
+    # init_rapyer writes the full plan once to CASCADE_PLAN_KEY; find that set
+    # call and confirm it holds every registered class (not a per-root subset).
+    set_calls = (
+        mock_redis_client.set.await_args_list or mock_redis_client.set.call_args_list
+    )
+    plan_call = next(c for c in set_calls if c.args[0] == CASCADE_PLAN_KEY)
+    decoded = json.loads(plan_call.args[1])
     for model in redis_models:
-        decoded = json.loads(model._cascade_plan_arg)
         assert model.__name__ in decoded
-
-
-@pytest.mark.asyncio
-async def test_init_rapyer_no_edge_model_ships_only_its_own_class_sanity(
-    mock_redis_client,
-):
-    # Act
-    await init_rapyer(mock_redis_client)
-
-    # Assert
-    # A no-edge model's subset is O(reachable) -- at most its own class -- not
-    # the full registry, proving the per-call plan does not bake every model.
-    decoded = set(json.loads(NoneTestModel._cascade_plan_arg))
-    assert decoded <= {NoneTestModel.__name__}
 
 
 @pytest.mark.asyncio

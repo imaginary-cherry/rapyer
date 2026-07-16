@@ -4,7 +4,7 @@ from rapyer.scripts import arun_sha
 from rapyer.scripts.constants import CASCADE_TTL_APPLY_SCRIPT_NAME
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.redis_set import RedisSet
-from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX
+from rapyer.types.special import CASCADE_PLAN_KEY, SPECIAL_FIELD_KEY_PREFIX
 from tests.models.cascade_types import (
     CascadeAuthor,
     CascadeBlanketLeaf,
@@ -44,7 +44,7 @@ async def _apply_cascade(fake_redis_client, root, cascade=True):
         SPECIAL_FIELD_KEY_PREFIX,
         type(root).Meta.ttl,
         1 if cascade else 0,
-        type(root)._cascade_plan_arg,
+        CASCADE_PLAN_KEY,
     )
 
 
@@ -676,3 +676,28 @@ async def test_node_beyond_nested_depth_budget_is_never_reached_sanity(
     }
     assert refreshed == {root.key, holder.key, mentor.key}
     assert await fake_redis_client.ttl(beyond.key) in (-1, -2)
+
+
+# --- Missing-plan-key degrade path ---
+
+
+@pytest.mark.asyncio
+async def test_cascade_apply_with_deleted_plan_key_degrades_to_root_only(
+    fake_redis_client,
+):
+    # Arrange
+    # The plan key is deleted, so the Lua's GET returns nil -> `or {}` empty
+    # plan. A cascade call must not raise and must still refresh the root's own
+    # main key; the FK child is unreachable with no plan entry.
+    child = await CascadeSpecialChild().asave()
+    parent = await CascadeSpecialParent(child=child.key).asave()
+    await fake_redis_client.persist(parent.key)
+    await fake_redis_client.persist(child.key)
+    await fake_redis_client.delete(CASCADE_PLAN_KEY)
+
+    # Act
+    await _apply_cascade(fake_redis_client, parent)
+
+    # Assert
+    assert await fake_redis_client.ttl(parent.key) > 0
+    assert await fake_redis_client.ttl(child.key) in (-1, -2)

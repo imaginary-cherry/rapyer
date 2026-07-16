@@ -84,7 +84,11 @@ from rapyer.types.base import (
 from rapyer.types.convert import RedisConverter
 from rapyer.types.generic import GenericRedisType
 from rapyer.types.relational import RelationalFieldType
-from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX, SpecialFieldType
+from rapyer.types.special import (
+    CASCADE_PLAN_KEY,
+    SPECIAL_FIELD_KEY_PREFIX,
+    SpecialFieldType,
+)
 from rapyer.typing_support import Self, Unpack
 from rapyer.utils.annotation import (
     DYNAMIC_CLASS_DOC,
@@ -170,10 +174,6 @@ class AtomicRedisModel(BaseModel):
     _redis_link_field_names: ClassVar[set[str]] = set()
     _contain_sf: ClassVar[set[str]] = set()
     _contain_fk: ClassVar[set[str]] = set()
-    # Reachable-plan subset JSON shipped per call as the cascade script's
-    # ARGV[5]; init_rapyer caches it. Default "{}" degrades a pre-init model to
-    # a root-own-keys-only refresh instead of raising.
-    _cascade_plan_arg: ClassVar[str] = "{}"
     _field_name: str = PrivateAttr(default="")
     model_config = ConfigDict(validate_assignment=True, validate_default=True)
 
@@ -264,9 +264,9 @@ class AtomicRedisModel(BaseModel):
                 SPECIAL_FIELD_KEY_PREFIX,
                 self.Meta.ttl,
                 1,
-                # Reachable-plan subset shipped per call (ARGV[5]) instead of
-                # baked into the script at SCRIPT LOAD.
-                self._cascade_plan_arg,
+                # The full plan lives in one Redis key read server-side; we pass
+                # only its name (ARGV[5]). The script still ALWAYS runs.
+                CASCADE_PLAN_KEY,
             )
             return None
 
@@ -616,7 +616,9 @@ class AtomicRedisModel(BaseModel):
                 SPECIAL_FIELD_KEY_PREFIX,
                 ttl,
                 1 if cascade else 0,
-                self._cascade_plan_arg,
+                # The full plan lives in one Redis key read server-side; we pass
+                # only its name (ARGV[5]).
+                CASCADE_PLAN_KEY,
             )
             if in_outer_pipe:
                 # Outer caller owns execution; we cannot observe the result here.

@@ -5,8 +5,8 @@ import pytest
 from rapyer.cascade.planner import (
     CascadeEdge,
     CascadePlanEntry,
+    build_cascade_plan,
     cascade_plan_json,
-    reachable_plan_subset,
 )
 from rapyer.scripts.constants import (
     ATOMIC_GET_OR_CREATE_SCRIPT_NAME,
@@ -17,6 +17,7 @@ from rapyer.scripts.registry import (
     SCRIPT_REGISTRY,
     register_scripts,
 )
+from tests.unit.cascade.conftest import CASCADE_PLANNER_MODELS
 
 
 def _edge(target: str) -> CascadeEdge:
@@ -51,100 +52,25 @@ def test_cascade_registry_entry_present():
     assert ("cascade", "apply", CASCADE_TTL_APPLY_SCRIPT_NAME) in SCRIPT_REGISTRY
 
 
-def test_reachable_plan_subset_is_cycle_safe():
-    # Arrange
-    # A -> B -> A is a cycle; the closure must terminate.
-    plan = {"A": _entry("B"), "B": _entry("A")}
-
-    # Act
-    subset = reachable_plan_subset(plan, "A")
-
-    # Assert
-    assert set(subset) == {"A", "B"}
-
-
-def test_reachable_plan_subset_covers_diamond():
-    # Arrange
-    plan = {
-        "A": _entry("B", "C"),
-        "B": _entry("D"),
-        "C": _entry("D"),
-        "D": _entry(),
-    }
-
-    # Act
-    subset = reachable_plan_subset(plan, "A")
-
-    # Assert
-    assert set(subset) == {"A", "B", "C", "D"}
-
-
-def test_reachable_plan_subset_excludes_unreachable_class():
-    # Arrange
-    # Unrelated is present in the full plan but not reachable from A.
-    plan = {"A": _entry("B"), "B": _entry(), "Unrelated": _entry()}
-
-    # Act
-    subset = reachable_plan_subset(plan, "A")
-
-    # Assert
-    assert set(subset) == {"A", "B"}
-    assert "Unrelated" not in subset
-
-
-def test_reachable_plan_subset_root_only_for_no_edge_model():
-    # Arrange
-    plan = {"A": _entry(), "B": _entry()}
-
-    # Act
-    subset = reachable_plan_subset(plan, "A")
-
-    # Assert
-    assert set(subset) == {"A"}
-
-
-def test_reachable_plan_subset_includes_transitive_targets():
-    # Arrange
-    plan = {"A": _entry("B"), "B": _entry("C"), "C": _entry()}
-
-    # Act
-    subset = reachable_plan_subset(plan, "A")
-
-    # Assert
-    assert set(subset) == {"A", "B", "C"}
-
-
-def test_reachable_plan_subset_skips_absent_target_without_raising():
-    # Arrange
-    # A references Missing, which has no plan entry.
-    plan = {"A": _entry("Missing")}
-
-    # Act
-    subset = reachable_plan_subset(plan, "A")
-
-    # Assert
-    assert set(subset) == {"A"}
-
-
 def test_cascade_plan_json_omits_none_depth_and_ttl():
     # Arrange
     # ttl=None on the entry and depth=None on the edge (its default).
     plan = {"A": _entry("B", ttl=None), "B": _entry(ttl=None)}
 
     # Act
-    payload = cascade_plan_json(reachable_plan_subset(plan, "A"))
+    payload = cascade_plan_json(plan)
 
     # Assert
     assert '"ttl"' not in payload
     assert '"depth"' not in payload
 
 
-def test_cascade_plan_json_round_trips_to_expected_shape():
+def test_cascade_plan_json_round_trips_full_plan_to_expected_shape():
     # Arrange
     plan = {"Foo": _entry("Author", ttl=10, suffixes=["tasks"]), "Author": _entry()}
 
     # Act
-    decoded = json.loads(cascade_plan_json(reachable_plan_subset(plan, "Foo")))
+    decoded = json.loads(cascade_plan_json(plan))
 
     # Assert
     assert set(decoded) == {"Foo", "Author"}
@@ -152,6 +78,35 @@ def test_cascade_plan_json_round_trips_to_expected_shape():
     assert decoded["Foo"]["ttl"] == 10
     assert decoded["Foo"]["fks"][0]["target"] == "Author"
     assert decoded["Author"]["fks"] == []
+
+
+def test_cascade_plan_json_serializes_every_class_in_the_plan():
+    # Arrange
+    plan = {
+        "A": _entry("B"),
+        "B": _entry("C"),
+        "C": _entry(),
+        "Unrelated": _entry(),
+    }
+
+    # Act
+    decoded = json.loads(cascade_plan_json(plan))
+
+    # Assert
+    # The full plan carries every class, including ones not reachable from A.
+    assert set(decoded) == {"A", "B", "C", "Unrelated"}
+
+
+def test_cascade_plan_json_covers_every_built_class(setup_fake_redis_for_cascade_apply):
+    # Arrange
+    plan = build_cascade_plan(CASCADE_PLANNER_MODELS)
+
+    # Act
+    decoded = json.loads(cascade_plan_json(plan))
+
+    # Assert
+    for model in CASCADE_PLANNER_MODELS:
+        assert model.__name__ in decoded
 
 
 @pytest.mark.asyncio

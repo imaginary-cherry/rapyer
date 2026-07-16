@@ -5,6 +5,7 @@ from rapyer.scripts.loader import load_sf_load_snippet, load_sf_save_snippet
 from rapyer.types.base import BaseRedisType
 
 SPECIAL_FIELD_KEY_PREFIX = "__rapyer_special__"
+CASCADE_PLAN_KEY = "__rapyer_cascade_plan__"
 
 
 class SpecialFieldType(BaseRedisType, abc.ABC):

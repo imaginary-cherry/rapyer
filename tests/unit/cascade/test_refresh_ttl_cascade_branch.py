@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from rapyer.scripts.constants import CASCADE_TTL_APPLY_SCRIPT_NAME
-from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX
+from rapyer.types.special import CASCADE_PLAN_KEY, SPECIAL_FIELD_KEY_PREFIX
 from tests.models.cascade_types import CascadeAuthor, CascadeChainRoot
 
 
@@ -35,7 +35,7 @@ async def test_refresh_ttl_cascade_enabled_model_calls_run_sha_not_expire():
         SPECIAL_FIELD_KEY_PREFIX,
         root.Meta.ttl,
         1,
-        type(root)._cascade_plan_arg,
+        CASCADE_PLAN_KEY,
     )
     mock_pipe.expire.assert_not_called()
 
@@ -69,6 +69,6 @@ async def test_refresh_ttl_non_cascade_model_also_calls_run_sha():
         SPECIAL_FIELD_KEY_PREFIX,
         author.Meta.ttl,
         1,
-        type(author)._cascade_plan_arg,
+        CASCADE_PLAN_KEY,
     )
     mock_pipe.expire.assert_not_called()

@@ -277,36 +277,6 @@ def validate_cascade_ttl_targets(plan: dict[str, CascadePlanEntry]):
             )
 
 
-def reachable_plan_subset(
-    plan: dict[str, CascadePlanEntry], root_class: str
-) -> dict[str, CascadePlanEntry]:
-    """
-    Return the subset of the plan reachable from root_class.
-
-    The subset is what a single root ships per call as ARGV[5]: the root itself
-    (its own special_suffixes are read even when it has no edges) plus every
-    class transitively reachable by following FK edges. Depth budgets are
-    ignored so the subset is a superset-safe closure; a visited set makes it
-    cycle-safe, and a target absent from the plan is skipped rather than raised.
-    """
-    subset: dict[str, CascadePlanEntry] = {}
-    visited: set[str] = set()
-    stack = [root_class]
-    while stack:
-        name = stack.pop()
-        if name in visited:
-            continue
-        visited.add(name)
-        entry = plan.get(name)
-        if entry is None:
-            continue
-        subset[name] = entry
-        for edge in entry.fks:
-            if edge.target not in visited:
-                stack.append(edge.target)
-    return subset
-
-
 def _drop_none_values(value: Any) -> Any:
     """Recursively drop None-valued dict keys (depth/ttl omitted when unset)."""
     if isinstance(value, dict):
@@ -320,10 +290,15 @@ def _drop_none_values(value: Any) -> Any:
     return value
 
 
-def cascade_plan_json(subset: dict[str, CascadePlanEntry]) -> str:
-    """Serialize a reachable-plan subset to compact JSON for ARGV[5]."""
+def cascade_plan_json(plan: dict[str, CascadePlanEntry]) -> str:
+    """
+    Serialize the full cascade plan to compact JSON.
+
+    The result is written once to a Redis key at init_rapyer and read
+    server-side by the Lua on every call, rather than shipped per call.
+    """
     payload = {
         name: _drop_none_values(dataclasses.asdict(entry))
-        for name, entry in subset.items()
+        for name, entry in plan.items()
     }
     return json.dumps(payload, separators=(",", ":"))

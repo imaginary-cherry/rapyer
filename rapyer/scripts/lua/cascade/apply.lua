@@ -1,12 +1,12 @@
 -- An unbounded recursion budget: keep following edges with no depth cap.
 local UNBOUNDED = -1
 
--- The reachable-plan subset for THIS root is shipped per call as JSON in
--- ARGV[5] (root + its transitively reachable classes, precomputed at
--- init_rapyer), decoded once here -- replacing the SCRIPT-LOAD-time bake of
--- every registered model's plan. `or '{}'` degrades a missing arg to a
--- root-own-keys-only refresh.
-local CASCADE_PLAN = cjson.decode(ARGV[5] or '{}')
+-- The full cascade plan is written once to a Redis key at init_rapyer; ARGV[5]
+-- carries that key's NAME (not the plan itself), and we GET + decode it here
+-- rather than reshipping the plan on every call. A missing key (pre-init, or
+-- flushed) makes GET return false -> empty plan -> root-own-keys-only refresh.
+local plan_raw = redis.call('GET', ARGV[5])
+local CASCADE_PLAN = plan_raw and cjson.decode(plan_raw) or {}
 local classes = CASCADE_PLAN
 
 local root_key = KEYS[1]

@@ -2,7 +2,7 @@ import pytest
 
 from rapyer.scripts import arun_sha
 from rapyer.scripts.constants import CASCADE_TTL_APPLY_SCRIPT_NAME
-from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX
+from rapyer.types.special import CASCADE_PLAN_KEY, SPECIAL_FIELD_KEY_PREFIX
 from tests.models.cascade_types import (
     CascadeChainNode,
     CascadeChainRoot,
@@ -26,7 +26,7 @@ async def _apply_cascade(real_redis_client, root):
         SPECIAL_FIELD_KEY_PREFIX,
         type(root).Meta.ttl,
         1,
-        type(root)._cascade_plan_arg,
+        CASCADE_PLAN_KEY,
     )
 
 

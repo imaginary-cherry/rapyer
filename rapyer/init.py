@@ -9,12 +9,12 @@ from rapyer.cascade import CascadeTTL
 from rapyer.cascade.planner import (
     build_cascade_plan,
     cascade_plan_json,
-    reachable_plan_subset,
     validate_cascade_ttl_targets,
 )
 from rapyer.result import resolve_forward_refs
 from rapyer.scripts import register_scripts
 from rapyer.types.relational import resolve_relational_targets
+from rapyer.types.special import CASCADE_PLAN_KEY
 
 
 def is_fakeredis(client) -> bool:
@@ -83,12 +83,6 @@ async def init_rapyer(
         # registered. Pure config check; needs no Redis connection.
         plan = build_cascade_plan(REDIS_MODELS)
         validate_cascade_ttl_targets(plan)
-        # Cache each root's reachable-plan subset so the hot TTL path ships only
-        # O(reachable) classes per call instead of baking the full plan.
-        for model in REDIS_MODELS:
-            model._cascade_plan_arg = cascade_plan_json(
-                reachable_plan_subset(plan, model.__name__)
-            )
     finally:
         # Refreeze now that the plan is baked; further Meta mutation is blocked
         # until the next init_rapyer() call. Runs even on failure.
@@ -96,6 +90,10 @@ async def init_rapyer(
             model.Meta._meta_locked = True
 
     if redis is not None:
+        # Write the full plan to one Redis key so the Lua reads it server-side
+        # on every call instead of us reshipping it per call. Must precede
+        # register_scripts so the plan is present before any cascade runs.
+        await redis.set(CASCADE_PLAN_KEY, cascade_plan_json(plan))
         await register_scripts(redis, is_fake_redis)
 
 

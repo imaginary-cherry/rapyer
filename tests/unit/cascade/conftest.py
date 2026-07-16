@@ -4,10 +4,10 @@ import pytest_asyncio
 from rapyer.cascade.planner import (
     build_cascade_plan,
     cascade_plan_json,
-    reachable_plan_subset,
 )
 from rapyer.scripts import register_scripts
 from rapyer.types.relational import resolve_relational_targets
+from rapyer.types.special import CASCADE_PLAN_KEY
 from tests.models.cascade_types import (
     CascadeAuthor,
     CascadeBlanketCollectionRoot,
@@ -104,8 +104,8 @@ def setup_fake_redis_for_cascade_models(fake_redis_client):
 async def setup_fake_redis_for_cascade_apply(fake_redis_client):
     """
     Same wiring as ``setup_fake_redis_for_cascade_models``, plus a real
-    ``register_scripts`` call so the registered ``cascade_ttl_apply`` SHA's
-    baked-in plan table reflects every ``CASCADE_PLANNER_MODELS`` class
+    ``register_scripts`` call and a full-plan write to ``CASCADE_PLAN_KEY`` so
+    the cascade Lua reads a plan covering every ``CASCADE_PLANNER_MODELS`` class
     (``fake_redis_client`` itself already registered scripts once at fixture
     creation time, before these classes' ``Meta.redis`` was wired here).
     """
@@ -120,14 +120,13 @@ async def setup_fake_redis_for_cascade_apply(fake_redis_client):
         model.Meta.is_fake_redis = True
         model.Meta.cascade_ttl = _DECLARED_CASCADE_TTL[model]
     resolve_relational_targets(CASCADE_PLANNER_MODELS)
-    # The plan is no longer baked into the SHA; each model ships its reachable
-    # subset per call via _cascade_plan_arg, so emulate init_rapyer's caching.
-    plan = build_cascade_plan(CASCADE_PLANNER_MODELS)
-    for model in CASCADE_PLANNER_MODELS:
-        model._cascade_plan_arg = cascade_plan_json(
-            reachable_plan_subset(plan, model.__name__)
-        )
     await register_scripts(fake_redis_client, is_fakeredis=True)
+    # The full plan lives in one Redis key read server-side; emulate init_rapyer
+    # by writing it after register_scripts.
+    await fake_redis_client.set(
+        CASCADE_PLAN_KEY,
+        cascade_plan_json(build_cascade_plan(CASCADE_PLANNER_MODELS)),
+    )
     yield
     for model, (
         original_redis,

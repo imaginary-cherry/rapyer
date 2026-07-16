@@ -11,11 +11,11 @@ from rapyer.base import REDIS_MODELS
 from rapyer.cascade.planner import (
     build_cascade_plan,
     cascade_plan_json,
-    reachable_plan_subset,
 )
 from rapyer.result import resolve_forward_refs
 from rapyer.scripts import register_scripts
 from rapyer.types.relational import resolve_relational_targets
+from rapyer.types.special import CASCADE_PLAN_KEY
 from tests.models.registry import TESTED_REDIS_MODELS
 from tests.models.simple_types import TTLRefreshDisabledModel, TTLRefreshTestModel
 
@@ -51,17 +51,15 @@ async def real_redis_client(redis_client):
     for model in TESTED_REDIS_MODELS:
         model.Meta.redis = redis_client
 
-    # The cascade plan is no longer baked into the SHA; each model ships its
-    # reachable subset per call via _cascade_plan_arg, so emulate init_rapyer's
-    # caching here (this fixture stands in for init_rapyer in these tests).
-    plan = build_cascade_plan(REDIS_MODELS)
-    for model in REDIS_MODELS:
-        model._cascade_plan_arg = cascade_plan_json(
-            reachable_plan_subset(plan, model.__name__)
-        )
-
     # Register Lua scripts
     await register_scripts(redis_client)
+
+    # The cascade plan lives in one Redis key read server-side; emulate
+    # init_rapyer by writing the full plan after register_scripts (this fixture
+    # stands in for init_rapyer in these tests).
+    await redis_client.set(
+        CASCADE_PLAN_KEY, cascade_plan_json(build_cascade_plan(REDIS_MODELS))
+    )
 
     yield redis_client
 
