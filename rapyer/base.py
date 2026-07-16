@@ -72,7 +72,6 @@ from rapyer.result import (
 from rapyer.scripts import registry as scripts_registry
 from rapyer.scripts.constants import (
     ATOMIC_GET_OR_CREATE_SCRIPT_NAME,
-    CASCADE_TTL_APPLY_SCRIPT_NAME,
 )
 from rapyer.types.base import (
     FAILED_FIELDS_KEY,
@@ -85,7 +84,6 @@ from rapyer.types.convert import RedisConverter
 from rapyer.types.generic import GenericRedisType
 from rapyer.types.relational import RelationalFieldType
 from rapyer.types.special import (
-    CASCADE_PLAN_KEY,
     SPECIAL_FIELD_KEY_PREFIX,
     SpecialFieldType,
 )
@@ -253,20 +251,20 @@ class AtomicRedisModel(BaseModel):
             return None
         pipe_context = ensure_pipeline if can_use_pipeline else pipeline_with_execution
         async with pipe_context(self.Meta) as pipe:
-            # Always cascade (ARGV cascade=1): re-arms the whole reachable
-            # subtree; with no outgoing edges it just re-arms this model's own keys.
-            scripts_registry.run_sha(
+            if self.Meta.is_fake_redis:
+                # Cascade edge-following is real-Redis-only; re-arm root-own keys.
+                for key in self.all_keys:
+                    pipe.expire(key, self.Meta.ttl)
+                return None
+            # Always cascade (do_cascade=1): re-arms the whole reachable subtree.
+            scripts_registry.run_fcall(
                 pipe,
-                CASCADE_TTL_APPLY_SCRIPT_NAME,
                 1,
                 self.key,
                 type(self).__name__,
                 SPECIAL_FIELD_KEY_PREFIX,
                 self.Meta.ttl,
                 1,
-                # The full plan lives in one Redis key read server-side; we pass
-                # only its name (ARGV[5]). The script still ALWAYS runs.
-                CASCADE_PLAN_KEY,
             )
             return None
 
@@ -600,34 +598,37 @@ class AtomicRedisModel(BaseModel):
         if self.is_inner_model():
             raise RuntimeError("Can only set TTL from top level model")
 
-        # aset_ttl always routes through the cascade script, and `cascade` is a
-        # per-call ARGV (0 = root's own keys only, 1 = walk the FK graph).
-
         # Check for an outer pipeline BEFORE entering the pipeline context,
         # since ensure_pipeline itself pushes a pipeline into context.
         in_outer_pipe = _context_pipe.get() is not None
         async with ensure_pipeline(self.Meta, should_execute=False) as pipe:
-            scripts_registry.run_sha(
+            if self.Meta.is_fake_redis:
+                # Cascade edge-following is a no-op on fakeredis; only root-own keys refresh.
+                for key in self.all_keys:
+                    pipe.expire(key, ttl)
+                if in_outer_pipe:
+                    return None
+                await pipe.execute()
+                if not cascade:
+                    return None
+                return CascadeResult(dangling_children=0, dangling_special=0)
+            # `cascade` is a per-call flag: 0 = root's own keys only, 1 = walk the graph.
+            scripts_registry.run_fcall(
                 pipe,
-                CASCADE_TTL_APPLY_SCRIPT_NAME,
                 1,
                 self.key,
                 type(self).__name__,
                 SPECIAL_FIELD_KEY_PREFIX,
                 ttl,
                 1 if cascade else 0,
-                # The full plan lives in one Redis key read server-side; we pass
-                # only its name (ARGV[5]).
-                CASCADE_PLAN_KEY,
             )
             if in_outer_pipe:
                 # Outer caller owns execution; we cannot observe the result here.
                 return None
-            # NOTE: bare execute -- no NOSCRIPT self-heal yet here (tracked follow-up in issue #284).
+            # NOTE: bare execute -- no self-heal yet here (tracked follow-up in issue #284).
             results = await pipe.execute()
         if not cascade:
-            # Matches the old plain-EXPIRE contract: a non-cascading call
-            # returns None, even though it now runs through the same script.
+            # Matches the old plain-EXPIRE contract: a non-cascading call returns None.
             return None
         dangling_children, dangling_special = results[-1]
         return CascadeResult(
