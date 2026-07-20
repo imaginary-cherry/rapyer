@@ -1,6 +1,5 @@
 import pytest
 
-from rapyer.scripts import arun_fcall
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.redis_set import RedisSet
 from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX
@@ -20,9 +19,8 @@ pytestmark = pytest.mark.usefixtures("setup_real_redis_for_cascade_apply")
 
 
 async def _apply_cascade(real_redis_client, root):
-    return await arun_fcall(
-        real_redis_client,
-        type(root).Meta,
+    return await real_redis_client.fcall(
+        type(root).Meta.cascade_function_name,
         1,
         root.key,
         type(root).__name__,
@@ -158,9 +156,8 @@ async def test_baked_plan_refreshes_whole_reachable_subtree_with_root_child_spli
 
     # Act
     # A distinct root ttl so the assertion proves the root-vs-child split.
-    await arun_fcall(
-        real_redis_client,
-        type(parent).Meta,
+    await real_redis_client.fcall(
+        parent.Meta.cascade_function_name,
         1,
         parent.key,
         type(parent).__name__,
@@ -178,10 +175,3 @@ async def test_baked_plan_refreshes_whole_reachable_subtree_with_root_child_spli
     for key in (child.key, tags_key, scores_key):
         child_ttl = await real_redis_client.ttl(key)
         assert ROOT_TTL_SECONDS < child_ttl <= CASCADE_FIXTURE_TTL_SECONDS
-
-
-# NOTE: the pipelined `aset_ttl`/`refresh_ttl` cascade branches (enqueuing
-# `run_fcall` into a pipeline via `ensure_pipeline`/`pipeline_with_execution`)
-# do NOT self-heal a missing function -- only the direct `arun_fcall` path does.
-# Extending recovery to these pipelined TTL-refresh paths is a follow-up
-# (issue #284); see NOSCRIPT-ISSUE.md.

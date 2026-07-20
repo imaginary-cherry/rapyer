@@ -627,8 +627,9 @@ class AtomicRedisModel(BaseModel):
             if in_outer_pipe:
                 # Outer caller owns execution; we cannot observe the result here.
                 return None
-            # NOTE: bare execute -- no self-heal yet here (tracked follow-up in issue #284).
-            results = await pipe.execute()
+            results = await scripts_registry.aexecute_pipeline_with_cascade_self_heal(
+                pipe, self.Meta
+            )
         if not cascade:
             # Matches the old plain-EXPIRE contract: a non-cascading call returns None.
             return None
@@ -1390,6 +1391,7 @@ async def _apipeline(
             commands_backup = list(pipe.command_stack)
             noscript_on_first_attempt = False
             noscript_on_retry = False
+            missing_function_on_first_attempt = False
 
             try:
                 await pipe.execute()
@@ -1402,8 +1404,21 @@ async def _apipeline(
                         "ignore_redis_error=True: %s",
                         exc,
                     )
+                # redis-py's async pipeline masks the FCALL error, so detect via the registry.
+                elif (
+                    not _meta.is_fake_redis
+                    and any(args[0] == "FCALL" for args, _options in commands_backup)
+                    and await scripts_registry.acascade_function_missing(_meta)
+                ):
+                    missing_function_on_first_attempt = True
                 else:
                     raise
+
+            if missing_function_on_first_attempt:
+                # Reload the cascade function and replay only the FCALL commands.
+                await scripts_registry.aretry_fcall_after_missing_function(
+                    _meta, commands_backup
+                )
 
             if noscript_on_first_attempt:
                 await scripts_registry.handle_noscript_error(redis, _meta)

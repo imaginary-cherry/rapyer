@@ -1,6 +1,5 @@
 import pytest
 
-from rapyer.scripts import arun_fcall
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.redis_set import RedisSet
 from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX
@@ -26,9 +25,8 @@ pytestmark = pytest.mark.usefixtures("setup_real_redis_for_cascade_apply")
 
 
 async def _apply_cascade(real_redis_client, root, cascade=True):
-    return await arun_fcall(
-        real_redis_client,
-        type(root).Meta,
+    return await real_redis_client.fcall(
+        type(root).Meta.cascade_function_name,
         1,
         root.key,
         type(root).__name__,

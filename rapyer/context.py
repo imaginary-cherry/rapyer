@@ -54,15 +54,23 @@ async def ensure_pipeline(meta, should_execute: bool = True):
     if existing is not None:
         yield existing
     else:
+        # Lazy import: module-top import re-enters the half-built actions/context cycle.
+        from rapyer.scripts import registry as scripts_registry
+
         async with meta.redis.pipeline(transaction=True) as pipe:
             with with_pipe_context(pipe):
                 yield pipe
                 if should_execute:
-                    await pipe.execute()
+                    await scripts_registry.aexecute_pipeline_with_cascade_self_heal(
+                        pipe, meta
+                    )
 
 
 @contextlib.asynccontextmanager
 async def pipeline_with_execution(meta):
+    # Lazy import: module-top import re-enters the half-built actions/context cycle.
+    from rapyer.scripts import registry as scripts_registry
+
     async with meta.redis.pipeline(transaction=True) as pipe:
         yield pipe
-        await pipe.execute()
+        await scripts_registry.aexecute_pipeline_with_cascade_self_heal(pipe, meta)
