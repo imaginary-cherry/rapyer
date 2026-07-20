@@ -27,6 +27,7 @@ async def test_refresh_ttl_cascade_enabled_model_calls_run_sha_not_expire():
     # Assert
     mock_run_fcall.assert_called_once_with(
         mock_pipe,
+        type(root).Meta.cascade_function_name,
         1,
         root.key,
         "CascadeChainRoot",
@@ -59,6 +60,7 @@ async def test_refresh_ttl_non_cascade_model_also_calls_run_sha():
     # Assert
     mock_run_fcall.assert_called_once_with(
         mock_pipe,
+        type(author).Meta.cascade_function_name,
         1,
         author.key,
         "CascadeAuthor",

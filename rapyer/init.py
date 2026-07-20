@@ -92,7 +92,12 @@ async def init_rapyer(
         await register_scripts(redis, is_fake_redis)
         # TTL cascade traversal is real-Redis-7+-only; on fakeredis only root-own keys refresh.
         if not is_fake_redis:
-            await register_cascade_function(redis, cascade_plan_json(plan))
+            # Assigned post-freeze: cascade_function_name is a freeze-exempt derived value.
+            function_name = await register_cascade_function(
+                redis, cascade_plan_json(plan)
+            )
+            for model in REDIS_MODELS:
+                model.Meta.cascade_function_name = function_name
 
 
 async def teardown_rapyer():

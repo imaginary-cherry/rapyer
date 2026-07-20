@@ -47,6 +47,7 @@ async def test_aset_ttl_default_cascade_false_runs_the_script_with_cascade_argv_
     # Assert
     mock_run_fcall.assert_called_once_with(
         mock_pipe,
+        type(root).Meta.cascade_function_name,
         1,
         root.key,
         "CascadeChainRoot",
@@ -82,6 +83,7 @@ async def test_aset_ttl_cascade_true_runs_the_script_with_cascade_argv_one():
     # Assert
     mock_run_fcall.assert_called_once_with(
         mock_pipe,
+        type(root).Meta.cascade_function_name,
         1,
         root.key,
         "CascadeChainRoot",
@@ -117,6 +119,7 @@ async def test_aset_ttl_cascade_standalone_owns_execution_and_returns_cascade_re
     # Assert
     mock_run_fcall.assert_called_once_with(
         mock_pipe,
+        type(root).Meta.cascade_function_name,
         1,
         root.key,
         "CascadeChainRoot",

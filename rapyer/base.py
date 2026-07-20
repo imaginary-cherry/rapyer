@@ -259,6 +259,7 @@ class AtomicRedisModel(BaseModel):
             # Always cascade (do_cascade=1): re-arms the whole reachable subtree.
             scripts_registry.run_fcall(
                 pipe,
+                self.Meta.cascade_function_name,
                 1,
                 self.key,
                 type(self).__name__,
@@ -615,6 +616,7 @@ class AtomicRedisModel(BaseModel):
             # `cascade` is a per-call flag: 0 = root's own keys only, 1 = walk the graph.
             scripts_registry.run_fcall(
                 pipe,
+                self.Meta.cascade_function_name,
                 1,
                 self.key,
                 type(self).__name__,
