@@ -156,7 +156,7 @@ async def register_cascade_function(redis_client, plan_json: str) -> str:
 
 
 def run_fcall(pipeline, function_name: str, keys: int, *args):
-    # No self-heal in-pipeline, matching the EVALSHA path (see issue #284 note in aset_ttl).
+    # Enqueue only; self-heal happens at execute time (aexecute_pipeline_with_cascade_self_heal).
     pipeline.fcall(function_name, keys, *args)
 
 
@@ -177,6 +177,47 @@ async def arun_fcall(client, redis_config: "RedisConfig", keys: int, *args):
             "Cascade function still missing after re-loading. "
             "This indicates a server-side problem with Redis."
         ) from e
+
+
+async def aretry_fcall_after_missing_function(
+    redis_config: "RedisConfig", commands_backup: list
+):
+    """
+    Reload the cascade function, then replay only the backed-up FCALL commands.
+    """
+    await handle_missing_function(redis_config.redis, redis_config)
+    # Re-read the name: handle_missing_function may rewrite it if the plan hash changed.
+    async with redis_config.redis.pipeline(transaction=True) as retry_pipe:
+        for args, options in commands_backup:
+            if args[0] == "FCALL":
+                # Rewrite only the function-name slot (args[1]); keep numkeys/keys/args verbatim.
+                retry_pipe.execute_command(
+                    args[0],
+                    redis_config.cascade_function_name,
+                    *args[2:],
+                    **options,
+                )
+        try:
+            return await retry_pipe.execute()
+        except ResponseError as e:
+            raise PersistentCascadeFunctionError(
+                "Cascade function still missing after re-loading. "
+                "This indicates a server-side problem with Redis."
+            ) from e
+
+
+async def aexecute_pipeline_with_cascade_self_heal(pipe, redis_config: "RedisConfig"):
+    """
+    Execute a pipeline, transparently reloading the cascade function and
+    replaying the FCALL on a function-not-found error.
+    """
+    commands_backup = list(pipe.command_stack)
+    try:
+        return await pipe.execute()
+    except ResponseError as e:
+        if "function not found" not in str(e).lower():
+            raise
+        return await aretry_fcall_after_missing_function(redis_config, commands_backup)
 
 
 async def handle_missing_function(redis_client, redis_config: "RedisConfig"):

@@ -178,10 +178,3 @@ async def test_baked_plan_refreshes_whole_reachable_subtree_with_root_child_spli
     for key in (child.key, tags_key, scores_key):
         child_ttl = await real_redis_client.ttl(key)
         assert ROOT_TTL_SECONDS < child_ttl <= CASCADE_FIXTURE_TTL_SECONDS
-
-
-# NOTE: the pipelined `aset_ttl`/`refresh_ttl` cascade branches (enqueuing
-# `run_fcall` into a pipeline via `ensure_pipeline`/`pipeline_with_execution`)
-# do NOT self-heal a missing function -- only the direct `arun_fcall` path does.
-# Extending recovery to these pipelined TTL-refresh paths is a follow-up
-# (issue #284); see NOSCRIPT-ISSUE.md.
