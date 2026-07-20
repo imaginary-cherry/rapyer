@@ -10,7 +10,7 @@ from _pytest.reports import TestReport
 import rapyer
 import rapyer.types  # noqa: F401  # ensure all BaseRedisType subclasses are registered
 from rapyer.actions import ACTION_GROUPS_ATTR, ActionGroup
-from rapyer.base import AtomicRedisModel
+from rapyer.base import REDIS_MODELS, AtomicRedisModel
 from rapyer.types.base import BaseRedisType
 from rapyer.types.special import SpecialFieldType
 from tests.action_groups import (
@@ -41,6 +41,19 @@ from tests.coverage_helpers import (
     should_ignore_group,
     special_field_cover_marker,
 )
+
+
+@pytest.fixture(autouse=True)
+def reset_meta_freeze():
+    # Meta is frozen (all fields immutable) after init_rapyer(), and the config
+    # is a process-global shared singleton per model. Unfreeze around every test
+    # so a prior init can't leak MetaFrozenError into a later test that mutates
+    # Meta directly (tests own their other Meta cleanup, as they already did).
+    for model in REDIS_MODELS:
+        model.Meta._meta_locked = False
+    yield
+    for model in REDIS_MODELS:
+        model.Meta._meta_locked = False
 
 
 @pytest.fixture

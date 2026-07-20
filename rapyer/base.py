@@ -63,13 +63,16 @@ from rapyer.fields.key import KeyAnnotation, RapyerKey
 from rapyer.fields.safe_load import SafeLoadAnnotation
 from rapyer.links import ATOMIC_MODEL_API_REF_LINK, REDIS_SUPPORTED_LINK
 from rapyer.result import (
+    CascadeResult,
     DeleteResult,
     GetOrCreateResult,
     GetOrCreateStatus,
     RapyerDeleteResult,
 )
 from rapyer.scripts import registry as scripts_registry
-from rapyer.scripts.constants import ATOMIC_GET_OR_CREATE_SCRIPT_NAME
+from rapyer.scripts.constants import (
+    ATOMIC_GET_OR_CREATE_SCRIPT_NAME,
+)
 from rapyer.types.base import (
     FAILED_FIELDS_KEY,
     REDIS_DUMP_FLAG_NAME,
@@ -80,7 +83,10 @@ from rapyer.types.base import (
 from rapyer.types.convert import RedisConverter
 from rapyer.types.generic import GenericRedisType
 from rapyer.types.relational import RelationalFieldType
-from rapyer.types.special import SpecialFieldType
+from rapyer.types.special import (
+    SPECIAL_FIELD_KEY_PREFIX,
+    SpecialFieldType,
+)
 from rapyer.typing_support import Self, Unpack
 from rapyer.utils.annotation import (
     DYNAMIC_CLASS_DOC,
@@ -245,8 +251,22 @@ class AtomicRedisModel(BaseModel):
             return None
         pipe_context = ensure_pipeline if can_use_pipeline else pipeline_with_execution
         async with pipe_context(self.Meta) as pipe:
-            for key in self._ttl_keys():
-                pipe.expire(key, self.Meta.ttl)
+            if self.Meta.is_fake_redis:
+                # Cascade edge-following is real-Redis-only; re-arm root-own keys.
+                for key in self.all_keys:
+                    pipe.expire(key, self.Meta.ttl)
+                return None
+            # Always cascade (do_cascade=1): re-arms the whole reachable subtree.
+            scripts_registry.run_fcall(
+                pipe,
+                self.Meta.cascade_function_name,
+                1,
+                self.key,
+                type(self).__name__,
+                SPECIAL_FIELD_KEY_PREFIX,
+                self.Meta.ttl,
+                1,
+            )
             return None
 
     @classmethod
@@ -573,12 +593,48 @@ class AtomicRedisModel(BaseModel):
             update_keys_in_pipeline(pipe_json, self.key, **json_path_kwargs)
 
     @mark_actions(ActionGroup.UPDATE, ignore_refresh=True)
-    async def aset_ttl(self, ttl: int) -> None:
+    async def aset_ttl(
+        self, ttl: int, cascade: bool = False
+    ) -> Optional[CascadeResult]:
         if self.is_inner_model():
             raise RuntimeError("Can only set TTL from top level model")
-        async with ensure_pipeline(self.Meta) as pipe:
-            for key in self._ttl_keys():
-                pipe.expire(key, ttl)
+
+        # Check for an outer pipeline BEFORE entering the pipeline context,
+        # since ensure_pipeline itself pushes a pipeline into context.
+        in_outer_pipe = _context_pipe.get() is not None
+        async with ensure_pipeline(self.Meta, should_execute=False) as pipe:
+            if self.Meta.is_fake_redis:
+                # Cascade edge-following is a no-op on fakeredis; only root-own keys refresh.
+                for key in self.all_keys:
+                    pipe.expire(key, ttl)
+                if in_outer_pipe:
+                    return None
+                await pipe.execute()
+                if not cascade:
+                    return None
+                return CascadeResult(dangling_children=0, dangling_special=0)
+            # `cascade` is a per-call flag: 0 = root's own keys only, 1 = walk the graph.
+            scripts_registry.run_fcall(
+                pipe,
+                self.Meta.cascade_function_name,
+                1,
+                self.key,
+                type(self).__name__,
+                SPECIAL_FIELD_KEY_PREFIX,
+                ttl,
+                1 if cascade else 0,
+            )
+            if in_outer_pipe:
+                # Outer caller owns execution; we cannot observe the result here.
+                return None
+            results = await pipe.execute()
+        if not cascade:
+            # Matches the old plain-EXPIRE contract: a non-cascading call returns None.
+            return None
+        dangling_children, dangling_special = results[-1]
+        return CascadeResult(
+            dangling_children=dangling_children, dangling_special=dangling_special
+        )
 
     @functools.cached_property
     def all_keys(self) -> list[str]:
