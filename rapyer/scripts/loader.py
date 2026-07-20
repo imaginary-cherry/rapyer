@@ -41,6 +41,9 @@ end""",
 LUA_SCRIPT_LOCATION = "rapyer.scripts.lua"
 SF_SAVE_FILENAME = "save.lua"
 SF_LOAD_FILENAME = "load.lua"
+CASCADE_LIB_TOKEN = "RAPYER_CASCADE_LIB"
+CASCADE_FN_TOKEN = "RAPYER_CASCADE_FN"
+CASCADE_PLAN_LITERAL_TOKEN = "RAPYER_CASCADE_PLAN_LITERAL"
 
 
 @lru_cache(maxsize=None)
@@ -71,11 +74,6 @@ def load_sf_save_snippet(type_dir: str) -> str:
 
 def load_sf_load_snippet(type_dir: str) -> str:
     return _read_sf_file(type_dir, SF_LOAD_FILENAME)
-
-
-CASCADE_LIB_TOKEN = "RAPYER_CASCADE_LIB"
-CASCADE_FN_TOKEN = "RAPYER_CASCADE_FN"
-CASCADE_PLAN_LITERAL_TOKEN = "RAPYER_CASCADE_PLAN_LITERAL"
 
 
 def build_cascade_library(plan_json: str) -> tuple[str, str, str]:
