@@ -18,7 +18,6 @@ from rapyer.errors.cascade import (
     CascadeTargetTtlMissingError,
     InvalidCascadeDepthError,
     MetaFrozenError,
-    PersistentCascadeFunctionError,
 )
 from rapyer.errors.delete import BadDeleteActionError
 from rapyer.errors.find import (
@@ -59,7 +58,6 @@ __all__ = [
     "MetaFrozenError",
     "MissingParameterError",
     "NotResolvedError",
-    "PersistentCascadeFunctionError",
     "PersistentNoScriptError",
     "RapyerError",
     "RapyerModelDoesntExistError",
