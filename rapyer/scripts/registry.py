@@ -2,7 +2,10 @@ from typing import TYPE_CHECKING
 
 from redis.exceptions import NoScriptError
 
-from rapyer.errors import PersistentNoScriptError, ScriptsNotInitializedError
+from rapyer.errors import (
+    PersistentNoScriptError,
+    ScriptsNotInitializedError,
+)
 from rapyer.scripts.constants import (
     ATOMIC_GET_OR_CREATE_SCRIPT_NAME,
     DATETIME_ADD_SCRIPT_NAME,
@@ -20,7 +23,7 @@ from rapyer.scripts.constants import (
     STR_APPEND_SCRIPT_NAME,
     STR_MUL_SCRIPT_NAME,
 )
-from rapyer.scripts.loader import load_script
+from rapyer.scripts.loader import build_cascade_library, load_script
 
 if TYPE_CHECKING:
     from rapyer.config import RedisConfig
@@ -82,20 +85,24 @@ def _inject_sf_dispatch(template: str, sf_base) -> str:
     return template.replace(SF_DISPATCH_PLACEHOLDER, "\n".join(lines))
 
 
-async def register_scripts(redis_client, is_fakeredis: bool = False) -> None:
+def build_script_texts(is_fakeredis: bool = False) -> dict[str, str]:
     # Late import: SpecialFieldType lives under rapyer.types, which depends on
-    # this module via the SCRIPT_REGISTRY constants. Importing it at call time
+    # this module via the SCRIPT_REGISTRY constants. Importing at call time
     # avoids the circular import while still letting __subclasses__() see every
-    # SF type that was loaded before init_rapyer() ran.
+    # type that was loaded before init_rapyer() ran.
     from rapyer.types.special import SpecialFieldType
 
     variant = FAKEREDIS_VARIANT if is_fakeredis else REDIS_VARIANT
     scripts = _build_scripts(variant)
-    # Any script in the registry may opt into SF dispatch by including the
-    # ``--[[SF_DISPATCH_TABLE]]`` placeholder; templates without it pass through
-    # unchanged (the helper short-circuits).
+    # Any script in the registry may opt into SF dispatch injection by including
+    # the placeholder; templates without it pass through unchanged.
     for name, script_text in scripts.items():
         scripts[name] = _inject_sf_dispatch(script_text, SpecialFieldType)
+    return scripts
+
+
+async def register_scripts(redis_client, is_fakeredis: bool = False) -> None:
+    scripts = build_script_texts(is_fakeredis=is_fakeredis)
     for name, script_text in scripts.items():
         sha = await redis_client.script_load(script_text)
         _REGISTERED_SCRIPT_SHAS[name] = sha
@@ -137,3 +144,15 @@ async def arun_sha(
 
 async def handle_noscript_error(redis_client, redis_config: "RedisConfig"):
     await register_scripts(redis_client, is_fakeredis=redis_config.is_fake_redis)
+
+
+async def register_cascade_function(redis_client, plan_json: str) -> str:
+    _library_name, function_name, source = build_cascade_library(plan_json)
+    # REPLACE makes re-init idempotent for the same plan and refreshes a changed one.
+    await redis_client.function_load(source, replace=True)
+    return function_name
+
+
+def run_fcall(pipeline, function_name: str, keys: int, *args):
+    # Enqueue only; self-heal for a missing cascade function is a future follow-up (issue #284).
+    pipeline.fcall(function_name, keys, *args)

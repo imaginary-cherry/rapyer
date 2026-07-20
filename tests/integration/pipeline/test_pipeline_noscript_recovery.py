@@ -6,9 +6,16 @@ from tests.models.collection_types import ComprehensiveTestModel
 from tests.models.simple_types import TTL_TEST_SECONDS, TTLRefreshTestModel
 
 
+async def _flush_all_but_cascade(redis_client):
+    # SCRIPT FLUSH drops every EVALSHA data-op script (exercising _apipeline's
+    # NOSCRIPT self-heal) but leaves Redis Functions intact, so TTL-refresh
+    # (which now routes through FCALL) keeps working uninterrupted.
+    await redis_client.execute_command("SCRIPT", "FLUSH")
+
+
 @pytest.mark.asyncio
 async def test_pipeline_recovers_from_noscript_error_after_script_flush_sanity(
-    flush_scripts,
+    real_redis_client,
 ):
     # Arrange
     model = ComprehensiveTestModel(
@@ -16,6 +23,7 @@ async def test_pipeline_recovers_from_noscript_error_after_script_flush_sanity(
         metadata={"key1": "value1"},
     )
     await model.asave()
+    await _flush_all_but_cascade(real_redis_client)
 
     # Act
     async with model.apipeline() as redis_model:
@@ -31,7 +39,7 @@ async def test_pipeline_recovers_from_noscript_error_after_script_flush_sanity(
 
 @pytest.mark.asyncio
 async def test_pipeline_recovers_with_all_redis_types_after_script_flush_sanity(
-    flush_scripts,
+    real_redis_client,
 ):
     # Arrange
     model = TTLRefreshTestModel(
@@ -42,6 +50,7 @@ async def test_pipeline_recovers_with_all_redis_types_after_script_flush_sanity(
         settings={"setting1": "value1"},
     )
     await model.asave()
+    await _flush_all_but_cascade(real_redis_client)
 
     # Act
     async with model.apipeline() as redis_model:
@@ -69,12 +78,14 @@ async def test_pipeline_recovers_with_all_redis_types_after_script_flush_sanity(
 
 @pytest.mark.asyncio
 async def test_pipeline_raises_persistent_noscript_error_when_scripts_keep_failing_error(
-    flush_scripts,
+    real_redis_client,
     disable_noscript_recovery,
 ):
-    # Arrange
+    # Arrange - save while scripts are loaded, then flush server-side so only
+    # the pipeline's remove_range call hits NOSCRIPT
     model = ComprehensiveTestModel(tags=["a", "b", "c"])
     await model.asave()
+    await _flush_all_but_cascade(real_redis_client)
 
     # Act & Assert
     with pytest.raises(PersistentNoScriptError) as exc_info:

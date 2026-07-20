@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Union
+from typing import Annotated, Any, Union
 
 import redis
 from pydantic import (
@@ -16,7 +16,8 @@ from redis.asyncio import Redis
 from redis.commands.json import JSON
 
 from rapyer.actions import ActionGroup
-from rapyer.errors import InvalidRefreshTtlError
+from rapyer.cascade import CascadeTTL
+from rapyer.errors import InvalidRefreshTtlError, MetaFrozenError
 
 DEFAULT_CONNECTION = "redis://localhost:6379/0"
 
@@ -43,6 +44,10 @@ class RedisConfig(BaseModel):
     ]
     redis_type: dict[type, type] = Field(default_factory=create_all_types)
     ttl: int | None = None
+    # Global TTL-cascade default, disabled unless init_rapyer(cascade_ttl=...) sets it.
+    cascade_ttl: CascadeTTL | None = None
+    # Plan-hashed cascade Redis Function name, init-baked (None on fakeredis).
+    cascade_function_name: str | None = None
     init_with_rapyer: bool = True
     # Enable TTL refresh on read/write operations by default.
     # Accepts bool (True=all actions, False=none) or ActionGroup flag set for fine-grained control.
@@ -57,6 +62,9 @@ class RedisConfig(BaseModel):
     max_delete_per_transaction: int | None = 1000
 
     _redis_json: JSON = PrivateAttr(default=None)
+    # Set to True by init_rapyer() once the config is baked into the cascade
+    # plan, refusing further mutation until the next init_rapyer() call.
+    _meta_locked: bool = PrivateAttr(default=False)
 
     @model_validator(mode="after")
     def _build_redis_json(self):
@@ -66,6 +74,26 @@ class RedisConfig(BaseModel):
     @property
     def redis_json(self):
         return self._redis_json
+
+    def __setattr__(self, name: str, value: Any):
+        # The whole config is baked into the cascade plan at init, so once frozen
+        # no public field may change until the next init_rapyer(). Private attrs
+        # (including _meta_locked itself) stay writable so init/teardown can
+        # toggle it.
+        # cascade_function_name is exempt: it is a DERIVED value (hash of the
+        # already-frozen plan) assigned post-freeze by init_rapyer(), not a plan
+        # INPUT, so it must stay writable even when frozen.
+        if (
+            self._meta_locked
+            and not name.startswith("_")
+            and name != "cascade_function_name"
+        ):
+            raise MetaFrozenError(
+                f"Meta.{name} is frozen after init_rapyer() bakes the config "
+                f"into the cascade plan — call init_rapyer() again to "
+                f"reconfigure instead of mutating Meta.{name} directly."
+            )
+        super().__setattr__(name, value)
 
     @field_validator("refresh_ttl", mode="after")
     @classmethod

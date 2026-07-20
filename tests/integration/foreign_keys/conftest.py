@@ -1,9 +1,52 @@
 import pytest_asyncio
 
+from rapyer.cascade.planner import (
+    build_cascade_plan,
+    cascade_plan_json,
+)
+from rapyer.scripts import register_cascade_function, register_scripts
+from rapyer.types.relational import resolve_relational_targets
+from tests.models.cascade_types import ALL_CASCADE_MODELS
 from tests.models.foreign_key_types import FkAuthor, FkBook, FkPublisher
 
 MISSING_AUTHOR_KEY = "FkAuthor:missing"
 MISSING_PUBLISHER_KEY = "FkPublisher:missing"
+
+# Full cascade set so the baked plan covers every reachable edge target.
+CASCADE_INTEGRATION_MODELS = ALL_CASCADE_MODELS
+
+
+@pytest_asyncio.fixture
+async def setup_real_redis_for_cascade_apply(
+    real_redis_client, requires_redis_functions
+):
+    original_clients = {}
+    for model in CASCADE_INTEGRATION_MODELS:
+        original_clients[model] = (
+            model.Meta.redis,
+            model.Meta.is_fake_redis,
+            model.Meta.cascade_function_name,
+        )
+        model.Meta.redis = real_redis_client
+        model.Meta.is_fake_redis = False
+    resolve_relational_targets(CASCADE_INTEGRATION_MODELS)
+    await register_scripts(real_redis_client, is_fakeredis=False)
+    # Emulate init_rapyer: bake the plan into the cascade function and load it.
+    function_name = await register_cascade_function(
+        real_redis_client,
+        cascade_plan_json(build_cascade_plan(CASCADE_INTEGRATION_MODELS)),
+    )
+    for model in CASCADE_INTEGRATION_MODELS:
+        model.Meta.cascade_function_name = function_name
+    yield
+    for model, (
+        original_redis,
+        original_is_fake,
+        original_function_name,
+    ) in original_clients.items():
+        model.Meta.redis = original_redis
+        model.Meta.is_fake_redis = original_is_fake
+        model.Meta.cascade_function_name = original_function_name
 
 
 @pytest_asyncio.fixture

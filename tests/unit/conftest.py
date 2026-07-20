@@ -12,7 +12,14 @@ pytest.register_assert_rewrite("tests.assertions")
 async def fake_redis_client():
     client = fake_aioredis.FakeRedis(decode_responses=True)
     await register_scripts(client, is_fakeredis=True)
+    # Mark every model as fakeredis-backed so TTL refresh uses the root-own-keys
+    # EXPIRE fallback (fakeredis has no Redis Functions to FCALL).
+    originals = {model: model.Meta.is_fake_redis for model in REDIS_MODELS}
+    for model in REDIS_MODELS:
+        model.Meta.is_fake_redis = True
     yield client
+    for model, original in originals.items():
+        model.Meta.is_fake_redis = original
     await client.aclose()
 
 
