@@ -81,8 +81,8 @@ class RedisConfig(BaseModel):
         # (including _meta_locked itself) stay writable so init/teardown can
         # toggle it.
         # cascade_function_name is exempt: it is a DERIVED value (hash of the
-        # already-frozen plan) that the cascade self-heal path (handle_missing_function)
-        # rewrites at runtime, not a plan INPUT, so it must stay writable even when frozen.
+        # already-frozen plan) assigned post-freeze by init_rapyer(), not a plan
+        # INPUT, so it must stay writable even when frozen.
         if (
             self._meta_locked
             and not name.startswith("_")

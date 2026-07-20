@@ -19,7 +19,3 @@ class MetaFrozenError(RapyerError):
 
 class CascadeLuaLiteralError(RapyerError):
     """Raised when a cascade plan cannot be safely embedded as a Lua long-bracket literal."""
-
-
-class PersistentCascadeFunctionError(RapyerError):
-    """Raised when the cascade Redis Function is still missing after a re-load + retry."""
