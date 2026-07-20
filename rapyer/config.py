@@ -46,6 +46,8 @@ class RedisConfig(BaseModel):
     ttl: int | None = None
     # Global TTL-cascade default, disabled unless init_rapyer(cascade_ttl=...) sets it.
     cascade_ttl: CascadeTTL | None = None
+    # Plan-hashed cascade Redis Function name, init-baked (None on fakeredis).
+    cascade_function_name: str | None = None
     init_with_rapyer: bool = True
     # Enable TTL refresh on read/write operations by default.
     # Accepts bool (True=all actions, False=none) or ActionGroup flag set for fine-grained control.
@@ -78,7 +80,14 @@ class RedisConfig(BaseModel):
         # no public field may change until the next init_rapyer(). Private attrs
         # (including _meta_locked itself) stay writable so init/teardown can
         # toggle it.
-        if self._meta_locked and not name.startswith("_"):
+        # cascade_function_name is exempt: it is a DERIVED value (hash of the
+        # already-frozen plan) that arun_fcall's self-heal path rewrites at
+        # runtime, not a plan INPUT, so it must stay writable even when frozen.
+        if (
+            self._meta_locked
+            and not name.startswith("_")
+            and name != "cascade_function_name"
+        ):
             raise MetaFrozenError(
                 f"Meta.{name} is frozen after init_rapyer() bakes the config "
                 f"into the cascade plan — call init_rapyer() again to "
