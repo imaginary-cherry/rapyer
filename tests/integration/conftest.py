@@ -62,12 +62,17 @@ async def real_redis_client(redis_client):
     await register_scripts(redis_client)
 
     # Emulate init_rapyer: load the cascade Redis Function for refresh_ttl's FCALL path.
-    await register_cascade_function(
+    function_name = await register_cascade_function(
         redis_client, cascade_plan_json(build_cascade_plan(REDIS_MODELS))
     )
+    for model in TESTED_REDIS_MODELS:
+        model.Meta.cascade_function_name = function_name
 
     yield redis_client
 
+    # Reset to avoid the baked name leaking into fakeredis-based tests.
+    for model in TESTED_REDIS_MODELS:
+        model.Meta.cascade_function_name = None
     await redis_client.aclose()
 
 
