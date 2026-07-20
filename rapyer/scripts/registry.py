@@ -160,25 +160,6 @@ def run_fcall(pipeline, function_name: str, keys: int, *args):
     pipeline.fcall(function_name, keys, *args)
 
 
-async def arun_fcall(client, redis_config: "RedisConfig", keys: int, *args):
-    name = redis_config.cascade_function_name
-    try:
-        return await client.fcall(name, keys, *args)
-    except ResponseError as e:
-        if "function not found" not in str(e).lower():
-            raise
-
-    await handle_missing_function(client, redis_config)
-    name = redis_config.cascade_function_name
-    try:
-        return await client.fcall(name, keys, *args)
-    except ResponseError as e:
-        raise PersistentCascadeFunctionError(
-            "Cascade function still missing after re-loading. "
-            "This indicates a server-side problem with Redis."
-        ) from e
-
-
 async def aretry_fcall_after_missing_function(
     redis_config: "RedisConfig", commands_backup: list
 ):
