@@ -187,16 +187,48 @@ async def aretry_fcall_after_missing_function(
             ) from e
 
 
+def _pipeline_has_fcall(commands_backup: list) -> bool:
+    return any(args and args[0] == "FCALL" for args, _options in commands_backup)
+
+
+def _name_in_function_list(function_list, name: str) -> bool:
+    # FUNCTION LIST replies as nested lists (RESP2) or dicts (RESP3); scan both shapes.
+    stack = [function_list]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, (list, tuple)):
+            stack.extend(item)
+        elif isinstance(item, dict):
+            stack.extend(item.keys())
+            stack.extend(item.values())
+        elif item == name:
+            return True
+    return False
+
+
+async def acascade_function_missing(redis_config: "RedisConfig") -> bool:
+    name = redis_config.cascade_function_name
+    if name is None:
+        return True
+    listing = await redis_config.redis.function_list()
+    return not _name_in_function_list(listing, name)
+
+
 async def aexecute_pipeline_with_cascade_self_heal(pipe, redis_config: "RedisConfig"):
     """
     Execute a pipeline, transparently reloading the cascade function and
-    replaying the FCALL on a function-not-found error.
+    replaying the FCALL if it went missing.
     """
     commands_backup = list(pipe.command_stack)
     try:
         return await pipe.execute()
-    except ResponseError as e:
-        if "function not found" not in str(e).lower():
+    except ResponseError:
+        # redis-py's async pipeline masks the FCALL error, so detect via the registry.
+        if (
+            redis_config.is_fake_redis
+            or not _pipeline_has_fcall(commands_backup)
+            or not await acascade_function_missing(redis_config)
+        ):
             raise
         return await aretry_fcall_after_missing_function(redis_config, commands_backup)
 

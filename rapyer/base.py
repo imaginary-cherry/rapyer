@@ -1404,7 +1404,12 @@ async def _apipeline(
                         "ignore_redis_error=True: %s",
                         exc,
                     )
-                elif "function not found" in str(exc).lower():
+                # redis-py's async pipeline masks the FCALL error, so detect via the registry.
+                elif (
+                    not _meta.is_fake_redis
+                    and any(args[0] == "FCALL" for args, _options in commands_backup)
+                    and await scripts_registry.acascade_function_missing(_meta)
+                ):
                     missing_function_on_first_attempt = True
                 else:
                     raise
