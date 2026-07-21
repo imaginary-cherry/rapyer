@@ -40,6 +40,8 @@ def _requires_thread_offload(vectorizer: Any) -> bool:
 
 
 def pack_float32_blob(vector: Sequence[float], dim: int) -> bytes:
+    # Guard first: base install gets the guided error, not a bare AttributeError on None.
+    _ensure_redisvl_installed()
     if len(vector) != dim:
         raise RapyerSerializationError(
             f"Vector length {len(vector)} does not match declared dim {dim}"

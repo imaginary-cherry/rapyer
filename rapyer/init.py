@@ -28,8 +28,8 @@ async def init_rapyer(
     override_old_idx: bool = True,
     prefer_normal_json_dump: bool = None,
     cascade_ttl: CascadeTTL | None = None,
-    vectorizer: EmbeddingAdapter | None = None,
     logger: logging.Logger = None,
+    vectorizer: EmbeddingAdapter | None = None,
 ):
     if logger is not None:
         rapyer_logger = logging.getLogger("rapyer")
@@ -46,6 +46,9 @@ async def init_rapyer(
 
     is_fake_redis = is_fakeredis(redis)
 
+    # Build the fallback default once so non-preset models share one adapter (one model load).
+    default_vectorizer = vectorizer or default_embedding_adapter()
+
     # Unfreeze -> (re)configure -> bake -> refreeze; finally always refreezes, even on failure.
     try:
         for model in REDIS_MODELS:
@@ -61,9 +64,7 @@ async def init_rapyer(
             model.Meta.cascade_ttl = cascade_ttl
             # Unlike cascade_ttl, a per-model preset (D-06) beats this global param/default.
             if not model.Meta._vectorizer_preset:
-                model.Meta._resolve_vectorizer(
-                    vectorizer or default_embedding_adapter()
-                )
+                model.Meta._resolve_vectorizer(default_vectorizer)
 
             # Initialize model fields
             model.init_class()
