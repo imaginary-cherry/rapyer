@@ -1,6 +1,6 @@
 import pytest
-from rapyer.embeddings.adapter import _ensure_redisvl_installed
 
+from rapyer.embeddings.adapter import _ensure_redisvl_installed
 from rapyer.errors import EmbeddingsExtraNotInstalledError
 
 

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
-from rapyer.embeddings.adapter import pack_float32_blob
 
+from rapyer.embeddings.adapter import pack_float32_blob
 from rapyer.errors import RapyerSerializationError
 
 
