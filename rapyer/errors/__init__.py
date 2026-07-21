@@ -20,6 +20,7 @@ from rapyer.errors.cascade import (
     MetaFrozenError,
 )
 from rapyer.errors.delete import BadDeleteActionError
+from rapyer.errors.embeddings import EmbeddingsExtraNotInstalledError
 from rapyer.errors.find import (
     BadFilterError,
     CantSerializeRedisValueError,
@@ -51,6 +52,7 @@ __all__ = [
     "CascadeTargetTtlMissingError",
     "CorruptedModelError",
     "DuplicateModelNameError",
+    "EmbeddingsExtraNotInstalledError",
     "FindError",
     "InvalidCascadeDepthError",
     "InvalidRefreshTtlError",
