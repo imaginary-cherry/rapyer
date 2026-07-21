@@ -11,6 +11,8 @@ from rapyer.cascade.planner import (
     cascade_plan_json,
     validate_cascade_ttl_targets,
 )
+from rapyer.embeddings.adapter import default_embedding_adapter
+from rapyer.embeddings.protocol import EmbeddingAdapter
 from rapyer.result import resolve_forward_refs
 from rapyer.scripts import register_cascade_function, register_scripts
 from rapyer.types.relational import resolve_relational_targets
@@ -26,6 +28,7 @@ async def init_rapyer(
     override_old_idx: bool = True,
     prefer_normal_json_dump: bool = None,
     cascade_ttl: CascadeTTL | None = None,
+    vectorizer: EmbeddingAdapter | None = None,
     logger: logging.Logger = None,
 ):
     if logger is not None:
@@ -43,9 +46,7 @@ async def init_rapyer(
 
     is_fake_redis = is_fakeredis(redis)
 
-    # Unfreeze -> (re)configure -> bake -> refreeze, wrapped so a failure mid-way
-    # (e.g. a mis-configured graph or an index error) still refreezes every model
-    # in the finally block rather than leaving Meta silently mutable.
+    # Unfreeze -> (re)configure -> bake -> refreeze; finally always refreezes, even on failure.
     try:
         for model in REDIS_MODELS:
             model.Meta._meta_locked = False
@@ -56,9 +57,13 @@ async def init_rapyer(
                 model.Meta.ttl = ttl
             if prefer_normal_json_dump is not None:
                 model.Meta.prefer_normal_json_dump = prefer_normal_json_dump
-            # cascade_ttl=None means "off", not "unset", so always reset it —
-            # unlike ttl/prefer_normal_json_dump which only apply when passed.
+            # cascade_ttl=None means "off" not "unset", so always reset it (unlike ttl above).
             model.Meta.cascade_ttl = cascade_ttl
+            # Unlike cascade_ttl, a per-model preset (D-06) beats this global param/default.
+            if not model.Meta._vectorizer_preset:
+                model.Meta._resolve_vectorizer(
+                    vectorizer or default_embedding_adapter()
+                )
 
             # Initialize model fields
             model.init_class()
@@ -79,13 +84,11 @@ async def init_rapyer(
                         if override_old_idx:
                             raise
 
-        # Fail fast on a mis-configured cascade graph before any script is
-        # registered. Pure config check; needs no Redis connection.
+        # Fail fast on a mis-configured cascade graph before any script is registered.
         plan = build_cascade_plan(REDIS_MODELS)
         validate_cascade_ttl_targets(plan)
     finally:
-        # Refreeze now that the plan is baked; further Meta mutation is blocked
-        # until the next init_rapyer() call. Runs even on failure.
+        # Refreeze now that the plan is baked; blocks further mutation until the next init_rapyer().
         for model in REDIS_MODELS:
             model.Meta._meta_locked = True
 
@@ -107,6 +110,5 @@ async def teardown_rapyer():
         if id(model.Meta.redis) not in closed_clients:
             closed_clients.add(id(model.Meta.redis))
             await model.Meta.redis.aclose()
-        # Clear the freeze on teardown so a torn-down model doesn't leak
-        # MetaFrozenError into a later path that mutates Meta without re-init.
+        # Clears the freeze so a torn-down model doesn't leak MetaFrozenError before the next re-init.
         model.Meta._meta_locked = False
