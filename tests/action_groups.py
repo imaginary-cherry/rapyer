@@ -54,11 +54,13 @@ PRIVATE_METHODS = _group(
     AtomicRedisModel.redis_dump_json,
     AtomicRedisModel.redis_dump,
     AtomicRedisModel.is_inner_model,
-    AtomicRedisModel.assign_fields_links,
+    AtomicRedisModel.model_post_init,
     AtomicRedisModel.validate_sub_model,
     AtomicRedisModel._all_keys_for_key,
     AtomicRedisModel._iter_expanded_filter_batches,
     AtomicRedisModel._resolve_key,
+    # Pure in-memory identity minting (lazily fills _pk); no Redis round trip.
+    AtomicRedisModel._ensure_pk,
     # Pure in-memory traversal / key enumeration for special fields — no
     # Redis round trips, so pipeline/TTL coverage doesn't apply.
     AtomicRedisModel._iter_special_fields,
@@ -208,3 +210,11 @@ SYNC_NATIVE_RAISES_GROUP = SYNC_NATIVE_EFFECT_GROUP | _group(
     RedisList.clear,
     RedisDict.clear,
 )
+
+
+# ADDITIONAL_READ_ACTIONS — read/fetch actions that are not marked with the
+# READ action group, so the group-based ``ignore_groups=READ`` exclusion misses
+# them. They resolve and return a value and cannot be deferred inside a pipeline,
+# so pipeline-atomicity does not apply. Excluded from COVER_PIPELINE_ATOM
+# alongside the marked READ actions.
+ADDITIONAL_READ_ACTIONS = _group(ForeignKey.afetch)

@@ -8,8 +8,12 @@ import pytest_asyncio
 
 import rapyer
 from rapyer.base import REDIS_MODELS
+from rapyer.cascade.planner import (
+    build_cascade_plan,
+    cascade_plan_json,
+)
 from rapyer.result import resolve_forward_refs
-from rapyer.scripts import register_scripts
+from rapyer.scripts import register_cascade_function, register_scripts
 from rapyer.types.relational import resolve_relational_targets
 from tests.models.registry import TESTED_REDIS_MODELS
 from tests.models.simple_types import TTLRefreshDisabledModel, TTLRefreshTestModel
@@ -37,6 +41,14 @@ async def redis_client():
     await redis.flushdb()
 
 
+@pytest_asyncio.fixture
+async def requires_redis_functions(redis_client):
+    info = await redis_client.info("server")
+    major = int(str(info.get("redis_version", "0")).split(".")[0])
+    if major < 7:
+        pytest.skip("TTL cascade requires Redis 7+ (Redis Functions)")
+
+
 @pytest_asyncio.fixture(autouse=True)
 async def real_redis_client(redis_client):
     resolve_forward_refs()
@@ -49,8 +61,18 @@ async def real_redis_client(redis_client):
     # Register Lua scripts
     await register_scripts(redis_client)
 
+    # Emulate init_rapyer: load the cascade Redis Function for refresh_ttl's FCALL path.
+    function_name = await register_cascade_function(
+        redis_client, cascade_plan_json(build_cascade_plan(REDIS_MODELS))
+    )
+    for model in TESTED_REDIS_MODELS:
+        model.Meta.cascade_function_name = function_name
+
     yield redis_client
 
+    # Reset to avoid the baked name leaking into fakeredis-based tests.
+    for model in TESTED_REDIS_MODELS:
+        model.Meta.cascade_function_name = None
     await redis_client.aclose()
 
 

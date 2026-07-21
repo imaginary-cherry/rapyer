@@ -15,6 +15,7 @@ from rapyer.base import (
 )
 from rapyer.init import init_rapyer, teardown_rapyer
 from rapyer.result import (
+    CascadeResult,
     DeleteResult,
     GetOrCreateResult,
     GetOrCreateStatus,
@@ -39,6 +40,7 @@ __all__ = [
     "adelete_many",
     "alock_from_key",
     "apipeline",
+    "CascadeResult",
     "DeleteResult",
     "GetOrCreateResult",
     "GetOrCreateStatus",

@@ -63,25 +63,34 @@ from rapyer.fields.key import KeyAnnotation, RapyerKey
 from rapyer.fields.safe_load import SafeLoadAnnotation
 from rapyer.links import ATOMIC_MODEL_API_REF_LINK, REDIS_SUPPORTED_LINK
 from rapyer.result import (
+    CascadeResult,
     DeleteResult,
     GetOrCreateResult,
     GetOrCreateStatus,
     RapyerDeleteResult,
 )
 from rapyer.scripts import registry as scripts_registry
-from rapyer.scripts.constants import ATOMIC_GET_OR_CREATE_SCRIPT_NAME
+from rapyer.scripts.constants import (
+    ATOMIC_GET_OR_CREATE_SCRIPT_NAME,
+)
 from rapyer.types.base import (
     FAILED_FIELDS_KEY,
     REDIS_DUMP_FLAG_NAME,
     BaseRedisType,
     RedisType,
+    is_redis_field_value,
 )
 from rapyer.types.convert import RedisConverter
+from rapyer.types.generic import GenericRedisType
 from rapyer.types.relational import RelationalFieldType
-from rapyer.types.special import SpecialFieldType
+from rapyer.types.special import (
+    SPECIAL_FIELD_KEY_PREFIX,
+    SpecialFieldType,
+)
 from rapyer.typing_support import Self, Unpack
 from rapyer.utils.annotation import (
     DYNAMIC_CLASS_DOC,
+    annotation_origin,
     field_with_flag,
     has_annotation,
     replace_to_redis_types_in_annotation,
@@ -151,7 +160,7 @@ def make_pickle_field_serializer(
 
 
 class AtomicRedisModel(BaseModel):
-    _pk: str = PrivateAttr(default_factory=lambda: str(uuid.uuid4()))
+    _pk: str | None = PrivateAttr(default=None)
     _base_model_link: Self | BaseRedisType = PrivateAttr(default=None)
     _failed_fields: set[str] = PrivateAttr(default_factory=set)
 
@@ -170,11 +179,16 @@ class AtomicRedisModel(BaseModel):
     def failed_fields(self) -> set[str]:
         return self._failed_fields
 
+    def _ensure_pk(self) -> str:
+        if self._pk is None:
+            self._pk = str(uuid.uuid4())
+        return self._pk
+
     @property
     def pk(self):
         if self._key_field_name:
             return self.model_dump(include={self._key_field_name})[self._key_field_name]
-        return RapyerKey(self._pk)
+        return RapyerKey(self._ensure_pk())
 
     @pk.setter
     def pk(self, value: str):
@@ -237,8 +251,22 @@ class AtomicRedisModel(BaseModel):
             return None
         pipe_context = ensure_pipeline if can_use_pipeline else pipeline_with_execution
         async with pipe_context(self.Meta) as pipe:
-            for key in self._ttl_keys():
-                pipe.expire(key, self.Meta.ttl)
+            if self.Meta.is_fake_redis:
+                # Cascade edge-following is real-Redis-only; re-arm root-own keys.
+                for key in self.all_keys:
+                    pipe.expire(key, self.Meta.ttl)
+                return None
+            # Always cascade (do_cascade=1): re-arms the whole reachable subtree.
+            scripts_registry.run_fcall(
+                pipe,
+                self.Meta.cascade_function_name,
+                1,
+                self.key,
+                type(self).__name__,
+                SPECIAL_FIELD_KEY_PREFIX,
+                self.Meta.ttl,
+                1,
+            )
             return None
 
     @classmethod
@@ -248,7 +276,12 @@ class AtomicRedisModel(BaseModel):
         for field_name, field_info in cls.model_fields.items():
             real_type = field_info.annotation
             # Check if real_type is a class before using issubclass
-            if get_origin(real_type) is not None or not isinstance(real_type, type):
+            if (
+                get_origin(real_type) is not None
+                or not isinstance(real_type, type)
+                or safe_issubclass(real_type, GenericRedisType)
+                or safe_issubclass(real_type, SpecialFieldType)
+            ):
                 if field_with_flag(field_info, IndexAnnotation):
                     raise UnsupportedIndexedFieldError(
                         f"Field {field_name} is type {real_type}, and not supported for indexing"
@@ -337,11 +370,14 @@ class AtomicRedisModel(BaseModel):
         original_annotations = cls.__annotations__.copy()
         original_annotations.update(new_annotation)
 
-        def _check_is_excluded(name_of_field: str) -> bool:
+        def _check_is_excluded(name_of_field: str, annot) -> bool:
             info = pydantic_annotation.get(name_of_field) or cls.__dict__.get(
                 name_of_field
             )
-            return isinstance(info, FieldInfo) and info.exclude is True
+            if not (isinstance(info, FieldInfo) and info.exclude is True):
+                return False
+            # Redis types are converted even if exlcuded
+            return not safe_issubclass(annotation_origin(annot), BaseRedisType)
 
         new_annotations = {
             field_name: replace_to_redis_types_in_annotation(
@@ -356,7 +392,7 @@ class AtomicRedisModel(BaseModel):
             )
             for field_name, annotation in original_annotations.items()
             if is_redis_field(field_name, annotation)
-            if not _check_is_excluded(field_name)
+            if not _check_is_excluded(field_name, annotation)
         }
         cls.__annotations__ = {**cls.__annotations__, **new_annotations}
         for field_name, field in pydantic_annotation.items():
@@ -374,6 +410,7 @@ class AtomicRedisModel(BaseModel):
         cls._contain_fk = set(getattr(cls, "_contain_fk", set()))
         for field_name, annotation in cls.__annotations__.items():
             # If the field was redfined, we remove it from list
+            cls._redis_link_field_names.discard(field_name)
             cls._special_field_names.discard(field_name)
             cls._contain_sf.discard(field_name)
             cls._relational_field_names.discard(field_name)
@@ -413,6 +450,10 @@ class AtomicRedisModel(BaseModel):
             # Skip special fields — they handle their own serialization
             if attr_name in cls._special_field_names:
                 continue
+            # Skip relational fields — ForeignKey is left unconverted and
+            # serializes itself to a key string via its own core schema.
+            if attr_name in cls._relational_field_names:
+                continue
             if original_annotations[attr_name] == attr_type:
                 default_value = cls.__dict__.get(attr_name, None)
                 can_json = is_type_json_serializable(attr_type, default_value)
@@ -430,8 +471,14 @@ class AtomicRedisModel(BaseModel):
         cls.build_redis_model()
 
         # Update the redis model list for initialization
-        # Skip dynamically created classes from type conversion
-        if cls.__doc__ != DYNAMIC_CLASS_DOC and cls.Meta.init_with_rapyer:
+        # Skip dynamically created classes from type conversion.
+        # Skip generic origins
+        not_generic_origin = not bool(getattr(cls, "__parameters__", ()))
+        if (
+            cls.__doc__ != DYNAMIC_CLASS_DOC
+            and cls.Meta.init_with_rapyer
+            and not_generic_origin
+        ):
             existing = next(
                 (m for m in REDIS_MODELS if m.__name__ == cls.__name__), None
             )
@@ -499,7 +546,8 @@ class AtomicRedisModel(BaseModel):
         if self.is_inner_model():
             raise RuntimeError("Can only duplicate from top level model")
 
-        duplicated_models = [self.__class__(**self.model_dump()) for _ in range(num)]
+        dump = self.model_dump()
+        duplicated_models = [self.__class__(**dump) for _ in range(num)]
         async with ensure_pipeline(self.Meta) as pipe:
             for dup in duplicated_models:
                 pipe.copy(self.key, dup.key)
@@ -545,12 +593,48 @@ class AtomicRedisModel(BaseModel):
             update_keys_in_pipeline(pipe_json, self.key, **json_path_kwargs)
 
     @mark_actions(ActionGroup.UPDATE, ignore_refresh=True)
-    async def aset_ttl(self, ttl: int) -> None:
+    async def aset_ttl(
+        self, ttl: int, cascade: bool = False
+    ) -> Optional[CascadeResult]:
         if self.is_inner_model():
             raise RuntimeError("Can only set TTL from top level model")
-        async with ensure_pipeline(self.Meta) as pipe:
-            for key in self._ttl_keys():
-                pipe.expire(key, ttl)
+
+        # Check for an outer pipeline BEFORE entering the pipeline context,
+        # since ensure_pipeline itself pushes a pipeline into context.
+        in_outer_pipe = _context_pipe.get() is not None
+        async with ensure_pipeline(self.Meta, should_execute=False) as pipe:
+            if self.Meta.is_fake_redis:
+                # Cascade edge-following is a no-op on fakeredis; only root-own keys refresh.
+                for key in self.all_keys:
+                    pipe.expire(key, ttl)
+                if in_outer_pipe:
+                    return None
+                await pipe.execute()
+                if not cascade:
+                    return None
+                return CascadeResult(dangling_children=0, dangling_special=0)
+            # `cascade` is a per-call flag: 0 = root's own keys only, 1 = walk the graph.
+            scripts_registry.run_fcall(
+                pipe,
+                self.Meta.cascade_function_name,
+                1,
+                self.key,
+                type(self).__name__,
+                SPECIAL_FIELD_KEY_PREFIX,
+                ttl,
+                1 if cascade else 0,
+            )
+            if in_outer_pipe:
+                # Outer caller owns execution; we cannot observe the result here.
+                return None
+            results = await pipe.execute()
+        if not cascade:
+            # Matches the old plain-EXPIRE contract: a non-cascading call returns None.
+            return None
+        dangling_children, dangling_special = results[-1]
+        return CascadeResult(
+            dangling_children=dangling_children, dangling_special=dangling_special
+        )
 
     @functools.cached_property
     def all_keys(self) -> list[str]:
@@ -624,8 +708,9 @@ class AtomicRedisModel(BaseModel):
         inject_at_paths(model_dump, plan, sf_raw)
         context = {REDIS_DUMP_FLAG_NAME: True, FAILED_FIELDS_KEY: set()}
         instance = cls.model_validate(model_dump, context=context)
-        instance._pk = self._pk
+        instance._pk = self._ensure_pk()
         instance._base_model_link = self._base_model_link
+        instance.field_name = self.field_name
         instance._failed_fields = context.get(FAILED_FIELDS_KEY, set())
         return instance
 
@@ -654,12 +739,14 @@ class AtomicRedisModel(BaseModel):
 
     @classmethod
     def queue_special_loads_in_pipeline(
-        cls, pipe, key: str, plan: list, parent_path: str = ""
+        cls, pipe, key: str, plan: list, parent_path: str = "", field_name: str = ""
     ):
         """Queue load ops for every SF reachable from this model. both directly and nested (in a list or container model)"""
         for fname in cls._special_field_names:
             field_cls = cls.model_fields[fname].annotation
-            field_cls.queue_special_loads_in_pipeline(pipe, key, plan, parent_path)
+            field_cls.queue_special_loads_in_pipeline(
+                pipe, key, plan, parent_path, field_name=f".{fname}"
+            )
         for fname in cls._contain_sf:
             field_cls = cls.model_fields[fname].annotation
             nested_path = f"{parent_path}.{fname}"
@@ -1014,8 +1101,13 @@ class AtomicRedisModel(BaseModel):
             yield redis_model
 
     def __setattr__(self, name: str, value: Any) -> None:
+        # Dont change private attr set beahvior
+        if name.startswith("_"):
+            super().__setattr__(name, value)
+            return
+
         skip_redis_set = False
-        if isinstance(value, BaseRedisType):
+        if is_redis_field_value(value):
             skip_redis_set = value._redis_updated
             value._redis_updated = False
 
@@ -1025,8 +1117,9 @@ class AtomicRedisModel(BaseModel):
 
         if value is not None:
             attr = getattr(self, name)
-            if isinstance(attr, BaseRedisType):
+            if isinstance(attr, (BaseRedisType, AtomicRedisModel)):
                 attr._base_model_link = self
+                attr.field_name = f".{name}"
 
         if skip_redis_set:
             return
@@ -1061,17 +1154,20 @@ class AtomicRedisModel(BaseModel):
             return values.model_dump()
         return values
 
-    @model_validator(mode="after")
-    def assign_fields_links(self):
+    def model_post_init(self, __context: Any) -> None:
+        # Wire child redis types / nested models back to this model once, after
+        # construction or full validation. validate_assignment does NOT call this,
+        # so per-field reassignment is handled in __setattr__ instead — keeping
+        # repeated assignments from re-linking every sibling field every time.
         link_fields = self.__class__._redis_link_field_names
         if not link_fields:
-            return self
+            return
         instance_dict = self.__dict__
         for name in link_fields:
             attr = instance_dict.get(name)
-            if attr is not None:
+            if isinstance(attr, (BaseRedisType, AtomicRedisModel)):
                 attr._base_model_link = self
-        return self
+                attr.field_name = f".{name}"
 
 
 REDIS_MODELS: list[type[AtomicRedisModel]] = []

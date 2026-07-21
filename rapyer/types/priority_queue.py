@@ -1,6 +1,6 @@
 import json
 from dataclasses import dataclass
-from typing import Any, Generic, Optional, TypeVar, get_args
+from typing import Any, Generic, Optional, TypeVar
 
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
@@ -9,6 +9,7 @@ from rapyer.actions import ActionGroup, mark_actions
 from rapyer.errors.base import RapyerSerializationError
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME
 from rapyer.types.special import SpecialFieldType
+from rapyer.utils.pythonic import resolve_generic_args
 
 T = TypeVar("T")
 
@@ -24,7 +25,6 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
     Priority queue backed by a Redis Sorted Set. Pure Redis proxy — no local state.
     """
 
-    original_type: type = type(None)
     LUA_SNIPPET_DIR = "redis_priority_queue"
 
     # --- Serialization helpers ---
@@ -126,7 +126,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
     def __get_pydantic_core_schema__(
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
-        args = get_args(source_type)
+        args = resolve_generic_args(source_type)
         inner = args[0] if args else Any
 
         def _validate_wrap(v, handler_call, info):
@@ -151,8 +151,6 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
         def _serialize(v, serializer):
             if isinstance(v, list):
                 return serializer(v)  # ← let pydantic serialize as list[T]
-            if isinstance(v, RedisPriorityQueue):
-                return RedisPriorityQueue()
             return v
 
         schema = handler(list[inner])

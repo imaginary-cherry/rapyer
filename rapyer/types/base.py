@@ -2,7 +2,7 @@ import abc
 import base64
 import pickle
 from abc import ABC
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, ClassVar, Optional
 
 from pydantic import GetCoreSchemaHandler, TypeAdapter
 from pydantic_core import core_schema
@@ -23,9 +23,11 @@ FAILED_FIELDS_KEY = "__rapyer_failed_fields__"
 class BaseRedisType(ABC):
     """Common base for all Redis-aware field types (inline and special)."""
 
-    original_type: type = None
-    field_name: str = None
     _adapter: TypeAdapter = None
+    field_name: str
+
+    # The plain Python type this redis type wraps (e.g. ``int``, ``str``, ``list``).
+    wrapped_python_type: ClassVar[type]
 
     def __init_subclass__(cls, *, owner_meta: Optional["RedisConfig"] = None, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -60,7 +62,7 @@ class BaseRedisType(ABC):
 
     @classmethod
     def queue_special_loads_in_pipeline(
-        cls, pipe, key: str, plan: list, parent_path: str = ""
+        cls, pipe, key: str, plan: list, parent_path: str = "", field_name: str = ""
     ):
         """Queue any special-field loads this type contributes into ``pipe``., it will be used by the pipe creator"""
         return
@@ -105,6 +107,7 @@ class BaseRedisType(ABC):
     def __init__(self, *args, **kwargs):
         self._base_model_link = None
         self._redis_updated = False
+        self.field_name = ""
 
     def init_redis_field(self, key, val):
         if hasattr(val, "_base_model_link"):
@@ -151,7 +154,7 @@ class RedisType(BaseRedisType):
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
         return core_schema.no_info_after_validator_function(
-            cls, handler(cls.original_type)
+            cls, handler(cls.wrapped_python_type)
         )
 
     @staticmethod
@@ -161,3 +164,8 @@ class RedisType(BaseRedisType):
     @staticmethod
     def deserialize_unknown(value: str):
         return pickle.loads(base64.b64decode(value))
+
+
+def is_redis_field_value(value: Any) -> bool:
+    # cheap isinstance(value, BaseRedisType): every instance sets _redis_updated in __init__
+    return hasattr(value, "_redis_updated")

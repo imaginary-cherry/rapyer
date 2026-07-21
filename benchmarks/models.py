@@ -1,12 +1,14 @@
 from datetime import datetime
-from typing import ClassVar, Dict, List
+from typing import Annotated, ClassVar, Dict, List, Optional
 
 from pydantic import Field
 
 from rapyer.actions import ActionGroup
 from rapyer.base import AtomicRedisModel
+from rapyer.cascade import CascadeTTL
 from rapyer.config import RedisConfig
 from rapyer.types import RedisDatetimeTimestamp
+from rapyer.types.foreign_key import Reference
 from tests.models.collection_types import SimpleListModel, StrDictModel
 from tests.models.index_types import IndexTestModel
 from tests.models.redis_types import DirectRedisIntModel
@@ -100,3 +102,54 @@ class GenericRedisSetModelWithTTL(GenericRedisSetModel[str]):
         ttl=BENCHMARK_TTL_SECONDS,
         refresh_ttl=ActionGroup.all(for_ttl=True),
     )
+
+
+# TTL-cascade benchmark models: exercise aset_ttl(cascade=True) (real-Redis-7+ only).
+
+BENCHMARK_CASCADE_DEPTH = 10
+BENCHMARK_CASCADE_LIST_SIZE = 10
+
+
+class BenchCascadeChild(AtomicRedisModel):
+    """Plain cascade leaf shared by the two-FK and list-of-FK roots."""
+
+    name: str = "child"
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=BENCHMARK_TTL_SECONDS)
+
+
+class BenchCascadeTwoFkRoot(AtomicRedisModel):
+    """Root with two cascade-enabled FK fields (the minimal cascade fan-out)."""
+
+    name: str = "root"
+    first: Annotated[Reference[BenchCascadeChild], CascadeTTL()]
+    second: Annotated[Reference[BenchCascadeChild], CascadeTTL()]
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=BENCHMARK_TTL_SECONDS)
+
+
+class BenchCascadeChainNode(AtomicRedisModel):
+    """Self-referencing chain node whose ``next`` cascades one hop deeper.
+
+    The marker lives on the field (not ``Meta.cascade_ttl``) because
+    ``init_rapyer()`` resets every model's blanket ``Meta.cascade_ttl`` to None
+    unless it is passed explicitly, and the benchmark conftest calls
+    ``init_rapyer(redis=...)`` with no cascade arg. A per-field marker survives
+    that reset, so the whole chain is walked regardless of length.
+    """
+
+    name: str = "node"
+    next: Annotated[Optional[Reference["BenchCascadeChainNode"]], CascadeTTL()] = None
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=BENCHMARK_TTL_SECONDS)
+
+
+class BenchCascadeListRoot(AtomicRedisModel):
+    """Root holding a cascade-enabled list of many FK references."""
+
+    name: str = "root"
+    children: Annotated[list[Reference[BenchCascadeChild]], CascadeTTL()] = Field(
+        default_factory=list
+    )
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=BENCHMARK_TTL_SECONDS)

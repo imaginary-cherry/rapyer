@@ -5,7 +5,9 @@ import pytest
 
 from rapyer import AtomicRedisModel
 from rapyer.base import find_redis_models
-from rapyer.errors import DuplicateModelNameError
+from rapyer.config import RedisConfig
+from rapyer.errors import DuplicateModelNameError, UnsupportedIndexedFieldError
+from rapyer.fields import Index
 
 T = TypeVar("T")
 
@@ -41,7 +43,6 @@ def test_find_redis_models_returns_all_loaded_models_sanity(clean_redis_models):
         Model2,
         Model3,
         Model4,
-        GenericModel,
         GenericModel[type],
         GenericModel[Model],
     }
@@ -51,6 +52,8 @@ def test_find_redis_models_returns_all_loaded_models_sanity(clean_redis_models):
 
     # Assert
     assert set(models) == expected
+    # Generic model is not registered
+    assert GenericModel not in models
 
 
 def test_registering_two_models_with_same_class_name_raises(clean_redis_models):
@@ -65,3 +68,21 @@ def test_registering_two_models_with_same_class_name_raises(clean_redis_models):
             field2: int = 0
 
     assert exc_info.value.model_name == "DuplicateNameModel"
+
+
+def test_redis_schema_raises_for_indexed_field_with_unsupported_scalar_type_sanity(
+    clean_redis_models,
+):
+    # ``complex`` is a valid pydantic type but has no RedisType conversion, so its
+    # annotation reaches redis_schema unconverted. With the Index flag set it is not
+    # an AtomicRedisModel nor a RedisType, so it falls through to the final guard that
+    # rejects indexed fields whose type Redis cannot index.
+    class IndexedComplexModel(AtomicRedisModel):
+        name: str
+        value: Index[complex]
+
+        Meta = RedisConfig(init_with_rapyer=False)
+
+    # Act & Assert
+    with pytest.raises(UnsupportedIndexedFieldError):
+        IndexedComplexModel.redis_schema()

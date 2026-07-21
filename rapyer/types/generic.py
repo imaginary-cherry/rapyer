@@ -1,7 +1,7 @@
 import abc
 import logging
 from abc import ABC
-from typing import Any, Generic, TypeVar, get_args, get_origin
+from typing import Any, Generic, TypeVar, get_origin
 
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
@@ -10,7 +10,7 @@ from pydantic_core.core_schema import CoreSchema, SerializationInfo, ValidationI
 from rapyer.errors import CantSerializeRedisValueError
 from rapyer.types.base import RedisType
 from rapyer.types.special import SpecialFieldType
-from rapyer.utils.pythonic import safe_issubclass
+from rapyer.utils.pythonic import resolve_generic_args, safe_issubclass
 
 logger = logging.getLogger("rapyer")
 
@@ -29,12 +29,12 @@ class GenericRedisType(RedisType, Generic[T], ABC):
 
     @classmethod
     def find_inner_type(cls, type_):
-        args = get_args(type_)
+        args = resolve_generic_args(type_)
         return args[0] if args else Any
 
     @classmethod
     def contains_sf_field(cls) -> bool:
-        inner = cls.find_inner_type(cls.original_type)
+        inner = cls.find_inner_type(cls)
         if inner is Any:
             return False
         if safe_issubclass(inner, SpecialFieldType):
@@ -46,7 +46,7 @@ class GenericRedisType(RedisType, Generic[T], ABC):
 
     @classmethod
     def contains_fk_field(cls) -> bool:
-        inner = cls.find_inner_type(cls.original_type)
+        inner = cls.find_inner_type(cls)
         if inner is Any:
             return False
 
@@ -112,7 +112,7 @@ class GenericRedisType(RedisType, Generic[T], ABC):
         if should_pickle:
             # Build schema with both validator and serializer
             python_schema = core_schema.with_info_before_validator_function(
-                cls.full_deserializer, handler(cls.original_type)
+                cls.full_deserializer, handler(cls.wrapped_python_type)
             )
 
             return core_schema.with_info_after_validator_function(
@@ -126,7 +126,7 @@ class GenericRedisType(RedisType, Generic[T], ABC):
             )
         else:
             # Normal serialization for concrete types — preserve inner type args
-            args = get_args(source_type)
+            args = resolve_generic_args(source_type)
             inner_type = cls.build_typed_original(args)
             return core_schema.no_info_after_validator_function(
                 cls, handler(inner_type)

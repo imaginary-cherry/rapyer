@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    branches: [main, develop]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -12,7 +13,8 @@ concurrency:
 jobs:
   validate-branch-target:
     runs-on: ubuntu-22.04
-    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
 
     steps:
     - name: Validate PR target branch
@@ -22,7 +24,7 @@ jobs:
       run: |
         echo "Source branch: $SOURCE_BRANCH"
         echo "Target branch: $TARGET_BRANCH"
-        
+
         # Rule 1: Only develop branch can merge to main
         if [[ "$TARGET_BRANCH" == "main" && "$SOURCE_BRANCH" != "develop" ]]; then
           echo "❌ Error: Only 'develop' branch can merge to 'main'"
@@ -38,23 +40,52 @@ jobs:
   mirror-redis:
     runs-on: ubuntu-22.04
     permissions:
+      contents: read
       packages: write
     outputs:
       image: ${{ steps.mirror.outputs.image }}
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
+      with:
+        persist-credentials: false
     - id: mirror
       uses: ./.github/actions/mirror-redis
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
 
+  # Build the redis test matrix from .github/redis-matrix.json: all versions when
+  # the branch maps to 0, otherwise a random sample of that branch's count.
+  setup-matrix:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    needs: [validate-branch-target]
+    outputs:
+      redis-versions: ${{ steps.pick.outputs.redis }}
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        persist-credentials: false
+    - id: pick
+      env:
+        TARGET: ${{ github.base_ref || github.ref_name }}
+      run: |
+        CFG=.github/redis-matrix.json
+        COUNT=$(jq -r --arg b "$TARGET" '.sample_per_branch[$b] // .sample_per_branch.default' "$CFG")
+        ALL=$(jq -r '.versions[]' "$CFG")
+        if [ "$COUNT" = "0" ]; then PICK="$ALL"; else PICK=$(shuf -n "$COUNT" <<< "$ALL"); fi
+        echo "redis=$(jq -R . <<< "$PICK" | jq -cs .)" >> "$GITHUB_OUTPUT"
+
   lint:
     runs-on: ubuntu-22.04
     needs: [validate-branch-target]
-    if: always() && (needs.validate-branch-target.result == 'success' || needs.validate-branch-target.result == 'skipped')
+    permissions:
+      contents: read
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
+      with:
+        persist-credentials: false
     
     - name: Set up Python
       uses: actions/setup-python@v6
@@ -76,13 +107,16 @@ jobs:
   mypy:
     runs-on: ubuntu-22.04
     needs: [validate-branch-target]
-    if: always() && (needs.validate-branch-target.result == 'success' || needs.validate-branch-target.result == 'skipped')
+    permissions:
+      contents: read
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
+      with:
+        persist-credentials: false
     
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v6
@@ -100,8 +134,7 @@ jobs:
 
   test:
     runs-on: ubuntu-22.04
-    needs: [validate-branch-target, mirror-redis]
-    if: always() && (needs.validate-branch-target.result == 'success' || needs.validate-branch-target.result == 'skipped') && needs.mirror-redis.result == 'success'
+    needs: [validate-branch-target, mirror-redis, setup-matrix]
     permissions:
       contents: read
       packages: read
@@ -109,7 +142,7 @@ jobs:
       fail-fast: ${{ github.event_name == 'pull_request' }}
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
-        redis-version: ["6.0", "6.1", "6.2", "6.3", "6.4", "7.0", "7.1", "7.2", "7.3", "7.4"]
+        redis-version: ${{ fromJSON(needs.setup-matrix.outputs.redis-versions) }}
         pydantic-version: ["2.11", "2.12", "2.13"]
 
     services:
@@ -127,7 +160,9 @@ jobs:
           --health-retries 5
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
+      with:
+        persist-credentials: false
     
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v6
@@ -166,6 +201,8 @@ jobs:
   test-results:
     runs-on: ubuntu-22.04
     needs: [validate-branch-target, lint, mypy, test]
+    permissions:
+      contents: read
     if: always()
     steps:
       - name: Check test results
