@@ -9,19 +9,19 @@ from rapyer.errors import EmbeddingsExtraNotInstalledError
 
 
 class _DummyVectorizerClass:
-    """Stand-in for HFTextVectorizer/OpenAITextVectorizer's minimal call shape."""
+    """Stand-in for HFTextVectorizer's minimal (sync, thread-offloaded) call shape."""
 
     def __init__(self, model):
         self.model = model
-        self.aembed_calls = []
-        self.aembed_many_calls = []
+        self.embed_calls = []
+        self.embed_many_calls = []
 
-    async def aembed(self, content):
-        self.aembed_calls.append(content)
+    def embed(self, content):
+        self.embed_calls.append(content)
         return [0.1, 0.2, 0.3]
 
-    async def aembed_many(self, contents):
-        self.aembed_many_calls.append(list(contents))
+    def embed_many(self, contents):
+        self.embed_many_calls.append(list(contents))
         return [[0.1, 0.2, 0.3] for _ in contents]
 
 
@@ -107,5 +107,5 @@ async def test_aembed_and_aembed_many_delegate_to_resolved_adapter_sanity(
     assert vector == [0.1, 0.2, 0.3]
     assert vectors == [[0.1, 0.2, 0.3], [0.1, 0.2, 0.3]]
     resolved_vectorizer = default_adapter._resolve()._vectorizer
-    assert resolved_vectorizer.aembed_calls == ["hi"]
-    assert resolved_vectorizer.aembed_many_calls == [["hi", "there"]]
+    assert resolved_vectorizer.embed_calls == ["hi"]
+    assert resolved_vectorizer.embed_many_calls == [["hi", "there"]]

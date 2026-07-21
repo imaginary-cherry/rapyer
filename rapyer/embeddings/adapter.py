@@ -150,3 +150,77 @@ class RedisvlEmbeddingAdapter:
                 ]
             )
         return results
+
+
+# D-01/D-02: dim is a schema contract that must never drift with install profile.
+_HF_DEFAULT_MODEL = "sentence-transformers/all-mpnet-base-v2"
+_HF_DEFAULT_DIMS = 768
+_OPENAI_DEFAULT_MODEL = "text-embedding-3-small"
+_OPENAI_DEFAULT_DIMS = 1536
+
+
+def _try_import_hf_vectorizer() -> "type | None":
+    try:
+        from redisvl.utils.vectorize import HFTextVectorizer
+    except ImportError:
+        return None
+    return HFTextVectorizer
+
+
+def _try_import_openai_vectorizer() -> "type | None":
+    try:
+        from redisvl.utils.vectorize import OpenAITextVectorizer
+    except ImportError:
+        return None
+    return OpenAITextVectorizer
+
+
+def _build_packaged_default_adapter() -> RedisvlEmbeddingAdapter:
+    _ensure_redisvl_installed()
+    hf_vectorizer_cls = _try_import_hf_vectorizer()
+    if hf_vectorizer_cls is not None:
+        return RedisvlEmbeddingAdapter(
+            hf_vectorizer_cls(model=_HF_DEFAULT_MODEL),
+            dims=_HF_DEFAULT_DIMS,
+            model_name=_HF_DEFAULT_MODEL,
+        )
+    openai_vectorizer_cls = _try_import_openai_vectorizer()
+    if openai_vectorizer_cls is not None:
+        return RedisvlEmbeddingAdapter(
+            openai_vectorizer_cls(model=_OPENAI_DEFAULT_MODEL),
+            dims=_OPENAI_DEFAULT_DIMS,
+            model_name=_OPENAI_DEFAULT_MODEL,
+        )
+    # Never reads/logs OPENAI_API_KEY here - delegated entirely to OpenAITextVectorizer.
+    raise EmbeddingsExtraNotInstalledError(
+        "embeddings-hf",
+        "No embedding provider installed. Install rapyer[embeddings-hf] (local, "
+        "offline) or rapyer[embeddings-openai] (API-based), or configure a custom "
+        "vectorizer via Meta.vectorizer / init_rapyer(vectorizer=...).",
+    )
+
+
+class DefaultEmbeddingAdapter:
+    """Lazy, zero-config packaged default: HF, else OpenAI, else a guided error."""
+
+    def __init__(self):
+        self._resolved: RedisvlEmbeddingAdapter | None = None
+
+    def _resolve(self) -> RedisvlEmbeddingAdapter:
+        if self._resolved is None:
+            self._resolved = _build_packaged_default_adapter()
+        return self._resolved
+
+    @property
+    def dims(self) -> int:
+        return self._resolve().dims
+
+    async def aembed(self, content: str) -> list[float]:
+        return await self._resolve().aembed(content)
+
+    async def aembed_many(self, contents: list[str]) -> list[list[float]]:
+        return await self._resolve().aembed_many(contents)
+
+
+def default_embedding_adapter() -> DefaultEmbeddingAdapter:
+    return DefaultEmbeddingAdapter()
