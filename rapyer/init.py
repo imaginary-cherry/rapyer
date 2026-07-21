@@ -63,7 +63,8 @@ async def init_rapyer(
             # Initialize model fields
             model.init_class()
 
-            # Create indexes for models with indexed fields
+        # Index creation runs only after every model is rebound, so an index error leaves none unbound.
+        for model in REDIS_MODELS:
             if redis is not None:
                 fields = model.redis_schema()
                 if fields:

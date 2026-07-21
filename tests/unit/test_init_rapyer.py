@@ -5,6 +5,7 @@ import pytest
 from redis import ResponseError
 from redis.asyncio.client import Redis
 
+from rapyer.base import REDIS_MODELS
 from rapyer.init import init_rapyer, teardown_rapyer
 from rapyer.result import RapyerDeleteResult
 from rapyer.scripts import SCRIPTS
@@ -36,6 +37,35 @@ def mock_redis_client():
     redis_mock.function_load = AsyncMock(return_value="mock_lib")
     redis_mock.set = AsyncMock()
     return redis_mock
+
+
+@pytest.fixture(autouse=True)
+def restore_registered_model_init_state():
+    original_state = {
+        model: (
+            model.Meta.redis,
+            model.Meta.is_fake_redis,
+            model.Meta.ttl,
+            model.Meta.prefer_normal_json_dump,
+        )
+        for model in REDIS_MODELS
+    }
+    yield
+    for (
+        model,
+        (
+            original_redis,
+            original_is_fake_redis,
+            original_ttl,
+            original_prefer_normal_json_dump,
+        ),
+    ) in original_state.items():
+        # Unfreeze the init_rapyer() cascade-plan lock before restoring state.
+        model.Meta._meta_locked = False
+        model.Meta.redis = original_redis
+        model.Meta.is_fake_redis = original_is_fake_redis
+        model.Meta.ttl = original_ttl
+        model.Meta.prefer_normal_json_dump = original_prefer_normal_json_dump
 
 
 @pytest.fixture
@@ -147,7 +177,8 @@ async def test_teardown_rapyer_calls_aclose_once_per_unique_client_sanity():
     TaskModel.Meta.redis = mock_redis
 
     # Act
-    await teardown_rapyer()
+    with patch("rapyer.init.REDIS_MODELS", [UserModelWithTTL, TaskModel]):
+        await teardown_rapyer()
 
     # Assert
     mock_redis.aclose.assert_called_once()
@@ -168,6 +199,51 @@ async def test_init_rapyer_raises_response_error_when_acreate_index_fails_with_o
         # Act & Assert
         with pytest.raises(ResponseError):
             await init_rapyer(mock_redis, override_old_idx=True)
+
+
+@pytest.mark.asyncio
+async def test_init_rapyer_rebinds_all_models_before_script_registration_error():
+    # Arrange
+    from rapyer.base import REDIS_MODELS as registered_redis_models
+
+    mock_redis = AsyncMock(spec=Redis)
+    mock_redis.ft.return_value.dropindex = AsyncMock()
+    mock_redis.ft.return_value.create_index = AsyncMock()
+    registered_models = registered_redis_models.copy()
+
+    with patch(
+        "rapyer.init.register_scripts",
+        AsyncMock(side_effect=ConnectionError("Redis unavailable")),
+    ):
+        # Act & Assert
+        with pytest.raises(ConnectionError):
+            await init_rapyer(mock_redis)
+
+    for model in registered_models:
+        assert model.Meta.redis is mock_redis
+
+
+@pytest.mark.asyncio
+async def test_init_rapyer_rebinds_all_models_before_index_creation_error():
+    # Arrange
+    from rapyer.base import REDIS_MODELS as registered_redis_models
+
+    mock_redis = AsyncMock(spec=Redis)
+    mock_redis.ft.return_value.dropindex = AsyncMock()
+    mock_redis.script_load = AsyncMock(return_value="mock_sha")
+    registered_models = registered_redis_models.copy()
+
+    with patch.object(
+        IndexTestModel,
+        "acreate_index",
+        AsyncMock(side_effect=ResponseError("Index error")),
+    ):
+        # Act & Assert
+        with pytest.raises(ResponseError):
+            await init_rapyer(mock_redis, override_old_idx=True)
+
+    for model in registered_models:
+        assert model.Meta.redis is mock_redis
 
 
 @pytest.mark.asyncio
