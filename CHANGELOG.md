@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.5]
+
+### 🐛 Fixed
+
+- **TTL cascade no longer slows bulk inserts of non-referencing models**: `refresh_ttl`/`aset_ttl` issued a per-model server-side cascade `FCALL` on every TTL refresh, so bulk-inserting many models that hold no `ForeignKey` fields paid that call once per model for no benefit — a ~13% regression on the bulk-insert-with-TTL path. Models with no foreign-key fields now take the native `EXPIRE` fast path; models that reference others still cascade atomically server-side, unchanged. (#288)
+
+
 ## [1.3.4]
 
 ### 🔄 Changed

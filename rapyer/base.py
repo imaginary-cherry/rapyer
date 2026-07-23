@@ -245,14 +245,18 @@ class AtomicRedisModel(BaseModel):
         await self.refresh_ttl(can_use_pipeline=can_use_pipeline)
         return None
 
+    @classmethod
+    def _contains_foreign_key(cls) -> bool:
+        return bool(cls._relational_field_names or cls._contain_fk)
+
     async def refresh_ttl(self, can_use_pipeline: bool = False):
         """Refresh TTL unconditionally."""
         if self.Meta.ttl is None:
             return None
         pipe_context = ensure_pipeline if can_use_pipeline else pipeline_with_execution
         async with pipe_context(self.Meta) as pipe:
-            if self.Meta.is_fake_redis:
-                # Cascade edge-following is real-Redis-only; re-arm root-own keys.
+            # Native-EXPIRE fast path on fakeredis or when there is no graph to walk.
+            if self.Meta.is_fake_redis or not self._contains_foreign_key():
                 for key in self.all_keys:
                     pipe.expire(key, self.Meta.ttl)
                 return None
@@ -603,8 +607,8 @@ class AtomicRedisModel(BaseModel):
         # since ensure_pipeline itself pushes a pipeline into context.
         in_outer_pipe = _context_pipe.get() is not None
         async with ensure_pipeline(self.Meta, should_execute=False) as pipe:
-            if self.Meta.is_fake_redis:
-                # Cascade edge-following is a no-op on fakeredis; only root-own keys refresh.
+            # Native-EXPIRE fast path on fakeredis or when there is no graph to walk.
+            if self.Meta.is_fake_redis or not self._contains_foreign_key():
                 for key in self.all_keys:
                     pipe.expire(key, ttl)
                 if in_outer_pipe:
