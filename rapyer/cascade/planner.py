@@ -195,6 +195,48 @@ def _static_walk_fk_edges(model_cls: Any, parent_path: str, fks: list[CascadeEdg
         )
 
 
+def _static_walk_sf_fk_edges(model_cls: Any, fks: list[CascadeEdge]):
+    """
+    Append a distinct edge for each SF-held-ref field (RedisSet/RedisPriorityQueue
+    wrapping a Reference[T]) directly on model_cls. Complementary to, not a
+    replacement for, the refresh-only suffix _static_walk_special_suffixes emits
+    for the same field.
+    """
+    # Lazy import: priority_queue -> special -> scripts.loader -> planner is a real cycle.
+    from rapyer.types.priority_queue import RedisPriorityQueue
+    from rapyer.types.redis_set import RedisSet
+
+    for field_name in model_cls._special_field_names:
+        annotation = model_cls.model_fields[field_name].annotation
+        target_cls = _unwrap_relational_target(annotation)
+        if target_cls is None:
+            continue
+        stripped = strip_optional(annotation)
+        origin = get_origin(stripped) or stripped
+        if safe_issubclass(origin, RedisSet):
+            sf_container = "set"
+        elif safe_issubclass(origin, RedisPriorityQueue):
+            sf_container = "zset"
+        else:
+            continue
+        edge = _classify_edge(model_cls, field_name)
+        if not edge.enabled:
+            continue
+        fks.append(
+            CascadeEdge(
+                path=field_name,
+                target=target_cls.__name__,
+                is_collection=True,
+                recurse_into_target=True,
+                refresh_target_ttl=True,
+                refresh_target_special_keys=True,
+                resets_depth_budget=edge.override,
+                depth=edge.depth,
+                sf_container=sf_container,
+            )
+        )
+
+
 def _static_walk_special_suffixes(model_cls: Any, parent_path: str = "") -> list[str]:
     """
     Derive the dotted-path special-field suffixes for model_cls, recursing
@@ -239,6 +281,7 @@ def build_cascade_plan(
     for model_cls in models:
         fks: list[CascadeEdge] = []
         _static_walk_fk_edges(model_cls, "$", fks)
+        _static_walk_sf_fk_edges(model_cls, fks)
         plan[model_cls.__name__] = CascadePlanEntry(
             ttl=model_cls.Meta.ttl,
             special_suffixes=_static_walk_special_suffixes(model_cls),

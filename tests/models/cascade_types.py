@@ -367,7 +367,8 @@ class CascadeSetRefNoTtlTarget(AtomicRedisModel):
 
     name: str = "no_ttl_target"
 
-    Meta: ClassVar[RedisConfig] = RedisConfig()
+    # Excluded from REDIS_MODELS so it never trips init_rapyer()'s full-set validation.
+    Meta: ClassVar[RedisConfig] = RedisConfig(init_with_rapyer=False)
 
 
 class CascadeSetRefToNoTtl(AtomicRedisModel):
@@ -378,7 +379,9 @@ class CascadeSetRefToNoTtl(AtomicRedisModel):
         Field(default_factory=RedisSet)
     )
 
-    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+    Meta: ClassVar[RedisConfig] = RedisConfig(
+        ttl=CASCADE_FIXTURE_TTL_SECONDS, init_with_rapyer=False
+    )
 
 
 class CascadeSetRefRootNoTtl(AtomicRedisModel):
@@ -389,7 +392,7 @@ class CascadeSetRefRootNoTtl(AtomicRedisModel):
         default_factory=RedisSet
     )
 
-    Meta: ClassVar[RedisConfig] = RedisConfig()
+    Meta: ClassVar[RedisConfig] = RedisConfig(init_with_rapyer=False)
 
 
 # Full cascade-model set shared by unit and integration cascade fixtures.
