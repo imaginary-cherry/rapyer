@@ -56,6 +56,14 @@ class CascadeEdge:
     resets_depth_budget means an explicit per-field CascadeTTL() spec resets
     the child's depth budget to this edge's own depth instead of decrementing
     the budget inherited from the parent.
+
+    sf_container is None for an inline edge (direct/collection/nested). It is
+    "set" / "zset" when the FK reference is held inside a RedisSet /
+    RedisPriorityQueue special-field container instead of inline in the
+    parent's JSON document. For an SF edge, path holds the SF key suffix (the
+    dotted form used to build __rapyer_special__:{model_key}:{suffix}), NOT a
+    $.-rooted JSONPath — Phase-2 Lua branches on sf_container to read via
+    SMEMBERS/ZRANGE instead of the inline JSON.GET batch.
     """
 
     path: str
@@ -66,6 +74,7 @@ class CascadeEdge:
     refresh_target_special_keys: bool
     resets_depth_budget: bool
     depth: int | None = None
+    sf_container: str | None = None
 
 
 @dataclasses.dataclass(frozen=True)
