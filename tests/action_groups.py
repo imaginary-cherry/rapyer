@@ -65,6 +65,8 @@ PRIVATE_METHODS = _group(
     # Redis round trips, so pipeline/TTL coverage doesn't apply.
     AtomicRedisModel._iter_special_fields,
     AtomicRedisModel._ttl_keys,
+    # Pure in-memory FK-field check gating the TTL cascade fast path; no Redis.
+    AtomicRedisModel._contains_foreign_key,
     AtomicRedisModel.class_key_initials,
     AtomicRedisModel.index_name,
     AtomicRedisModel.create_expressions,
