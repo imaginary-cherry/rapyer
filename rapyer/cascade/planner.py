@@ -198,9 +198,14 @@ def _static_walk_fk_edges(model_cls: Any, parent_path: str, fks: list[CascadeEdg
 def _static_walk_sf_fk_edges(model_cls: Any, fks: list[CascadeEdge]):
     """
     Append a distinct edge for each SF-held-ref field (RedisSet/RedisPriorityQueue
-    wrapping a Reference[T]) directly on model_cls. Complementary to, not a
-    replacement for, the refresh-only suffix _static_walk_special_suffixes emits
+    wrapping a Reference[T]) declared directly on model_cls. Complementary to, not
+    a replacement for, the refresh-only suffix _static_walk_special_suffixes emits
     for the same field.
+
+    Scope: direct fields only. Unlike _static_walk_special_suffixes, this pass does
+    NOT recurse into nested inline sub-models, so an SF-held ref inside a nested
+    sub-model gets its refresh suffix but no traversal edge. Extending traversal to
+    the nested case is deferred to the server-side traversal work.
     """
     # Lazy import: priority_queue -> special -> scripts.loader -> planner is a real cycle.
     from rapyer.types.priority_queue import RedisPriorityQueue
