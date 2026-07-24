@@ -313,6 +313,85 @@ class CascadeMaxBudgetRoot(AtomicRedisModel):
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
 
 
+# --- SF-held-ref fixtures (FK elements held inside RedisSet / RedisPriorityQueue) ---
+
+
+class CascadeSetRefParent(AtomicRedisModel):
+    """SF-held-ref shape: FK references held inside a RedisSet, per-field enabled."""
+
+    name: str = "set_ref"
+    refs: Annotated[RedisSet[Reference[CascadeAuthor]], CascadeTTL()] = Field(
+        default_factory=RedisSet
+    )
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+class CascadePQRefParent(AtomicRedisModel):
+    """SF-held-ref shape: FK references held inside a RedisPriorityQueue."""
+
+    name: str = "pq_ref"
+    queue: Annotated[
+        RedisPriorityQueue[Reference[CascadeAuthor]], CascadeTTL(depth=2)
+    ] = Field(default_factory=RedisPriorityQueue)
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+class CascadeSetRefBlanket(AtomicRedisModel):
+    """SF-held-ref field with no per-field marker; cascades via the blanket global."""
+
+    name: str = "set_ref_blanket"
+    refs: RedisSet[Reference[CascadeAuthor]] = Field(default_factory=RedisSet)
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(
+        cascade_ttl=CascadeTTL(depth=2), ttl=CASCADE_FIXTURE_TTL_SECONDS
+    )
+
+
+class CascadeSetRefOptOut(AtomicRedisModel):
+    """SF-held-ref field opts OUT of an otherwise-blanket-enabled global."""
+
+    name: str = "set_ref_opt_out"
+    refs: Annotated[RedisSet[Reference[CascadeAuthor]], CascadeTTL(enabled=False)] = (
+        Field(default_factory=RedisSet)
+    )
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(
+        cascade_ttl=CascadeTTL(), ttl=CASCADE_FIXTURE_TTL_SECONDS
+    )
+
+
+class CascadeSetRefNoTtlTarget(AtomicRedisModel):
+    """SF-held-ref target with no Meta.ttl — fail-fast fixture, not registered."""
+
+    name: str = "no_ttl_target"
+
+    Meta: ClassVar[RedisConfig] = RedisConfig()
+
+
+class CascadeSetRefToNoTtl(AtomicRedisModel):
+    """Root has a ttl; its SF-held-ref target does not — target violation."""
+
+    name: str = "set_ref_to_no_ttl"
+    refs: Annotated[RedisSet[Reference[CascadeSetRefNoTtlTarget]], CascadeTTL()] = (
+        Field(default_factory=RedisSet)
+    )
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+class CascadeSetRefRootNoTtl(AtomicRedisModel):
+    """Root-with-only-SF-edges has no Meta.ttl — root violation."""
+
+    name: str = "set_ref_root_no_ttl"
+    refs: Annotated[RedisSet[Reference[CascadeAuthor]], CascadeTTL()] = Field(
+        default_factory=RedisSet
+    )
+
+    Meta: ClassVar[RedisConfig] = RedisConfig()
+
+
 # Full cascade-model set shared by unit and integration cascade fixtures.
 ALL_CASCADE_MODELS = [
     CascadeAuthor,
@@ -342,4 +421,8 @@ ALL_CASCADE_MODELS = [
     CascadeWR02SharedChild,
     CascadeWR02Root,
     CascadeMaxBudgetRoot,
+    CascadeSetRefParent,
+    CascadePQRefParent,
+    CascadeSetRefBlanket,
+    CascadeSetRefOptOut,
 ]

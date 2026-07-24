@@ -24,7 +24,11 @@ from tests.models.cascade_types import (
     CascadeMaxBudgetRoot,
     CascadeMultiDepthRoot,
     CascadeNestedDepthRoot,
+    CascadePQRefParent,
     CascadeProfile,
+    CascadeSetRefBlanket,
+    CascadeSetRefOptOut,
+    CascadeSetRefParent,
     CascadeShallowRoot,
     CascadeSpecialChild,
     CascadeSpecialParent,
@@ -61,6 +65,10 @@ CASCADE_PLANNER_MODELS = [
     CascadeWR02SharedChild,
     CascadeWR02Root,
     CascadeMaxBudgetRoot,
+    CascadeSetRefParent,
+    CascadePQRefParent,
+    CascadeSetRefBlanket,
+    CascadeSetRefOptOut,
 ]
 
 # init_rapyer() authoritatively resets Meta.cascade_ttl to None on every registered
