@@ -30,8 +30,12 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
     # --- Serialization helpers ---
 
     def _dump_members(self, values) -> list[str]:
+        # dump_python never validates, so coerce raw input (e.g. an FK key string) first.
+        validated = self._adapter.validate_python(
+            list(values), context={REDIS_DUMP_FLAG_NAME: True}
+        )
         serialized = self._adapter.dump_python(
-            list(values), mode="json", context={REDIS_DUMP_FLAG_NAME: True}
+            validated, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
         )
         return [json.dumps(s) for s in serialized]
 
