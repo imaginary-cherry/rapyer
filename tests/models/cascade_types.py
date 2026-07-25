@@ -395,6 +395,94 @@ class CascadeSetRefRootNoTtl(AtomicRedisModel):
     Meta: ClassVar[RedisConfig] = RedisConfig(init_with_rapyer=False)
 
 
+# --- SF-held-ref hard-shape fixtures (Phase 2: server-side traversal proof) ---
+
+
+class CascadeSetRefSelfNode(AtomicRedisModel):
+    """Self-reference held inside a RedisSet: the node's own key can be a
+    member of its own ``peers`` field. Proves the shared visited map
+    terminates this cycle via the SMEMBERS read branch instead of hanging."""
+
+    name: str = "set_ref_self"
+    peers: Annotated[RedisSet[Reference["CascadeSetRefSelfNode"]], CascadeTTL()] = (
+        Field(default_factory=RedisSet)
+    )
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+class CascadePQRefSelfNode(AtomicRedisModel):
+    """Same self-reference shape as CascadeSetRefSelfNode but held inside a
+    RedisPriorityQueue instead of a RedisSet — proves the cycle-safety
+    guarantee holds independently for the ZRANGE read branch."""
+
+    name: str = "pq_ref_self"
+    peers: Annotated[
+        RedisPriorityQueue[Reference["CascadePQRefSelfNode"]], CascadeTTL()
+    ] = Field(default_factory=RedisPriorityQueue)
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+class CascadeMixedEdgeSharedChild(AtomicRedisModel):
+    """Chain node reached by CascadeMixedEdgeSharedChildRoot via both an
+    inline edge and an SF-held-ref edge. Blanket (non-override) cascade so
+    depth genuinely decrements on every established hop."""
+
+    name: str = "mixed_edge_shared_child"
+    onward: Optional[Reference["CascadeMixedEdgeSharedChild"]] = None
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(
+        cascade_ttl=CascadeTTL(), ttl=CASCADE_FIXTURE_TTL_SECONDS
+    )
+
+
+class CascadeMixedEdgeSharedChildRoot(AtomicRedisModel):
+    """Two fields point at the SAME saved CascadeMixedEdgeSharedChild
+    instance: ``shallow_inline`` (inline FK, override, depth=1) and
+    ``deep_set`` (SF-held-ref, override, depth=4). Proves SF edges
+    participate in the SAME best-budget-per-node visited map as inline
+    edges — the shared child is walked at the larger SF budget regardless
+    of which edge's push_child call happens first."""
+
+    name: str = "mixed_edge_shared_child_root"
+    shallow_inline: Annotated[
+        Reference[CascadeMixedEdgeSharedChild], CascadeTTL(depth=1)
+    ]
+    deep_set: Annotated[
+        RedisSet[Reference[CascadeMixedEdgeSharedChild]], CascadeTTL(depth=4)
+    ] = Field(default_factory=RedisSet)
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+class CascadeSfDiamondChild(AtomicRedisModel):
+    """Plain leaf reached by CascadeSfDiamondRoot via two different
+    SF-container kinds on the same root (SET and ZSET)."""
+
+    name: str = "sf_diamond_child"
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+class CascadeSfDiamondRoot(AtomicRedisModel):
+    """Two independent SF-held-ref fields (one RedisSet, one
+    RedisPriorityQueue) both pointing at the SAME saved
+    CascadeSfDiamondChild instance. Proves a child reached via two
+    different SF-container kinds converges through the shared visited map
+    and is re-armed exactly once, with no double-processing error."""
+
+    name: str = "sf_diamond_root"
+    left: Annotated[RedisSet[Reference[CascadeSfDiamondChild]], CascadeTTL()] = Field(
+        default_factory=RedisSet
+    )
+    right: Annotated[
+        RedisPriorityQueue[Reference[CascadeSfDiamondChild]], CascadeTTL()
+    ] = Field(default_factory=RedisPriorityQueue)
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
 # Full cascade-model set shared by unit and integration cascade fixtures.
 ALL_CASCADE_MODELS = [
     CascadeAuthor,
@@ -428,4 +516,10 @@ ALL_CASCADE_MODELS = [
     CascadePQRefParent,
     CascadeSetRefBlanket,
     CascadeSetRefOptOut,
+    CascadeSetRefSelfNode,
+    CascadePQRefSelfNode,
+    CascadeMixedEdgeSharedChild,
+    CascadeMixedEdgeSharedChildRoot,
+    CascadeSfDiamondChild,
+    CascadeSfDiamondRoot,
 ]
