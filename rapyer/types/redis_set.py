@@ -28,8 +28,10 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
     # --- Serialization helpers ---
 
     def _dump_members(self, values: Iterable[T]) -> list[str]:
+        # dump_python never validates, so coerce raw input (e.g. an FK key string) first.
+        validated = self._adapter.validate_python(set(values))
         return self._adapter.dump_python(
-            set(values), mode="json", context={REDIS_DUMP_FLAG_NAME: True}
+            validated, mode="json", context={REDIS_DUMP_FLAG_NAME: True}
         )
 
     def _dump_member(self, value: T) -> str:

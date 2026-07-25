@@ -1,7 +1,7 @@
 import dataclasses
 import hashlib
 import json
-from typing import TYPE_CHECKING, Any, get_origin
+from typing import TYPE_CHECKING, Any, ForwardRef, get_origin
 
 from rapyer.cascade.ttl import CascadeTTL
 from rapyer.errors.cascade import CascadeLuaLiteralError, CascadeTargetTtlMissingError
@@ -25,13 +25,38 @@ def _field_cascade_spec(model_cls: Any, field_name: str) -> CascadeTTL | None:
     return None
 
 
+def _resolve_forward_ref(forward_ref: ForwardRef) -> Any | None:
+    """Resolve a (self-)referencing FK target baked into an SF container's
+    dynamic subclass generic args at class-body execution time.
+
+    Pydantic's ``model_rebuild(force=True)`` only re-evaluates its own
+    top-level field annotations, never the opaque generic alias baked into an
+    ``__init_subclass__``-generated ``BaseRedisType`` subclass's
+    ``__orig_bases__`` (see ``RedisConverter._build_redis_subclass``), so a
+    forward ref inside e.g. ``RedisSet[Reference["Self"]]`` stays unresolved
+    after rebuild. Every registered model name is unique, so a lookup by
+    name against the global registry stands in for pydantic's own mechanism.
+    """
+    # Lazy import: avoids any risk of a cycle back into rapyer.cascade.planner.
+    from rapyer.base import REDIS_MODELS
+
+    name = forward_ref.__forward_arg__
+    for model in REDIS_MODELS:
+        if model.__name__ == name:
+            return model
+    return None
+
+
 def _unwrap_relational_target(annotation: Any) -> Any | None:
     """Return the model class an FK-shaped annotation points to, or None."""
     stripped = strip_optional(annotation)
     origin = get_origin(stripped) or stripped
     if safe_issubclass(origin, RelationalFieldType):
         args = resolve_generic_args(stripped)
-        return args[0] if args else None
+        target = args[0] if args else None
+        if isinstance(target, ForwardRef):
+            return _resolve_forward_ref(target)
+        return target
     for arg in resolve_generic_args(stripped):
         found = _unwrap_relational_target(arg)
         if found is not None:
