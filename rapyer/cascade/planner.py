@@ -267,6 +267,23 @@ def _static_walk_sf_fk_edges(model_cls: Any, fks: list[CascadeEdge]):
         )
 
 
+def class_declares_cascade_enabled_sf_ref_edge(model_cls: Any) -> bool:
+    """
+    True if model_cls declares at least one cascade-enabled SF-held-ref edge
+    (an FK reference held inside a RedisSet/RedisPriorityQueue field, per the
+    same field>global>off precedence build_cascade_plan bakes into the Lua
+    plan table).
+
+    Reuses _static_walk_sf_fk_edges's classification verbatim rather than a
+    bare structural "is this a RedisSet-of-ForeignKey?" check, so a
+    cascade-disabled SF-of-FK model (e.g. a per-field CascadeTTL(enabled=False)
+    opt-out) correctly returns False here too.
+    """
+    fks: list[CascadeEdge] = []
+    _static_walk_sf_fk_edges(model_cls, fks)
+    return any(edge.sf_container is not None for edge in fks)
+
+
 def _static_walk_special_suffixes(model_cls: Any, parent_path: str = "") -> list[str]:
     """
     Derive the dotted-path special-field suffixes for model_cls, recursing
