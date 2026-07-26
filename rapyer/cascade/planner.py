@@ -157,13 +157,18 @@ def _unwrap_nested_model_cls(annotation: Any) -> Any | None:
     return origin if safe_issubclass(origin, AtomicRedisModel) else None
 
 
-def _static_walk_fk_edges(model_cls: Any, parent_path: str, fks: list[CascadeEdge]):
+def _static_walk_fk_edges(
+    model_cls: Any, parent_path: str, fks: list[CascadeEdge], top_level: bool = True
+):
     """
     Append every enabled FK edge reachable from model_cls's own fields.
 
     Direct and collection FK fields become edges here; nested inline sub-models
-    are walked recursively. Each edge carries its own declared depth (field
-    override else global else unbounded).
+    are walked recursively; SF-held refs (RedisSet/RedisPriorityQueue of a
+    Reference) become sf_container edges. Nested SF-held-ref traversal is
+    deferred, so the SF branch fires for direct (top_level) fields only. Each
+    edge carries its own declared depth (field override else global else
+    unbounded).
     """
     for field_name in model_cls._relational_field_names:
         edge = _classify_edge(model_cls, field_name)
@@ -192,14 +197,38 @@ def _static_walk_fk_edges(model_cls: Any, parent_path: str, fks: list[CascadeEdg
         annotation = model_cls.model_fields[field_name].annotation
         nested_cls = _unwrap_nested_model_cls(annotation)
         if nested_cls is not None:
-            # Nested inline sub-model: same RedisJSON document, zero-hop
-            # recursion; the marker lives on the nested class's own field.
+            # Nested inline sub-model: same RedisJSON document, zero-hop recursion.
             nested_path = f"{parent_path}.{field_name}"
-            _static_walk_fk_edges(nested_cls, nested_path, fks)
+            _static_walk_fk_edges(nested_cls, nested_path, fks, top_level=False)
             continue
 
-        # Collection of FK: the marker lives on the collection field itself;
-        # one edge covers every element.
+        sf_container = _sf_container_kind(annotation)
+        if sf_container is not None:
+            # Nested SF-held-ref traversal is deferred; direct fields only.
+            if not top_level:
+                continue
+            edge = _classify_edge(model_cls, field_name)
+            if not edge.enabled:
+                continue
+            target_cls = _unwrap_relational_target(annotation)
+            if target_cls is None:
+                continue
+            fks.append(
+                CascadeEdge(
+                    path=field_name,
+                    target=target_cls.__name__,
+                    is_collection=True,
+                    recurse_into_target=True,
+                    refresh_target_ttl=True,
+                    refresh_target_special_keys=True,
+                    resets_depth_budget=edge.override,
+                    depth=edge.depth,
+                    sf_container=sf_container,
+                )
+            )
+            continue
+
+        # Collection of FK: one edge covers every element.
         edge = _classify_edge(model_cls, field_name)
         if not edge.enabled:
             continue
@@ -220,68 +249,19 @@ def _static_walk_fk_edges(model_cls: Any, parent_path: str, fks: list[CascadeEdg
         )
 
 
-def _static_walk_sf_fk_edges(model_cls: Any, fks: list[CascadeEdge]):
-    """
-    Append a distinct edge for each SF-held-ref field (RedisSet/RedisPriorityQueue
-    wrapping a Reference[T]) declared directly on model_cls. Complementary to, not
-    a replacement for, the refresh-only suffix _static_walk_special_suffixes emits
-    for the same field.
-
-    Scope: direct fields only. Unlike _static_walk_special_suffixes, this pass does
-    NOT recurse into nested inline sub-models, so an SF-held ref inside a nested
-    sub-model gets its refresh suffix but no traversal edge. Extending traversal to
-    the nested case is deferred to the server-side traversal work.
-    """
+def _sf_container_kind(annotation: Any) -> str | None:
+    """Return "set"/"zset" if annotation is a RedisSet/RedisPriorityQueue, else None."""
     # Lazy import: priority_queue -> special -> scripts.loader -> planner is a real cycle.
     from rapyer.types.priority_queue import RedisPriorityQueue
     from rapyer.types.redis_set import RedisSet
 
-    for field_name in model_cls._special_field_names:
-        annotation = model_cls.model_fields[field_name].annotation
-        target_cls = _unwrap_relational_target(annotation)
-        if target_cls is None:
-            continue
-        stripped = strip_optional(annotation)
-        origin = get_origin(stripped) or stripped
-        if safe_issubclass(origin, RedisSet):
-            sf_container = "set"
-        elif safe_issubclass(origin, RedisPriorityQueue):
-            sf_container = "zset"
-        else:
-            continue
-        edge = _classify_edge(model_cls, field_name)
-        if not edge.enabled:
-            continue
-        fks.append(
-            CascadeEdge(
-                path=field_name,
-                target=target_cls.__name__,
-                is_collection=True,
-                recurse_into_target=True,
-                refresh_target_ttl=True,
-                refresh_target_special_keys=True,
-                resets_depth_budget=edge.override,
-                depth=edge.depth,
-                sf_container=sf_container,
-            )
-        )
-
-
-def class_declares_cascade_enabled_sf_ref_edge(model_cls: Any) -> bool:
-    """
-    True if model_cls declares at least one cascade-enabled SF-held-ref edge
-    (an FK reference held inside a RedisSet/RedisPriorityQueue field, per the
-    same field>global>off precedence build_cascade_plan bakes into the Lua
-    plan table).
-
-    Reuses _static_walk_sf_fk_edges's classification verbatim rather than a
-    bare structural "is this a RedisSet-of-ForeignKey?" check, so a
-    cascade-disabled SF-of-FK model (e.g. a per-field CascadeTTL(enabled=False)
-    opt-out) correctly returns False here too.
-    """
-    fks: list[CascadeEdge] = []
-    _static_walk_sf_fk_edges(model_cls, fks)
-    return any(edge.sf_container is not None for edge in fks)
+    stripped = strip_optional(annotation)
+    origin = get_origin(stripped) or stripped
+    if safe_issubclass(origin, RedisSet):
+        return "set"
+    if safe_issubclass(origin, RedisPriorityQueue):
+        return "zset"
+    return None
 
 
 def _static_walk_special_suffixes(model_cls: Any, parent_path: str = "") -> list[str]:
@@ -328,7 +308,6 @@ def build_cascade_plan(
     for model_cls in models:
         fks: list[CascadeEdge] = []
         _static_walk_fk_edges(model_cls, "$", fks)
-        _static_walk_sf_fk_edges(model_cls, fks)
         plan[model_cls.__name__] = CascadePlanEntry(
             ttl=model_cls.Meta.ttl,
             special_suffixes=_static_walk_special_suffixes(model_cls),
