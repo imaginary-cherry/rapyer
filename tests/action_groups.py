@@ -45,6 +45,8 @@ PRIVATE_METHODS = _group(
     # Generic
     GenericRedisType.contains_sf_field,
     GenericRedisType.contains_fk_field,
+    RedisSet.contains_fk_field,
+    RedisPriorityQueue.contains_fk_field,
     # AtomicRedisModel
     AtomicRedisModel._search_keys_by_query,
     AtomicRedisModel.build_redis_model,

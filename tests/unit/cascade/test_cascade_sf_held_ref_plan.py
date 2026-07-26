@@ -3,13 +3,12 @@ import json
 import pytest
 
 from rapyer.cascade.planner import (
+    _static_walk_fk_edges,
     build_cascade_plan,
     cascade_plan_json,
     validate_cascade_ttl_targets,
 )
 from rapyer.errors import CascadeTargetTtlMissingError
-from rapyer.types.priority_queue import RedisPriorityQueue
-from rapyer.types.redis_set import RedisSet
 from tests.models.cascade_types import (
     CascadeAuthor,
     CascadeBlanketRoot,
@@ -22,6 +21,7 @@ from tests.models.cascade_types import (
     CascadeSetRefParent,
     CascadeSetRefRootNoTtl,
     CascadeSetRefToNoTtl,
+    CascadeSpecialChild,
 )
 
 pytestmark = pytest.mark.usefixtures("setup_fake_redis_for_cascade_models")
@@ -144,9 +144,26 @@ def test_positive_control_all_ttl_present_does_not_raise():
     validate_cascade_ttl_targets(plan)
 
 
-def test_guard_redis_set_contains_fk_field_is_false_and_field_not_in_contain_fk():
-    # Guards D-02: the SF edge comes from _special_field_names, not _contain_fk.
-    assert RedisSet.contains_fk_field() is False
-    assert RedisPriorityQueue.contains_fk_field() is False
-    assert "refs" not in CascadeSetRefParent._contain_fk
+def test_sf_of_fk_field_lands_in_both_contain_fk_and_special_field_names():
+    """Unified detection (reverses D-02): an SF-of-FK field is both a traversal edge
+    source (_contain_fk) and a refresh-suffix source (_special_field_names)."""
+    assert CascadeSetRefParent.contains_fk_field() is True
+    assert CascadePQRefParent.contains_fk_field() is True
+    assert "refs" in CascadeSetRefParent._contain_fk
     assert "refs" in CascadeSetRefParent._special_field_names
+    assert "queue" in CascadePQRefParent._contain_fk
+    assert "queue" in CascadePQRefParent._special_field_names
+
+
+def test_plain_sf_container_without_fk_stays_off_the_cascade_path():
+    # A non-FK SF container must not enter _contain_fk nor trip the trigger gate.
+    assert "tags" not in CascadeSpecialChild._contain_fk
+    assert "scores" not in CascadeSpecialChild._contain_fk
+    assert CascadeSpecialChild._contains_foreign_key() is False
+
+
+def test_nested_sf_held_ref_traversal_stays_deferred():
+    # Nested SF-held refs are deferred: the SF branch fires only at top level.
+    fks = []
+    _static_walk_fk_edges(CascadeSetRefParent, "$.holder", fks, top_level=False)
+    assert all(edge.sf_container is None for edge in fks)

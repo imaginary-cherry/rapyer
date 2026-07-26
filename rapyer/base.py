@@ -246,25 +246,8 @@ class AtomicRedisModel(BaseModel):
         return None
 
     @classmethod
-    def _has_cascade_enabled_sf_ref_edge(cls) -> bool:
-        # Lazy import: breaks a real planner<->scripts-package cycle at module-init.
-        from rapyer.cascade.planner import class_declares_cascade_enabled_sf_ref_edge
-
-        # cls.__dict__ (not getattr) gives each subclass its own cache slot.
-        cached = cls.__dict__.get("_cascade_sf_ref_edge_flag")
-        if cached is not None:
-            return cached
-        result = class_declares_cascade_enabled_sf_ref_edge(cls)
-        setattr(cls, "_cascade_sf_ref_edge_flag", result)
-        return result
-
-    @classmethod
     def _contains_foreign_key(cls) -> bool:
-        return bool(
-            cls._relational_field_names
-            or cls._contain_fk
-            or cls._has_cascade_enabled_sf_ref_edge()
-        )
+        return bool(cls._relational_field_names or cls._contain_fk)
 
     async def refresh_ttl(self, can_use_pipeline: bool = False):
         """Refresh TTL unconditionally."""

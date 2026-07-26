@@ -74,8 +74,10 @@ async def test_pq_ref_parent_refresh_ttl_calls_run_fcall_not_expire():
 
 
 @pytest.mark.asyncio
-async def test_set_ref_opt_out_refresh_ttl_still_uses_plain_expire():
-    # Arrange: sole SF field opts OUT via a per-field CascadeTTL(enabled=False).
+async def test_set_ref_opt_out_refresh_ttl_gates_like_a_normal_opt_out_fk():
+    """A cascade-opt-out SF field gates like any opt-out FK: _contains_foreign_key is
+    True, so refresh_ttl takes the FCALL path. The plan carries no enabled edge, so the
+    FCALL refreshes only the parent's own keys and follows no reference (no child)."""
     parent = CascadeSetRefOptOut()
     mock_pipe = MagicMock()
 
@@ -90,8 +92,15 @@ async def test_set_ref_opt_out_refresh_ttl_still_uses_plain_expire():
         # Act
         await parent.refresh_ttl(can_use_pipeline=True)
 
-    # Assert (all_keys includes the opted-out `refs` SF key, not just the main key)
-    mock_run_fcall.assert_not_called()
-    expected_calls = [((key, parent.Meta.ttl),) for key in parent.all_keys]
-    actual_calls = [call.args for call in mock_pipe.expire.call_args_list]
-    assert actual_calls == [args for (args,) in expected_calls]
+    # Assert
+    mock_run_fcall.assert_called_once_with(
+        mock_pipe,
+        type(parent).Meta.cascade_function_name,
+        1,
+        parent.key,
+        "CascadeSetRefOptOut",
+        SPECIAL_FIELD_KEY_PREFIX,
+        parent.Meta.ttl,
+        1,
+    )
+    mock_pipe.expire.assert_not_called()
