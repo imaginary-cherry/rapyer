@@ -75,7 +75,7 @@ async def test_pq_ref_parent_refresh_ttl_calls_run_fcall_not_expire():
 
 @pytest.mark.asyncio
 async def test_set_ref_opt_out_refresh_ttl_gates_like_a_normal_opt_out_fk():
-    """A cascade-opt-out SF field gates like any opt-out FK: _contains_foreign_key is
+    """A cascade-opt-out SF field gates like any opt-out FK: _needs_cascade_script is
     True, so refresh_ttl takes the FCALL path. The plan carries no enabled edge, so the
     FCALL refreshes only the parent's own keys and follows no reference (no child)."""
     parent = CascadeSetRefOptOut()
