@@ -246,8 +246,14 @@ class AtomicRedisModel(BaseModel):
         return None
 
     @classmethod
-    def _contains_foreign_key(cls) -> bool:
-        return bool(cls._relational_field_names or cls._contain_fk)
+    def _needs_cascade_script(cls) -> bool:
+        # Any FK edge or special-field key needs the script; plain scalars use EXPIRE.
+        return bool(
+            cls._relational_field_names
+            or cls._contain_fk
+            or cls._special_field_names
+            or cls._contain_sf
+        )
 
     async def refresh_ttl(self, can_use_pipeline: bool = False):
         """Refresh TTL unconditionally."""
@@ -256,7 +262,7 @@ class AtomicRedisModel(BaseModel):
         pipe_context = ensure_pipeline if can_use_pipeline else pipeline_with_execution
         async with pipe_context(self.Meta) as pipe:
             # Native-EXPIRE fast path on fakeredis or when there is no graph to walk.
-            if self.Meta.is_fake_redis or not self._contains_foreign_key():
+            if self.Meta.is_fake_redis or not self._needs_cascade_script():
                 for key in self.all_keys:
                     pipe.expire(key, self.Meta.ttl)
                 return None
@@ -608,7 +614,7 @@ class AtomicRedisModel(BaseModel):
         in_outer_pipe = _context_pipe.get() is not None
         async with ensure_pipeline(self.Meta, should_execute=False) as pipe:
             # Native-EXPIRE fast path on fakeredis or when there is no graph to walk.
-            if self.Meta.is_fake_redis or not self._contains_foreign_key():
+            if self.Meta.is_fake_redis or not self._needs_cascade_script():
                 for key in self.all_keys:
                     pipe.expire(key, ttl)
                 if in_outer_pipe:

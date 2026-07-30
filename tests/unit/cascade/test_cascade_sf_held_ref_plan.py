@@ -155,11 +155,11 @@ def test_sf_of_fk_field_lands_in_both_contain_fk_and_special_field_names():
     assert "queue" in CascadePQRefParent._special_field_names
 
 
-def test_plain_sf_container_without_fk_stays_off_the_cascade_path():
-    # A non-FK SF container must not enter _contain_fk nor trip the trigger gate.
+def test_plain_sf_container_is_not_an_fk_edge_but_needs_the_cascade_script():
+    # Not an FK edge, but its special key still routes through the cascade script.
     assert "tags" not in CascadeSpecialChild._contain_fk
     assert "scores" not in CascadeSpecialChild._contain_fk
-    assert CascadeSpecialChild._contains_foreign_key() is False
+    assert CascadeSpecialChild._needs_cascade_script() is True
 
 
 def test_nested_sf_held_ref_traversal_stays_deferred():

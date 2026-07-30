@@ -68,7 +68,7 @@ PRIVATE_METHODS = _group(
     AtomicRedisModel._iter_special_fields,
     AtomicRedisModel._ttl_keys,
     # Pure in-memory FK-field check gating the TTL cascade fast path; no Redis.
-    AtomicRedisModel._contains_foreign_key,
+    AtomicRedisModel._needs_cascade_script,
     AtomicRedisModel.class_key_initials,
     AtomicRedisModel.index_name,
     AtomicRedisModel.create_expressions,
