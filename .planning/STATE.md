@@ -28,7 +28,13 @@ See: .planning/PROJECT.md (updated 2026-07-24)
 Phase: 02
 Plan: Not started
 Status: Milestone complete
-Last activity: 2026-07-25
+Last activity: 2026-07-30
+
+## Quick Tasks Completed
+
+| ID | Task | Date | Status | Commit |
+|----|------|------|--------|--------|
+| 260730-tv8 | Broaden cascade-refresh gate to fire on any FK or special field (`_needs_cascade_script`) | 2026-07-30 | complete ✓ | b4a63a3 |
 
 ## Milestone v1.3.6 Roadmap (SF-Cascade — Phases 1-2)
 
