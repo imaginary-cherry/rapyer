@@ -1,8 +1,9 @@
 import pytest
 
 from rapyer.types.redis_set import RedisSet
-from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX
+from tests.integration.foreign_keys.conftest import apply_cascade
 from tests.models.cascade_types import (
+    CASCADE_FIXTURE_TTL_SECONDS,
     CascadeAuthor,
     CascadeMixedEdgeSharedChild,
     CascadeMixedEdgeSharedChildRoot,
@@ -15,18 +16,6 @@ from tests.models.cascade_types import (
 )
 
 pytestmark = pytest.mark.usefixtures("setup_real_redis_for_cascade_apply")
-
-
-async def _apply_cascade(real_redis_client, root):
-    return await real_redis_client.fcall(
-        type(root).Meta.cascade_function_name,
-        1,
-        root.key,
-        type(root).__name__,
-        SPECIAL_FIELD_KEY_PREFIX,
-        type(root).Meta.ttl,
-        1,
-    )
 
 
 # --- Test A (CASF-04): RedisSet[ForeignKey] reach ---
@@ -46,12 +35,11 @@ async def test_set_ref_parent_reaches_and_refreshes_both_set_members(
         await real_redis_client.persist(key)
 
     # Act
-    await _apply_cascade(real_redis_client, parent)
+    await apply_cascade(real_redis_client, parent)
 
-    # Assert
-    assert await real_redis_client.ttl(parent.key) > 0
-    assert await real_redis_client.ttl(author1.key) > 0
-    assert await real_redis_client.ttl(author2.key) > 0
+    # Assert (root and both SET-referenced members refresh to their own Meta.ttl)
+    for key in (parent.key, author1.key, author2.key):
+        assert 0 < await real_redis_client.ttl(key) <= CASCADE_FIXTURE_TTL_SECONDS
 
 
 # --- Test B (CASF-05): RedisPriorityQueue[ForeignKey] reach ---
@@ -67,11 +55,11 @@ async def test_pq_ref_parent_reaches_and_refreshes_pq_member(real_redis_client):
         await real_redis_client.persist(key)
 
     # Act
-    await _apply_cascade(real_redis_client, parent)
+    await apply_cascade(real_redis_client, parent)
 
-    # Assert
-    assert await real_redis_client.ttl(parent.key) > 0
-    assert await real_redis_client.ttl(author.key) > 0
+    # Assert (root and the PQ-referenced member refresh to their own Meta.ttl)
+    for key in (parent.key, author.key):
+        assert 0 < await real_redis_client.ttl(key) <= CASCADE_FIXTURE_TTL_SECONDS
 
 
 # --- Test C (CASF-06 dangling reuse, D-02) ---
@@ -90,12 +78,12 @@ async def test_set_ref_dangling_member_reuses_existing_dangling_count(
         await real_redis_client.persist(key)
 
     # Act
-    result = await _apply_cascade(real_redis_client, parent)
+    result = await apply_cascade(real_redis_client, parent)
 
     # Assert (no separate SF-dangling counter -- reuses the existing dangling shape)
     assert result == [1, 0]
-    assert await real_redis_client.ttl(parent.key) > 0
-    assert await real_redis_client.ttl(author.key) > 0
+    for key in (parent.key, author.key):
+        assert 0 < await real_redis_client.ttl(key) <= CASCADE_FIXTURE_TTL_SECONDS
 
 
 # --- Test D (CASF-07 self-ref in SET) ---
@@ -109,10 +97,10 @@ async def test_set_ref_self_node_terminates_without_hanging(real_redis_client):
     await real_redis_client.persist(node.key)
 
     # Act (bounded by the shared visited map; must not hang or error)
-    await _apply_cascade(real_redis_client, node)
+    await apply_cascade(real_redis_client, node)
 
     # Assert
-    assert await real_redis_client.ttl(node.key) > 0
+    assert 0 < await real_redis_client.ttl(node.key) <= CASCADE_FIXTURE_TTL_SECONDS
 
 
 # --- Test E (CASF-07 mixed-edge max-budget-wins) ---
@@ -135,7 +123,7 @@ async def test_mixed_edge_shared_child_walked_at_the_larger_sf_budget(
         await real_redis_client.persist(key)
 
     # Act
-    await _apply_cascade(real_redis_client, root)
+    await apply_cascade(real_redis_client, root)
 
     # Assert (deep_set depth=4 SF budget wins over shallow_inline depth=1)
     refreshed = {key for key in all_keys if await real_redis_client.ttl(key) > 0}
@@ -157,11 +145,11 @@ async def test_malformed_and_non_string_sf_members_are_tolerated(real_redis_clie
         await real_redis_client.persist(key)
 
     # Act (must not raise despite the malformed/non-string members)
-    await _apply_cascade(real_redis_client, parent)
+    await apply_cascade(real_redis_client, parent)
 
     # Assert
-    assert await real_redis_client.ttl(parent.key) > 0
-    assert await real_redis_client.ttl(author.key) > 0
+    for key in (parent.key, author.key):
+        assert 0 < await real_redis_client.ttl(key) <= CASCADE_FIXTURE_TTL_SECONDS
 
 
 # --- Test G (CASF-07 self-ref in PQ/ZSET) ---
@@ -175,10 +163,10 @@ async def test_pq_ref_self_node_terminates_without_hanging(real_redis_client):
     await real_redis_client.persist(node.key)
 
     # Act (exercises the ZRANGE branch's cycle-safety, independent of Test D)
-    await _apply_cascade(real_redis_client, node)
+    await apply_cascade(real_redis_client, node)
 
     # Assert
-    assert await real_redis_client.ttl(node.key) > 0
+    assert 0 < await real_redis_client.ttl(node.key) <= CASCADE_FIXTURE_TTL_SECONDS
 
 
 # --- Test H (CASF-07 SF-only dual-edge diamond) ---
@@ -197,9 +185,9 @@ async def test_sf_only_dual_edge_diamond_shared_child_refreshed_exactly_once(
         await real_redis_client.persist(key)
 
     # Act (must not error from the double-visit -- visited-map dedup across SET+ZSET)
-    result = await _apply_cascade(real_redis_client, root)
+    result = await apply_cascade(real_redis_client, root)
 
     # Assert
-    assert await real_redis_client.ttl(root.key) > 0
-    assert await real_redis_client.ttl(child.key) > 0
+    for key in (root.key, child.key):
+        assert 0 < await real_redis_client.ttl(key) <= CASCADE_FIXTURE_TTL_SECONDS
     assert result == [0, 0]
