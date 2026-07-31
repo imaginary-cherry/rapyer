@@ -1,6 +1,5 @@
 import inspect
-from contextlib import asynccontextmanager
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -22,24 +21,18 @@ def test_aset_ttl_signature_has_cascade_kwarg_defaulting_false():
 
 
 @pytest.mark.asyncio
-async def test_aset_ttl_default_cascade_false_runs_the_script_with_cascade_argv_zero():
+async def test_aset_ttl_default_cascade_false_runs_the_script_with_cascade_argv_zero(
+    fcall_pipeline_spy,
+):
     # Arrange
     # aset_ttl is unified onto the cascade script for EVERY call, including
     # the default cascade=False -- only the trailing ARGV cascade flag
     # differs, never a separate per-key EXPIRE branch.
-    root = CascadeChainRoot(head="CascadeChainNode:fake")
-    mock_pipe = MagicMock()
+    mock_pipe, mock_run_fcall = fcall_pipeline_spy
     mock_pipe.execute = AsyncMock(return_value=[[0, 0]])
+    root = CascadeChainRoot(head="CascadeChainNode:fake")
 
-    @asynccontextmanager
-    async def fake_ensure_pipeline(_meta, should_execute=True):
-        yield mock_pipe
-
-    with (
-        patch("rapyer.base._context_pipe") as mock_context_pipe,
-        patch("rapyer.base.ensure_pipeline", fake_ensure_pipeline),
-        patch("rapyer.base.scripts_registry.run_fcall") as mock_run_fcall,
-    ):
+    with patch("rapyer.base._context_pipe") as mock_context_pipe:
         mock_context_pipe.get.return_value = None
         # Act
         result = await root.aset_ttl(TTL_SECONDS)
@@ -61,21 +54,15 @@ async def test_aset_ttl_default_cascade_false_runs_the_script_with_cascade_argv_
 
 
 @pytest.mark.asyncio
-async def test_aset_ttl_cascade_true_runs_the_script_with_cascade_argv_one():
+async def test_aset_ttl_cascade_true_runs_the_script_with_cascade_argv_one(
+    fcall_pipeline_spy,
+):
     # Arrange
-    root = CascadeChainRoot(head="CascadeChainNode:fake")
-    mock_pipe = MagicMock()
+    mock_pipe, mock_run_fcall = fcall_pipeline_spy
     mock_pipe.execute = AsyncMock(return_value=[[0, 0]])
+    root = CascadeChainRoot(head="CascadeChainNode:fake")
 
-    @asynccontextmanager
-    async def fake_ensure_pipeline(_meta, should_execute=True):
-        yield mock_pipe
-
-    with (
-        patch("rapyer.base._context_pipe") as mock_context_pipe,
-        patch("rapyer.base.ensure_pipeline", fake_ensure_pipeline),
-        patch("rapyer.base.scripts_registry.run_fcall") as mock_run_fcall,
-    ):
+    with patch("rapyer.base._context_pipe") as mock_context_pipe:
         mock_context_pipe.get.return_value = None
         # Act
         result = await root.aset_ttl(TTL_SECONDS, cascade=True)
@@ -95,23 +82,17 @@ async def test_aset_ttl_cascade_true_runs_the_script_with_cascade_argv_one():
 
 
 @pytest.mark.asyncio
-async def test_aset_ttl_cascade_standalone_owns_execution_and_returns_cascade_result():
+async def test_aset_ttl_cascade_standalone_owns_execution_and_returns_cascade_result(
+    fcall_pipeline_spy,
+):
     # Arrange
     # Standalone call (no outer pipeline): enqueues run_sha, awaits
     # pipe.execute() itself, and decodes the two-element result.
-    root = CascadeChainRoot(head="CascadeChainNode:fake")
-    mock_pipe = MagicMock()
+    mock_pipe, mock_run_fcall = fcall_pipeline_spy
     mock_pipe.execute = AsyncMock(return_value=[[1, 2]])
+    root = CascadeChainRoot(head="CascadeChainNode:fake")
 
-    @asynccontextmanager
-    async def fake_ensure_pipeline(_meta, should_execute=True):
-        yield mock_pipe
-
-    with (
-        patch("rapyer.base._context_pipe") as mock_context_pipe,
-        patch("rapyer.base.ensure_pipeline", fake_ensure_pipeline),
-        patch("rapyer.base.scripts_registry.run_fcall") as mock_run_fcall,
-    ):
+    with patch("rapyer.base._context_pipe") as mock_context_pipe:
         mock_context_pipe.get.return_value = None
         # Act
         result = await root.aset_ttl(TTL_SECONDS, cascade=True)
@@ -132,25 +113,19 @@ async def test_aset_ttl_cascade_standalone_owns_execution_and_returns_cascade_re
 
 
 @pytest.mark.asyncio
-async def test_aset_ttl_cascade_standalone_awaits_pipe_execute_directly():
+async def test_aset_ttl_cascade_standalone_awaits_pipe_execute_directly(
+    fcall_pipeline_spy,
+):
     # Arrange
     # The standalone (should_execute=False, own-pipeline) branch executes with
     # a bare `await pipe.execute()` -- this path does not yet self-heal a
     # NOSCRIPT (tracked as a follow-up, see NOSCRIPT-ISSUE.md). It must still
     # capture the awaited results[-1] for the CascadeResult.
-    root = CascadeChainRoot(head="CascadeChainNode:fake")
-    mock_pipe = MagicMock()
+    mock_pipe, _ = fcall_pipeline_spy
     mock_pipe.execute = AsyncMock(return_value=[[3, 4]])
+    root = CascadeChainRoot(head="CascadeChainNode:fake")
 
-    @asynccontextmanager
-    async def fake_ensure_pipeline(_meta, should_execute=True):
-        yield mock_pipe
-
-    with (
-        patch("rapyer.base._context_pipe") as mock_context_pipe,
-        patch("rapyer.base.ensure_pipeline", fake_ensure_pipeline),
-        patch("rapyer.base.scripts_registry.run_fcall"),
-    ):
+    with patch("rapyer.base._context_pipe") as mock_context_pipe:
         mock_context_pipe.get.return_value = None
         # Act
         result = await root.aset_ttl(TTL_SECONDS, cascade=True)
@@ -161,23 +136,17 @@ async def test_aset_ttl_cascade_standalone_awaits_pipe_execute_directly():
 
 
 @pytest.mark.asyncio
-async def test_aset_ttl_cascade_inside_outer_pipeline_returns_none_without_executing():
+async def test_aset_ttl_cascade_inside_outer_pipeline_returns_none_without_executing(
+    fcall_pipeline_spy,
+):
     # Arrange
     # Called while already inside an outer pipeline: enqueues into the
     # outer pipe, never calls pipe.execute() itself, returns None.
-    root = CascadeChainRoot(head="CascadeChainNode:fake")
-    mock_pipe = MagicMock()
+    mock_pipe, mock_run_fcall = fcall_pipeline_spy
     mock_pipe.execute = AsyncMock()
+    root = CascadeChainRoot(head="CascadeChainNode:fake")
 
-    @asynccontextmanager
-    async def fake_ensure_pipeline(_meta, should_execute=True):
-        yield mock_pipe
-
-    with (
-        patch("rapyer.base._context_pipe") as mock_context_pipe,
-        patch("rapyer.base.ensure_pipeline", fake_ensure_pipeline),
-        patch("rapyer.base.scripts_registry.run_fcall") as mock_run_fcall,
-    ):
+    with patch("rapyer.base._context_pipe") as mock_context_pipe:
         mock_context_pipe.get.return_value = mock_pipe
         # Act
         result = await root.aset_ttl(TTL_SECONDS, cascade=True)

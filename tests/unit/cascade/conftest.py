@@ -1,3 +1,6 @@
+from contextlib import asynccontextmanager
+from unittest.mock import MagicMock, patch
+
 import pytest
 import pytest_asyncio
 
@@ -101,6 +104,25 @@ def setup_fake_redis_for_cascade_models(fake_redis_client):
         model.Meta.redis = original_redis
         model.Meta.is_fake_redis = original_is_fake
         model.Meta.cascade_ttl = original_cascade_ttl
+
+
+@pytest.fixture
+def fcall_pipeline_spy():
+    """Patches ensure_pipeline + scripts_registry.run_fcall so a refresh_ttl()/
+    aset_ttl() call can be asserted against the FCALL args without touching real
+    Redis. Accepts the optional should_execute kwarg aset_ttl's call site passes.
+    Yields (mock_pipe, mock_run_fcall)."""
+    mock_pipe = MagicMock()
+
+    @asynccontextmanager
+    async def fake_ensure_pipeline(_meta, should_execute=True):
+        yield mock_pipe
+
+    with (
+        patch("rapyer.base.ensure_pipeline", fake_ensure_pipeline),
+        patch("rapyer.base.scripts_registry.run_fcall") as mock_run_fcall,
+    ):
+        yield mock_pipe, mock_run_fcall
 
 
 @pytest_asyncio.fixture
