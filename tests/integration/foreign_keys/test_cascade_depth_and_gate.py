@@ -2,7 +2,7 @@ import pytest
 
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.redis_set import RedisSet
-from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX
+from tests.integration.foreign_keys.conftest import apply_cascade
 from tests.models.cascade_types import (
     CascadeAuthor,
     CascadeBlanketLeaf,
@@ -24,18 +24,6 @@ from tests.models.cascade_types import (
 pytestmark = pytest.mark.usefixtures("setup_real_redis_for_cascade_apply")
 
 
-async def _apply_cascade(real_redis_client, root, cascade=True):
-    return await real_redis_client.fcall(
-        type(root).Meta.cascade_function_name,
-        1,
-        root.key,
-        type(root).__name__,
-        SPECIAL_FIELD_KEY_PREFIX,
-        type(root).Meta.ttl,
-        1 if cascade else 0,
-    )
-
-
 # --- do_cascade gate (real-Redis-only; ported from the fakeredis unit tests) ---
 
 
@@ -52,7 +40,7 @@ async def test_cascade_false_refreshes_only_root_not_the_fk_child(real_redis_cli
         await real_redis_client.persist(key)
 
     # Act
-    await _apply_cascade(real_redis_client, parent, cascade=False)
+    await apply_cascade(real_redis_client, parent, cascade=False)
 
     # Assert
     assert await real_redis_client.ttl(parent.key) > 0
@@ -70,7 +58,7 @@ async def test_cascade_false_still_refreshes_roots_own_special_keys(real_redis_c
     await real_redis_client.persist(child.key)
 
     # Act
-    result = await _apply_cascade(real_redis_client, child, cascade=False)
+    result = await apply_cascade(real_redis_client, child, cascade=False)
 
     # Assert
     assert await real_redis_client.ttl(child.key) > 0
@@ -100,7 +88,7 @@ async def test_cascade_counts_fully_dangling_child_and_its_special_keys(
     await real_redis_client.persist(parent.key)
 
     # Act
-    result = await _apply_cascade(real_redis_client, parent)
+    result = await apply_cascade(real_redis_client, parent)
 
     # Assert
     assert result == [1, 2]
@@ -117,7 +105,7 @@ async def test_cascade_counts_dangling_special_keys_on_an_existing_child(
     await real_redis_client.persist(child.key)
 
     # Act
-    result = await _apply_cascade(real_redis_client, parent)
+    result = await apply_cascade(real_redis_client, parent)
 
     # Assert
     assert result == [0, 2]
@@ -138,7 +126,7 @@ async def test_depth0_shallow_root_extends_via_explicit_override(real_redis_clie
         await real_redis_client.persist(key)
 
     # Act
-    await _apply_cascade(real_redis_client, root)
+    await apply_cascade(real_redis_client, root)
 
     # Assert
     refreshed = {key for key in all_keys if await real_redis_client.ttl(key) > 0}
@@ -172,7 +160,7 @@ async def test_independent_sibling_depth_budgets(real_redis_client):
         await real_redis_client.persist(key)
 
     # Act
-    await _apply_cascade(real_redis_client, root)
+    await apply_cascade(real_redis_client, root)
 
     # Assert
     refreshed = {key for key in all_keys if await real_redis_client.ttl(key) > 0}
@@ -197,7 +185,7 @@ async def test_max_budget_wins_for_shared_child_reaches_full_deep_prefix(
         await real_redis_client.persist(key)
 
     # Act
-    await _apply_cascade(real_redis_client, root)
+    await apply_cascade(real_redis_client, root)
 
     # Assert
     refreshed = {key for key in all_keys if await real_redis_client.ttl(key) > 0}
@@ -217,7 +205,7 @@ async def test_nested_submodel_fk_reaches_the_targets_own_ttl(real_redis_client)
     await real_redis_client.persist(book.key)
 
     # Act
-    await _apply_cascade(real_redis_client, book)
+    await apply_cascade(real_redis_client, book)
 
     # Assert
     assert await real_redis_client.ttl(book.key) > 0
@@ -235,7 +223,7 @@ async def test_blanket_opt_out_field_stops_traversal_despite_blanket_global(
     await real_redis_client.persist(leaf.key)
 
     # Act
-    await _apply_cascade(real_redis_client, root)
+    await apply_cascade(real_redis_client, root)
 
     # Assert
     assert await real_redis_client.ttl(root.key) > 0
@@ -256,7 +244,7 @@ async def test_nested_submodel_zero_hop_does_not_consume_depth_budget(
         await real_redis_client.persist(key)
 
     # Act
-    await _apply_cascade(real_redis_client, root)
+    await apply_cascade(real_redis_client, root)
 
     # Assert
     refreshed = {
@@ -280,7 +268,7 @@ async def test_node_beyond_nested_depth_budget_is_never_reached(real_redis_clien
         await real_redis_client.persist(key)
 
     # Act
-    await _apply_cascade(real_redis_client, root)
+    await apply_cascade(real_redis_client, root)
 
     # Assert
     refreshed = {

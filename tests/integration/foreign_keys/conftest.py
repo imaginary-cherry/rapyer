@@ -6,6 +6,7 @@ from rapyer.cascade.planner import (
 )
 from rapyer.scripts import register_cascade_function, register_scripts
 from rapyer.types.relational import resolve_relational_targets
+from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX
 from tests.models.cascade_types import ALL_CASCADE_MODELS
 from tests.models.foreign_key_types import FkAuthor, FkBook, FkPublisher
 
@@ -47,6 +48,18 @@ async def setup_real_redis_for_cascade_apply(
         model.Meta.redis = original_redis
         model.Meta.is_fake_redis = original_is_fake
         model.Meta.cascade_function_name = original_function_name
+
+
+async def apply_cascade(real_redis_client, root, cascade=True):
+    return await real_redis_client.fcall(
+        type(root).Meta.cascade_function_name,
+        1,
+        root.key,
+        type(root).__name__,
+        SPECIAL_FIELD_KEY_PREFIX,
+        type(root).Meta.ttl,
+        1 if cascade else 0,
+    )
 
 
 @pytest_asyncio.fixture
