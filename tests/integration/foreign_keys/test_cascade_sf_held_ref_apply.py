@@ -152,6 +152,27 @@ async def test_malformed_and_non_string_sf_members_are_tolerated(real_redis_clie
         assert 0 < await real_redis_client.ttl(key) <= CASCADE_FIXTURE_TTL_SECONDS
 
 
+@pytest.mark.asyncio
+async def test_wrongtype_sf_container_key_is_tolerated_not_an_aborted_cascade(
+    real_redis_client,
+):
+    # Arrange
+    # This is the SOLE regression guard for the SF-container counterpart of the
+    # inline WRONGTYPE-degradation fix (test_cascade_apply_skips_corrupt_
+    # wrongtype_reached_target_sanity in test_cascade_ttl_apply.py): the sf_key
+    # is a STRING, not a SET, so SMEMBERS raises WRONGTYPE inside push_sf_edge.
+    parent = await CascadeSetRefParent().asave()
+    sf_key = RedisSet.special_field_key(parent.key, "refs")
+    await real_redis_client.set(sf_key, "not-a-set")
+    await real_redis_client.persist(parent.key)
+
+    # Act (must not raise/abort the whole FCALL despite the WRONGTYPE key)
+    await apply_cascade(real_redis_client, parent)
+
+    # Assert (root still refreshes even though the SF edge was a dead end)
+    assert 0 < await real_redis_client.ttl(parent.key) <= CASCADE_FIXTURE_TTL_SECONDS
+
+
 # --- Test G (CASF-07 self-ref in PQ/ZSET) ---
 
 

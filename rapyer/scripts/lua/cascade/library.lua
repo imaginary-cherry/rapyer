@@ -234,13 +234,19 @@ local function cascade_apply(keys, args)
         if not edge.recurse_into_target then
             budget = 0
         end
+        -- redis.pcall (unlike redis.call) returns an error table instead of
+        -- raising on a Redis-level error such as WRONGTYPE -- a corrupt SF
+        -- container key becomes a dead end (no members) for this edge only,
+        -- not an aborted cascade, matching read_reference_paths' contract.
         local sf_key = special_prefix .. ':' .. parent_key .. ':' .. edge.path
-        local members
+        local raw_members
         if edge.sf_container == 'set' then
-            members = redis.call('SMEMBERS', sf_key)
+            raw_members = redis.pcall('SMEMBERS', sf_key)
         else
-            members = redis.call('ZRANGE', sf_key, 0, -1)
+            raw_members = redis.pcall('ZRANGE', sf_key, 0, -1)
         end
+        local members = (type(raw_members) == 'table' and raw_members.err == nil)
+            and raw_members or {}
         for _, raw_member in ipairs(members) do
             -- A malformed (non-JSON) or non-string-decoded member is a dead
             -- end for that member only -- never aborts the atomic FCALL.
