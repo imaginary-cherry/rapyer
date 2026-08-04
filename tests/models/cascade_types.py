@@ -483,6 +483,39 @@ class CascadeSfDiamondRoot(AtomicRedisModel):
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
 
 
+# --- Multi-candidate FK fixtures (union targets) ---
+
+
+class CascadeUnionMemberA(AtomicRedisModel):
+    """Concrete union member A — a plain ttl-bearing leaf."""
+
+    name: str = "union_member_a"
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+class CascadeUnionMemberB(AtomicRedisModel):
+    """Concrete union member B — a plain ttl-bearing leaf."""
+
+    name: str = "union_member_b"
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+class CascadeUnionOwner(AtomicRedisModel):
+    """Owns a scalar FK whose target is a union of two models.
+
+    The whole point of the phase: the edge must list BOTH members as
+    candidate targets rather than crashing on ``UnionType.__name__``.
+    """
+
+    ref: Annotated[
+        Reference[CascadeUnionMemberA | CascadeUnionMemberB], CascadeTTL()
+    ]
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
 # Full cascade-model set shared by unit and integration cascade fixtures.
 ALL_CASCADE_MODELS = [
     CascadeAuthor,
