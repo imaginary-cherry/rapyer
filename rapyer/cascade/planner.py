@@ -81,12 +81,17 @@ def _unwrap_relational_target(annotation: Any, models: list) -> list:
 
 
 def _expand_candidates(target_cls: Any, models: list) -> list:
-    """Candidate classes contributed by one resolved FK target class.
+    """Candidate classes contributed by one resolved FK target class:
+    ``{target_cls} ∪ {registered subclasses of target_cls}``.
 
-    Phase-1 tracer: enumerate the resolved class verbatim (concrete leaf).
-    Subclass expansion over the threaded ``models`` list is added in Task 2.
+    Enumerated over the THREADED ``models`` list (Option B) for test hermeticity.
+    Because ``safe_issubclass(T, T)`` is True, the base is included iff it is
+    itself registered in ``models`` (Decision #3: an abstract, unregistered base
+    carries no Meta.ttl and must stay out of the candidate set). The resolved
+    class leads, then its subclasses in declaration order; the caller
+    de-duplicates across union members.
     """
-    return [target_cls]
+    return [m for m in models if safe_issubclass(m, target_cls)]
 
 
 @dataclasses.dataclass(frozen=True)
