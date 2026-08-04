@@ -516,6 +516,49 @@ class CascadeUnionOwner(AtomicRedisModel):
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
 
 
+# --- Multi-candidate FK fixtures (polymorphic base + registered subclasses) ---
+
+
+class CascadePolyBase(AtomicRedisModel):
+    """Registered polymorphic base — a candidate in its own right (Decision #3:
+    included because it is a registered, ttl-bearing, saveable model)."""
+
+    name: str = "poly_base"
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+class CascadePolySub1(CascadePolyBase):
+    """First registered subclass of CascadePolyBase."""
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+class CascadePolySub2(CascadePolyBase):
+    """Second registered subclass of CascadePolyBase."""
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+class CascadePolyOwner(AtomicRedisModel):
+    """Owns a scalar FK to a polymorphic base with registered subclasses."""
+
+    ref: Annotated[Reference[CascadePolyBase], CascadeTTL()]
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+class CascadePolyDedupOwner(AtomicRedisModel):
+    """Union whose members overlap: CascadePolySub1 is both a listed union
+    member and a subclass of CascadePolyBase, so it must appear exactly once."""
+
+    ref: Annotated[
+        Reference[CascadePolyBase | CascadePolySub1], CascadeTTL()
+    ]
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
 # Full cascade-model set shared by unit and integration cascade fixtures.
 ALL_CASCADE_MODELS = [
     CascadeAuthor,

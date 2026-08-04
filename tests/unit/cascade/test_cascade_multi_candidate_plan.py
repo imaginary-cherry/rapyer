@@ -4,6 +4,11 @@ from rapyer.cascade.planner import build_cascade_plan
 from tests.models.cascade_types import (
     CascadeBlanketLeaf,
     CascadeBlanketRoot,
+    CascadePolyBase,
+    CascadePolyDedupOwner,
+    CascadePolyOwner,
+    CascadePolySub1,
+    CascadePolySub2,
     CascadeUnionMemberA,
     CascadeUnionMemberB,
     CascadeUnionOwner,
@@ -37,4 +42,69 @@ def test_single_target_edge_is_unchanged_with_none_candidates():
     # candidates list (byte-identity preserved: candidates=None is dropped).
     edge = plan["CascadeBlanketRoot"].fks[0]
     assert edge.target == "CascadeBlanketLeaf"
+    assert edge.candidates is None
+
+
+def test_polymorphic_base_fk_enumerates_base_and_all_subclasses():
+    # Act
+    plan = build_cascade_plan(
+        [CascadePolyOwner, CascadePolyBase, CascadePolySub1, CascadePolySub2]
+    )
+
+    # Assert
+    # Base included (Decision #3: registered, ttl-bearing) plus every subclass
+    # enumerated from the threaded models list — three candidates, not one.
+    edge = plan["CascadePolyOwner"].fks[0]
+    assert set(edge.candidates) == {
+        "CascadePolyBase",
+        "CascadePolySub1",
+        "CascadePolySub2",
+    }
+    assert len(edge.candidates) == 3
+
+
+def test_candidate_ordering_is_declaration_order_with_target_first():
+    # Act
+    plan = build_cascade_plan(
+        [CascadePolyOwner, CascadePolyBase, CascadePolySub1, CascadePolySub2]
+    )
+
+    # Assert
+    edge = plan["CascadePolyOwner"].fks[0]
+    assert edge.candidates == [
+        "CascadePolyBase",
+        "CascadePolySub1",
+        "CascadePolySub2",
+    ]
+    assert edge.target == edge.candidates[0]
+
+
+def test_candidates_are_deduplicated_when_reachable_via_two_paths():
+    # Act
+    plan = build_cascade_plan(
+        [CascadePolyDedupOwner, CascadePolyBase, CascadePolySub1, CascadePolySub2]
+    )
+
+    # Assert
+    # CascadePolySub1 is both a listed union member and a subclass of the base;
+    # it must appear exactly once, order-preserving.
+    edge = plan["CascadePolyDedupOwner"].fks[0]
+    assert edge.candidates == [
+        "CascadePolyBase",
+        "CascadePolySub1",
+        "CascadePolySub2",
+    ]
+    assert edge.candidates.count("CascadePolySub1") == 1
+
+
+def test_base_with_no_registered_subclasses_degrades_to_single_target():
+    # Act
+    # Option B threading: subclasses absent from the passed models list are not
+    # enumerated, so a base with no reachable subclasses degrades to a single
+    # target (candidates dropped, byte-identical).
+    plan = build_cascade_plan([CascadePolyOwner, CascadePolyBase])
+
+    # Assert
+    edge = plan["CascadePolyOwner"].fks[0]
+    assert edge.target == "CascadePolyBase"
     assert edge.candidates is None
