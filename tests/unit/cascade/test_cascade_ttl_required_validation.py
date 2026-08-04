@@ -8,7 +8,7 @@ from rapyer.cascade.planner import (
 from rapyer.errors import CascadeTargetTtlMissingError
 
 
-def _plan(a_ttl, b_ttl, edge_target="B"):
+def _plan(a_ttl, b_ttl, edge_target="B", candidates=None):
     return {
         "A": CascadePlanEntry(
             ttl=a_ttl,
@@ -22,6 +22,7 @@ def _plan(a_ttl, b_ttl, edge_target="B"):
                     refresh_target_ttl=True,
                     refresh_target_special_keys=True,
                     resets_depth_budget=False,
+                    candidates=candidates,
                 )
             ],
         ),
@@ -43,6 +44,40 @@ def test_raises_when_cascade_reachable_target_has_no_ttl():
 
     # Assert
     assert exc_info.value.model_name == "B"
+
+
+def test_raises_on_a_non_first_candidate_that_lacks_ttl():
+    # Arrange
+    # A multi-candidate edge whose FIRST candidate is fine but whose SECOND
+    # candidate declares no Meta.ttl must still fail fast, naming the offending
+    # (non-first) candidate — the CMCT-06 per-candidate guarantee.
+    plan = {
+        "A": CascadePlanEntry(
+            ttl=30,
+            special_suffixes=[],
+            fks=[
+                CascadeEdge(
+                    path="$.ref",
+                    target="First",
+                    is_collection=False,
+                    recurse_into_target=True,
+                    refresh_target_ttl=True,
+                    refresh_target_special_keys=True,
+                    resets_depth_budget=False,
+                    candidates=["First", "Second"],
+                )
+            ],
+        ),
+        "First": CascadePlanEntry(ttl=60, special_suffixes=[], fks=[]),
+        "Second": CascadePlanEntry(ttl=None, special_suffixes=[], fks=[]),
+    }
+
+    # Act
+    with pytest.raises(CascadeTargetTtlMissingError) as exc_info:
+        validate_cascade_ttl_targets(plan)
+
+    # Assert
+    assert exc_info.value.model_name == "Second"
 
 
 def test_does_not_raise_when_target_ttl_is_set():

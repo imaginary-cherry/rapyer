@@ -6,6 +6,7 @@ from rapyer.cascade.planner import (
     CascadeEdge,
     CascadePlanEntry,
     build_cascade_plan,
+    cascade_plan_hash,
     cascade_plan_json,
 )
 from rapyer.scripts.constants import ATOMIC_GET_OR_CREATE_SCRIPT_NAME
@@ -17,7 +18,7 @@ from rapyer.scripts.registry import (
 from tests.unit.cascade.conftest import CASCADE_PLANNER_MODELS
 
 
-def _edge(target: str) -> CascadeEdge:
+def _edge(target: str, candidates: list[str] | None = None) -> CascadeEdge:
     return CascadeEdge(
         path=f"$.{target.lower()}",
         target=target,
@@ -26,6 +27,7 @@ def _edge(target: str) -> CascadeEdge:
         refresh_target_ttl=True,
         refresh_target_special_keys=True,
         resets_depth_budget=False,
+        candidates=candidates,
     )
 
 
@@ -68,6 +70,31 @@ def test_cascade_plan_json_round_trips_full_plan_to_expected_shape():
     assert decoded["Foo"]["ttl"] == 10
     assert decoded["Foo"]["fks"][0]["target"] == "Author"
     assert decoded["Author"]["fks"] == []
+
+
+def test_single_target_plan_json_and_hash_are_byte_identical_golden():
+    # Arrange
+    # The load-bearing byte-identity invariant (CMCT-03/CMCT-09): after adding
+    # the sibling `candidates` field, a single-target plan must serialize
+    # character-for-character as before and keep the same plan hash — otherwise
+    # every Redis Function library/function name (which embeds the hash) churns.
+    plan = {"A": _entry("B"), "B": _entry()}
+
+    # Act
+    payload = cascade_plan_json(plan)
+
+    # Assert
+    expected = (
+        '{"A":{"ttl":10,"special_suffixes":[],"fks":[{"path":"$.b",'
+        '"target":"B","is_collection":false,"recurse_into_target":true,'
+        '"refresh_target_ttl":true,"refresh_target_special_keys":true,'
+        '"resets_depth_budget":false}]},"B":{"ttl":10,"special_suffixes":[],'
+        '"fks":[]}}'
+    )
+    assert payload == expected
+    assert cascade_plan_hash(payload) == "0bc1f0e973ecfcf4"
+    # candidates=None is dropped: a single-target edge carries no candidates key.
+    assert '"candidates"' not in payload
 
 
 def test_cascade_plan_json_serializes_every_class_in_the_plan():

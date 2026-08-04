@@ -1,6 +1,7 @@
 import pytest
 
 from rapyer.cascade.planner import build_cascade_plan
+from tests.unit.cascade.conftest import CASCADE_PLANNER_MODELS
 from tests.models.cascade_types import (
     CascadeBlanketLeaf,
     CascadeBlanketRoot,
@@ -108,3 +109,14 @@ def test_base_with_no_registered_subclasses_degrades_to_single_target():
     edge = plan["CascadePolyOwner"].fks[0]
     assert edge.target == "CascadePolyBase"
     assert edge.candidates is None
+
+
+def test_no_preexisting_single_target_model_is_silently_expanded():
+    # Assert (Assumption A2)
+    # Every model that shipped before this phase is single-target; none of them
+    # has registered subclasses or a union FK, so the subclass-expansion rule
+    # must leave every pre-existing edge with candidates=None (byte-identity).
+    plan = build_cascade_plan(CASCADE_PLANNER_MODELS)
+    for class_name, entry in plan.items():
+        for edge in entry.fks:
+            assert edge.candidates is None, (class_name, edge.path)
