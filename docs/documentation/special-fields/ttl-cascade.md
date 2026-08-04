@@ -18,6 +18,11 @@ propagation of the parent's TTL value onto its children — a child with a short
     (`CascadeResult(0, 0)`). Non-cascade `Meta.ttl` / `refresh_ttl` behavior is
     unchanged on both backends.
 
+    This identical divergence applies to SF-held-ref cascade (`RedisSet`/
+    `RedisPriorityQueue` members): on fakeredis the container's own key still
+    refreshes via a plain `EXPIRE`, but its members are never followed — no
+    traversal, same as inline cascade.
+
 ## Enabling Cascade
 
 Cascade is opt-in and disabled by default. There are two ways to enable it:
@@ -65,6 +70,65 @@ A global default applies to every `Reference` field that has no explicit per-fie
 
 Passing `CascadeTTL(enabled=False)` on a field explicitly disables cascade for that edge
 even when a global default is set.
+
+## Cascade-Eligible Shapes
+
+Cascade traversal follows every shape a `ForeignKey` (`Reference`) can take — whether the
+reference lives inline in the parent's JSON document or inside a special-field container
+with its own Redis key:
+
+| Shape | Example | Cascade-eligible |
+|-------|---------|-------------------|
+| Direct FK field | `Reference[Author]` | Yes |
+| Collection-of-FK | `list[Reference[Author]]` / `dict[K, Reference[Author]]` | Yes |
+| Nested-submodel FK | An inline sub-model whose own field is `Reference`-annotated | Yes |
+| `RedisSet[Reference[Author]]` | FK references held as members of a Redis SET | Yes |
+| `RedisPriorityQueue[Reference[Author]]` | FK references held as members of a Redis sorted set | Yes |
+
+All five shapes resolve cascade eligibility through the same **field > global > off**
+precedence rule described above — a `RedisSet`/`RedisPriorityQueue` field is annotated
+with `CascadeTTL` exactly like an inline `Reference` field.
+
+### Worked Example: Cascading Through a `RedisSet`
+
+```python
+from typing import Annotated, ClassVar
+
+from pydantic import Field
+from rapyer import AtomicRedisModel
+from rapyer.cascade import CascadeTTL
+from rapyer.config import RedisConfig
+from rapyer.types import Reference, RedisSet
+
+
+class Author(AtomicRedisModel):
+    name: str = "anon"
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=3600)
+
+
+class Library(AtomicRedisModel):
+    name: str = "main"
+    authors: Annotated[RedisSet[Reference[Author]], CascadeTTL()] = Field(
+        default_factory=RedisSet
+    )
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=3600)
+
+
+library = await Library(name="main").asave()
+author = await Author(name="Jane").asave()
+await library.authors.aadd(author.key)
+
+# Every member of the set is re-armed to its own Meta.ttl, exactly like an
+# inline collection-of-FK field, whenever the parent's TTL is (re)set:
+await library.asave()
+# ...or explicitly:
+await library.aset_ttl(3600, cascade=True)
+```
+
+The same applies to a `RedisPriorityQueue[Reference[Author]]` field: members added via
+`apush` are reached the same way and re-armed to their own `Meta.ttl`.
 
 ## Precedence
 
