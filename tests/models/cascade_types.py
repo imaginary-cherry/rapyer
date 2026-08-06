@@ -5,6 +5,7 @@ from pydantic import Field
 from rapyer.base import AtomicRedisModel
 from rapyer.cascade import CascadeTTL
 from rapyer.config import RedisConfig
+from rapyer.fields.key import Key
 from rapyer.types.foreign_key import Reference
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.redis_set import RedisSet
@@ -559,6 +560,128 @@ class CascadePolyDedupOwner(AtomicRedisModel):
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
 
 
+# --- Multi-candidate FK fixtures across every remaining FK shape (Wave 0) ---
+#
+# The Phase-1 union fixtures above cover only the SCALAR union shape
+# (CascadeUnionOwner). These owners extend the same union target
+# (CascadeUnionMemberA | CascadeUnionMemberB) across the collection and
+# special-field shapes so build_cascade_plan enumerates BOTH members as
+# candidates on every FK shape, not just the scalar one. Members are REUSED,
+# not reinvented.
+
+
+class CascadeUnionListOwner(AtomicRedisModel):
+    """Collection-of-union shape: list[Reference[A | B]] carrying the marker on
+    the collection itself (mirrors CascadeBookCollection, union target)."""
+
+    refs: Annotated[
+        list[Reference[CascadeUnionMemberA | CascadeUnionMemberB]], CascadeTTL()
+    ] = Field(default_factory=list)
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+class CascadeUnionDictOwner(AtomicRedisModel):
+    """Collection-of-union shape: dict[str, Reference[A | B]] carrying the
+    marker on the collection itself (mirrors CascadeDictCollectionRoot)."""
+
+    refs: Annotated[
+        dict[str, Reference[CascadeUnionMemberA | CascadeUnionMemberB]], CascadeTTL()
+    ] = Field(default_factory=dict)
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+class CascadeUnionSetOwner(AtomicRedisModel):
+    """SF-held-union shape: RedisSet[Reference[A | B]] carrying the marker on
+    the special field (mirrors CascadeSetRefParent, union target)."""
+
+    refs: Annotated[
+        RedisSet[Reference[CascadeUnionMemberA | CascadeUnionMemberB]], CascadeTTL()
+    ] = Field(default_factory=RedisSet)
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+class CascadeUnionPQOwner(AtomicRedisModel):
+    """SF-held-union shape: RedisPriorityQueue[Reference[A | B]] carrying the
+    marker on the special field (mirrors CascadePQRefParent, union target)."""
+
+    queue: Annotated[
+        RedisPriorityQueue[Reference[CascadeUnionMemberA | CascadeUnionMemberB]],
+        CascadeTTL(),
+    ] = Field(default_factory=RedisPriorityQueue)
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+# --- Mixed-class diamond: two candidate classes share a single leaf ---
+
+
+class CascadeMultiClassDiamondLeaf(AtomicRedisModel):
+    """Plain ttl-bearing leaf FK'd by BOTH diamond members. A real cascade
+    reaches this single shared leaf via two distinct candidate-class paths."""
+
+    name: str = "multi_class_diamond_leaf"
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+class CascadeMultiClassDiamondMemberA(AtomicRedisModel):
+    """Diamond member A — carries a scalar FK to the shared leaf."""
+
+    leaf: Annotated[Reference[CascadeMultiClassDiamondLeaf], CascadeTTL()]
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+class CascadeMultiClassDiamondMemberB(AtomicRedisModel):
+    """Diamond member B (a DIFFERENT class than A) — carries a scalar FK to the
+    SAME shared leaf, so the leaf is reachable via two candidate classes."""
+
+    leaf: Annotated[Reference[CascadeMultiClassDiamondLeaf], CascadeTTL()]
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+class CascadeMultiClassDiamondRoot(AtomicRedisModel):
+    """Union-FK root whose scalar edge lists both diamond members as candidates.
+    Whichever member it resolves to, the cascade continues on to the single
+    shared leaf — a mixed-class diamond over a shared child (CMCT-08)."""
+
+    member: Annotated[
+        Reference[CascadeMultiClassDiamondMemberA | CascadeMultiClassDiamondMemberB],
+        CascadeTTL(),
+    ]
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+# --- Colon-bearing Key[...] pk union member (Pitfall 2 lock) ---
+
+
+class CascadeColonPkMember(AtomicRedisModel):
+    """Union member with a Key[str]-annotated pk so a saved instance can carry a
+    colon-bearing pk. Locks the first-colon {class}:{pk} split against a pk that
+    itself contains a colon (RESEARCH Pitfall 2)."""
+
+    member_id: Key[str]
+    name: str = "colon_pk_member"
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
+class CascadeColonPkOwner(AtomicRedisModel):
+    """Owns a scalar union FK whose candidates include the colon-pk member, so
+    reached-key class resolution can be locked against a colon-bearing pk."""
+
+    ref: Annotated[
+        Reference[CascadeColonPkMember | CascadeUnionMemberA], CascadeTTL()
+    ]
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
 # Full cascade-model set shared by unit and integration cascade fixtures.
 ALL_CASCADE_MODELS = [
     CascadeAuthor,
@@ -601,4 +724,14 @@ ALL_CASCADE_MODELS = [
     CascadeUnionMemberA,
     CascadeUnionMemberB,
     CascadeUnionOwner,
+    CascadeUnionListOwner,
+    CascadeUnionDictOwner,
+    CascadeUnionSetOwner,
+    CascadeUnionPQOwner,
+    CascadeMultiClassDiamondLeaf,
+    CascadeMultiClassDiamondMemberA,
+    CascadeMultiClassDiamondMemberB,
+    CascadeMultiClassDiamondRoot,
+    CascadeColonPkMember,
+    CascadeColonPkOwner,
 ]
