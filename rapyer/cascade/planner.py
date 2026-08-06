@@ -5,7 +5,11 @@ from types import UnionType
 from typing import TYPE_CHECKING, Any, ForwardRef, Union, get_args, get_origin
 
 from rapyer.cascade.ttl import CascadeTTL
-from rapyer.errors.cascade import CascadeLuaLiteralError, CascadeTargetTtlMissingError
+from rapyer.errors.cascade import (
+    CascadeKeyInitialsError,
+    CascadeLuaLiteralError,
+    CascadeTargetTtlMissingError,
+)
 from rapyer.scripts.constants import CASCADE_FUNCTION_PREFIX, CASCADE_LIBRARY_PREFIX
 from rapyer.types.relational import RelationalFieldType
 from rapyer.utils.annotation import strip_optional
@@ -47,6 +51,15 @@ def _unwrap_relational_target(annotation: Any, models: list) -> list:
     (a collection/SF wrapper around a union must not drop members), and the
     result is order-preserving and de-duplicated. An empty list means the
     annotation is not FK-shaped.
+
+    Candidates are keyed by ``cls.__name__`` (D-04). At traversal time the
+    reached child's class is resolved from its real ``{class}:{pk}`` key prefix
+    and membership-checked against these names, so a cascade participant's
+    ``class_key_initials()`` MUST equal ``__name__`` — otherwise the reached
+    prefix never matches a candidate and the cascade silently dead-ends. That
+    equality is enforced at init by ``validate_cascade_key_initials``; class-name
+    uniqueness is separately guaranteed at registration by
+    ``DuplicateModelNameError``.
     """
     stripped = strip_optional(annotation)
     origin = get_origin(stripped) or stripped
@@ -114,6 +127,11 @@ class CascadeEdge:
     # Every candidate target class name for a multi-class edge (union / polymorphic
     # base). None (dropped by _drop_none_values) for a single-target edge, which
     # keeps its plan JSON byte-for-byte identical; when set, candidates[0] == target.
+    # D-04: these names are ``cls.__name__``. Traversal resolves a reached child's
+    # class from its ``{class}:{pk}`` key prefix and membership-checks it here, so a
+    # participant's ``class_key_initials()`` MUST equal ``__name__`` (enforced by
+    # ``validate_cascade_key_initials``); class-name uniqueness is separately
+    # guaranteed at registration by ``DuplicateModelNameError``.
     candidates: list[str] | None = None
 
 
@@ -346,6 +364,58 @@ def validate_cascade_ttl_targets(plan: dict[str, CascadePlanEntry]):
                 f"{class_name!r} has outgoing cascade-enabled edges (it is a "
                 "cascade root) but declares no Meta.ttl; the cascade would "
                 "EXPIRE its own key with a nil ttl",
+            )
+
+
+def validate_cascade_key_initials(models: list[type["AtomicRedisModel"]]):
+    """Raise CascadeKeyInitialsError when a cascade participant overrides
+    class_key_initials() to a value other than __name__ (D-02).
+
+    The cascade plan and ``edge.candidates`` are keyed by ``cls.__name__``, but
+    the real Redis key prefix is ``class_key_initials()``. Reached-key class
+    resolution (``library.lua`` ``push_child``) splits the ``{class}:{pk}``
+    prefix and matches it against those ``__name__``-keyed candidates, so a
+    participant whose ``class_key_initials() != __name__`` stores its keys under
+    a prefix the traversal can never match — silently mis-resolving or
+    dead-ending the cascade. This turns that silent no-op into a loud fail-fast
+    at ``init_rapyer()``.
+
+    Scope is every model that participates in the built cascade plan: each root
+    (a plan entry with outgoing edges) plus every ``edge.target`` /
+    ``edge.candidates`` member reachable via an edge. The check is pure config
+    time — it builds the static plan and calls ``class_key_initials()``, doing
+    NO Redis I/O, mirroring ``validate_cascade_ttl_targets``.
+
+    Class-name uniqueness across participants is NOT re-checked here; it is
+    already enforced at registration by ``DuplicateModelNameError``. This guard
+    checks only the initials-vs-``__name__`` equality.
+    """
+    plan = build_cascade_plan(models)
+    participant_names: set[str] = set()
+    for class_name, entry in plan.items():
+        if entry.fks:
+            # A cascade root: it EXPIREs its own key, so its prefix is load-bearing.
+            participant_names.add(class_name)
+        for edge in entry.fks:
+            # Single-target edges carry candidates=None -> [edge.target].
+            for target in edge.candidates or [edge.target]:
+                participant_names.add(target)
+
+    models_by_name = {model.__name__: model for model in models}
+    for name in sorted(participant_names):
+        cls = models_by_name.get(name)
+        if cls is None:
+            # A missing target is validate_cascade_ttl_targets' concern; skip here.
+            continue
+        initials = cls.class_key_initials()
+        if initials != cls.__name__:
+            raise CascadeKeyInitialsError(
+                cls.__name__,
+                f"{cls.__name__!r} participates in the cascade plan but its "
+                f"class_key_initials() returns {initials!r}, not its __name__ "
+                f"{cls.__name__!r}; cascade class resolution matches the reached "
+                "key's {class}:{pk} prefix against __name__-keyed candidates, so "
+                "an override would silently mis-resolve or dead-end the cascade",
             )
 
 

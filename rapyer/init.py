@@ -9,6 +9,7 @@ from rapyer.cascade import CascadeTTL
 from rapyer.cascade.planner import (
     build_cascade_plan,
     cascade_plan_json,
+    validate_cascade_key_initials,
     validate_cascade_ttl_targets,
 )
 from rapyer.result import resolve_forward_refs
@@ -83,6 +84,10 @@ async def init_rapyer(
         # registered. Pure config check; needs no Redis connection.
         plan = build_cascade_plan(REDIS_MODELS)
         validate_cascade_ttl_targets(plan)
+        # A cascade participant overriding class_key_initials() != __name__ would
+        # silently mis-resolve at traversal time; fail fast here (D-02). Needs the
+        # model CLASSES to call class_key_initials(); no Redis I/O.
+        validate_cascade_key_initials(REDIS_MODELS)
     finally:
         # Refreeze now that the plan is baked; further Meta mutation is blocked
         # until the next init_rapyer() call. Runs even on failure.

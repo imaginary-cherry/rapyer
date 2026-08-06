@@ -14,6 +14,7 @@ from rapyer.errors.base import (
     UpdateAtomicModelError,
 )
 from rapyer.errors.cascade import (
+    CascadeKeyInitialsError,
     CascadeLuaLiteralError,
     CascadeTargetTtlMissingError,
     InvalidCascadeDepthError,
@@ -47,6 +48,7 @@ __all__ = [
     "BadDeleteActionError",
     "BadFilterError",
     "CantSerializeRedisValueError",
+    "CascadeKeyInitialsError",
     "CascadeLuaLiteralError",
     "CascadeTargetTtlMissingError",
     "CorruptedModelError",
