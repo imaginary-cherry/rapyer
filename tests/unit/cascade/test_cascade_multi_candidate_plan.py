@@ -5,14 +5,24 @@ from tests.unit.cascade.conftest import CASCADE_PLANNER_MODELS
 from tests.models.cascade_types import (
     CascadeBlanketLeaf,
     CascadeBlanketRoot,
+    CascadeColonPkMember,
+    CascadeColonPkOwner,
+    CascadeMultiClassDiamondLeaf,
+    CascadeMultiClassDiamondMemberA,
+    CascadeMultiClassDiamondMemberB,
+    CascadeMultiClassDiamondRoot,
     CascadePolyBase,
     CascadePolyDedupOwner,
     CascadePolyOwner,
     CascadePolySub1,
     CascadePolySub2,
+    CascadeUnionDictOwner,
+    CascadeUnionListOwner,
     CascadeUnionMemberA,
     CascadeUnionMemberB,
     CascadeUnionOwner,
+    CascadeUnionPQOwner,
+    CascadeUnionSetOwner,
 )
 
 pytestmark = pytest.mark.usefixtures("setup_fake_redis_for_cascade_models")
@@ -120,3 +130,99 @@ def test_no_preexisting_single_target_model_is_silently_expanded():
     for class_name, entry in plan.items():
         for edge in entry.fks:
             assert edge.candidates is None, (class_name, edge.path)
+
+
+# --- Candidate enumeration extends across every FK shape (Wave 0, CMCT-07) ---
+#
+# These prove the Phase-1 edge.candidates enumeration already extends across the
+# collection (list/dict) and special-field (RedisSet/RedisPriorityQueue) shapes,
+# not just the scalar union. Set-equality comparisons make the assertion
+# order-independent (CMCT-07 ordering-independence at the plan level) and give
+# the Plan-04 integration proofs a static precondition. Pure introspection over
+# build_cascade_plan — fakeredis-safe, no Redis I/O.
+
+_UNION_MEMBERS = {"CascadeUnionMemberA", "CascadeUnionMemberB"}
+
+
+def test_list_of_union_fk_enumerates_both_members():
+    # Act
+    plan = build_cascade_plan(
+        [CascadeUnionListOwner, CascadeUnionMemberA, CascadeUnionMemberB]
+    )
+
+    # Assert
+    edge = plan["CascadeUnionListOwner"].fks[0]
+    assert set(edge.candidates) == _UNION_MEMBERS
+
+
+def test_dict_of_union_fk_enumerates_both_members():
+    # Act
+    plan = build_cascade_plan(
+        [CascadeUnionDictOwner, CascadeUnionMemberA, CascadeUnionMemberB]
+    )
+
+    # Assert
+    edge = plan["CascadeUnionDictOwner"].fks[0]
+    assert set(edge.candidates) == _UNION_MEMBERS
+
+
+def test_redis_set_of_union_fk_enumerates_both_members():
+    # Act
+    plan = build_cascade_plan(
+        [CascadeUnionSetOwner, CascadeUnionMemberA, CascadeUnionMemberB]
+    )
+
+    # Assert
+    edge = plan["CascadeUnionSetOwner"].fks[0]
+    assert set(edge.candidates) == _UNION_MEMBERS
+
+
+def test_priority_queue_of_union_fk_enumerates_both_members():
+    # Act
+    plan = build_cascade_plan(
+        [CascadeUnionPQOwner, CascadeUnionMemberA, CascadeUnionMemberB]
+    )
+
+    # Assert
+    edge = plan["CascadeUnionPQOwner"].fks[0]
+    assert set(edge.candidates) == _UNION_MEMBERS
+
+
+def test_mixed_class_diamond_root_lists_both_member_classes():
+    # Act
+    plan = build_cascade_plan(
+        [
+            CascadeMultiClassDiamondRoot,
+            CascadeMultiClassDiamondMemberA,
+            CascadeMultiClassDiamondMemberB,
+            CascadeMultiClassDiamondLeaf,
+        ]
+    )
+
+    # Assert
+    # The union-FK root enumerates both diamond member classes as candidates;
+    # each member independently FKs the SAME shared leaf (the mixed-class
+    # diamond that Plan 04 drives on real Redis).
+    edge = plan["CascadeMultiClassDiamondRoot"].fks[0]
+    assert set(edge.candidates) == {
+        "CascadeMultiClassDiamondMemberA",
+        "CascadeMultiClassDiamondMemberB",
+    }
+    # Both members reach the identical leaf class.
+    member_a_edge = plan["CascadeMultiClassDiamondMemberA"].fks[0]
+    member_b_edge = plan["CascadeMultiClassDiamondMemberB"].fks[0]
+    assert member_a_edge.target == "CascadeMultiClassDiamondLeaf"
+    assert member_b_edge.target == "CascadeMultiClassDiamondLeaf"
+
+
+def test_colon_pk_union_owner_enumerates_both_candidates():
+    # Act
+    plan = build_cascade_plan(
+        [CascadeColonPkOwner, CascadeColonPkMember, CascadeUnionMemberA]
+    )
+
+    # Assert
+    # The colon-pk member is a first-class candidate alongside the plain-pk
+    # member, so reached-key resolution can be locked against a colon-bearing pk.
+    edge = plan["CascadeColonPkOwner"].fks[0]
+    assert set(edge.candidates) == {"CascadeColonPkMember", "CascadeUnionMemberA"}
