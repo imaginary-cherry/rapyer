@@ -4,8 +4,15 @@ from rapyer.result import CascadeResult
 from tests.integration.foreign_keys.conftest import apply_cascade
 from tests.models.cascade_types import (
     CASCADE_FIXTURE_TTL_SECONDS,
+    CascadeAuthor,
+    CascadeChainNode,
     CascadeColonPkMember,
     CascadeColonPkOwner,
+    CascadeMultiClassDiamondLeaf,
+    CascadeMultiClassDiamondMemberA,
+    CascadeMultiClassDiamondMemberB,
+    CascadeMultiClassDiamondRoot,
+    CascadeUnionDepthRoot,
     CascadeUnionDictOwner,
     CascadeUnionListOwner,
     CascadeUnionMemberA,
@@ -227,3 +234,148 @@ async def test_colon_bearing_pk_member_resolves_via_first_colon_split_and_rearms
     # Assert
     assert await real_redis_client.ttl(member.key) > 0
     assert result[2] == 0
+
+
+# --- Task 2: cycle-safe mixed-class diamond over a shared leaf (CMCT-08) ---
+
+
+@pytest.mark.asyncio
+async def test_mixed_class_diamond_shared_leaf_rearmed_via_two_candidate_classes(
+    real_redis_client,
+):
+    # Arrange
+    # A single shared leaf FK'd by TWO DIFFERENT candidate classes
+    # (CascadeMultiClassDiamondMemberA and ...MemberB). The diamond root's scalar
+    # edge is a union over both member classes; whichever candidate it resolves
+    # to, the cascade continues on to the SAME shared leaf. Two roots -- one
+    # resolving to member-A, one to member-B -- exercise the shared leaf via two
+    # DISTINCT candidate-class paths (the CascadeMultiClassDiamondRoot scalar-union
+    # fixture only carries one candidate per instance, so the two candidate-class
+    # paths are driven by two root instances, mirroring the accepted
+    # test_shared_child_via_two_independent_roots pattern). Within each walk the
+    # shared leaf is re-armed exactly once at the best budget via the visited
+    # best-budget map (the map is unchanged by D-01 -- cycle/diamond dedup is
+    # inherited, already proven by test_diamond_shared_child / test_max_budget_wins),
+    # and every diamond node is re-armed to its OWN class Meta.ttl with no
+    # double-refresh crash.
+    leaf = await CascadeMultiClassDiamondLeaf(name="shared").asave()
+    member_a = await CascadeMultiClassDiamondMemberA(leaf=leaf.key).asave()
+    member_b = await CascadeMultiClassDiamondMemberB(leaf=leaf.key).asave()
+    root_a = await CascadeMultiClassDiamondRoot(member=member_a.key).asave()
+    root_b = await CascadeMultiClassDiamondRoot(member=member_b.key).asave()
+    for key in (root_a.key, root_b.key, member_a.key, member_b.key, leaf.key):
+        await real_redis_client.persist(key)
+
+    # Act / Assert -- candidate-class path A: root -> member A -> shared leaf.
+    result_a = await apply_cascade(real_redis_client, root_a)
+    for key in (root_a.key, member_a.key, leaf.key):
+        assert 0 < await real_redis_client.ttl(key) <= CASCADE_FIXTURE_TTL_SECONDS
+    assert result_a[2] == 0
+
+    # Re-arm the leaf's dangling state, then candidate-class path B:
+    # root -> member B -> the SAME shared leaf. The leaf re-arms via either
+    # candidate-class path, never a collision or double-refresh error.
+    await real_redis_client.persist(leaf.key)
+    result_b = await apply_cascade(real_redis_client, root_b)
+    for key in (root_b.key, member_b.key, leaf.key):
+        assert 0 < await real_redis_client.ttl(key) <= CASCADE_FIXTURE_TTL_SECONDS
+    assert result_b[2] == 0
+
+
+# --- Task 2: per-subtree depth budget truncates THROUGH a resolved-class edge ---
+
+
+@pytest.mark.asyncio
+async def test_depth_budget_truncates_through_a_resolved_class_union_edge(
+    real_redis_client,
+):
+    # Arrange
+    # A 3-node blanket-decrementing CascadeChainNode chain (c1 -> c2 -> c3),
+    # entered THROUGH CascadeUnionDepthRoot's union edge (candidates:
+    # CascadeChainNode | CascadeUnionMemberB) capped at depth=1. entry resolves
+    # c1's class from its "CascadeChainNode:" prefix among the edge's candidates
+    # and carries the reset depth=1 budget into c1's subtree:
+    #   c1 at budget 1  -> re-armed
+    #   c2 at budget 0  -> re-armed (the one in-budget blanket hop)
+    #   c3 at budget -1 -> truncated, NOT re-armed
+    # The budget argument and the visited best-budget map pass through push_child
+    # UNCHANGED (D-01 resolves only the CHILD's class), so the budget arithmetic is
+    # inherited from the single-target path already proven by
+    # test_cascade_depth_and_gate.py::test_independent_sibling_depth_budgets. This
+    # test adds the DIRECT multi-class leg so CMCT-08's depth-budget clause is
+    # traceable, not merely indirect.
+    c3 = await CascadeChainNode(name="c3").asave()
+    c2 = await CascadeChainNode(name="c2", next=c3.key).asave()
+    c1 = await CascadeChainNode(name="c1", next=c2.key).asave()
+    root = await CascadeUnionDepthRoot(entry=c1.key).asave()
+    all_keys = (root.key, c1.key, c2.key, c3.key)
+    for key in all_keys:
+        await real_redis_client.persist(key)
+
+    # Act
+    await apply_cascade(real_redis_client, root)
+
+    # Assert
+    refreshed = {key for key in all_keys if await real_redis_client.ttl(key) > 0}
+    assert refreshed == {root.key, c1.key, c2.key}
+    assert await real_redis_client.ttl(c3.key) in (-1, -2)
+
+
+# --- Task 2: dead-end contracts -- counted non-candidate vs uncounted corrupt ---
+
+
+@pytest.mark.asyncio
+async def test_non_candidate_reach_is_skipped_and_tallied_as_class_drift(
+    real_redis_client,
+):
+    # Arrange
+    # A union owner's ref points at a saved CascadeAuthor key. CascadeAuthor is a
+    # registered, plan-present model but is NOT among CascadeUnionOwner.ref's
+    # candidates ({CascadeUnionMemberA, CascadeUnionMemberB}). The reach resolves
+    # to a valid-but-non-candidate class: it MUST be skipped (no TTL applied) AND
+    # tallied in the FCALL's third return element (mismatched_class), giving
+    # operators a class-drift signal (D-03, CMCT-10).
+    #
+    # The tally is asserted at REACH time (at-least-once, NOT deduped via the
+    # visited map): per the LOCKED D-03 choice, the requirement is observability
+    # of drift, not exact-once accounting -- a non-candidate reached via two paths
+    # may count more than once, and that is acceptable.
+    author = await CascadeAuthor(name="drift").asave()
+    owner = await CascadeUnionOwner(ref=author.key).asave()
+    for key in (owner.key, author.key):
+        await real_redis_client.persist(key)
+
+    # Act
+    result = await apply_cascade(real_redis_client, owner)
+
+    # Assert
+    # No misapplied TTL on the non-candidate key ...
+    assert await real_redis_client.ttl(author.key) in (-1, -2)
+    # ... and the drift is observed (mismatched_class incremented).
+    assert result[2] == 1
+    # The root itself still re-arms -- the non-candidate reach is a safe dead-end,
+    # never an aborted FCALL (T-02-07 mitigation).
+    assert await real_redis_client.ttl(owner.key) > 0
+
+
+@pytest.mark.asyncio
+async def test_corrupt_no_colon_reach_is_a_silent_uncounted_dead_end(
+    real_redis_client,
+):
+    # Arrange
+    # A union owner's ref holds a corrupt, colon-less value. string.match on the
+    # first-colon pattern yields nil, so the reach is the EXISTING silent dead-end
+    # (skip, no crash) and is NOT tallied as class drift -- only a parsed-but-non-
+    # candidate PREFIX is counted (D-03, CMCT-10). This distinguishes a corrupt
+    # reach (uncounted) from a class-drift reach (counted, previous test).
+    owner = await CascadeUnionOwner(ref="corrupt-no-colon-value").asave()
+    await real_redis_client.persist(owner.key)
+
+    # Act
+    result = await apply_cascade(real_redis_client, owner)
+
+    # Assert
+    # No class-drift tally for a corrupt (colon-less) reach ...
+    assert result[2] == 0
+    # ... and the FCALL completes, re-arming the root (safe dead-end, T-02-07).
+    assert await real_redis_client.ttl(owner.key) > 0

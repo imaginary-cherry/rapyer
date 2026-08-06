@@ -682,6 +682,28 @@ class CascadeColonPkOwner(AtomicRedisModel):
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
 
 
+# --- Union-edge depth-budget fixture (CMCT-08 depth clause, Plan 04) ---
+
+
+class CascadeUnionDepthRoot(AtomicRedisModel):
+    """Enters a chain THROUGH a resolved-class (union) edge under a per-subtree
+    depth cap. The single scalar ``entry`` edge is a UNION whose two candidates
+    are the EXISTING blanket-decrementing ``CascadeChainNode`` and the EXISTING
+    ``CascadeUnionMemberB`` leaf (neither reinvented, neither modified). Capped at
+    ``depth=1``: when ``entry`` resolves the reached key's class from its
+    ``CascadeChainNode:`` prefix, the reset depth=1 budget is carried into that
+    child's subtree, so the chain truncates one hop in -- proving the per-subtree
+    depth budget is honored THROUGH a multi-class edge, not merely on single-target
+    chains (CMCT-08 depth-budget clause, proven DIRECTLY not just via the diamond).
+    """
+
+    entry: Annotated[
+        Reference[CascadeChainNode | CascadeUnionMemberB], CascadeTTL(depth=1)
+    ]
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
+
+
 # Full cascade-model set shared by unit and integration cascade fixtures.
 ALL_CASCADE_MODELS = [
     CascadeAuthor,
@@ -734,4 +756,5 @@ ALL_CASCADE_MODELS = [
     CascadeMultiClassDiamondRoot,
     CascadeColonPkMember,
     CascadeColonPkOwner,
+    CascadeUnionDepthRoot,
 ]
