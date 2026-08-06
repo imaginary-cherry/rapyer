@@ -598,4 +598,7 @@ ALL_CASCADE_MODELS = [
     CascadeMixedEdgeSharedChildRoot,
     CascadeSfDiamondChild,
     CascadeSfDiamondRoot,
+    CascadeUnionMemberA,
+    CascadeUnionMemberB,
+    CascadeUnionOwner,
 ]

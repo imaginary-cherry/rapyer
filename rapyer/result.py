@@ -34,6 +34,11 @@ class RapyerDeleteResult(DeleteResult):
 class CascadeResult(BaseModel):
     dangling_children: int
     dangling_special: int
+    # Count of MULTI-CLASS reaches whose resolved class was not among the edge's
+    # candidate targets (or was absent from the plan) -- server-side class-drift
+    # observability (D-03). Defaulted to 0 so existing construction sites stay
+    # forward-compatible; the Lua/apply lockstep sites set it explicitly.
+    mismatched_class: int = 0
 
 
 class GetOrCreateStatus(str, Enum):
