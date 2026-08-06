@@ -80,8 +80,9 @@ async def test_set_ref_dangling_member_reuses_existing_dangling_count(
     # Act
     result = await apply_cascade(real_redis_client, parent)
 
-    # Assert (no separate SF-dangling counter -- reuses the existing dangling shape)
-    assert result == [1, 0]
+    # Assert (no separate SF-dangling counter -- reuses the existing dangling shape;
+    # third element is the D-03 mismatched_class counter, 0 for a single-target reach)
+    assert result == [1, 0, 0]
     for key in (parent.key, author.key):
         assert 0 < await real_redis_client.ttl(key) <= CASCADE_FIXTURE_TTL_SECONDS
 
@@ -211,4 +212,4 @@ async def test_sf_only_dual_edge_diamond_shared_child_refreshed_exactly_once(
     # Assert
     for key in (root.key, child.key):
         assert 0 < await real_redis_client.ttl(key) <= CASCADE_FIXTURE_TTL_SECONDS
-    assert result == [0, 0]
+    assert result == [0, 0, 0]
