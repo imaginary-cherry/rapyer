@@ -44,22 +44,8 @@ def _resolve_forward_ref(forward_ref: ForwardRef) -> Any | None:
 
 
 def _unwrap_relational_target(annotation: Any, models: list) -> list:
-    """Return every candidate model class an FK-shaped annotation points to.
-
-    A single-target FK returns a one-element list; a union ``Reference[A | B]``
-    returns one entry per member. The recursion ACCUMULATES across generic args
-    (a collection/SF wrapper around a union must not drop members), and the
-    result is order-preserving and de-duplicated. An empty list means the
-    annotation is not FK-shaped.
-
-    Candidates are keyed by ``cls.__name__`` (D-04). At traversal time the
-    reached child's class is resolved from its real ``{class}:{pk}`` key prefix
-    and membership-checked against these names, so a cascade participant's
-    ``class_key_initials()`` MUST equal ``__name__`` — otherwise the reached
-    prefix never matches a candidate and the cascade silently dead-ends. That
-    equality is enforced at init by ``validate_cascade_key_initials``; class-name
-    uniqueness is separately guaranteed at registration by
-    ``DuplicateModelNameError``.
+    """
+    Return every model class an FK-shaped annotation can point to, empty if it is not FK-shaped.
     """
     stripped = strip_optional(annotation)
     origin = get_origin(stripped) or stripped
@@ -68,6 +54,7 @@ def _unwrap_relational_target(annotation: Any, models: list) -> list:
         target = args[0] if args else None
         if target is None:
             return []
+        # Reference[A | B] contributes one candidate per union member.
         if get_origin(target) in (Union, UnionType):
             members = get_args(target)
         else:
@@ -94,16 +81,10 @@ def _unwrap_relational_target(annotation: Any, models: list) -> list:
 
 
 def _expand_candidates(target_cls: Any, models: list) -> list:
-    """Candidate classes contributed by one resolved FK target class:
-    ``{target_cls} ∪ {registered subclasses of target_cls}``.
-
-    Enumerated over the THREADED ``models`` list (Option B) for test hermeticity.
-    Because ``safe_issubclass(T, T)`` is True, the base is included iff it is
-    itself registered in ``models`` (Decision #3: an abstract, unregistered base
-    carries no Meta.ttl and must stay out of the candidate set). The resolved
-    class leads, then its subclasses in declaration order; the caller
-    de-duplicates across union members.
     """
+    Return target_cls together with its registered subclasses, in declaration order.
+    """
+    # safe_issubclass(T, T) holds, so an unregistered base stays out: it carries no Meta.ttl.
     return [m for m in models if safe_issubclass(m, target_cls)]
 
 
@@ -124,14 +105,7 @@ class CascadeEdge:
     depth: int | None = None
     # None = inline; "set"/"zset" = FK held in a RedisSet/PQ, path is then the SF key suffix.
     sf_container: str | None = None
-    # Every candidate target class name for a multi-class edge (union / polymorphic
-    # base). None (dropped by _drop_none_values) for a single-target edge, which
-    # keeps its plan JSON byte-for-byte identical; when set, candidates[0] == target.
-    # D-04: these names are ``cls.__name__``. Traversal resolves a reached child's
-    # class from its ``{class}:{pk}`` key prefix and membership-checks it here, so a
-    # participant's ``class_key_initials()`` MUST equal ``__name__`` (enforced by
-    # ``validate_cascade_key_initials``); class-name uniqueness is separately
-    # guaranteed at registration by ``DuplicateModelNameError``.
+    # Class names a union/polymorphic edge may reach; None keeps single-target JSON identical.
     candidates: list[str] | None = None
 
 
@@ -209,9 +183,7 @@ def _static_walk_fk_edges(
                 refresh_target_special_keys=True,
                 resets_depth_budget=edge.override,
                 depth=edge.depth,
-                candidates=(
-                    [c.__name__ for c in cands] if len(cands) > 1 else None
-                ),
+                candidates=([c.__name__ for c in cands] if len(cands) > 1 else None),
             )
         )
 
@@ -221,9 +193,7 @@ def _static_walk_fk_edges(
         if nested_cls is not None:
             # Nested inline sub-model: same RedisJSON document, zero-hop recursion.
             nested_path = f"{parent_path}.{field_name}"
-            _static_walk_fk_edges(
-                nested_cls, nested_path, fks, models, top_level=False
-            )
+            _static_walk_fk_edges(nested_cls, nested_path, fks, models, top_level=False)
             continue
 
         sf_container = _sf_container_kind(annotation)
@@ -272,9 +242,7 @@ def _static_walk_fk_edges(
                 refresh_target_special_keys=True,
                 resets_depth_budget=edge.override,
                 depth=edge.depth,
-                candidates=(
-                    [c.__name__ for c in cands] if len(cands) > 1 else None
-                ),
+                candidates=([c.__name__ for c in cands] if len(cands) > 1 else None),
             )
         )
 
@@ -337,8 +305,7 @@ def validate_cascade_ttl_targets(plan: dict[str, CascadePlanEntry]):
     """Raise CascadeTargetTtlMissingError when a cascade participant lacks a Meta.ttl."""
     for class_name, entry in sorted(plan.items()):
         for edge in entry.fks:
-            # Validate EVERY candidate of a multi-class edge (single-target edges
-            # carry candidates=None, so this loops once over [edge.target]).
+            # A single-target edge carries candidates=None, so this loops once.
             for target in edge.candidates or [edge.target]:
                 # A partial plan may omit a target; surface a RapyerError, not a bare KeyError.
                 target_entry = plan.get(target)
@@ -368,36 +335,18 @@ def validate_cascade_ttl_targets(plan: dict[str, CascadePlanEntry]):
 
 
 def validate_cascade_key_initials(models: list[type["AtomicRedisModel"]]):
-    """Raise CascadeKeyInitialsError when a cascade participant overrides
-    class_key_initials() to a value other than __name__ (D-02).
-
-    The cascade plan and ``edge.candidates`` are keyed by ``cls.__name__``, but
-    the real Redis key prefix is ``class_key_initials()``. Reached-key class
-    resolution (``library.lua`` ``push_child``) splits the ``{class}:{pk}``
-    prefix and matches it against those ``__name__``-keyed candidates, so a
-    participant whose ``class_key_initials() != __name__`` stores its keys under
-    a prefix the traversal can never match — silently mis-resolving or
-    dead-ending the cascade. This turns that silent no-op into a loud fail-fast
-    at ``init_rapyer()``.
-
-    Scope is every model that participates in the built cascade plan: each root
-    (a plan entry with outgoing edges) plus every ``edge.target`` /
-    ``edge.candidates`` member reachable via an edge. The check is pure config
-    time — it builds the static plan and calls ``class_key_initials()``, doing
-    NO Redis I/O, mirroring ``validate_cascade_ttl_targets``.
-
-    Class-name uniqueness across participants is NOT re-checked here; it is
-    already enforced at registration by ``DuplicateModelNameError``. This guard
-    checks only the initials-vs-``__name__`` equality.
+    """
+    Raise CascadeKeyInitialsError when a cascade participant's class_key_initials()
+    is not its __name__.
     """
     plan = build_cascade_plan(models)
     participant_names: set[str] = set()
     for class_name, entry in plan.items():
         if entry.fks:
-            # A cascade root: it EXPIREs its own key, so its prefix is load-bearing.
+            # A cascade root EXPIREs its own key, so its prefix is load-bearing too.
             participant_names.add(class_name)
         for edge in entry.fks:
-            # Single-target edges carry candidates=None -> [edge.target].
+            # A single-target edge carries candidates=None, so this loops once.
             for target in edge.candidates or [edge.target]:
                 participant_names.add(target)
 
@@ -407,6 +356,7 @@ def validate_cascade_key_initials(models: list[type["AtomicRedisModel"]]):
         if cls is None:
             # A missing target is validate_cascade_ttl_targets' concern; skip here.
             continue
+        # Traversal matches a reached {class}:{pk} prefix against __name__-keyed candidates.
         initials = cls.class_key_initials()
         if initials != cls.__name__:
             raise CascadeKeyInitialsError(

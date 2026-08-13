@@ -176,13 +176,7 @@ local function cascade_apply(keys, args)
     local pending_refresh = {}
     local refresh_order = {}
     local stack = {}
-    -- Per-call drift counter (D-03): incremented in push_child whenever a
-    -- MULTI-CLASS reach resolves to a class that is NOT one of the edge's
-    -- candidates (or is absent from the plan). Declared here beside visited/
-    -- stack -- a cascade_apply-scope local, NEVER library scope -- because it is
-    -- per-call mutable state; hoisting it would leak across FCALLs (see the
-    -- callback header contract above). Returned as the third element of the
-    -- write-phase tuple so the Python apply layer can surface class drift.
+    -- Per-call state, never library scope: a hoisted local would leak across FCALLs.
     local mismatched_class = 0
 
     local function queue_refresh(full_key, class_name, is_root, is_special)
@@ -213,29 +207,13 @@ local function cascade_apply(keys, args)
         if type(target_key) ~= 'string' then
             return
         end
-        -- Resolve the reached child's ACTUAL class.
-        --
-        -- Single-target edge (edge.candidates absent): the edge already carries
-        -- its one target's class name, so the class is read straight from the
-        -- plan, NEVER parsed back out of the key. This keeps the single-target
-        -- path byte-identical and parse-free (D-01 / CMCT-09).
-        --
-        -- Multi-class edge (edge.candidates present -- a union or polymorphic-
-        -- base FK): the child's class is resolved from its own key's
-        -- {class}:{pk} prefix, split on the FIRST colon via
-        -- string.match(target_key, '^([^:]+):'). The negated character class
-        -- [^:]+ stops at the first colon, mirroring the Python key.setter's
-        -- value.split(':', maxsplit=1) in base.py, so a Key[...] pk that itself
-        -- carries a ':' still resolves to the correct class prefix. Class
-        -- identity IS the key prefix; membership is EXACT string equality
-        -- against this edge's candidate set.
+        -- A single-target edge reads its class from the plan, never parsing the key.
         local resolved_class = edge.target
         if edge.candidates then
+            -- [^:]+ stops at the FIRST colon, mirroring base.py's split(':', maxsplit=1).
             local prefix = string.match(target_key, '^([^:]+):')
             if prefix == nil then
-                -- No colon / unparseable prefix: a silent, UNCOUNTED dead-end,
-                -- reusing the corrupt/WRONGTYPE reach contract's skip ACTION.
-                -- Never tallied as class drift (a corrupt reach is not drift).
+                -- A corrupt reach is not drift: dead-end silently, like the WRONGTYPE contract.
                 return
             end
             local is_candidate = false
@@ -246,15 +224,7 @@ local function cascade_apply(keys, args)
                 end
             end
             if not is_candidate or CASCADE_PLAN[prefix] == nil then
-                -- Resolved to a class that is NOT one of this edge's candidates
-                -- (or is absent from the plan): class drift. Skip -- no refresh,
-                -- no recursion -- and tally it so the caller can observe a
-                -- misconfigured graph (D-03). validate_cascade_ttl_targets
-                -- guarantees every candidate has a plan entry, so these two
-                -- sub-cases fold into one branch. Counted at REACH time
-                -- (at-least-once, NOT deduped via the visited map): the
-                -- requirement is observability of drift, not exact-once
-                -- accounting.
+                -- Class drift: tally at reach time, not deduped, so drift stays observable.
                 mismatched_class = mismatched_class + 1
                 return
             end
