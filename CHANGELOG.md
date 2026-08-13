@@ -1,10 +1,30 @@
 # Changelog
 
+## [1.3.6]
+
+### ✨ Added
+
+- **Cascade reaches references held inside special fields**: members of a `RedisSet[Reference[T]]` or `RedisPriorityQueue[Reference[T]]` live under their own SET/ZSET keys, so the inline (`JSON.GET`) traversal never saw them. The walker now reads those containers server-side within the same atomic call and re-arms each referenced child to its own `Meta.ttl`. A parent whose only cascade-enabled edge is special-field-held now fires the cascade at all — previously it silently took the native `EXPIRE` fast path. `RedisSet`/`RedisPriorityQueue` member dumping was also fixed so a raw reference key string round-trips correctly. (#289)
+
+### 🐛 Fixed
+
+- **Cascade no longer skips union and polymorphic-base reference targets**: an FK declared as `Reference[A | B]`, or as `Reference[Base]` where `Base` has registered subclasses, resolved to a single target class — so a reached child of any other candidate class was never re-armed. Every candidate is now carried on the edge, and each reached child's actual class is resolved from its stored `{class}:{pk}` key, then re-armed to *that* class's own `Meta.ttl`, special-field keys, and outgoing edges. A reach whose class is a real model but not a candidate of that edge is skipped and reported in the new `CascadeResult.mismatched_class` counter. `init_rapyer` now also raises `CascadeKeyInitialsError` when a cascade participant overrides `class_key_initials()` away from its `__name__`, which would otherwise make class resolution silently dead-end. (#290)
+
+
 ## [1.3.5]
+
+### ✨ Added
+
+- **Configurable TTL cascade across reference graphs**: opt in per field with `Annotated[Reference[T], CascadeTTL()]`, or globally via `init_rapyer(..., cascade_ttl=CascadeTTL())`. `aset_ttl(cascade=True)` and `refresh_ttl` then walk the reference graph server-side in a single atomic Redis Functions call and re-arm every reached child to **its own** `Meta.ttl` — a per-child cascading refresh, not propagation of the parent's TTL value, so a child with a shorter `Meta.ttl` still expires on its own schedule. Direct references, collections of references, and references on nested sub-models are all covered, with a per-subtree `depth` budget (field overrides global overrides off) and a visited set that makes cycles and diamonds safe. The call returns a `CascadeResult` reporting keys that were reached but missing, and a mis-configured graph fails fast at `init_rapyer` with `CascadeTargetTtlMissingError`. Requires real Redis 7+; under `fakeredis` a cascade-enabled model still refreshes its own keys, but edges are not followed. Standalone Redis only — cross-slot traversal is not supported on Cluster. (#283)
 
 ### 🐛 Fixed
 
 - **TTL cascade no longer slows bulk inserts of non-referencing models**: `refresh_ttl`/`aset_ttl` issued a per-model server-side cascade `FCALL` on every TTL refresh, so bulk-inserting many models that hold no `ForeignKey` fields paid that call once per model for no benefit — a ~13% regression on the bulk-insert-with-TTL path. Models with no foreign-key fields now take the native `EXPIRE` fast path; models that reference others still cascade atomically server-side, unchanged. (#288)
+- **`init_rapyer` no longer leaves models pinned to the default client after a failed startup**: registered models are now rebound to the supplied Redis client before any initialization I/O runs, so a failure during script registration or index creation can no longer leave models still talking to `localhost:6379`. (#276)
+
+### 🛠️ Technical Improvements
+
+- **Faster model construction and attribute assignment**: `_pk` is now minted lazily on first identity read rather than eagerly on every construction — the uuid accounted for ~45% of construction cost and was discarded for every model loaded from Redis — and the hot `__setattr__` path replaces two ABC `isinstance` checks with a cheaper per-instance marker test. Construction measured 3.851 µs → 1.811 µs for Redis-loaded and bulk models. No public API change. (#263)
 
 
 ## [1.3.4]
