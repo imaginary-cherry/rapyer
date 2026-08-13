@@ -73,11 +73,7 @@ def test_cascade_plan_json_round_trips_full_plan_to_expected_shape():
 
 
 def test_single_target_plan_json_and_hash_are_byte_identical_golden():
-    # Arrange
-    # The load-bearing byte-identity invariant (CMCT-03/CMCT-09): after adding
-    # the sibling `candidates` field, a single-target plan must serialize
-    # character-for-character as before and keep the same plan hash — otherwise
-    # every Redis Function library/function name (which embeds the hash) churns.
+    # Arrange -- the Function library and function names embed this hash.
     plan = {"A": _entry("B"), "B": _entry()}
 
     # Act

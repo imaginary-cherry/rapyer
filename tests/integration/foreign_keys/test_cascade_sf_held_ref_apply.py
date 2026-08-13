@@ -80,8 +80,7 @@ async def test_set_ref_dangling_member_reuses_existing_dangling_count(
     # Act
     result = await apply_cascade(real_redis_client, parent)
 
-    # Assert (no separate SF-dangling counter -- reuses the existing dangling shape;
-    # third element is the D-03 mismatched_class counter, 0 for a single-target reach)
+    # Assert -- SF reuses the existing dangling shape; the third element is class drift.
     assert result == [1, 0, 0]
     for key in (parent.key, author.key):
         assert 0 < await real_redis_client.ttl(key) <= CASCADE_FIXTURE_TTL_SECONDS

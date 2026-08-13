@@ -504,15 +504,9 @@ class CascadeUnionMemberB(AtomicRedisModel):
 
 
 class CascadeUnionOwner(AtomicRedisModel):
-    """Owns a scalar FK whose target is a union of two models.
+    """Owns a scalar FK whose target is a union of two models."""
 
-    The whole point of the phase: the edge must list BOTH members as
-    candidate targets rather than crashing on ``UnionType.__name__``.
-    """
-
-    ref: Annotated[
-        Reference[CascadeUnionMemberA | CascadeUnionMemberB], CascadeTTL()
-    ]
+    ref: Annotated[Reference[CascadeUnionMemberA | CascadeUnionMemberB], CascadeTTL()]
 
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
 
@@ -521,8 +515,7 @@ class CascadeUnionOwner(AtomicRedisModel):
 
 
 class CascadePolyBase(AtomicRedisModel):
-    """Registered polymorphic base — a candidate in its own right (Decision #3:
-    included because it is a registered, ttl-bearing, saveable model)."""
+    """Registered polymorphic base — a candidate in its own right."""
 
     name: str = "poly_base"
 
@@ -550,29 +543,18 @@ class CascadePolyOwner(AtomicRedisModel):
 
 
 class CascadePolyDedupOwner(AtomicRedisModel):
-    """Union whose members overlap: CascadePolySub1 is both a listed union
-    member and a subclass of CascadePolyBase, so it must appear exactly once."""
+    """Union whose members overlap: a subclass listed beside its own base."""
 
-    ref: Annotated[
-        Reference[CascadePolyBase | CascadePolySub1], CascadeTTL()
-    ]
+    ref: Annotated[Reference[CascadePolyBase | CascadePolySub1], CascadeTTL()]
 
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
 
 
-# --- Multi-candidate FK fixtures across every remaining FK shape (Wave 0) ---
-#
-# The Phase-1 union fixtures above cover only the SCALAR union shape
-# (CascadeUnionOwner). These owners extend the same union target
-# (CascadeUnionMemberA | CascadeUnionMemberB) across the collection and
-# special-field shapes so build_cascade_plan enumerates BOTH members as
-# candidates on every FK shape, not just the scalar one. Members are REUSED,
-# not reinvented.
+# --- The same union target across every remaining FK shape ---
 
 
 class CascadeUnionListOwner(AtomicRedisModel):
-    """Collection-of-union shape: list[Reference[A | B]] carrying the marker on
-    the collection itself (mirrors CascadeBookCollection, union target)."""
+    """Collection-of-union shape: list[Reference[A | B]], marker on the collection."""
 
     refs: Annotated[
         list[Reference[CascadeUnionMemberA | CascadeUnionMemberB]], CascadeTTL()
@@ -582,8 +564,7 @@ class CascadeUnionListOwner(AtomicRedisModel):
 
 
 class CascadeUnionDictOwner(AtomicRedisModel):
-    """Collection-of-union shape: dict[str, Reference[A | B]] carrying the
-    marker on the collection itself (mirrors CascadeDictCollectionRoot)."""
+    """Collection-of-union shape: dict[str, Reference[A | B]], marker on the collection."""
 
     refs: Annotated[
         dict[str, Reference[CascadeUnionMemberA | CascadeUnionMemberB]], CascadeTTL()
@@ -593,8 +574,7 @@ class CascadeUnionDictOwner(AtomicRedisModel):
 
 
 class CascadeUnionSetOwner(AtomicRedisModel):
-    """SF-held-union shape: RedisSet[Reference[A | B]] carrying the marker on
-    the special field (mirrors CascadeSetRefParent, union target)."""
+    """SF-held-union shape: RedisSet[Reference[A | B]], marker on the special field."""
 
     refs: Annotated[
         RedisSet[Reference[CascadeUnionMemberA | CascadeUnionMemberB]], CascadeTTL()
@@ -604,8 +584,7 @@ class CascadeUnionSetOwner(AtomicRedisModel):
 
 
 class CascadeUnionPQOwner(AtomicRedisModel):
-    """SF-held-union shape: RedisPriorityQueue[Reference[A | B]] carrying the
-    marker on the special field (mirrors CascadePQRefParent, union target)."""
+    """SF-held-union shape: RedisPriorityQueue[Reference[A | B]], marker on the field."""
 
     queue: Annotated[
         RedisPriorityQueue[Reference[CascadeUnionMemberA | CascadeUnionMemberB]],
@@ -619,8 +598,7 @@ class CascadeUnionPQOwner(AtomicRedisModel):
 
 
 class CascadeMultiClassDiamondLeaf(AtomicRedisModel):
-    """Plain ttl-bearing leaf FK'd by BOTH diamond members. A real cascade
-    reaches this single shared leaf via two distinct candidate-class paths."""
+    """Plain ttl-bearing leaf FK'd by both diamond members."""
 
     name: str = "multi_class_diamond_leaf"
 
@@ -636,8 +614,7 @@ class CascadeMultiClassDiamondMemberA(AtomicRedisModel):
 
 
 class CascadeMultiClassDiamondMemberB(AtomicRedisModel):
-    """Diamond member B (a DIFFERENT class than A) — carries a scalar FK to the
-    SAME shared leaf, so the leaf is reachable via two candidate classes."""
+    """Diamond member B — a different class than A, FK'd to the same shared leaf."""
 
     leaf: Annotated[Reference[CascadeMultiClassDiamondLeaf], CascadeTTL()]
 
@@ -645,9 +622,7 @@ class CascadeMultiClassDiamondMemberB(AtomicRedisModel):
 
 
 class CascadeMultiClassDiamondRoot(AtomicRedisModel):
-    """Union-FK root whose scalar edge lists both diamond members as candidates.
-    Whichever member it resolves to, the cascade continues on to the single
-    shared leaf — a mixed-class diamond over a shared child (CMCT-08)."""
+    """Union-FK root whose two candidate members both lead to one shared leaf."""
 
     member: Annotated[
         Reference[CascadeMultiClassDiamondMemberA | CascadeMultiClassDiamondMemberB],
@@ -661,9 +636,7 @@ class CascadeMultiClassDiamondRoot(AtomicRedisModel):
 
 
 class CascadeColonPkMember(AtomicRedisModel):
-    """Union member with a Key[str]-annotated pk so a saved instance can carry a
-    colon-bearing pk. Locks the first-colon {class}:{pk} split against a pk that
-    itself contains a colon (RESEARCH Pitfall 2)."""
+    """Union member whose Key[str] pk can itself contain a colon."""
 
     member_id: Key[str]
     name: str = "colon_pk_member"
@@ -672,31 +645,20 @@ class CascadeColonPkMember(AtomicRedisModel):
 
 
 class CascadeColonPkOwner(AtomicRedisModel):
-    """Owns a scalar union FK whose candidates include the colon-pk member, so
-    reached-key class resolution can be locked against a colon-bearing pk."""
+    """Owns a scalar union FK whose candidates include the colon-pk member."""
 
-    ref: Annotated[
-        Reference[CascadeColonPkMember | CascadeUnionMemberA], CascadeTTL()
-    ]
+    ref: Annotated[Reference[CascadeColonPkMember | CascadeUnionMemberA], CascadeTTL()]
 
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=CASCADE_FIXTURE_TTL_SECONDS)
 
 
-# --- Union-edge depth-budget fixture (CMCT-08 depth clause, Plan 04) ---
+# --- Union-edge depth-budget fixture ---
 
 
 class CascadeUnionDepthRoot(AtomicRedisModel):
-    """Enters a chain THROUGH a resolved-class (union) edge under a per-subtree
-    depth cap. The single scalar ``entry`` edge is a UNION whose two candidates
-    are the EXISTING blanket-decrementing ``CascadeChainNode`` and the EXISTING
-    ``CascadeUnionMemberB`` leaf (neither reinvented, neither modified). Capped at
-    ``depth=1``: when ``entry`` resolves the reached key's class from its
-    ``CascadeChainNode:`` prefix, the reset depth=1 budget is carried into that
-    child's subtree, so the chain truncates one hop in -- proving the per-subtree
-    depth budget is honored THROUGH a multi-class edge, not merely on single-target
-    chains (CMCT-08 depth-budget clause, proven DIRECTLY not just via the diamond).
-    """
+    """Enters a chain through a union edge under a per-subtree depth cap."""
 
+    # Resolving to CascadeChainNode carries the reset depth=1 budget into its subtree.
     entry: Annotated[
         Reference[CascadeChainNode | CascadeUnionMemberB], CascadeTTL(depth=1)
     ]

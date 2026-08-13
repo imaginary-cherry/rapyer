@@ -1,7 +1,6 @@
 import pytest
 
 from rapyer.cascade.planner import build_cascade_plan
-from tests.unit.cascade.conftest import CASCADE_PLANNER_MODELS
 from tests.models.cascade_types import (
     CascadeBlanketLeaf,
     CascadeBlanketRoot,
@@ -24,6 +23,7 @@ from tests.models.cascade_types import (
     CascadeUnionPQOwner,
     CascadeUnionSetOwner,
 )
+from tests.unit.cascade.conftest import CASCADE_PLANNER_MODELS
 
 pytestmark = pytest.mark.usefixtures("setup_fake_redis_for_cascade_models")
 
@@ -48,9 +48,7 @@ def test_single_target_edge_is_unchanged_with_none_candidates():
     # Act
     plan = build_cascade_plan([CascadeBlanketRoot, CascadeBlanketLeaf])
 
-    # Assert
-    # A pre-existing single-target edge keeps its scalar target and carries no
-    # candidates list (byte-identity preserved: candidates=None is dropped).
+    # Assert -- candidates=None is dropped from the JSON, so byte-identity holds.
     edge = plan["CascadeBlanketRoot"].fks[0]
     assert edge.target == "CascadeBlanketLeaf"
     assert edge.candidates is None
@@ -62,9 +60,7 @@ def test_polymorphic_base_fk_enumerates_base_and_all_subclasses():
         [CascadePolyOwner, CascadePolyBase, CascadePolySub1, CascadePolySub2]
     )
 
-    # Assert
-    # Base included (Decision #3: registered, ttl-bearing) plus every subclass
-    # enumerated from the threaded models list — three candidates, not one.
+    # Assert -- the registered base counts as a candidate alongside its subclasses.
     edge = plan["CascadePolyOwner"].fks[0]
     assert set(edge.candidates) == {
         "CascadePolyBase",
@@ -96,9 +92,7 @@ def test_candidates_are_deduplicated_when_reachable_via_two_paths():
         [CascadePolyDedupOwner, CascadePolyBase, CascadePolySub1, CascadePolySub2]
     )
 
-    # Assert
-    # CascadePolySub1 is both a listed union member and a subclass of the base;
-    # it must appear exactly once, order-preserving.
+    # Assert -- Sub1 is both a listed union member and a subclass of the base.
     edge = plan["CascadePolyDedupOwner"].fks[0]
     assert edge.candidates == [
         "CascadePolyBase",
@@ -109,10 +103,7 @@ def test_candidates_are_deduplicated_when_reachable_via_two_paths():
 
 
 def test_base_with_no_registered_subclasses_degrades_to_single_target():
-    # Act
-    # Option B threading: subclasses absent from the passed models list are not
-    # enumerated, so a base with no reachable subclasses degrades to a single
-    # target (candidates dropped, byte-identical).
+    # Act -- subclasses absent from the passed models list are never enumerated.
     plan = build_cascade_plan([CascadePolyOwner, CascadePolyBase])
 
     # Assert
@@ -122,24 +113,14 @@ def test_base_with_no_registered_subclasses_degrades_to_single_target():
 
 
 def test_no_preexisting_single_target_model_is_silently_expanded():
-    # Assert (Assumption A2)
-    # Every model that shipped before this phase is single-target; none of them
-    # has registered subclasses or a union FK, so the subclass-expansion rule
-    # must leave every pre-existing edge with candidates=None (byte-identity).
+    # Assert -- no pre-existing model has a union FK or registered subclasses.
     plan = build_cascade_plan(CASCADE_PLANNER_MODELS)
     for class_name, entry in plan.items():
         for edge in entry.fks:
             assert edge.candidates is None, (class_name, edge.path)
 
 
-# --- Candidate enumeration extends across every FK shape (Wave 0, CMCT-07) ---
-#
-# These prove the Phase-1 edge.candidates enumeration already extends across the
-# collection (list/dict) and special-field (RedisSet/RedisPriorityQueue) shapes,
-# not just the scalar union. Set-equality comparisons make the assertion
-# order-independent (CMCT-07 ordering-independence at the plan level) and give
-# the Plan-04 integration proofs a static precondition. Pure introspection over
-# build_cascade_plan — fakeredis-safe, no Redis I/O.
+# --- Candidate enumeration extends across every FK shape ---
 
 _UNION_MEMBERS = {"CascadeUnionMemberA", "CascadeUnionMemberB"}
 
@@ -200,9 +181,6 @@ def test_mixed_class_diamond_root_lists_both_member_classes():
     )
 
     # Assert
-    # The union-FK root enumerates both diamond member classes as candidates;
-    # each member independently FKs the SAME shared leaf (the mixed-class
-    # diamond that Plan 04 drives on real Redis).
     edge = plan["CascadeMultiClassDiamondRoot"].fks[0]
     assert set(edge.candidates) == {
         "CascadeMultiClassDiamondMemberA",
@@ -221,8 +199,6 @@ def test_colon_pk_union_owner_enumerates_both_candidates():
         [CascadeColonPkOwner, CascadeColonPkMember, CascadeUnionMemberA]
     )
 
-    # Assert
-    # The colon-pk member is a first-class candidate alongside the plain-pk
-    # member, so reached-key resolution can be locked against a colon-bearing pk.
+    # Assert -- the colon-pk member is a candidate alongside the plain-pk member.
     edge = plan["CascadeColonPkOwner"].fks[0]
     assert set(edge.candidates) == {"CascadeColonPkMember", "CascadeUnionMemberA"}

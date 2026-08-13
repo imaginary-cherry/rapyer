@@ -48,9 +48,6 @@ def test_raises_when_cascade_reachable_target_has_no_ttl():
 
 def test_raises_on_a_non_first_candidate_that_lacks_ttl():
     # Arrange
-    # A multi-candidate edge whose FIRST candidate is fine but whose SECOND
-    # candidate declares no Meta.ttl must still fail fast, naming the offending
-    # (non-first) candidate — the CMCT-06 per-candidate guarantee.
     plan = {
         "A": CascadePlanEntry(
             ttl=30,

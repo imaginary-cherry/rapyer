@@ -1,10 +1,4 @@
-"""Unit tests for validate_cascade_key_initials (D-02 fail-fast guard).
-
-These tests drive the guard DIRECTLY on locally-constructed model lists — they
-never route through the global init_rapyer() / REDIS_MODELS registry. Every
-local fixture below is declared with ``init_with_rapyer=False`` so it stays out
-of REDIS_MODELS and cannot poison the global model set for other tests.
-"""
+"""Unit tests for validate_cascade_key_initials, driven on local model lists."""
 
 from typing import Annotated, ClassVar
 
