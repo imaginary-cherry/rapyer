@@ -43,7 +43,9 @@ def _resolve_forward_ref(forward_ref: ForwardRef) -> Any | None:
     return None
 
 
-def _unwrap_relational_target(annotation: Any, models: list) -> list:
+def _unwrap_relational_target(
+    annotation: Any, models: list[type["AtomicRedisModel"]]
+) -> list[type["AtomicRedisModel"]]:
     """
     Return every model class an FK-shaped annotation can point to, empty if it is not FK-shaped.
     """
@@ -59,7 +61,7 @@ def _unwrap_relational_target(annotation: Any, models: list) -> list:
             members = get_args(target)
         else:
             members = (target,)
-        candidates: list = []
+        candidates: list[type["AtomicRedisModel"]] = []
         for member in members:
             resolved = (
                 _resolve_forward_ref(member)
@@ -72,7 +74,7 @@ def _unwrap_relational_target(annotation: Any, models: list) -> list:
                 if candidate not in candidates:
                     candidates.append(candidate)
         return candidates
-    accumulated: list = []
+    accumulated: list[type["AtomicRedisModel"]] = []
     for arg in resolve_generic_args(stripped):
         for candidate in _unwrap_relational_target(arg, models):
             if candidate not in accumulated:
@@ -80,7 +82,9 @@ def _unwrap_relational_target(annotation: Any, models: list) -> list:
     return accumulated
 
 
-def _expand_candidates(target_cls: Any, models: list) -> list:
+def _expand_candidates(
+    target_cls: Any, models: list[type["AtomicRedisModel"]]
+) -> list[type["AtomicRedisModel"]]:
     """
     Return target_cls together with its registered subclasses, in declaration order.
     """
@@ -142,7 +146,9 @@ def _classify_edge(model_cls: Any, field_name: str) -> EdgeClassification:
     return EdgeClassification(enabled=True, depth=global_spec.depth, override=False)
 
 
-def _resolve_target_cls(model_cls: Any, field_name: str, models: list) -> list:
+def _resolve_target_cls(
+    model_cls: Any, field_name: str, models: list[type["AtomicRedisModel"]]
+) -> list[type["AtomicRedisModel"]]:
     annotation = model_cls.model_fields[field_name].annotation
     return _unwrap_relational_target(annotation, models)
 
@@ -161,7 +167,7 @@ def _static_walk_fk_edges(
     model_cls: Any,
     parent_path: str,
     fks: list[CascadeEdge],
-    models: list,
+    models: list[type["AtomicRedisModel"]],
     top_level: bool = True,
 ):
     """Append every enabled FK edge reachable from model_cls's own fields."""
