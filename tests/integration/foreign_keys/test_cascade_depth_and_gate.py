@@ -71,7 +71,8 @@ async def test_cascade_false_still_refreshes_roots_own_special_keys(real_redis_c
         )
         > 0
     )
-    assert result == [0, 0]
+    # Third element is the D-03 mismatched_class counter, 0 for a single-target reach.
+    assert result == [0, 0, 0]
 
 
 # --- Dangling-count contract ---
@@ -91,7 +92,7 @@ async def test_cascade_counts_fully_dangling_child_and_its_special_keys(
     result = await apply_cascade(real_redis_client, parent)
 
     # Assert
-    assert result == [1, 2]
+    assert result == [1, 2, 0]
 
 
 @pytest.mark.asyncio
@@ -108,7 +109,7 @@ async def test_cascade_counts_dangling_special_keys_on_an_existing_child(
     result = await apply_cascade(real_redis_client, parent)
 
     # Assert
-    assert result == [0, 2]
+    assert result == [0, 2, 0]
 
 
 # --- Depth-budget arithmetic ---

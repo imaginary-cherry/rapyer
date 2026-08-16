@@ -165,5 +165,7 @@ def test_plain_sf_container_is_not_an_fk_edge_but_needs_the_cascade_script():
 def test_nested_sf_held_ref_traversal_stays_deferred():
     # Nested SF-held refs are deferred: the SF branch fires only at top level.
     fks = []
-    _static_walk_fk_edges(CascadeSetRefParent, "$.holder", fks, top_level=False)
+    _static_walk_fk_edges(
+        CascadeSetRefParent, "$.holder", fks, [CascadeSetRefParent], top_level=False
+    )
     assert all(edge.sf_container is None for edge in fks)

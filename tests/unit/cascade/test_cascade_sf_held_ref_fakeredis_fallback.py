@@ -32,7 +32,9 @@ async def test_set_ref_parent_cascade_on_fakeredis_refreshes_root_and_container_
     result = await parent.aset_ttl(TTL_SECONDS, cascade=True)
 
     # Assert
-    assert result == CascadeResult(dangling_children=0, dangling_special=0)
+    assert result == CascadeResult(
+        dangling_children=0, dangling_special=0, mismatched_class=0
+    )
     assert await fake_redis_client.ttl(parent.key) > 0
     assert await fake_redis_client.ttl(refs_key) > 0
     assert await fake_redis_client.ttl(author.key) in (-1, -2)
@@ -57,7 +59,9 @@ async def test_pq_ref_parent_cascade_on_fakeredis_refreshes_root_and_container_n
     result = await parent.aset_ttl(TTL_SECONDS, cascade=True)
 
     # Assert
-    assert result == CascadeResult(dangling_children=0, dangling_special=0)
+    assert result == CascadeResult(
+        dangling_children=0, dangling_special=0, mismatched_class=0
+    )
     assert await fake_redis_client.ttl(parent.key) > 0
     assert await fake_redis_client.ttl(queue_key) > 0
     assert await fake_redis_client.ttl(author.key) in (-1, -2)

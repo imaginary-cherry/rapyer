@@ -29,7 +29,7 @@ async def test_aset_ttl_default_cascade_false_runs_the_script_with_cascade_argv_
     # the default cascade=False -- only the trailing ARGV cascade flag
     # differs, never a separate per-key EXPIRE branch.
     mock_pipe, mock_run_fcall = fcall_pipeline_spy
-    mock_pipe.execute = AsyncMock(return_value=[[0, 0]])
+    mock_pipe.execute = AsyncMock(return_value=[[0, 0, 0]])
     root = CascadeChainRoot(head="CascadeChainNode:fake")
 
     with patch("rapyer.base._context_pipe") as mock_context_pipe:
@@ -59,7 +59,7 @@ async def test_aset_ttl_cascade_true_runs_the_script_with_cascade_argv_one(
 ):
     # Arrange
     mock_pipe, mock_run_fcall = fcall_pipeline_spy
-    mock_pipe.execute = AsyncMock(return_value=[[0, 0]])
+    mock_pipe.execute = AsyncMock(return_value=[[0, 0, 0]])
     root = CascadeChainRoot(head="CascadeChainNode:fake")
 
     with patch("rapyer.base._context_pipe") as mock_context_pipe:
@@ -78,7 +78,9 @@ async def test_aset_ttl_cascade_true_runs_the_script_with_cascade_argv_one(
         TTL_SECONDS,
         1,
     )
-    assert result == CascadeResult(dangling_children=0, dangling_special=0)
+    assert result == CascadeResult(
+        dangling_children=0, dangling_special=0, mismatched_class=0
+    )
 
 
 @pytest.mark.asyncio
@@ -89,7 +91,7 @@ async def test_aset_ttl_cascade_standalone_owns_execution_and_returns_cascade_re
     # Standalone call (no outer pipeline): enqueues run_sha, awaits
     # pipe.execute() itself, and decodes the two-element result.
     mock_pipe, mock_run_fcall = fcall_pipeline_spy
-    mock_pipe.execute = AsyncMock(return_value=[[1, 2]])
+    mock_pipe.execute = AsyncMock(return_value=[[1, 2, 0]])
     root = CascadeChainRoot(head="CascadeChainNode:fake")
 
     with patch("rapyer.base._context_pipe") as mock_context_pipe:
@@ -109,7 +111,9 @@ async def test_aset_ttl_cascade_standalone_owns_execution_and_returns_cascade_re
         1,
     )
     mock_pipe.execute.assert_awaited_once()
-    assert result == CascadeResult(dangling_children=1, dangling_special=2)
+    assert result == CascadeResult(
+        dangling_children=1, dangling_special=2, mismatched_class=0
+    )
 
 
 @pytest.mark.asyncio
@@ -122,7 +126,7 @@ async def test_aset_ttl_cascade_standalone_awaits_pipe_execute_directly(
     # NOSCRIPT (tracked as a follow-up, see NOSCRIPT-ISSUE.md). It must still
     # capture the awaited results[-1] for the CascadeResult.
     mock_pipe, _ = fcall_pipeline_spy
-    mock_pipe.execute = AsyncMock(return_value=[[3, 4]])
+    mock_pipe.execute = AsyncMock(return_value=[[3, 4, 0]])
     root = CascadeChainRoot(head="CascadeChainNode:fake")
 
     with patch("rapyer.base._context_pipe") as mock_context_pipe:
@@ -132,7 +136,9 @@ async def test_aset_ttl_cascade_standalone_awaits_pipe_execute_directly(
 
     # Assert
     mock_pipe.execute.assert_awaited_once()
-    assert result == CascadeResult(dangling_children=3, dangling_special=4)
+    assert result == CascadeResult(
+        dangling_children=3, dangling_special=4, mismatched_class=0
+    )
 
 
 @pytest.mark.asyncio

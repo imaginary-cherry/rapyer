@@ -1,10 +1,15 @@
 import dataclasses
 import hashlib
 import json
-from typing import TYPE_CHECKING, Any, ForwardRef, get_origin
+from types import UnionType
+from typing import TYPE_CHECKING, Any, ForwardRef, Union, get_args, get_origin
 
 from rapyer.cascade.ttl import CascadeTTL
-from rapyer.errors.cascade import CascadeLuaLiteralError, CascadeTargetTtlMissingError
+from rapyer.errors.cascade import (
+    CascadeKeyInitialsError,
+    CascadeLuaLiteralError,
+    CascadeTargetTtlMissingError,
+)
 from rapyer.scripts.constants import CASCADE_FUNCTION_PREFIX, CASCADE_LIBRARY_PREFIX
 from rapyer.types.relational import RelationalFieldType
 from rapyer.utils.annotation import strip_optional
@@ -38,21 +43,53 @@ def _resolve_forward_ref(forward_ref: ForwardRef) -> Any | None:
     return None
 
 
-def _unwrap_relational_target(annotation: Any) -> Any | None:
-    """Return the model class an FK-shaped annotation points to, or None."""
+def _unwrap_relational_target(
+    annotation: Any, models: list[type["AtomicRedisModel"]]
+) -> list[type["AtomicRedisModel"]]:
+    """
+    Return every model class an FK-shaped annotation can point to, empty if it is not FK-shaped.
+    """
     stripped = strip_optional(annotation)
     origin = get_origin(stripped) or stripped
     if safe_issubclass(origin, RelationalFieldType):
         args = resolve_generic_args(stripped)
         target = args[0] if args else None
-        if isinstance(target, ForwardRef):
-            return _resolve_forward_ref(target)
-        return target
+        if target is None:
+            return []
+        # Reference[A | B] contributes one candidate per union member.
+        if get_origin(target) in (Union, UnionType):
+            members = get_args(target)
+        else:
+            members = (target,)
+        candidates: list[type["AtomicRedisModel"]] = []
+        for member in members:
+            resolved = (
+                _resolve_forward_ref(member)
+                if isinstance(member, ForwardRef)
+                else member
+            )
+            if resolved is None:
+                continue
+            for candidate in _expand_candidates(resolved, models):
+                if candidate not in candidates:
+                    candidates.append(candidate)
+        return candidates
+    accumulated: list[type["AtomicRedisModel"]] = []
     for arg in resolve_generic_args(stripped):
-        found = _unwrap_relational_target(arg)
-        if found is not None:
-            return found
-    return None
+        for candidate in _unwrap_relational_target(arg, models):
+            if candidate not in accumulated:
+                accumulated.append(candidate)
+    return accumulated
+
+
+def _expand_candidates(
+    target_cls: Any, models: list[type["AtomicRedisModel"]]
+) -> list[type["AtomicRedisModel"]]:
+    """
+    Return target_cls together with its registered subclasses, in declaration order.
+    """
+    # safe_issubclass(T, T) holds, so an unregistered base stays out: it carries no Meta.ttl.
+    return [m for m in models if safe_issubclass(m, target_cls)]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -72,6 +109,8 @@ class CascadeEdge:
     depth: int | None = None
     # None = inline; "set"/"zset" = FK held in a RedisSet/PQ, path is then the SF key suffix.
     sf_container: str | None = None
+    # Class names a union/polymorphic edge may reach; None keeps single-target JSON identical.
+    candidates: list[str] | None = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -107,9 +146,11 @@ def _classify_edge(model_cls: Any, field_name: str) -> EdgeClassification:
     return EdgeClassification(enabled=True, depth=global_spec.depth, override=False)
 
 
-def _resolve_target_cls(model_cls: Any, field_name: str) -> Any | None:
+def _resolve_target_cls(
+    model_cls: Any, field_name: str, models: list[type["AtomicRedisModel"]]
+) -> list[type["AtomicRedisModel"]]:
     annotation = model_cls.model_fields[field_name].annotation
-    return _unwrap_relational_target(annotation)
+    return _unwrap_relational_target(annotation, models)
 
 
 def _unwrap_nested_model_cls(annotation: Any) -> Any | None:
@@ -123,27 +164,32 @@ def _unwrap_nested_model_cls(annotation: Any) -> Any | None:
 
 
 def _static_walk_fk_edges(
-    model_cls: Any, parent_path: str, fks: list[CascadeEdge], top_level: bool = True
+    model_cls: Any,
+    parent_path: str,
+    fks: list[CascadeEdge],
+    models: list[type["AtomicRedisModel"]],
+    top_level: bool = True,
 ):
     """Append every enabled FK edge reachable from model_cls's own fields."""
     for field_name in model_cls._relational_field_names:
         edge = _classify_edge(model_cls, field_name)
         if not edge.enabled:
             continue
-        target_cls = _resolve_target_cls(model_cls, field_name)
-        if target_cls is None:
+        cands = _resolve_target_cls(model_cls, field_name, models)
+        if not cands:
             continue
         # A per-field spec resets the child's budget to this depth; a global edge decrements it.
         fks.append(
             CascadeEdge(
                 path=f"{parent_path}.{field_name}",
-                target=target_cls.__name__,
+                target=cands[0].__name__,
                 is_collection=False,
                 recurse_into_target=True,
                 refresh_target_ttl=True,
                 refresh_target_special_keys=True,
                 resets_depth_budget=edge.override,
                 depth=edge.depth,
+                candidates=([c.__name__ for c in cands] if len(cands) > 1 else None),
             )
         )
 
@@ -153,7 +199,7 @@ def _static_walk_fk_edges(
         if nested_cls is not None:
             # Nested inline sub-model: same RedisJSON document, zero-hop recursion.
             nested_path = f"{parent_path}.{field_name}"
-            _static_walk_fk_edges(nested_cls, nested_path, fks, top_level=False)
+            _static_walk_fk_edges(nested_cls, nested_path, fks, models, top_level=False)
             continue
 
         sf_container = _sf_container_kind(annotation)
@@ -164,13 +210,13 @@ def _static_walk_fk_edges(
             edge = _classify_edge(model_cls, field_name)
             if not edge.enabled:
                 continue
-            target_cls = _unwrap_relational_target(annotation)
-            if target_cls is None:
+            cands = _unwrap_relational_target(annotation, models)
+            if not cands:
                 continue
             fks.append(
                 CascadeEdge(
                     path=field_name,
-                    target=target_cls.__name__,
+                    target=cands[0].__name__,
                     is_collection=True,
                     recurse_into_target=True,
                     refresh_target_ttl=True,
@@ -178,6 +224,9 @@ def _static_walk_fk_edges(
                     resets_depth_budget=edge.override,
                     depth=edge.depth,
                     sf_container=sf_container,
+                    candidates=(
+                        [c.__name__ for c in cands] if len(cands) > 1 else None
+                    ),
                 )
             )
             continue
@@ -186,19 +235,20 @@ def _static_walk_fk_edges(
         edge = _classify_edge(model_cls, field_name)
         if not edge.enabled:
             continue
-        target_cls = _resolve_target_cls(model_cls, field_name)
-        if target_cls is None:
+        cands = _resolve_target_cls(model_cls, field_name, models)
+        if not cands:
             continue
         fks.append(
             CascadeEdge(
                 path=f"{parent_path}.{field_name}",
-                target=target_cls.__name__,
+                target=cands[0].__name__,
                 is_collection=True,
                 recurse_into_target=True,
                 refresh_target_ttl=True,
                 refresh_target_special_keys=True,
                 resets_depth_budget=edge.override,
                 depth=edge.depth,
+                candidates=([c.__name__ for c in cands] if len(cands) > 1 else None),
             )
         )
 
@@ -248,7 +298,7 @@ def build_cascade_plan(
     plan: dict[str, CascadePlanEntry] = {}
     for model_cls in models:
         fks: list[CascadeEdge] = []
-        _static_walk_fk_edges(model_cls, "$", fks)
+        _static_walk_fk_edges(model_cls, "$", fks, models)
         plan[model_cls.__name__] = CascadePlanEntry(
             ttl=model_cls.Meta.ttl,
             special_suffixes=_static_walk_special_suffixes(model_cls),
@@ -261,23 +311,24 @@ def validate_cascade_ttl_targets(plan: dict[str, CascadePlanEntry]):
     """Raise CascadeTargetTtlMissingError when a cascade participant lacks a Meta.ttl."""
     for class_name, entry in sorted(plan.items()):
         for edge in entry.fks:
-            target = edge.target
-            # A partial plan may omit a target; surface a RapyerError, not a bare KeyError.
-            target_entry = plan.get(target)
-            if target_entry is None:
-                raise CascadeTargetTtlMissingError(
-                    target,
-                    f"{target!r} is reachable via a cascade-enabled edge from "
-                    f"{class_name!r} (path {edge.path!r}) but is absent from "
-                    "the cascade plan",
-                )
-            if target_entry.ttl is None:
-                raise CascadeTargetTtlMissingError(
-                    target,
-                    f"{target!r} is reachable via a cascade-enabled edge "
-                    f"from {class_name!r} (path {edge.path!r}) but "
-                    "declares no Meta.ttl",
-                )
+            # A single-target edge carries candidates=None, so this loops once.
+            for target in edge.candidates or [edge.target]:
+                # A partial plan may omit a target; surface a RapyerError, not a bare KeyError.
+                target_entry = plan.get(target)
+                if target_entry is None:
+                    raise CascadeTargetTtlMissingError(
+                        target,
+                        f"{target!r} is reachable via a cascade-enabled edge from "
+                        f"{class_name!r} (path {edge.path!r}) but is absent from "
+                        "the cascade plan",
+                    )
+                if target_entry.ttl is None:
+                    raise CascadeTargetTtlMissingError(
+                        target,
+                        f"{target!r} is reachable via a cascade-enabled edge "
+                        f"from {class_name!r} (path {edge.path!r}) but "
+                        "declares no Meta.ttl",
+                    )
 
     for class_name, entry in sorted(plan.items()):
         if entry.fks and entry.ttl is None:
@@ -286,6 +337,41 @@ def validate_cascade_ttl_targets(plan: dict[str, CascadePlanEntry]):
                 f"{class_name!r} has outgoing cascade-enabled edges (it is a "
                 "cascade root) but declares no Meta.ttl; the cascade would "
                 "EXPIRE its own key with a nil ttl",
+            )
+
+
+def validate_cascade_key_initials(models: list[type["AtomicRedisModel"]]):
+    """
+    Raise CascadeKeyInitialsError when a cascade participant's class_key_initials()
+    is not its __name__.
+    """
+    plan = build_cascade_plan(models)
+    participant_names: set[str] = set()
+    for class_name, entry in plan.items():
+        if entry.fks:
+            # A cascade root EXPIREs its own key, so its prefix is load-bearing too.
+            participant_names.add(class_name)
+        for edge in entry.fks:
+            # A single-target edge carries candidates=None, so this loops once.
+            for target in edge.candidates or [edge.target]:
+                participant_names.add(target)
+
+    models_by_name = {model.__name__: model for model in models}
+    for name in sorted(participant_names):
+        cls = models_by_name.get(name)
+        if cls is None:
+            # A missing target is validate_cascade_ttl_targets' concern; skip here.
+            continue
+        # Traversal matches a reached {class}:{pk} prefix against __name__-keyed candidates.
+        initials = cls.class_key_initials()
+        if initials != cls.__name__:
+            raise CascadeKeyInitialsError(
+                cls.__name__,
+                f"{cls.__name__!r} participates in the cascade plan but its "
+                f"class_key_initials() returns {initials!r}, not its __name__ "
+                f"{cls.__name__!r}; cascade class resolution matches the reached "
+                "key's {class}:{pk} prefix against __name__-keyed candidates, so "
+                "an override would silently mis-resolve or dead-end the cascade",
             )
 
 

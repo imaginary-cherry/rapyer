@@ -176,6 +176,8 @@ local function cascade_apply(keys, args)
     local pending_refresh = {}
     local refresh_order = {}
     local stack = {}
+    -- Per-call state, never library scope: a hoisted local would leak across FCALLs.
+    local mismatched_class = 0
 
     local function queue_refresh(full_key, class_name, is_root, is_special)
         is_root = is_root or false
@@ -202,7 +204,33 @@ local function cascade_apply(keys, args)
     end
 
     local function push_child(target_key, edge, budget)
-        if type(target_key) == 'string' and budget_is_larger(budget, visited[target_key]) then
+        if type(target_key) ~= 'string' then
+            return
+        end
+        -- A single-target edge reads its class from the plan, never parsing the key.
+        local resolved_class = edge.target
+        if edge.candidates then
+            -- [^:]+ stops at the FIRST colon, mirroring base.py's split(':', maxsplit=1).
+            local prefix = string.match(target_key, '^([^:]+):')
+            if prefix == nil then
+                -- A corrupt reach is not drift: dead-end silently, like the WRONGTYPE contract.
+                return
+            end
+            local is_candidate = false
+            for _, name in ipairs(edge.candidates) do
+                if name == prefix then
+                    is_candidate = true
+                    break
+                end
+            end
+            if not is_candidate or CASCADE_PLAN[prefix] == nil then
+                -- Class drift: tally at reach time, not deduped, so drift stays observable.
+                mismatched_class = mismatched_class + 1
+                return
+            end
+            resolved_class = prefix
+        end
+        if budget_is_larger(budget, visited[target_key]) then
             -- Record the new best budget at PUSH time (not pop time) so a later,
             -- even-larger push for the same key is still correctly detected
             -- against the latest recorded best, and a smaller push arriving
@@ -210,10 +238,7 @@ local function cascade_apply(keys, args)
             visited[target_key] = budget
             stack[#stack + 1] = {
                 key = target_key,
-                -- The edge already carries its target's class name, so the
-                -- child's class is read straight from the plan, never parsed
-                -- back out of the key.
-                class = edge.target,
+                class = resolved_class,
                 edge = edge,
                 budget = budget,
                 -- A child's subtree is always established: it was entered via a
@@ -385,7 +410,7 @@ local function cascade_apply(keys, args)
         end
     end
 
-    return {dangling_children_count, dangling_special_count}
+    return {dangling_children_count, dangling_special_count, mismatched_class}
 end
 
 redis.register_function('RAPYER_CASCADE_FN', cascade_apply)

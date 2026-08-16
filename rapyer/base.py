@@ -622,7 +622,9 @@ class AtomicRedisModel(BaseModel):
                 await pipe.execute()
                 if not cascade:
                     return None
-                return CascadeResult(dangling_children=0, dangling_special=0)
+                return CascadeResult(
+                    dangling_children=0, dangling_special=0, mismatched_class=0
+                )
             # `cascade` is a per-call flag: 0 = root's own keys only, 1 = walk the graph.
             scripts_registry.run_fcall(
                 pipe,
@@ -641,9 +643,11 @@ class AtomicRedisModel(BaseModel):
         if not cascade:
             # Matches the old plain-EXPIRE contract: a non-cascading call returns None.
             return None
-        dangling_children, dangling_special = results[-1]
+        dangling_children, dangling_special, mismatched_class = results[-1]
         return CascadeResult(
-            dangling_children=dangling_children, dangling_special=dangling_special
+            dangling_children=dangling_children,
+            dangling_special=dangling_special,
+            mismatched_class=mismatched_class,
         )
 
     @functools.cached_property
