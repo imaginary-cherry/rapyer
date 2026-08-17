@@ -34,6 +34,8 @@ class RapyerDeleteResult(DeleteResult):
 class CascadeResult(BaseModel):
     dangling_children: int
     dangling_special: int
+    # Reaches whose resolved class was not one of the edge's candidates.
+    mismatched_class: int = 0
 
 
 class GetOrCreateStatus(str, Enum):

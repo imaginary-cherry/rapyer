@@ -45,6 +45,8 @@ PRIVATE_METHODS = _group(
     # Generic
     GenericRedisType.contains_sf_field,
     GenericRedisType.contains_fk_field,
+    RedisSet.contains_fk_field,
+    RedisPriorityQueue.contains_fk_field,
     # AtomicRedisModel
     AtomicRedisModel._search_keys_by_query,
     AtomicRedisModel.build_redis_model,
@@ -65,6 +67,8 @@ PRIVATE_METHODS = _group(
     # Redis round trips, so pipeline/TTL coverage doesn't apply.
     AtomicRedisModel._iter_special_fields,
     AtomicRedisModel._ttl_keys,
+    # Pure in-memory FK-field check gating the TTL cascade fast path; no Redis.
+    AtomicRedisModel._needs_cascade_script,
     AtomicRedisModel.class_key_initials,
     AtomicRedisModel.index_name,
     AtomicRedisModel.create_expressions,

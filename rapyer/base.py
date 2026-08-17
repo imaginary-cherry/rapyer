@@ -245,14 +245,24 @@ class AtomicRedisModel(BaseModel):
         await self.refresh_ttl(can_use_pipeline=can_use_pipeline)
         return None
 
+    @classmethod
+    def _needs_cascade_script(cls) -> bool:
+        # Any FK edge or special-field key needs the script; plain scalars use EXPIRE.
+        return bool(
+            cls._relational_field_names
+            or cls._contain_fk
+            or cls._special_field_names
+            or cls._contain_sf
+        )
+
     async def refresh_ttl(self, can_use_pipeline: bool = False):
         """Refresh TTL unconditionally."""
         if self.Meta.ttl is None:
             return None
         pipe_context = ensure_pipeline if can_use_pipeline else pipeline_with_execution
         async with pipe_context(self.Meta) as pipe:
-            if self.Meta.is_fake_redis:
-                # Cascade edge-following is real-Redis-only; re-arm root-own keys.
+            # Native-EXPIRE fast path on fakeredis or when there is no graph to walk.
+            if self.Meta.is_fake_redis or not self._needs_cascade_script():
                 for key in self.all_keys:
                     pipe.expire(key, self.Meta.ttl)
                 return None
@@ -603,8 +613,8 @@ class AtomicRedisModel(BaseModel):
         # since ensure_pipeline itself pushes a pipeline into context.
         in_outer_pipe = _context_pipe.get() is not None
         async with ensure_pipeline(self.Meta, should_execute=False) as pipe:
-            if self.Meta.is_fake_redis:
-                # Cascade edge-following is a no-op on fakeredis; only root-own keys refresh.
+            # Native-EXPIRE fast path on fakeredis or when there is no graph to walk.
+            if self.Meta.is_fake_redis or not self._needs_cascade_script():
                 for key in self.all_keys:
                     pipe.expire(key, ttl)
                 if in_outer_pipe:
@@ -612,7 +622,9 @@ class AtomicRedisModel(BaseModel):
                 await pipe.execute()
                 if not cascade:
                     return None
-                return CascadeResult(dangling_children=0, dangling_special=0)
+                return CascadeResult(
+                    dangling_children=0, dangling_special=0, mismatched_class=0
+                )
             # `cascade` is a per-call flag: 0 = root's own keys only, 1 = walk the graph.
             scripts_registry.run_fcall(
                 pipe,
@@ -631,9 +643,11 @@ class AtomicRedisModel(BaseModel):
         if not cascade:
             # Matches the old plain-EXPIRE contract: a non-cascading call returns None.
             return None
-        dangling_children, dangling_special = results[-1]
+        dangling_children, dangling_special, mismatched_class = results[-1]
         return CascadeResult(
-            dangling_children=dangling_children, dangling_special=dangling_special
+            dangling_children=dangling_children,
+            dangling_special=dangling_special,
+            mismatched_class=mismatched_class,
         )
 
     @functools.cached_property

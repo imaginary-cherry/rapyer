@@ -176,6 +176,8 @@ local function cascade_apply(keys, args)
     local pending_refresh = {}
     local refresh_order = {}
     local stack = {}
+    -- Per-call state, never library scope: a hoisted local would leak across FCALLs.
+    local mismatched_class = 0
 
     local function queue_refresh(full_key, class_name, is_root, is_special)
         is_root = is_root or false
@@ -202,7 +204,33 @@ local function cascade_apply(keys, args)
     end
 
     local function push_child(target_key, edge, budget)
-        if type(target_key) == 'string' and budget_is_larger(budget, visited[target_key]) then
+        if type(target_key) ~= 'string' then
+            return
+        end
+        -- A single-target edge reads its class from the plan, never parsing the key.
+        local resolved_class = edge.target
+        if edge.candidates then
+            -- [^:]+ stops at the FIRST colon, mirroring base.py's split(':', maxsplit=1).
+            local prefix = string.match(target_key, '^([^:]+):')
+            if prefix == nil then
+                -- A corrupt reach is not drift: dead-end silently, like the WRONGTYPE contract.
+                return
+            end
+            local is_candidate = false
+            for _, name in ipairs(edge.candidates) do
+                if name == prefix then
+                    is_candidate = true
+                    break
+                end
+            end
+            if not is_candidate or CASCADE_PLAN[prefix] == nil then
+                -- Class drift: tally at reach time, not deduped, so drift stays observable.
+                mismatched_class = mismatched_class + 1
+                return
+            end
+            resolved_class = prefix
+        end
+        if budget_is_larger(budget, visited[target_key]) then
             -- Record the new best budget at PUSH time (not pop time) so a later,
             -- even-larger push for the same key is still correctly detected
             -- against the latest recorded best, and a smaller push arriving
@@ -210,16 +238,47 @@ local function cascade_apply(keys, args)
             visited[target_key] = budget
             stack[#stack + 1] = {
                 key = target_key,
-                -- The edge already carries its target's class name, so the
-                -- child's class is read straight from the plan, never parsed
-                -- back out of the key.
-                class = edge.target,
+                class = resolved_class,
                 edge = edge,
                 budget = budget,
                 -- A child's subtree is always established: it was entered via a
                 -- cascade edge. Only the root frame is not-yet-established.
                 established = true,
             }
+        end
+    end
+
+    -- SF-held-ref edge: read the field's own SET/ZSET key (not the inline
+    -- JSON document) and feed each decoded member through push_child.
+    -- next_hop is called ONCE per edge here, never per member.
+    local function push_sf_edge(parent_key, edge, remaining_budget, established)
+        local follow, budget = next_hop(edge, remaining_budget, established)
+        if not follow then
+            return
+        end
+        if not edge.recurse_into_target then
+            budget = 0
+        end
+        -- redis.pcall (unlike redis.call) returns an error table instead of
+        -- raising on a Redis-level error such as WRONGTYPE -- a corrupt SF
+        -- container key becomes a dead end (no members) for this edge only,
+        -- not an aborted cascade, matching read_reference_paths' contract.
+        local sf_key = special_prefix .. ':' .. parent_key .. ':' .. edge.path
+        local raw_members
+        if edge.sf_container == 'set' then
+            raw_members = redis.pcall('SMEMBERS', sf_key)
+        else
+            raw_members = redis.pcall('ZRANGE', sf_key, 0, -1)
+        end
+        local members = (type(raw_members) == 'table' and raw_members.err == nil)
+            and raw_members or {}
+        for _, raw_member in ipairs(members) do
+            -- A malformed (non-JSON) or non-string-decoded member is a dead
+            -- end for that member only -- never aborts the atomic FCALL.
+            local ok, target_key = pcall(cjson.decode, raw_member)
+            if ok and type(target_key) == 'string' then
+                push_child(target_key, edge, budget)
+            end
         end
     end
 
@@ -236,12 +295,21 @@ local function cascade_apply(keys, args)
             return  -- no reference paths to read for this class
         end
         local paths = {}
+        local inline_edges = {}
         for _, edge in ipairs(edges) do
-            paths[#paths + 1] = edge.path
+            if edge.sf_container then
+                push_sf_edge(parent_key, edge, remaining_budget, established)
+            else
+                paths[#paths + 1] = edge.path
+                inline_edges[#inline_edges + 1] = edge
+            end
         end
-        -- One JSON.GET reads every edge path of this node, not one per edge.
+        if #paths == 0 then
+            return  -- every edge on this class was SF-held; no inline JSON.GET needed
+        end
+        -- One JSON.GET reads every inline edge path of this node, not one per edge.
         local values_by_path = read_reference_paths(parent_key, paths)
-        for _, edge in ipairs(edges) do
+        for _, edge in ipairs(inline_edges) do
             local matched = values_by_path[edge.path]
             if matched ~= nil then
                 local follow, budget = next_hop(edge, remaining_budget, established)
@@ -342,7 +410,7 @@ local function cascade_apply(keys, args)
         end
     end
 
-    return {dangling_children_count, dangling_special_count}
+    return {dangling_children_count, dangling_special_count, mismatched_class}
 end
 
 redis.register_function('RAPYER_CASCADE_FN', cascade_apply)
