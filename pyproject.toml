@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rapyer"
-version = "1.3.4"
+version = "1.3.6"
 description = "Pydantic models with Redis as the backend"
 authors = [{name = "YedidyaHKfir", email = "yedidyakfir@gmail.com"}]
 readme = "README.md"
