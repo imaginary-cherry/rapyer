@@ -19,7 +19,7 @@
 
 ### 🐛 Fixed
 
-- **TTL cascade no longer slows bulk inserts of non-referencing models**: `refresh_ttl`/`aset_ttl` issued a per-model server-side cascade `FCALL` on every TTL refresh, so bulk-inserting many models that hold no `ForeignKey` fields paid that call once per model for no benefit — a ~13% regression on the bulk-insert-with-TTL path. Models with no foreign-key fields now take the native `EXPIRE` fast path; models that reference others still cascade atomically server-side, unchanged. (#288)
+- **TTL cascade no longer slows bulk inserts of non-referencing models**: `refresh_ttl`/`aset_ttl` issued a per-model server-side cascade `FCALL` on every TTL refresh, so bulk-inserting many models that hold no `ForeignKey` fields paid that call once per model for no benefit — a ~13% regression on the bulk-insert-with-TTL path. Models with neither reference fields nor special fields now take the native `EXPIRE` fast path; models that reference others — or that own special-field keys — still cascade atomically server-side, unchanged. (#288)
 - **`init_rapyer` no longer leaves models pinned to the default client after a failed startup**: registered models are now rebound to the supplied Redis client before any initialization I/O runs, so a failure during script registration or index creation can no longer leave models still talking to `localhost:6379`. (#276)
 
 ### 🛠️ Technical Improvements

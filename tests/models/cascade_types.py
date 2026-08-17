@@ -719,4 +719,9 @@ ALL_CASCADE_MODELS = [
     CascadeColonPkMember,
     CascadeColonPkOwner,
     CascadeUnionDepthRoot,
+    CascadePolyBase,
+    CascadePolySub1,
+    CascadePolySub2,
+    CascadePolyOwner,
+    CascadePolyDedupOwner,
 ]
