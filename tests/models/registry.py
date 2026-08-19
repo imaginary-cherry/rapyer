@@ -106,8 +106,10 @@ from tests.models.special_types import (
     PriorityQueueIntModel,
     PriorityQueueModel,
     RedisSetContainerModel,
+    RedisTextModel,
     SubSubPriorityQueueModel,
     SubSubRedisSetModel,
+    VectorAnnotatedTextModel,
 )
 from tests.models.specialized import UserModel
 from tests.models.unknown_types import (
@@ -222,6 +224,9 @@ TESTED_REDIS_MODELS = [
     SubSubRedisSetModel,
     RedisSetContainerModel,
     ListOfSetsModel,
+    # Special types (redis text)
+    RedisTextModel,
+    VectorAnnotatedTextModel,
     # Foreign key types
     FkAuthor,
     FkBook,

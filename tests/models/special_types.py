@@ -1,13 +1,44 @@
-from typing import ClassVar, Generic, Optional, TypeVar
+import hashlib
+from typing import Annotated, ClassVar, Generic, Optional, TypeVar
 
 from pydantic import Field
 
 from rapyer.base import AtomicRedisModel, RedisConfig
+from rapyer.fields.vector import Vector
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.redis_set import RedisSet
+from rapyer.types.text import RedisText
 from tests.models.simple_types import TTL_TEST_SECONDS
 
 T = TypeVar("T")
+
+
+class _FakeTextEmbeddingAdapter:
+    """Deterministic, network-free EmbeddingAdapter double for RedisText fixtures."""
+
+    # Content-keyed vector: identical text always yields the identical vector.
+    def __init__(self):
+        self.call_count = 0
+
+    @property
+    def dims(self):
+        return 3
+
+    @property
+    def label(self):
+        return "fake-text-adapter@1:3"
+
+    @staticmethod
+    def _vector_for(content: str) -> list[float]:
+        digest = hashlib.sha256(content.encode()).digest()
+        return [digest[0] / 255.0, digest[1] / 255.0, digest[2] / 255.0]
+
+    async def aembed(self, content: str) -> list[float]:
+        return self._vector_for(content)
+
+    async def aembed_many(self, contents: list[str]) -> list[list[float]]:
+        self.call_count += 1
+        return [self._vector_for(content) for content in contents]
 
 
 class PriorityQueueModelBase(AtomicRedisModel, Generic[T]):
@@ -102,3 +133,19 @@ class ListOfSetsModel(AtomicRedisModel):
     # A plain list of bare special fields: the metaclass detects the nested
     # special field via GenericRedisType.contains_sf_field.
     buckets: list[RedisSet] = Field(default_factory=list)
+
+
+class RedisTextModel(AtomicRedisModel):
+    name: str = "default"
+    body: RedisText = Field(default_factory=lambda: RedisText(""))
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(vectorizer=_FakeTextEmbeddingAdapter())
+
+
+class VectorAnnotatedTextModel(AtomicRedisModel):
+    name: str = "default"
+    body: Annotated[RedisText, Vector(dim=3)] = Field(
+        default_factory=lambda: RedisText("")
+    )
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(vectorizer=_FakeTextEmbeddingAdapter())
