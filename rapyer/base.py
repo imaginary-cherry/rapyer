@@ -1130,6 +1130,13 @@ class AtomicRedisModel(BaseModel):
             if isinstance(attr, (BaseRedisType, AtomicRedisModel)):
                 attr._base_model_link = self
                 attr.field_name = f".{name}"
+            if isinstance(attr, RedisText):
+                # D-06: carry the OLD instance's dirty-check baseline forward.
+                attr._baseline_text = (
+                    getattr(previous, "_baseline_text", None)
+                    if isinstance(previous, RedisText)
+                    else None
+                )
 
         if skip_redis_set:
             return
@@ -1178,13 +1185,6 @@ class AtomicRedisModel(BaseModel):
             if isinstance(attr, (BaseRedisType, AtomicRedisModel)):
                 attr._base_model_link = self
                 attr.field_name = f".{name}"
-            if isinstance(attr, RedisText):
-                # D-06: carry the OLD instance's dirty-check baseline forward.
-                attr._baseline_text = (
-                    getattr(previous, "_baseline_text", None)
-                    if isinstance(previous, RedisText)
-                    else None
-                )
 
 
 REDIS_MODELS: list[type[AtomicRedisModel]] = []
