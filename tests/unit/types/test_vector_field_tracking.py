@@ -5,10 +5,28 @@ from rapyer.fields.vector import Vector, VectorAnnotation
 from rapyer.types.text import RedisText
 
 
+class _DimAdapter:
+    """EmbeddingAdapter double whose dims is fixed at construction time."""
+
+    def __init__(self, dims: int):
+        self._dims = dims
+
+    @property
+    def dims(self):
+        return self._dims
+
+    async def aembed(self, content):
+        return [0.0] * self._dims
+
+    async def aembed_many(self, contents):
+        return [[0.0] * self._dims for _ in contents]
+
+
+# Preset dims matches the declared Vector(dim=...) to avoid tripping init.py's dim check.
 class VectorFieldModel(AtomicRedisModel):
     body: Annotated[RedisText, Vector(dim=3)] = ""
 
-    Meta: ClassVar[RedisConfig] = RedisConfig()
+    Meta: ClassVar[RedisConfig] = RedisConfig(vectorizer=_DimAdapter(3))
 
 
 class BareTextFieldModel(AtomicRedisModel):
@@ -19,6 +37,8 @@ class BareTextFieldModel(AtomicRedisModel):
 
 class OverriddenVectorDimModel(VectorFieldModel):
     body: Annotated[RedisText, Vector(dim=5)] = ""
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(vectorizer=_DimAdapter(5))
 
 
 class OverriddenToPlainFieldModel(VectorFieldModel):

@@ -13,6 +13,7 @@ from rapyer.cascade.planner import (
 )
 from rapyer.embeddings.adapter import default_embedding_adapter
 from rapyer.embeddings.protocol import EmbeddingAdapter
+from rapyer.errors import VectorDimMismatchError
 from rapyer.result import resolve_forward_refs
 from rapyer.scripts import register_cascade_function, register_scripts
 from rapyer.types.relational import resolve_relational_targets
@@ -65,6 +66,13 @@ async def init_rapyer(
             # Unlike cascade_ttl, a per-model preset (D-06) beats this global param/default.
             if not model.Meta._vectorizer_preset:
                 model.Meta._resolve_vectorizer(default_vectorizer)
+
+            # A declared Vector(dim=N) must match the now-resolved vectorizer's dims (D-03).
+            for field_name, vector_annotation in model._vector_fields.items():
+                if vector_annotation.dim != model.Meta.vectorizer.dims:
+                    raise VectorDimMismatchError(
+                        field_name, vector_annotation.dim, model.Meta.vectorizer.dims
+                    )
 
             # Initialize model fields
             model.init_class()
