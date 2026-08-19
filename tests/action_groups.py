@@ -64,6 +64,8 @@ PRIVATE_METHODS = _group(
     # Pure in-memory traversal / key enumeration for special fields — no
     # Redis round trips, so pipeline/TTL coverage doesn't apply.
     AtomicRedisModel._iter_special_fields,
+    # Private prepare-pass orchestrator; the RedisText calls it feeds are what the matrix covers.
+    AtomicRedisModel._aprepare_special_fields,
     AtomicRedisModel._ttl_keys,
     AtomicRedisModel.class_key_initials,
     AtomicRedisModel.index_name,

@@ -43,6 +43,7 @@ from rapyer.context import (
     pipeline_with_execution,
     with_pipe_context,
 )
+from rapyer.embeddings.adapter import pack_float32_blob
 from rapyer.errors import (
     BadDeleteActionError,
     CantSerializeRedisValueError,
@@ -525,6 +526,7 @@ class AtomicRedisModel(BaseModel):
     @mark_actions(ActionGroup.UPDATE, ActionGroup.CREATE)
     async def asave(self) -> Self:
         model_dump = self.redis_dump()
+        await self._aprepare_special_fields()
         async with ensure_pipeline(self.Meta):
             pipeline_json = get_pipe_json()
             pipeline_json.set(self.key, self.json_path, model_dump)
@@ -560,6 +562,7 @@ class AtomicRedisModel(BaseModel):
         async with ensure_pipeline(self.Meta) as pipe:
             for dup in duplicated_models:
                 pipe.copy(self.key, dup.key)
+            # D-17: no prepare pass - aduplicate_special COPYs persisted state, not the in-memory value.
             for source_field, _ in self._iter_special_fields():
                 field_cls = type(source_field)
                 for dup in duplicated_models:
@@ -848,6 +851,8 @@ class AtomicRedisModel(BaseModel):
     @classmethod
     @mark_actions(ActionGroup.CREATE, target=TargetSource.RESULT)
     async def ainsert(cls, *models: Unpack[Self]):
+        for model in models:
+            await model._aprepare_special_fields()
         async with ensure_pipeline(cls.Meta):
             pipe_json = get_pipe_json()
             for model in models:
@@ -872,6 +877,30 @@ class AtomicRedisModel(BaseModel):
             if isinstance(child, AtomicRedisModel):
                 yield from child._iter_special_fields((*prefix, fname))
 
+    async def _aprepare_special_fields(self) -> None:
+        """
+        Batch every dirty SF field's embedding into one aembed_many() call
+        before this model's write path opens its pipeline (D-07/D-08/EMBED-05).
+        Dispatches purely through pending_embed_text()/aprepare_special() -
+        never isinstance()-checks for a concrete SpecialFieldType subclass.
+        """
+        sf_fields = list(self._iter_special_fields())
+        pending_texts: list[str] = []
+        pending_fields: list[BaseRedisType] = []
+        for field, _ in sf_fields:
+            text = field.pending_embed_text()
+            if text is not None:
+                pending_texts.append(text)
+                pending_fields.append(field)
+        if pending_texts:
+            vectors = await self.Meta.vectorizer.aembed_many(pending_texts)
+            for field, vector in zip(pending_fields, vectors):
+                field._prepared_vector = pack_float32_blob(
+                    vector, self.Meta.vectorizer.dims
+                )
+        for field, _ in sf_fields:
+            await field.aprepare_special()
+
     def _ttl_keys(self) -> list[str]:
         """
         Every Redis key whose TTL tracks this model: the main key plus each
@@ -892,6 +921,8 @@ class AtomicRedisModel(BaseModel):
     async def aget_or_create(cls, model: Self) -> "GetOrCreateResult[Self]":
         if model.is_inner_model():
             raise RuntimeError("Can only aget_or_create from top level model")
+
+        await model._aprepare_special_fields()
 
         # Build (type_name, special_key, save_payload) triples for every SF
         # field — direct and nested — in a single pass so the ARGV order and
@@ -1070,6 +1101,7 @@ class AtomicRedisModel(BaseModel):
     async def alock_from_key(
         cls, key: str, action: str = "default", save_at_end: bool = False
     ) -> AbstractAsyncContextManager[Self]:
+        # D-15: mutating RedisText here holds this lock across asave()'s embed call (see types/text.py).
         async with acquire_lock(cls.Meta.redis, f"{key}/{action}"):
             redis_model = await cls.aget(key)
             yield redis_model
@@ -1293,6 +1325,8 @@ def find_redis_models() -> list[type[AtomicRedisModel]]:
 
 @mark_actions(ActionGroup.CREATE, target=TargetSource.MANUAL, version=MarkVersion.V1)
 async def ainsert(*models: Unpack[AtomicRedisModel]) -> list[AtomicRedisModel]:
+    for model in models:
+        await model._aprepare_special_fields()
     async with ensure_pipeline(AtomicRedisModel.Meta):
         pipe_json = get_pipe_json()
         for model in models:
