@@ -10,6 +10,7 @@ from rapyer.types.redis_set import RedisSet
 from rapyer.types.relational import RelationalFieldType
 from rapyer.types.special import SpecialFieldType
 from rapyer.types.string import RedisStr
+from rapyer.types.text import RedisText
 
 __all__ = [
     "RedisStr",
@@ -26,4 +27,5 @@ __all__ = [
     "Reference",
     "RedisPriorityQueue",
     "RedisSet",
+    "RedisText",
 ]

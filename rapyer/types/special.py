@@ -51,12 +51,15 @@ class SpecialFieldType(BaseRedisType, abc.ABC):
         """
 
     @abc.abstractmethod
-    async def aduplicate_special(self, target_special_key: str):
+    async def aduplicate_special(self, target_special_key: str, target_model_key: str):
         """Copy this field's data to a new key for a duplicated model.
 
         The *read* must use ``self.redis`` (direct client) so the data is
         available immediately; the *write* should use ``self.client`` so it
-        participates in any active pipeline.
+        participates in any active pipeline. ``target_model_key`` is the
+        duplicated model's own key — needed by SF types (e.g. ``RedisText``)
+        whose stored data embeds the owning model's key and must not carry
+        the source model's key forward into the duplicate.
         """
 
     async def aprepare_special(self) -> None:

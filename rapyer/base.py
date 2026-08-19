@@ -557,7 +557,7 @@ class AtomicRedisModel(BaseModel):
                     target_key = field_cls.special_field_key(
                         dup.key, source_field.field_path
                     )
-                    await source_field.aduplicate_special(target_key)
+                    await source_field.aduplicate_special(target_key, dup.key)
         return duplicated_models
 
     def update(self, **kwargs):

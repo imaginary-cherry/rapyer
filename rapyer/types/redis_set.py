@@ -231,7 +231,7 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
     async def adelete_special(self):
         await self.client.delete(self.special_key)
 
-    async def aduplicate_special(self, target_special_key: str):
+    async def aduplicate_special(self, target_special_key: str, target_model_key: str):
         members = await self.redis.smembers(self.special_key)
         if members:
             await self.client.sadd(target_special_key, *members)
