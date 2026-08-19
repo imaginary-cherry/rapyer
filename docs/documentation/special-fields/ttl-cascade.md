@@ -182,6 +182,103 @@ the same atomic script, but the dangling counts aren't surfaced to the caller.
     `Meta.ttl`. A `None` TTL would otherwise become a nil-argument Lua runtime error at
     write time; failing fast at startup catches this instead.
 
+## Cost and Scaling
+
+A cascade is **linear in the number of keys it reaches**. For every reached node the
+server-side function issues one `EXPIRE`, plus one `JSON.GET` for each node that has
+outgoing reference paths to read. There is no per-node round trip — the whole walk
+happens inside a single `FCALL` — but there is also no batching: a graph twice as large
+costs roughly twice as much.
+
+The chart plots measured wall time against the number of reached keys, both axes
+logarithmic. A straight line means cost rises in direct proportion to graph size; the
+measured slope is 1.03, so ten times the links costs very close to ten times the time.
+
+<svg viewBox="0 0 700 280" role="img" aria-label="Cascade wall time against number of reached keys, log-log. Time rises in direct proportion to graph size: 1000 keys take 6 milliseconds, 500000 keys take 3.6 seconds, and one million keys is projected at about 7 seconds, above the 5 second mark where Redis begins replying BUSY.">
+<g stroke="currentColor" stroke-opacity="0.18" stroke-width="1">
+<line x1="90" y1="190" x2="660" y2="190"/>
+<line x1="90" y1="140" x2="660" y2="140"/>
+<line x1="90" y1="90" x2="660" y2="90"/>
+<line x1="90" y1="40" x2="660" y2="40"/>
+</g>
+<g stroke="currentColor" stroke-width="1.2">
+<line x1="90" y1="240" x2="660" y2="240"/>
+<line x1="90" y1="240" x2="90" y2="36"/>
+</g>
+<g font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10" fill="currentColor" fill-opacity="0.75" text-anchor="end">
+<text x="84" y="193">10ms</text>
+<text x="84" y="143">100ms</text>
+<text x="84" y="93">1s</text>
+<text x="84" y="43">10s</text>
+</g>
+<g font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10" fill="currentColor" fill-opacity="0.75" text-anchor="middle">
+<text x="90" y="256">1k</text>
+<text x="220" y="256">5k</text>
+<text x="333" y="256">20k</text>
+<text x="407" y="256">50k</text>
+<text x="520" y="256">200k</text>
+<text x="594" y="256">500k</text>
+<text x="650" y="256">1M</text>
+<text x="375" y="272" fill-opacity="0.6">keys reached by the cascade</text>
+</g>
+<line x1="90" y1="55" x2="660" y2="55" stroke="#c0562a" stroke-width="1.4" stroke-dasharray="5 4"/>
+<text x="656" y="50" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10" fill="#c0562a" text-anchor="end">5s — Redis starts replying BUSY to other clients</text>
+<polyline points="90,201 220,170 333,143 407,121 520,85 594,62" fill="none" stroke="#4a7fb5" stroke-width="2.2"/>
+<line x1="594" y1="62" x2="650" y2="48" stroke="#4a7fb5" stroke-width="1.6" stroke-dasharray="4 3"/>
+<g fill="#4a7fb5">
+<circle cx="90" cy="201" r="3.5"/>
+<circle cx="220" cy="170" r="3.5"/>
+<circle cx="333" cy="143" r="3.5"/>
+<circle cx="407" cy="121" r="3.5"/>
+<circle cx="520" cy="85" r="3.5"/>
+<circle cx="594" cy="62" r="3.5"/>
+</g>
+<circle cx="650" cy="48" r="3.5" fill="none" stroke="#4a7fb5" stroke-width="1.8"/>
+<g font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9.5" fill="currentColor" fill-opacity="0.8">
+<text x="98" y="197">6ms</text>
+<text x="520" y="78">1.3s</text>
+<text x="560" y="57">3.6s</text>
+<text x="628" y="38">~7s</text>
+</g>
+</svg>
+
+Measured on Redis Stack 7.2 in Docker on a laptop, one root over edge-free children.
+Treat the slope as the takeaway and the absolute numbers as indicative — they move with
+hardware. The hollow point at 1M is projected from the slope, not measured on this shape.
+
+Graph *shape* changes the constant, not the growth rate, because interior nodes each pay
+a `JSON.GET` that leaves do not:
+
+| shape at ~1M nodes | wall time |
+| --- | --- |
+| One root over 1,000,000 edge-free children | 3.2s |
+| A 1,000,000-node chain, one reference per node | 7.9s |
+| A branching tree, 1,111,111 nodes | 10.3s |
+
+These three shapes are covered by `benchmarks/test_cascade_ttl_large.py`; set
+`BENCHMARK_CASCADE_LARGE_SIZE` to run them at a different size.
+
+!!! warning "A cascade over a very large graph blocks the whole server"
+    Redis executes the function on its single command thread, so nothing else is served
+    until the walk finishes. Below `busy-reply-threshold` (5 seconds by default) every
+    client simply blocks, including one trying to intervene. Past it, clients receive
+    `BUSY`. `FUNCTION KILL` then works only while the function is still reading — the
+    walk collects every key before writing any — but once it starts issuing `EXPIRE`s a
+    kill is refused, leaving `SHUTDOWN NOSAVE` as the only escape. Keep cascade-reachable
+    graphs well under that bound, or raise the threshold deliberately.
+
+!!! danger "Every write re-walks the whole subtree"
+    The automatic path fires on *each* `asave()` / `refresh_ttl()` of a model that has
+    cascade-enabled edges, and each firing walks everything currently reachable. Building
+    a connected graph one node at a time is therefore quadratic: inserting a 1,000-node
+    chain node by node issues 500,500 `EXPIRE` calls (1 + 2 + … + 1000), not 1,000. At a
+    million nodes that is ~5×10¹¹ expiries — effectively unbounded.
+
+    When bulk-loading, keep the cascade off the per-node path: set `Meta.refresh_ttl` to
+    an `ActionGroup` that excludes creates (for example `ActionGroup.UPDATE`), or write
+    the nodes unlinked and attach the references last. Either way the cascade runs once
+    over the finished graph instead of once per node.
+
 ## Cluster Boundary
 
 !!! warning "Standalone Redis only"
