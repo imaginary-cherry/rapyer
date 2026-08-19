@@ -113,5 +113,17 @@ def has_annotation(field: Any, annotation_type: Any) -> bool:
     return False
 
 
+def get_annotation(field: Any, annotation_type: Any) -> Any | None:
+    """Return the matching ``annotation_type`` metadata instance on ``field``, or ``None``."""
+    origin = get_origin(field)
+    if origin is Annotated:
+        args = get_args(field)
+        for metadata in args[1:]:
+            if isinstance(metadata, annotation_type):
+                return metadata
+
+    return None
+
+
 def field_with_flag(field, flag):
     return any([isinstance(metadata, flag) for metadata in field.metadata])
