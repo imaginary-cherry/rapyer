@@ -88,6 +88,7 @@ from rapyer.types.special import (
     SPECIAL_FIELD_KEY_PREFIX,
     SpecialFieldType,
 )
+from rapyer.types.text import RedisText
 from rapyer.typing_support import Self, Unpack
 from rapyer.utils.annotation import (
     DYNAMIC_CLASS_DOC,
@@ -1119,6 +1120,7 @@ class AtomicRedisModel(BaseModel):
             skip_redis_set = value._redis_updated
             value._redis_updated = False
 
+        previous = self.__dict__.get(name)
         super().__setattr__(name, value)
         if name not in self.__class__.model_fields or value is None:
             return
@@ -1176,6 +1178,13 @@ class AtomicRedisModel(BaseModel):
             if isinstance(attr, (BaseRedisType, AtomicRedisModel)):
                 attr._base_model_link = self
                 attr.field_name = f".{name}"
+            if isinstance(attr, RedisText):
+                # D-06: carry the OLD instance's dirty-check baseline forward.
+                attr._baseline_text = (
+                    getattr(previous, "_baseline_text", None)
+                    if isinstance(previous, RedisText)
+                    else None
+                )
 
 
 REDIS_MODELS: list[type[AtomicRedisModel]] = []
