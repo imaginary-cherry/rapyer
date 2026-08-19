@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from typing import Annotated, ClassVar, Dict, List, Optional
 
@@ -150,6 +151,53 @@ class BenchCascadeListRoot(AtomicRedisModel):
     name: str = "root"
     children: Annotated[list[Reference[BenchCascadeChild]], CascadeTTL()] = Field(
         default_factory=list
+    )
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=BENCHMARK_TTL_SECONDS)
+
+
+# Large-graph cascade benchmarks: ~1M-node walks in three shapes. Size is env
+# overridable so a constrained runner can dial it down without editing code.
+BENCHMARK_CASCADE_LARGE_SIZE = int(os.getenv("BENCHMARK_CASCADE_LARGE_SIZE", "1000000"))
+BENCHMARK_CASCADE_LARGE_BRANCH = 10
+
+
+class BenchCascadeLargeLeaf(AtomicRedisModel):
+    """Edge-free leaf: a reached child costing one EXPIRE and no JSON.GET."""
+
+    name: str = "leaf"
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=BENCHMARK_TTL_SECONDS)
+
+
+class BenchCascadeLargeFanRoot(AtomicRedisModel):
+    """Wide and shallow: one root referencing every leaf in a single hop."""
+
+    name: str = "root"
+    children: Annotated[list[Reference[BenchCascadeLargeLeaf]], CascadeTTL()] = Field(
+        default_factory=list
+    )
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=BENCHMARK_TTL_SECONDS)
+
+
+class BenchCascadeLargeChainNode(AtomicRedisModel):
+    """Narrow and deep: one hop per node, so the walk is pure traversal depth."""
+
+    name: str = "node"
+    next: Annotated[Optional[Reference["BenchCascadeLargeChainNode"]], CascadeTTL()] = (
+        None
+    )
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=BENCHMARK_TTL_SECONDS)
+
+
+class BenchCascadeLargeTreeNode(AtomicRedisModel):
+    """Branching: every interior node pays its own JSON.GET, the mageflow shape."""
+
+    name: str = "node"
+    children: Annotated[list[Reference["BenchCascadeLargeTreeNode"]], CascadeTTL()] = (
+        Field(default_factory=list)
     )
 
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=BENCHMARK_TTL_SECONDS)
