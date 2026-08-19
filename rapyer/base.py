@@ -61,6 +61,7 @@ from rapyer.fields.expression import AtomicField, Expression, ExpressionField
 from rapyer.fields.index import IndexAnnotation
 from rapyer.fields.key import KeyAnnotation, RapyerKey
 from rapyer.fields.safe_load import SafeLoadAnnotation
+from rapyer.fields.vector import VectorAnnotation
 from rapyer.links import ATOMIC_MODEL_API_REF_LINK, REDIS_SUPPORTED_LINK
 from rapyer.result import (
     CascadeResult,
@@ -92,6 +93,7 @@ from rapyer.utils.annotation import (
     DYNAMIC_CLASS_DOC,
     annotation_origin,
     field_with_flag,
+    get_annotation,
     has_annotation,
     replace_to_redis_types_in_annotation,
     strip_optional,
@@ -168,6 +170,7 @@ class AtomicRedisModel(BaseModel):
     _key_field_name: ClassVar[str | None] = None
     _safe_load_fields: ClassVar[set[str]] = set()
     _special_field_names: ClassVar[set[str]] = set()
+    _vector_fields: ClassVar[dict[str, VectorAnnotation]] = {}
     _relational_field_names: ClassVar[set[str]] = set()
     _redis_link_field_names: ClassVar[set[str]] = set()
     _contain_sf: ClassVar[set[str]] = set()
@@ -408,6 +411,7 @@ class AtomicRedisModel(BaseModel):
         )
         cls._contain_sf = set(getattr(cls, "_contain_sf", set()))
         cls._contain_fk = set(getattr(cls, "_contain_fk", set()))
+        cls._vector_fields = dict(getattr(cls, "_vector_fields", {}))
         for field_name, annotation in cls.__annotations__.items():
             # If the field was redfined, we remove it from list
             cls._redis_link_field_names.discard(field_name)
@@ -415,6 +419,7 @@ class AtomicRedisModel(BaseModel):
             cls._contain_sf.discard(field_name)
             cls._relational_field_names.discard(field_name)
             cls._contain_fk.discard(field_name)
+            cls._vector_fields.pop(field_name, None)
 
             unwrapped = annotation
             while get_origin(unwrapped) is Annotated:
@@ -422,6 +427,9 @@ class AtomicRedisModel(BaseModel):
             origin = get_origin(unwrapped) or unwrapped
             if safe_issubclass(origin, SpecialFieldType):
                 cls._special_field_names.add(field_name)
+            vector_annotation = get_annotation(annotation, VectorAnnotation)
+            if vector_annotation is not None:
+                cls._vector_fields[field_name] = vector_annotation
 
             # Foreign keys: Check if field is a foreign key or has a FK
             fk_origin = strip_optional(unwrapped)
