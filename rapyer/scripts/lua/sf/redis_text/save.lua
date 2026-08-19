@@ -1,0 +1,3 @@
+-- Verified against real Redis 7.2.6 at :6370 on 2026-08-19: no `base64` global exists in the
+-- Lua sandbox (accessing it raises "Script attempted to access nonexistent global variable
+-- 'base64'"); `cjson`, by contrast, resolves as a live table. A base64 decoder must be vendored.
