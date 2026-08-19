@@ -20,7 +20,12 @@ from rapyer.errors.cascade import (
     MetaFrozenError,
 )
 from rapyer.errors.delete import BadDeleteActionError
-from rapyer.errors.embeddings import EmbeddingsExtraNotInstalledError
+from rapyer.errors.embeddings import (
+    EmbeddingsExtraNotInstalledError,
+    RedisTextEmbeddingNotMaterializedError,
+    RedisTextRealRedisRequiredError,
+    VectorDimMismatchError,
+)
 from rapyer.errors.find import (
     BadFilterError,
     CantSerializeRedisValueError,
@@ -64,9 +69,12 @@ __all__ = [
     "RapyerError",
     "RapyerModelDoesntExistError",
     "RapyerSerializationError",
+    "RedisTextEmbeddingNotMaterializedError",
+    "RedisTextRealRedisRequiredError",
     "ScriptsNotInitializedError",
     "UnsupportedArgumentTypeError",
     "UnsupportedArgumentValueError",
     "UnsupportedIndexedFieldError",
     "UpdateAtomicModelError",
+    "VectorDimMismatchError",
 ]

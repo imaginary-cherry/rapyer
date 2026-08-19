@@ -90,6 +90,10 @@ class RedisvlEmbeddingAdapter:
     def dims(self) -> int:
         return self._dims
 
+    @property
+    def label(self) -> str:
+        return self._label
+
     def _warn_if_truncated(self, content: str) -> None:
         # Best-effort signal only, never raises - exact tokenization is provider-specific.
         max_length = getattr(self._vectorizer, "max_length", None)
@@ -216,6 +220,10 @@ class DefaultEmbeddingAdapter:
     @property
     def dims(self) -> int:
         return self._resolve().dims
+
+    @property
+    def label(self) -> str:
+        return self._resolve().label
 
     async def aembed(self, content: str) -> list[float]:
         return await self._resolve().aembed(content)

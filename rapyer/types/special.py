@@ -59,6 +59,31 @@ class SpecialFieldType(BaseRedisType, abc.ABC):
         participates in any active pipeline.
         """
 
+    async def aprepare_special(self) -> None:
+        """Pre-``ensure_pipeline()`` materialization seam (D-07/EMBED-05).
+
+        Default no-op, inherited unchanged by every existing SF subclass.
+        ``RedisText`` (Plan 06-02) overrides this to be the actual per-field
+        materializer that consumes an already-computed vector and stashes it
+        for ``asave_special()``/``lua_save_payload()``.
+        """
+
+    def pending_embed_text(self) -> Optional[str]:
+        """Generic, type-agnostic half of the D-07/D-08 seam.
+
+        The model-level prepare pass (Plan 06-03) calls this on every SF
+        field via ``_iter_special_fields()`` to discover which fields want a
+        batched embedding computed this pass, without ever needing to
+        ``isinstance()``-check for ``RedisText`` in ``base.py``: ``RedisText``
+        overrides this to report its own current text when dirty (and
+        ``None`` when clean), letting ``base.py`` collect every dirty
+        field's text, issue exactly one ``aembed_many(...)`` (D-08), then
+        hand each field its own vector back before calling
+        ``aprepare_special()`` (which is where ``RedisText`` actually
+        stashes it).
+        """
+        return None
+
     @classmethod
     def lua_type_name(cls) -> str:
         """

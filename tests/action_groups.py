@@ -109,6 +109,8 @@ PRIVATE_INHERITED_METHODS = _group(
     SpecialFieldType.asave_special,
     SpecialFieldType.adelete_special,
     SpecialFieldType.aduplicate_special,
+    # Pre-pipeline materialization seam (D-07/EMBED-05) - joins the other SF-lifecycle methods above.
+    SpecialFieldType.aprepare_special,
     # Lua codegen / payload helpers for aget_or_create's server-side SF
     # dispatch: they build script source and ARGV strings, not Redis round
     # trips, so they aren't actions subject to pipeline/TTL coverage. Shared

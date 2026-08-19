@@ -6,6 +6,9 @@ class EmbeddingAdapter(Protocol):
     @property
     def dims(self) -> int: ...  # pragma: no cover
 
+    @property
+    def label(self) -> str: ...  # pragma: no cover
+
     async def aembed(self, content: str) -> list[float]: ...  # pragma: no cover
 
     async def aembed_many(
