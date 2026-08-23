@@ -13,34 +13,14 @@ from rapyer.cascade.planner import (
 )
 from rapyer.embeddings.adapter import default_embedding_adapter
 from rapyer.embeddings.protocol import EmbeddingAdapter
-from rapyer.errors import RedisTextRealRedisRequiredError, VectorDimMismatchError
+from rapyer.errors import VectorDimMismatchError
 from rapyer.result import resolve_forward_refs
 from rapyer.scripts import register_cascade_function, register_scripts
 from rapyer.types.relational import resolve_relational_targets
-from rapyer.types.text import RedisText
-from rapyer.utils.annotation import annotation_origin
-from rapyer.utils.pythonic import safe_issubclass
 
 
 def is_fakeredis(client) -> bool:
     return "fakeredis" in type(client).__module__
-
-
-def _model_has_redis_text_field(model_cls, seen: set | None = None) -> bool:
-    seen = seen or set()
-    if model_cls in seen:
-        return False
-    seen = seen | {model_cls}
-    for field_name in model_cls._special_field_names:
-        annotation = model_cls.model_fields[field_name].annotation
-        if safe_issubclass(annotation_origin(annotation), RedisText):
-            return True
-    for field_name in model_cls._contain_sf:
-        annotation = model_cls.model_fields[field_name].annotation
-        nested_cls = annotation_origin(annotation)
-        if _model_has_redis_text_field(nested_cls, seen):
-            return True
-    return False
 
 
 async def init_rapyer(
@@ -77,9 +57,6 @@ async def init_rapyer(
             if redis is not None:
                 model.Meta.redis = redis
                 model.Meta.is_fake_redis = is_fake_redis
-                # RedisText is unsupported on fakeredis; fail fast instead of a silent no-op.
-                if is_fake_redis and _model_has_redis_text_field(model):
-                    raise RedisTextRealRedisRequiredError(model.__name__)
             if ttl is not None:
                 model.Meta.ttl = ttl
             if prefer_normal_json_dump is not None:

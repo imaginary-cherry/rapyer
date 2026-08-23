@@ -78,6 +78,13 @@ await init_rapyer(redis=redis_client, ttl=3600)
 **Important:** `init_rapyer` is crucial for initializing special fields like indexed fields and other advanced features.
 For simple usage, it is possible to simply set the redis client yourself.
 
+!!! warning "`RedisText` requires real Redis"
+    `RedisText` fields are **not supported under `fakeredis`** and this is not
+    checked at `init_rapyer()`. The embedding is written as raw `FLOAT32` bytes
+    into a HASH, and the `aget_or_create` path decodes it inside a Lua script —
+    neither round-trips faithfully on `fakeredis`. Use a real Redis instance for
+    any model carrying a `RedisText` field.
+
 ## Generic Models
 
 !!! warning "Generic origin models are skipped during initialization"
