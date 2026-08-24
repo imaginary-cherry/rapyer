@@ -30,12 +30,49 @@ DEFAULT_CONNECTION = "redis://localhost:6379/0"
 
 @dataclasses.dataclass(frozen=True)
 class MetaField:
-    """Per-field write policy for RedisConfig, read from the field's annotation."""
+    """
+    Owns a RedisConfig field's write policy: freezing, exemption and init-time resolution.
+    """
 
     # Writable even while Meta is frozen, for values rapyer itself derives.
     frozen_exempt: bool = False
     # init_rapyer() may fill this in when the user did not set it explicitly.
     resolvable: bool = False
+
+    def check_write(self, config: "RedisConfig", name: str):
+        if config._meta_locked and not self.frozen_exempt:
+            raise MetaFrozenError(self.frozen_message(name))
+
+    def resolve(self, config: "RedisConfig", name: str, value: Any):
+        if not self.resolvable:
+            raise UnsupportedArgumentValueError(
+                f"Meta.{name} is not a resolvable field; annotate it with "
+                f"MetaField(resolvable=True) to allow init-time resolution."
+            )
+        self.check_write(config, name)
+        # Bypassing pydantic keeps the field out of model_fields_set, so it stays "not preset".
+        object.__setattr__(config, name, value)
+
+    @staticmethod
+    def frozen_message(name: str) -> str:
+        return (
+            f"Meta.{name} is frozen after init_rapyer() bakes the config "
+            f"into the cascade plan — call init_rapyer() again to "
+            f"reconfigure instead of mutating Meta.{name} directly."
+        )
+
+
+# A field with no annotation gets the strictest policy, so new fields are guarded by default.
+DEFAULT_META_FIELD = MetaField()
+
+
+def policy_for(config_cls: type[BaseModel], name: str) -> MetaField:
+    field = config_cls.model_fields.get(name)
+    if field is not None:
+        for meta in field.metadata:
+            if isinstance(meta, MetaField):
+                return meta
+    return DEFAULT_META_FIELD
 
 
 def create_all_types():
@@ -63,7 +100,7 @@ class RedisConfig(BaseModel):
     cascade_ttl: CascadeTTL | None = None
     # Plan-hashed cascade Redis Function name, init-baked (None on fakeredis).
     cascade_function_name: Annotated[str | None, MetaField(frozen_exempt=True)] = None
-    # Per-model vectorizer; None falls back to the packaged default (D-08), unlike cascade_ttl.
+    # Per-model vectorizer; None falls back to the packaged default, unlike cascade_ttl.
     vectorizer: Annotated[
         EmbeddingAdapter | None, SkipValidation, MetaField(resolvable=True)
     ] = None
@@ -92,39 +129,22 @@ class RedisConfig(BaseModel):
     def redis_json(self):
         return self._redis_json
 
-    def __setattr__(self, name: str, value: Any):
-        # Private attrs stay writable while frozen so init/teardown can still run.
-        if (
-            self._meta_locked
-            and not name.startswith("_")
-            and name not in FROZEN_EXEMPT_FIELDS
-        ):
-            raise MetaFrozenError(self._frozen_message(name))
-        super().__setattr__(name, value)
+    @model_validator(mode="wrap")
+    @classmethod
+    def _enforce_write_policy(cls, data, handler, info):
+        # Fires per assignment, so a missing annotation cannot lose the guard.
+        if info.field_name is not None:
+            policy_for(cls, info.field_name).check_write(data, info.field_name)
+        return handler(data)
 
     def _resolve(self, name: str, value: Any):
-        """Set a resolvable field without marking it as explicitly user-set."""
-        if name not in RESOLVABLE_FIELDS:
-            raise UnsupportedArgumentValueError(
-                f"Meta.{name} is not a resolvable field; annotate it with "
-                f"MetaField(resolvable=True) to allow init-time resolution."
-            )
-        if self._meta_locked:
-            raise MetaFrozenError(self._frozen_message(name))
-        # Bypassing pydantic keeps the field out of model_fields_set, so it stays "not preset".
-        object.__setattr__(self, name, value)
+        """
+        Set a resolvable field without marking it as explicitly user-set.
+        """
+        policy_for(type(self), name).resolve(self, name, value)
 
     def is_preset(self, name: str) -> bool:
-        """Whether the user set this field themselves rather than init_rapyer() filling it."""
         return name in self.model_fields_set
-
-    @staticmethod
-    def _frozen_message(name: str) -> str:
-        return (
-            f"Meta.{name} is frozen after init_rapyer() bakes the config "
-            f"into the cascade plan — call init_rapyer() again to "
-            f"reconfigure instead of mutating Meta.{name} directly."
-        )
 
     @field_validator("refresh_ttl", mode="after")
     @classmethod
@@ -137,19 +157,3 @@ class RedisConfig(BaseModel):
                 "removed from Redis on delete, so TTL cannot be refreshed."
             )
         return value
-
-
-def _fields_flagged(attr: str) -> frozenset[str]:
-    return frozenset(
-        name
-        for name, field in RedisConfig.model_fields.items()
-        if any(
-            isinstance(meta, MetaField) and getattr(meta, attr)
-            for meta in field.metadata
-        )
-    )
-
-
-# Precomputed once: __setattr__ runs on every Meta write and must not walk annotations.
-FROZEN_EXEMPT_FIELDS = _fields_flagged("frozen_exempt")
-RESOLVABLE_FIELDS = _fields_flagged("resolvable")

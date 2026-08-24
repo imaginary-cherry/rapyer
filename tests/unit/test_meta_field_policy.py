@@ -2,11 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from rapyer.config import (
-    FROZEN_EXEMPT_FIELDS,
-    RESOLVABLE_FIELDS,
-    RedisConfig,
-)
+from rapyer.config import DEFAULT_META_FIELD, MetaField, RedisConfig, policy_for
 from rapyer.errors import MetaFrozenError, UnsupportedArgumentValueError
 
 
@@ -14,35 +10,64 @@ def _config() -> RedisConfig:
     return RedisConfig(redis=MagicMock())
 
 
-def test_policy_sets_are_derived_from_field_annotations():
-    assert FROZEN_EXEMPT_FIELDS == frozenset({"cascade_function_name"})
-    assert RESOLVABLE_FIELDS == frozenset({"vectorizer"})
+def _locked_config() -> RedisConfig:
+    config = _config()
+    config._meta_locked = True
+    return config
+
+
+def test_policy_comes_from_the_field_annotation():
+    assert policy_for(RedisConfig, "cascade_function_name") == MetaField(
+        frozen_exempt=True
+    )
+    assert policy_for(RedisConfig, "vectorizer") == MetaField(resolvable=True)
+
+
+def test_unannotated_field_gets_the_strict_default_policy():
+    assert policy_for(RedisConfig, "max_delete_per_transaction") is DEFAULT_META_FIELD
+    assert DEFAULT_META_FIELD.frozen_exempt is False
+    assert DEFAULT_META_FIELD.resolvable is False
+
+
+def test_unannotated_field_is_still_frozen_at_runtime():
+    # The point of the default policy: forgetting an annotation must not lose the guard.
+    config = _locked_config()
+
+    with pytest.raises(MetaFrozenError):
+        config.max_delete_per_transaction = 5
+
+
+def test_blocked_write_does_not_change_the_value():
+    config = _config()
+    config.ttl = 60
+    config._meta_locked = True
+
+    with pytest.raises(MetaFrozenError):
+        config.ttl = 999
+
+    assert config.ttl == 60
 
 
 def test_frozen_exempt_field_stays_writable_while_locked():
-    config = _config()
-    config._meta_locked = True
+    config = _locked_config()
 
     config.cascade_function_name = "rapyer_cascade_abc"
 
     assert config.cascade_function_name == "rapyer_cascade_abc"
 
 
-def test_non_exempt_field_raises_while_locked():
-    config = _config()
-    config._meta_locked = True
-
-    with pytest.raises(MetaFrozenError):
-        config.ttl = 60
-
-
 def test_private_attrs_stay_writable_while_locked():
-    config = _config()
-    config._meta_locked = True
+    config = _locked_config()
 
     config._meta_locked = False
 
     assert config._meta_locked is False
+
+
+def test_construction_is_not_blocked_by_the_guard():
+    config = RedisConfig(redis=MagicMock(), ttl=30)
+
+    assert config.ttl == 30
 
 
 def test_resolve_rejects_a_field_not_marked_resolvable():
@@ -77,8 +102,7 @@ def test_constructor_value_marks_the_field_preset():
 
 
 def test_resolve_raises_while_locked():
-    config = _config()
-    config._meta_locked = True
+    config = _locked_config()
 
     with pytest.raises(MetaFrozenError):
         config._resolve("vectorizer", MagicMock())
