@@ -5,6 +5,7 @@ import json
 import logging
 import pickle
 import uuid
+from collections import defaultdict
 from collections.abc import AsyncIterator, Iterator
 from contextlib import AbstractAsyncContextManager
 from typing import Annotated, Any, ClassVar, Optional, get_args, get_origin
@@ -43,7 +44,6 @@ from rapyer.context import (
     pipeline_with_execution,
     with_pipe_context,
 )
-from rapyer.embeddings.adapter import pack_float32_blob
 from rapyer.errors import (
     BadDeleteActionError,
     CantSerializeRedisValueError,
@@ -892,28 +892,13 @@ class AtomicRedisModel(BaseModel):
                 yield from child._iter_special_fields((*prefix, fname))
 
     async def _aprepare_special_fields(self) -> None:
-        """
-        Batch every dirty SF field's embedding into one aembed_many() call
-        before this model's write path opens its pipeline (D-07/D-08/EMBED-05).
-        Dispatches purely through pending_embed_text()/aprepare_special() -
-        never isinstance()-checks for a concrete SpecialFieldType subclass.
-        """
-        sf_fields = list(self._iter_special_fields())
-        pending_texts: list[str] = []
-        pending_fields: list[BaseRedisType] = []
-        for field, _ in sf_fields:
-            text = field.pending_embed_text()
-            if text is not None:
-                pending_texts.append(text)
-                pending_fields.append(field)
-        if pending_texts:
-            vectors = await self.Meta.vectorizer.aembed_many(pending_texts)
-            for field, vector in zip(pending_fields, vectors):
-                field._prepared_vector = pack_float32_blob(
-                    vector, self.Meta.vectorizer.dims
-                )
-        for field, _ in sf_fields:
-            await field.aprepare_special()
+        """Group-and-dispatch batch prepare pass before the write pipeline opens (D-07/D-08)."""
+        groups: dict[str, list[SpecialFieldType]] = defaultdict(list)
+        for field, _ in self._iter_special_fields():
+            # lua_type_name(), not type(field): every field is its own generated subclass.
+            groups[type(field).lua_type_name()].append(field)
+        for fields in groups.values():
+            await type(fields[0]).aprepare_many(fields)
 
     def _ttl_keys(self) -> list[str]:
         """
