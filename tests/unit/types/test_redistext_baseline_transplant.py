@@ -19,7 +19,7 @@ def test_reassigning_same_text_keeps_baseline_clean():
     model.body = "original"
 
     assert model.body._baseline_text == "original"
-    assert model.body.pending_embed_text() is None
+    assert str(model.body) == model.body._baseline_text
 
 
 def test_reassigning_different_text_keeps_old_baseline_dirty():
@@ -29,7 +29,7 @@ def test_reassigning_different_text_keeps_old_baseline_dirty():
     model.body = "changed"
 
     assert model.body._baseline_text == "original"
-    assert model.body.pending_embed_text() == "changed"
+    assert str(model.body) != model.body._baseline_text
 
 
 def test_first_assignment_on_fresh_model_does_not_raise():

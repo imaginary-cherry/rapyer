@@ -181,36 +181,66 @@ def test_clone_returns_new_instance_same_value():
     assert isinstance(cloned, RedisText)
 
 
-def test_pending_embed_text_dirty_vs_clean():
+@pytest.mark.asyncio
+async def test_aprepare_many_noop_on_clean_field():
     model = TextFixtureModel(body="hi")
-
-    assert model.body.pending_embed_text() == "hi"
-
     model.body._baseline_text = "hi"
+    model.Meta.vectorizer.aembed_many = AsyncMock()
 
-    assert model.body.pending_embed_text() is None
+    await RedisText.aprepare_many([model.body])
 
-
-@pytest.mark.asyncio
-async def test_aprepare_special_noop_when_no_prepared_vector():
-    model = TextFixtureModel(body="hi")
-
-    await model.body.aprepare_special()
-
+    model.Meta.vectorizer.aembed_many.assert_not_awaited()
     assert getattr(model.body, "_pending_embedding", None) is None
-    assert getattr(model.body, "_baseline_text", None) is None
 
 
 @pytest.mark.asyncio
-async def test_aprepare_special_consumes_prepared_vector():
+async def test_aprepare_many_embeds_dirty_field():
     model = TextFixtureModel(body="hi")
-    model.body._prepared_vector = b"\x00\x01\x02\x03"
+    model.Meta.vectorizer.dims = 3
+    model.Meta.vectorizer.aembed_many = AsyncMock(return_value=[[0.1, 0.2, 0.3]])
 
-    await model.body.aprepare_special()
+    await RedisText.aprepare_many([model.body])
 
-    assert model.body._pending_embedding == b"\x00\x01\x02\x03"
+    model.Meta.vectorizer.aembed_many.assert_awaited_once_with(["hi"])
+    assert model.body._pending_embedding is not None
     assert model.body._baseline_text == "hi"
-    assert model.body._prepared_vector is None
+
+
+@pytest.mark.asyncio
+async def test_aprepare_many_batches_dirty_fields_of_the_same_vectorizer():
+    model1 = TextFixtureModel(body="a")
+    model2 = TextFixtureModel(body="b")
+    vectorizer = MagicMock(label="test-model@1:768", dims=3)
+    vectorizer.aembed_many = AsyncMock(return_value=[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])
+    model1.Meta.vectorizer = vectorizer
+    model2.Meta.vectorizer = vectorizer
+
+    await RedisText.aprepare_many([model1.body, model2.body])
+
+    vectorizer.aembed_many.assert_awaited_once_with(["a", "b"])
+    assert model1.body._pending_embedding is not None
+    assert model2.body._pending_embedding is not None
+
+
+@pytest.mark.asyncio
+async def test_aprepare_many_issues_one_call_per_distinct_vectorizer():
+    # Distinct model classes: Meta is a shared ClassVar per class, not per instance.
+    class OtherTextFixtureModel(TextFixtureModel):
+        Meta: ClassVar[RedisConfig] = RedisConfig(
+            redis=MagicMock(), vectorizer=MagicMock(label="other-model@1:3")
+        )
+
+    model1 = TextFixtureModel(body="a")
+    model2 = OtherTextFixtureModel(body="b")
+    model1.Meta.vectorizer.dims = 3
+    model1.Meta.vectorizer.aembed_many = AsyncMock(return_value=[[0.1] * 3])
+    model2.Meta.vectorizer.dims = 3
+    model2.Meta.vectorizer.aembed_many = AsyncMock(return_value=[[0.2] * 3])
+
+    await RedisText.aprepare_many([model1.body, model2.body])
+
+    model1.Meta.vectorizer.aembed_many.assert_awaited_once_with(["a"])
+    model2.Meta.vectorizer.aembed_many.assert_awaited_once_with(["b"])
 
 
 @pytest.mark.asyncio

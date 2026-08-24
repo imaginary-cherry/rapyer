@@ -66,33 +66,16 @@ async def test_no_dirty_fields_never_calls_aembed_many():
 
 
 @pytest.mark.asyncio
-async def test_pending_embed_text_and_aprepare_special_called_on_every_sf_field(
-    monkeypatch,
-):
+async def test_aprepare_many_dispatched_once_per_lua_type_group(monkeypatch):
     model = MixedSFModel(body="hi")
     model.Meta.vectorizer = _mock_vectorizer([[0.1, 0.2, 0.3]])
-
-    pending_calls: list = []
-    original_pending = RedisSet.pending_embed_text
-
-    def spy_pending(self):
-        pending_calls.append(self)
-        return original_pending(self)
-
-    prepare_calls: list = []
-    original_prepare = RedisSet.aprepare_special
-
-    async def spy_prepare(self):
-        prepare_calls.append(self)
-        return await original_prepare(self)
-
-    monkeypatch.setattr(RedisSet, "pending_embed_text", spy_pending)
-    monkeypatch.setattr(RedisSet, "aprepare_special", spy_prepare)
+    redis_set_prepare = AsyncMock()
+    monkeypatch.setattr(RedisSet, "aprepare_many", redis_set_prepare)
 
     await model._aprepare_special_fields()
 
-    assert pending_calls == [model.tags]
-    assert prepare_calls == [model.tags]
+    redis_set_prepare.assert_awaited_once_with([model.tags])
+    model.Meta.vectorizer.aembed_many.assert_awaited_once_with(["hi"])
 
 
 @pytest.mark.asyncio
