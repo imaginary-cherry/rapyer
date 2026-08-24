@@ -96,7 +96,7 @@ async def test_asave_special_clean_omits_embedding():
 
     _, kwargs = model.Meta.redis.hset.call_args
     mapping = kwargs["mapping"]
-    assert set(mapping.keys()) == {"text", "parent", "field"}
+    assert set(mapping.keys()) == {"text", "field"}
 
 
 @pytest.mark.asyncio
@@ -112,7 +112,6 @@ async def test_asave_special_dirty_includes_embedding_and_clears_pending():
     assert mapping["text"] == "hi"
     assert isinstance(mapping["embedding"], bytes)
     assert mapping["embedding"] == b"\x00\x01\x02\x03"
-    assert mapping["parent"] == model.key
     assert mapping["field"] == "body"
     assert mapping["model_label"] == "test-model@1:768"
     assert model.body._pending_embedding is None
@@ -155,7 +154,6 @@ def test_lua_save_payload_base64_roundtrips():
 
     assert base64.b64decode(decoded["embedding_b64"]) == b"\x00\x01\x02\x03"
     assert decoded["text"] == "hi"
-    assert decoded["parent"] == model.key
     assert decoded["field"] == "body"
     assert decoded["model_label"] == "test-model@1:768"
 
@@ -216,53 +214,38 @@ async def test_aprepare_special_consumes_prepared_vector():
 
 
 @pytest.mark.asyncio
-async def test_aduplicate_special_copy_then_parent_rewrite():
+async def test_aduplicate_special_is_copy_only_with_no_follow_up_write():
     model = TextFixtureModel(body="hi")
-    model.Meta.redis.exists = AsyncMock(return_value=1)
     model.Meta.redis.copy = AsyncMock(return_value=None)
     model.Meta.redis.hset = AsyncMock(return_value=None)
     tracker = MagicMock()
     tracker.attach_mock(model.Meta.redis.copy, "copy")
     tracker.attach_mock(model.Meta.redis.hset, "hset")
 
-    await model.body.aduplicate_special("target_special_key", "TextFixtureModel:dup")
+    await model.body.aduplicate_special("target_special_key")
 
-    # `field` is deliberately not rewritten -- COPY already carries the source's
-    # value and the duplicate shares its field path.
+    # Nothing in the HASH names the owning model any more, so COPY alone is correct:
+    # text/embedding/model_label are content and `field` is identical for the duplicate.
     assert tracker.mock_calls == [
-        call.copy(model.body.special_key, "target_special_key"),
-        call.hset("target_special_key", "parent", "TextFixtureModel:dup"),
+        call.copy(model.body.special_key, "target_special_key")
     ]
 
 
 @pytest.mark.asyncio
-async def test_aduplicate_special_skips_write_when_source_absent():
-    model = TextFixtureModel(body="hi")
-    model.Meta.redis.exists = AsyncMock(return_value=0)
-    model.Meta.redis.copy = AsyncMock(return_value=None)
-    model.Meta.redis.hset = AsyncMock(return_value=None)
-
-    await model.body.aduplicate_special("target_special_key", "TextFixtureModel:dup")
-
-    model.Meta.redis.copy.assert_not_called()
-    model.Meta.redis.hset.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_redis_set_aduplicate_special_widened_signature_noop_extra_arg():
+async def test_redis_set_aduplicate_special_takes_target_key_only():
     field = RedisSet()
     field._base_model_link = TextFixtureModel(body="hi")
     field.field_name = ".tags"
     field.Meta.redis.smembers = AsyncMock(return_value=set())
 
-    await field.aduplicate_special("target_special_key", "ignored_model_key")
+    await field.aduplicate_special("target_special_key")
 
 
 @pytest.mark.asyncio
-async def test_priority_queue_aduplicate_special_widened_signature_noop_extra_arg():
+async def test_priority_queue_aduplicate_special_takes_target_key_only():
     field = RedisPriorityQueue()
     field._base_model_link = TextFixtureModel(body="hi")
     field.field_name = ".tasks"
     field.Meta.redis.zrange = AsyncMock(return_value=[])
 
-    await field.aduplicate_special("target_special_key", "ignored_model_key")
+    await field.aduplicate_special("target_special_key")

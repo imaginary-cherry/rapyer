@@ -105,7 +105,7 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
     async def adelete_special(self):
         await self.client.delete(self.special_key)
 
-    async def aduplicate_special(self, target_special_key: str, target_model_key: str):
+    async def aduplicate_special(self, target_special_key: str):
         items = await self.redis.zrange(self.special_key, 0, -1, withscores=True)
         if items:
             mapping = {member: score for member, score in items}

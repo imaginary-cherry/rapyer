@@ -46,7 +46,6 @@ class RedisText(str, SpecialFieldType):
             raise RedisTextEmbeddingNotMaterializedError(self.field_path)
         mapping = {
             "text": str(self),
-            "parent": self.key,
             "field": self.field_path.lstrip("."),
         }
         if pending is not None:
@@ -58,15 +57,11 @@ class RedisText(str, SpecialFieldType):
     async def adelete_special(self):
         await self.client.delete(self.special_key)
 
-    async def aduplicate_special(self, target_special_key: str, target_model_key: str):
-        # Direct client: a pipelined COPY's result can't be branched on, and an absent source
-        # would otherwise leave the HSET below creating a stub HASH with no text/embedding.
-        if not await self.redis.exists(self.special_key):
-            return
-        # Follow-up HSET rewrites parent after COPY (D-17): plain COPY would keep the source's.
-        # `field` needs no rewrite -- the duplicate shares the source's field path.
+    async def aduplicate_special(self, target_special_key: str):
+        # Server-side COPY needs no follow-up rewrite: every field the HASH carries is either
+        # content (text/embedding/model_label) or identical for the duplicate (`field` shares
+        # the source's path). A COPY of an absent source is a no-op that creates nothing.
         await self.client.copy(self.special_key, target_special_key)
-        await self.client.hset(target_special_key, "parent", target_model_key)
 
     def lua_save_payload(self) -> str:
         if self.Meta.is_fake_redis:
@@ -80,7 +75,6 @@ class RedisText(str, SpecialFieldType):
             {
                 "text": str(self),
                 "embedding_b64": base64.b64encode(pending).decode("ascii"),
-                "parent": self.key,
                 "field": self.field_path.lstrip("."),
                 "model_label": self.Meta.vectorizer.label,
             }

@@ -36,7 +36,6 @@ function(special_key, payload)
     redis.call('HSET', special_key,
         'text', fields.text,
         'embedding', decoded_bytes,
-        'parent', fields.parent,
         'field', fields.field,
         'model_label', fields.model_label)
 end

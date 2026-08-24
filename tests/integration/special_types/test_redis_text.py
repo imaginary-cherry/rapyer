@@ -7,7 +7,7 @@ from rapyer import GetOrCreateStatus
 from rapyer.types.text import RedisText
 from tests.models.special_types import RedisTextModel, VectorAnnotatedTextModel
 
-SF_HASH_FIELDS = {"text", "embedding", "parent", "field", "model_label"}
+SF_HASH_FIELDS = {"text", "embedding", "field", "model_label"}
 
 
 @pytest.mark.asyncio
@@ -24,7 +24,6 @@ async def test_redistext_save_excludes_parent_json_and_writes_hash(real_redis_cl
     assert await real_redis_client.exists(model.body.special_key) == 1
     assert set(await real_redis_client.hkeys(model.body.special_key)) == SF_HASH_FIELDS
     assert await real_redis_client.hget(model.body.special_key, "text") == "hello world"
-    assert await real_redis_client.hget(model.body.special_key, "parent") == model.key
     assert await real_redis_client.hget(model.body.special_key, "field") == "body"
     # Pitfall A: never decode raw embedding bytes through decode_responses=True.
     strlen = await real_redis_client.execute_command(
@@ -77,7 +76,7 @@ async def test_redistext_get_or_create_writes_hash_atomically_via_lua_path(
         == "created via aget_or_create"
     )
     hash_fields = set(await real_redis_client.hkeys(model.body.special_key))
-    assert {"embedding", "parent", "field", "model_label"} <= hash_fields
+    assert {"embedding", "field", "model_label"} <= hash_fields
 
 
 @pytest.mark.asyncio
@@ -99,7 +98,7 @@ async def test_vector_annotated_text_model_saves_successfully(real_redis_client)
 
 
 @pytest.mark.asyncio
-async def test_redistext_aduplicate_rewrites_parent_to_duplicates_own_key(
+async def test_redistext_aduplicate_copies_hash_to_the_duplicates_own_key(
     real_redis_client,
 ):
     # Arrange
@@ -113,13 +112,15 @@ async def test_redistext_aduplicate_rewrites_parent_to_duplicates_own_key(
     assert duplicate.key != model.key
     assert await real_redis_client.exists(duplicate.body.special_key) == 1
     assert await real_redis_client.hget(duplicate.body.special_key, "text") == "dup me"
+    assert await real_redis_client.hget(duplicate.body.special_key, "field") == "body"
+    # Nothing in the HASH names the owning model, so the duplicate needs no rewrite --
+    # the owner is carried by the key itself, which already differs.
     assert (
-        await real_redis_client.hget(duplicate.body.special_key, "parent")
+        duplicate.body.special_key.rsplit(":", 1)[0].removeprefix("__rapyer_special__:")
         == duplicate.key
     )
-    assert await real_redis_client.hget(duplicate.body.special_key, "field") == "body"
     # Source's own HASH is untouched by duplicating it.
-    assert await real_redis_client.hget(model.body.special_key, "parent") == model.key
+    assert await real_redis_client.hget(model.body.special_key, "text") == "dup me"
 
 
 @pytest.mark.asyncio
