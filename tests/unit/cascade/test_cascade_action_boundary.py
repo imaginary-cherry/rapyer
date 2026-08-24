@@ -49,7 +49,9 @@ async def test_aset_ttl_cascade_true_on_fakeredis_refreshes_only_root_no_travers
     result = await parent.aset_ttl(ROOT_TTL_SECONDS, cascade=True)
 
     # Assert
-    assert result == CascadeResult(dangling_children=0, dangling_special=0)
+    assert result == CascadeResult(
+        dangling_children=0, dangling_special=0, mismatched_class=0
+    )
     assert await fake_redis_client.ttl(parent.key) > 0
     assert await fake_redis_client.ttl(child.key) == -1
 

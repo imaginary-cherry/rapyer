@@ -3,6 +3,7 @@ import pytest
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.redis_set import RedisSet
 from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX
+from tests.integration.foreign_keys.conftest import apply_cascade
 from tests.models.cascade_types import (
     CASCADE_FIXTURE_TTL_SECONDS,
     CascadeAuthor,
@@ -16,18 +17,6 @@ from tests.models.cascade_types import (
 ROOT_TTL_SECONDS = 120
 
 pytestmark = pytest.mark.usefixtures("setup_real_redis_for_cascade_apply")
-
-
-async def _apply_cascade(real_redis_client, root):
-    return await real_redis_client.fcall(
-        type(root).Meta.cascade_function_name,
-        1,
-        root.key,
-        type(root).__name__,
-        SPECIAL_FIELD_KEY_PREFIX,
-        type(root).Meta.ttl,
-        1,
-    )
 
 
 # --- Confirmatory dual-backend parity ---
@@ -49,7 +38,7 @@ async def test_cascade_apply_refreshes_special_field_child_keys_sanity(
     await real_redis_client.persist(child.key)
 
     # Act
-    await _apply_cascade(real_redis_client, parent)
+    await apply_cascade(real_redis_client, parent)
 
     # Assert
     assert await real_redis_client.ttl(parent.key) > 0
@@ -84,7 +73,7 @@ async def test_cascade_apply_refreshes_every_collection_of_fk_element_sanity(
         await real_redis_client.persist(key)
 
     # Act
-    await _apply_cascade(real_redis_client, book)
+    await apply_cascade(real_redis_client, book)
 
     # Assert
     assert await real_redis_client.ttl(book.key) > 0
@@ -109,7 +98,7 @@ async def test_cascade_apply_refreshes_every_dict_value_fk_element_sanity(
         await real_redis_client.persist(key)
 
     # Act
-    await _apply_cascade(real_redis_client, book)
+    await apply_cascade(real_redis_client, book)
 
     # Assert
     assert await real_redis_client.ttl(book.key) > 0
@@ -131,7 +120,7 @@ async def test_cascade_apply_skips_corrupt_wrongtype_reached_target_sanity(
     await real_redis_client.persist("CascadeChainNode:corrupt")
 
     # Act - before the Lua fix this raises (RED); after the fix it must not (GREEN)
-    await _apply_cascade(real_redis_client, root)
+    await apply_cascade(real_redis_client, root)
 
     # Assert
     assert await real_redis_client.ttl(root.key) > 0

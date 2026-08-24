@@ -18,6 +18,11 @@ propagation of the parent's TTL value onto its children — a child with a short
     (`CascadeResult(0, 0)`). Non-cascade `Meta.ttl` / `refresh_ttl` behavior is
     unchanged on both backends.
 
+    This identical divergence applies to SF-held-ref cascade (`RedisSet`/
+    `RedisPriorityQueue` members): on fakeredis the container's own key still
+    refreshes via a plain `EXPIRE`, but its members are never followed — no
+    traversal, same as inline cascade.
+
 ## Enabling Cascade
 
 Cascade is opt-in and disabled by default. There are two ways to enable it:
@@ -65,6 +70,65 @@ A global default applies to every `Reference` field that has no explicit per-fie
 
 Passing `CascadeTTL(enabled=False)` on a field explicitly disables cascade for that edge
 even when a global default is set.
+
+## Cascade-Eligible Shapes
+
+Cascade traversal follows every shape a `ForeignKey` (`Reference`) can take — whether the
+reference lives inline in the parent's JSON document or inside a special-field container
+with its own Redis key:
+
+| Shape | Example | Cascade-eligible |
+|-------|---------|-------------------|
+| Direct FK field | `Reference[Author]` | Yes |
+| Collection-of-FK | `list[Reference[Author]]` / `dict[K, Reference[Author]]` | Yes |
+| Nested-submodel FK | An inline sub-model whose own field is `Reference`-annotated | Yes |
+| `RedisSet[Reference[Author]]` | FK references held as members of a Redis SET | Yes |
+| `RedisPriorityQueue[Reference[Author]]` | FK references held as members of a Redis sorted set | Yes |
+
+All five shapes resolve cascade eligibility through the same **field > global > off**
+precedence rule described above — a `RedisSet`/`RedisPriorityQueue` field is annotated
+with `CascadeTTL` exactly like an inline `Reference` field.
+
+### Worked Example: Cascading Through a `RedisSet`
+
+```python
+from typing import Annotated, ClassVar
+
+from pydantic import Field
+from rapyer import AtomicRedisModel
+from rapyer.cascade import CascadeTTL
+from rapyer.config import RedisConfig
+from rapyer.types import Reference, RedisSet
+
+
+class Author(AtomicRedisModel):
+    name: str = "anon"
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=3600)
+
+
+class Library(AtomicRedisModel):
+    name: str = "main"
+    authors: Annotated[RedisSet[Reference[Author]], CascadeTTL()] = Field(
+        default_factory=RedisSet
+    )
+
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=3600)
+
+
+library = await Library(name="main").asave()
+author = await Author(name="Jane").asave()
+await library.authors.aadd(author.key)
+
+# Every member of the set is re-armed to its own Meta.ttl, exactly like an
+# inline collection-of-FK field, whenever the parent's TTL is (re)set:
+await library.asave()
+# ...or explicitly:
+await library.aset_ttl(3600, cascade=True)
+```
+
+The same applies to a `RedisPriorityQueue[Reference[Author]]` field: members added via
+`apush` are reached the same way and re-armed to their own `Meta.ttl`.
 
 ## Precedence
 
@@ -117,6 +181,57 @@ the same atomic script, but the dangling counts aren't surfaced to the caller.
     cascade-reachable class — or any class with outgoing cascade-enabled edges — has no
     `Meta.ttl`. A `None` TTL would otherwise become a nil-argument Lua runtime error at
     write time; failing fast at startup catches this instead.
+
+## Cost and Scaling
+
+A cascade is **linear in the number of keys it reaches**. For every reached node the
+server-side function issues one `EXPIRE`, plus one `JSON.GET` for each node that has
+outgoing reference paths to read. There is no per-node round trip — the whole walk
+happens inside a single `FCALL` — but there is also no batching: a graph twice as large
+costs roughly twice as much.
+
+The chart below plots measured wall time against the number of keys a single cascade
+reached. The line is straight: ten times the links costs very close to ten times the
+time.
+
+![Cascade execution time against the number of keys reached](../../images/cascade_scaling_performance.png)
+
+Measured on Redis Stack 7.2 in Docker on a laptop, one root over edge-free children.
+Treat the slope as the takeaway and the absolute numbers as indicative — they move with
+hardware. The 1M point is projected from the slope, not measured on this shape.
+
+Graph *shape* changes the constant, not the growth rate, because interior nodes each pay
+a `JSON.GET` that leaves do not:
+
+| shape at ~1M nodes | wall time |
+| --- | --- |
+| One root over 1,000,000 edge-free children | 3.2s |
+| A 1,000,000-node chain, one reference per node | 7.9s |
+| A branching tree, 1,111,111 nodes | 10.3s |
+
+These three shapes are covered by `benchmarks/test_cascade_ttl_large.py`; set
+`BENCHMARK_CASCADE_LARGE_SIZE` to run them at a different size.
+
+!!! warning "A cascade over a very large graph blocks the whole server"
+    Redis executes the function on its single command thread, so nothing else is served
+    until the walk finishes. Below `busy-reply-threshold` (5 seconds by default) every
+    client simply blocks, including one trying to intervene. Past it, clients receive
+    `BUSY`. `FUNCTION KILL` then works only while the function is still reading — the
+    walk collects every key before writing any — but once it starts issuing `EXPIRE`s a
+    kill is refused, leaving `SHUTDOWN NOSAVE` as the only escape. Keep cascade-reachable
+    graphs well under that bound, or raise the threshold deliberately.
+
+!!! danger "Every write re-walks the whole subtree"
+    The automatic path fires on *each* `asave()` / `refresh_ttl()` of a model that has
+    cascade-enabled edges, and each firing walks everything currently reachable. Building
+    a connected graph one node at a time is therefore quadratic: inserting a 1,000-node
+    chain node by node issues 500,500 `EXPIRE` calls (1 + 2 + … + 1000), not 1,000. At a
+    million nodes that is ~5×10¹¹ expiries — effectively unbounded.
+
+    When bulk-loading, keep the cascade off the per-node path: set `Meta.refresh_ttl` to
+    an `ActionGroup` that excludes creates (for example `ActionGroup.UPDATE`), or write
+    the nodes unlinked and attach the references last. Either way the cascade runs once
+    over the finished graph instead of once per node.
 
 ## Cluster Boundary
 

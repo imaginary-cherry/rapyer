@@ -13,6 +13,14 @@ class CascadeTargetTtlMissingError(RapyerError):
         self.model_name = model_name
 
 
+class CascadeKeyInitialsError(RapyerError):
+    """Raised at init_rapyer() when a cascade participant's class_key_initials() is not its __name__."""
+
+    def __init__(self, model_name: str, *args):
+        super().__init__(*args)
+        self.model_name = model_name
+
+
 class MetaFrozenError(RapyerError):
     """Raised when Meta config is mutated after init_rapyer() has baked the cascade plan against it."""
 

@@ -9,6 +9,7 @@ from rapyer.cascade import CascadeTTL
 from rapyer.cascade.planner import (
     build_cascade_plan,
     cascade_plan_json,
+    validate_cascade_key_initials,
     validate_cascade_ttl_targets,
 )
 from rapyer.embeddings.adapter import default_embedding_adapter
@@ -96,6 +97,8 @@ async def init_rapyer(
         # Fail fast on a mis-configured cascade graph before any script is registered.
         plan = build_cascade_plan(REDIS_MODELS)
         validate_cascade_ttl_targets(plan)
+        # Divergent class_key_initials() would silently dead-end traversal; fail fast.
+        validate_cascade_key_initials(REDIS_MODELS)
     finally:
         # Refreeze now that the plan is baked; blocks further mutation until the next init_rapyer().
         for model in REDIS_MODELS:
