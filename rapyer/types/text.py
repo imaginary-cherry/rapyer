@@ -2,11 +2,13 @@
 
 import base64
 import json
-from typing import Optional
+from collections import defaultdict
+from typing import Any
 
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
 
+from rapyer.embeddings.adapter import pack_float32_blob
 from rapyer.errors import (
     RedisTextEmbeddingNotMaterializedError,
     RedisTextRealRedisRequiredError,
@@ -22,17 +24,24 @@ class RedisText(str, SpecialFieldType):
     def clone(self):
         return self.__class__(str(self))
 
-    def pending_embed_text(self) -> Optional[str]:
-        baseline = getattr(self, "_baseline_text", None)
-        return str(self) if str(self) != baseline else None
-
-    async def aprepare_special(self) -> None:
-        vector_blob = getattr(self, "_prepared_vector", None)
-        if vector_blob is None:
+    @classmethod
+    async def aprepare_many(cls, fields: list["RedisText"]) -> None:
+        dirty = [f for f in fields if str(f) != getattr(f, "_baseline_text", None)]
+        if not dirty:
             return
-        self._pending_embedding = vector_blob
-        self._baseline_text = str(self)
-        self._prepared_vector = None
+        # Sub-group by vectorizer identity: nested models may use a different vectorizer (D-08).
+        groups: dict[int, list["RedisText"]] = defaultdict(list)
+        vectorizers: dict[int, Any] = {}
+        for field in dirty:
+            vectorizer = field.Meta.vectorizer
+            groups[id(vectorizer)].append(field)
+            vectorizers[id(vectorizer)] = vectorizer
+        for group_key, group_fields in groups.items():
+            vectorizer = vectorizers[group_key]
+            vectors = await vectorizer.aembed_many([str(f) for f in group_fields])
+            for field, vector in zip(group_fields, vectors):
+                field._pending_embedding = pack_float32_blob(vector, vectorizer.dims)
+                field._baseline_text = str(field)
 
     async def asave_special(self):
         if self.Meta.is_fake_redis:
