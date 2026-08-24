@@ -8,9 +8,9 @@ function(special_key, payload)
     -- per 1536-dim blob, scaling linearly with dim, on Redis's single thread.
     local function base64_decode(data)
         local b = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-        -- Pass 1: strip everything outside the alphabet.
-        data = string.gsub(data, '[^' .. b .. '=]', '')
-        -- Pass 2: each char -> its 6 bits as '0'/'1' characters.
+        -- Pass 1: each char -> its 6 bits as '0'/'1' characters. The upstream decoder strips
+        -- non-alphabet chars first; dropped here since lua_save_payload always feeds us
+        -- b64encode output (single line, no whitespace).
         return (data:gsub('.', function(x)
             if x == '=' then return '' end
             local r, f = '', (b:find(x) - 1)
@@ -18,7 +18,7 @@ function(special_key, payload)
                 r = r .. (f % 2 ^ i - f % 2 ^ (i - 1) > 0 and '1' or '0')
             end
             return r
-        -- Pass 3: regroup into bytes; `#x ~= 8` drops the padding tail.
+        -- Pass 2: regroup into bytes; `#x ~= 8` drops the padding tail.
         end):gsub('%d%d%d?%d?%d?%d?%d?%d?', function(x)
             if #x ~= 8 then return '' end
             local c = 0
