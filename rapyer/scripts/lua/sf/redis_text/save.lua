@@ -4,8 +4,8 @@
 function(special_key, payload)
     -- Public-domain base64 decoder (lua-users wiki), vendored since this codebase has no
     -- cross-file Lua require/include mechanism for SF snippet function literals. `gsub` returns
-    -- (string, count), so the outer parens on the chained return drop the count. Costs ~12ms
-    -- per 1536-dim blob, on Redis's single thread.
+    -- (string, count), so the outer parens on the chained return drop the count. Costs ~5.7ms
+    -- per 1536-dim blob, scaling linearly with dim, on Redis's single thread.
     local function base64_decode(data)
         local b = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
         -- Pass 1: strip everything outside the alphabet.
