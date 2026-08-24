@@ -216,8 +216,9 @@ async def test_aprepare_special_consumes_prepared_vector():
 
 
 @pytest.mark.asyncio
-async def test_aduplicate_special_copy_then_hset_rewrite():
+async def test_aduplicate_special_copy_then_parent_rewrite():
     model = TextFixtureModel(body="hi")
+    model.Meta.redis.exists = AsyncMock(return_value=1)
     model.Meta.redis.copy = AsyncMock(return_value=None)
     model.Meta.redis.hset = AsyncMock(return_value=None)
     tracker = MagicMock()
@@ -226,13 +227,25 @@ async def test_aduplicate_special_copy_then_hset_rewrite():
 
     await model.body.aduplicate_special("target_special_key", "TextFixtureModel:dup")
 
+    # `field` is deliberately not rewritten -- COPY already carries the source's
+    # value and the duplicate shares its field path.
     assert tracker.mock_calls == [
         call.copy(model.body.special_key, "target_special_key"),
-        call.hset(
-            "target_special_key",
-            mapping={"parent": "TextFixtureModel:dup", "field": "body"},
-        ),
+        call.hset("target_special_key", "parent", "TextFixtureModel:dup"),
     ]
+
+
+@pytest.mark.asyncio
+async def test_aduplicate_special_skips_write_when_source_absent():
+    model = TextFixtureModel(body="hi")
+    model.Meta.redis.exists = AsyncMock(return_value=0)
+    model.Meta.redis.copy = AsyncMock(return_value=None)
+    model.Meta.redis.hset = AsyncMock(return_value=None)
+
+    await model.body.aduplicate_special("target_special_key", "TextFixtureModel:dup")
+
+    model.Meta.redis.copy.assert_not_called()
+    model.Meta.redis.hset.assert_not_called()
 
 
 @pytest.mark.asyncio

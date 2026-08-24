@@ -146,3 +146,21 @@ async def test_redistext_asave_and_aget_or_create_produce_byte_identical_embeddi
 
     # Assert
     assert blob_a == blob_b
+
+
+@pytest.mark.asyncio
+async def test_redistext_aduplicate_of_unsaved_model_creates_no_orphan_hash(
+    real_redis_client,
+):
+    # Arrange - never persisted, so the source SF HASH does not exist
+    model = RedisTextModel(body=RedisText("never saved"))
+    assert await real_redis_client.exists(model.body.special_key) == 0
+
+    # Act
+    duplicates = await model.aduplicate_many(2)
+
+    # Assert - COPY is a no-op here; the parent rewrite must not conjure a stub
+    # HASH holding only `parent` (no text/embedding), the way RedisSet and
+    # RedisPriorityQueue write nothing at all in the same situation.
+    for duplicate in duplicates:
+        assert await real_redis_client.exists(duplicate.body.special_key) == 0

@@ -59,15 +59,14 @@ class RedisText(str, SpecialFieldType):
         await self.client.delete(self.special_key)
 
     async def aduplicate_special(self, target_special_key: str, target_model_key: str):
-        # Follow-up HSET rewrites parent/field after COPY (D-17): plain COPY would keep the source's.
+        # Direct client: a pipelined COPY's result can't be branched on, and an absent source
+        # would otherwise leave the HSET below creating a stub HASH with no text/embedding.
+        if not await self.redis.exists(self.special_key):
+            return
+        # Follow-up HSET rewrites parent after COPY (D-17): plain COPY would keep the source's.
+        # `field` needs no rewrite -- the duplicate shares the source's field path.
         await self.client.copy(self.special_key, target_special_key)
-        await self.client.hset(
-            target_special_key,
-            mapping={
-                "parent": target_model_key,
-                "field": self.field_path.lstrip("."),
-            },
-        )
+        await self.client.hset(target_special_key, "parent", target_model_key)
 
     def lua_save_payload(self) -> str:
         if self.Meta.is_fake_redis:
