@@ -24,7 +24,7 @@ def test_redis_config_vectorizer_defaults_to_none_unresolved_sanity():
 
     # Assert
     assert config.vectorizer is None
-    assert config._vectorizer_preset is False
+    assert config.is_preset("vectorizer") is False
 
 
 def test_redis_config_vectorizer_constructor_kwarg_flags_preset_sanity():
@@ -36,7 +36,7 @@ def test_redis_config_vectorizer_constructor_kwarg_flags_preset_sanity():
 
     # Assert
     assert config.vectorizer is adapter
-    assert config._vectorizer_preset is True
+    assert config.is_preset("vectorizer") is True
 
 
 def test_redis_config_vectorizer_post_construction_assignment_flags_preset_sanity():
@@ -49,7 +49,7 @@ def test_redis_config_vectorizer_post_construction_assignment_flags_preset_sanit
 
     # Assert
     assert config.vectorizer is adapter
-    assert config._vectorizer_preset is True
+    assert config.is_preset("vectorizer") is True
 
 
 def test_redis_config_vectorizer_assignment_raises_when_meta_locked_sanity():
@@ -63,20 +63,20 @@ def test_redis_config_vectorizer_assignment_raises_when_meta_locked_sanity():
         config.vectorizer = adapter
 
 
-def test_resolve_vectorizer_sets_value_without_flagging_preset_sanity():
+def test_resolve_sets_value_without_marking_it_preset_sanity():
     # Arrange
     adapter = _FakeEmbeddingAdapter()
     config = RedisConfig()
 
     # Act
-    config._resolve_vectorizer(adapter)
+    config._resolve("vectorizer", adapter)
 
     # Assert
     assert config.vectorizer is adapter
-    assert config._vectorizer_preset is False
+    assert config.is_preset("vectorizer") is False
 
 
-def test_resolve_vectorizer_raises_when_meta_locked_sanity():
+def test_resolve_raises_when_meta_locked_sanity():
     # Arrange
     adapter = _FakeEmbeddingAdapter()
     config = RedisConfig()
@@ -84,4 +84,4 @@ def test_resolve_vectorizer_raises_when_meta_locked_sanity():
 
     # Act + Assert
     with pytest.raises(MetaFrozenError):
-        config._resolve_vectorizer(adapter)
+        config._resolve("vectorizer", adapter)

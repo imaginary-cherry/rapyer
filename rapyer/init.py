@@ -64,9 +64,9 @@ async def init_rapyer(
                 model.Meta.prefer_normal_json_dump = prefer_normal_json_dump
             # cascade_ttl=None means "off" not "unset", so always reset it (unlike ttl above).
             model.Meta.cascade_ttl = cascade_ttl
-            # Unlike cascade_ttl, a per-model preset (D-06) beats this global param/default.
-            if not model.Meta._vectorizer_preset:
-                model.Meta._resolve_vectorizer(default_vectorizer)
+            # Unlike cascade_ttl, a per-model preset beats this global param/default.
+            if not model.Meta.is_preset("vectorizer"):
+                model.Meta._resolve("vectorizer", default_vectorizer)
 
             # A declared Vector(dim=N) must match the now-resolved vectorizer's dims (D-03).
             for field_name, vector_annotation in model._vector_fields.items():

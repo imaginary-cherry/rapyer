@@ -103,11 +103,11 @@ async def test_init_rapyer_reinit_updates_non_preset_model_without_flagging_pres
     with patch("rapyer.init.REDIS_MODELS", vectorizer_models):
         await init_rapyer(mock_redis_client, vectorizer=first_adapter)
         first_result = NoPresetVectorizerModel.Meta.vectorizer
-        first_preset_flag = NoPresetVectorizerModel.Meta._vectorizer_preset
+        first_preset_flag = NoPresetVectorizerModel.Meta.is_preset("vectorizer")
         await init_rapyer(mock_redis_client, vectorizer=second_adapter)
 
     # Assert
     assert first_result is first_adapter
     assert first_preset_flag is False
     assert NoPresetVectorizerModel.Meta.vectorizer is second_adapter
-    assert NoPresetVectorizerModel.Meta._vectorizer_preset is False
+    assert NoPresetVectorizerModel.Meta.is_preset("vectorizer") is False
