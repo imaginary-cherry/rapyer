@@ -142,16 +142,13 @@ class RedisConfig(BaseModel):
             policy_for(cls, info.field_name).check_write(data, info.field_name)
         return handler(data)
 
-    def resolve_unset(self, **values: Any):
+    def resolve_vectorizer(self, value: EmbeddingAdapter):
         """
-        Fill resolvable fields that the user did not set themselves.
+        Fill the vectorizer when the user did not set one themselves.
         """
-        for name, value in values.items():
-            policy = policy_for(type(self), name)
-            # Validated up front so a bad name is rejected even when the field is preset.
-            policy.check_resolvable(self, name)
-            if not self.is_preset(name):
-                policy.resolve(self, name, value)
+        field = "vectorizer"
+        if not self.is_preset(field):
+            policy_for(type(self), field).resolve(self, field, value)
 
     def is_preset(self, name: str) -> bool:
         if name not in type(self).model_fields:

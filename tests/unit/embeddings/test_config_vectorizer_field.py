@@ -69,7 +69,7 @@ def test_resolve_sets_value_without_marking_it_preset_sanity():
     config = RedisConfig()
 
     # Act
-    config.resolve_unset(vectorizer=adapter)
+    config.resolve_vectorizer(adapter)
 
     # Assert
     assert config.vectorizer is adapter
@@ -84,4 +84,4 @@ def test_resolve_raises_when_meta_locked_sanity():
 
     # Act + Assert
     with pytest.raises(MetaFrozenError):
-        config.resolve_unset(vectorizer=adapter)
+        config.resolve_vectorizer(adapter)

@@ -70,18 +70,18 @@ def test_construction_is_not_blocked_by_the_guard():
     assert config.ttl == 30
 
 
-def test_resolve_rejects_a_field_not_marked_resolvable():
+def test_write_policy_resolve_rejects_a_field_not_marked_resolvable():
     config = _config()
 
     with pytest.raises(UnsupportedArgumentValueError):
-        config.resolve_unset(ttl=60)
+        policy_for(RedisConfig, "ttl").resolve(config, "ttl", 60)
 
 
-def test_resolve_does_not_mark_the_field_preset():
+def test_resolve_vectorizer_does_not_mark_the_field_preset():
     config = _config()
     adapter = MagicMock()
 
-    config.resolve_unset(vectorizer=adapter)
+    config.resolve_vectorizer(adapter)
 
     assert config.vectorizer is adapter
     assert config.is_preset("vectorizer") is False
@@ -101,31 +101,17 @@ def test_constructor_value_marks_the_field_preset():
     assert config.is_preset("vectorizer") is True
 
 
-def test_resolve_raises_while_locked():
+def test_resolve_vectorizer_raises_while_locked():
     config = _locked_config()
 
     with pytest.raises(MetaFrozenError):
-        config.resolve_unset(vectorizer=MagicMock())
+        config.resolve_vectorizer(MagicMock())
 
 
-def test_resolve_unset_rejects_an_unknown_field_name():
-    config = _config()
-
-    with pytest.raises(UnsupportedArgumentValueError):
-        config.resolve_unset(vectorizr=MagicMock())
-
-
-def test_resolve_unset_rejects_a_non_resolvable_field_even_when_preset():
-    config = RedisConfig(redis=MagicMock(), ttl=30)
-
-    with pytest.raises(UnsupportedArgumentValueError):
-        config.resolve_unset(ttl=60)
-
-
-def test_resolve_unset_keeps_a_value_the_user_already_set():
+def test_resolve_vectorizer_keeps_a_value_the_user_already_set():
     config = RedisConfig(redis=MagicMock(), vectorizer="user-choice")
 
-    config.resolve_unset(vectorizer="init-default")
+    config.resolve_vectorizer("init-default")
 
     assert config.vectorizer == "user-choice"
 
