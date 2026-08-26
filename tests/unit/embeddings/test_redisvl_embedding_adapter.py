@@ -5,7 +5,7 @@ import pytest
 from rapyer.embeddings.adapter import RedisvlEmbeddingAdapter, build_cache_model_label
 
 
-class _SyncVectorizer:
+class FakeSyncVectorizer:
     """Simulates a local/CPU-bound vectorizer: only sync `embed`/`embed_many`."""
 
     def __init__(self, max_length=None):
@@ -22,7 +22,7 @@ class _SyncVectorizer:
         return [[0.1, 0.2, 0.3] for _ in contents]
 
 
-class _AsyncVectorizer:
+class FakeAsyncVectorizer:
     """Simulates a real-async-capable vectorizer: real `aembed`/`aembed_many`."""
 
     def __init__(self):
@@ -38,7 +38,7 @@ class _AsyncVectorizer:
         return [[0.4, 0.5, 0.6] for _ in contents]
 
 
-class _FakeCache:
+class FakeEmbeddingsCache:
     """Fake redisvl EmbeddingsCache honoring the aget/aset/amget/amset signatures."""
 
     def __init__(self):
@@ -79,7 +79,7 @@ async def test_aembed_offloads_unrecognized_sync_vectorizer_to_thread_sanity(
     monkeypatch,
 ):
     # Arrange
-    vectorizer = _SyncVectorizer()
+    vectorizer = FakeSyncVectorizer()
     adapter = RedisvlEmbeddingAdapter(vectorizer, dims=3, model_name="local-model")
     to_thread_calls = []
     original_to_thread = asyncio.to_thread
@@ -107,11 +107,11 @@ async def test_aembed_awaits_allowlisted_async_vectorizer_directly_sanity(
     # Arrange
     import rapyer.embeddings.adapter as adapter_module
 
-    vectorizer = _AsyncVectorizer()
+    vectorizer = FakeAsyncVectorizer()
     monkeypatch.setattr(
         adapter_module,
         "_ASYNC_CAPABLE_VECTORIZER_MODULES",
-        frozenset({_AsyncVectorizer.__module__}),
+        frozenset({FakeAsyncVectorizer.__module__}),
     )
     adapter = RedisvlEmbeddingAdapter(vectorizer, dims=3, model_name="api-model")
     to_thread_calls = []
@@ -131,7 +131,7 @@ async def test_aembed_awaits_allowlisted_async_vectorizer_directly_sanity(
 @pytest.mark.asyncio
 async def test_aembed_with_no_cache_invokes_vectorizer_every_call_sanity():
     # Arrange
-    vectorizer = _SyncVectorizer()
+    vectorizer = FakeSyncVectorizer()
     adapter = RedisvlEmbeddingAdapter(vectorizer, dims=3, model_name="local-model")
 
     # Act
@@ -145,8 +145,8 @@ async def test_aembed_with_no_cache_invokes_vectorizer_every_call_sanity():
 @pytest.mark.asyncio
 async def test_aembed_with_cache_returns_cached_vector_on_second_call_sanity():
     # Arrange
-    vectorizer = _SyncVectorizer()
-    cache = _FakeCache()
+    vectorizer = FakeSyncVectorizer()
+    cache = FakeEmbeddingsCache()
     adapter = RedisvlEmbeddingAdapter(
         vectorizer,
         dims=3,
@@ -170,8 +170,8 @@ async def test_aembed_with_cache_returns_cached_vector_on_second_call_sanity():
 @pytest.mark.asyncio
 async def test_aembed_many_only_calls_vectorizer_for_cache_misses_sanity():
     # Arrange
-    vectorizer = _SyncVectorizer()
-    cache = _FakeCache()
+    vectorizer = FakeSyncVectorizer()
+    cache = FakeEmbeddingsCache()
     adapter = RedisvlEmbeddingAdapter(
         vectorizer, dims=3, model_name="local-model", cache=cache
     )
@@ -193,7 +193,7 @@ async def test_aembed_warns_once_on_truncation_but_still_returns_vector_sanity(
     # Arrange
     import rapyer.embeddings.adapter as adapter_module
 
-    vectorizer = _SyncVectorizer(max_length=10)
+    vectorizer = FakeSyncVectorizer(max_length=10)
     adapter = RedisvlEmbeddingAdapter(vectorizer, dims=3, model_name="local-model")
     warnings = []
     monkeypatch.setattr(

@@ -11,7 +11,7 @@ from rapyer.errors import (
 )
 
 
-class _FakeResolvedAdapter:
+class FakeResolvedAdapter:
     label = "fake@1:3"
 
 
@@ -33,7 +33,7 @@ def test_default_embedding_adapter_label_delegates_to_resolved_adapter_sanity(
 ):
     # Arrange
     monkeypatch.setattr(
-        adapter, "_build_packaged_default_adapter", lambda: _FakeResolvedAdapter()
+        adapter, "_build_packaged_default_adapter", lambda: FakeResolvedAdapter()
     )
     default_adapter = DefaultEmbeddingAdapter()
 

@@ -13,7 +13,7 @@ from tests.models.simple_types import TTL_TEST_SECONDS
 T = TypeVar("T")
 
 
-class _FakeTextEmbeddingAdapter:
+class FakeTextEmbeddingAdapter:
     """Deterministic, network-free EmbeddingAdapter double for RedisText fixtures."""
 
     # Content-keyed vector: identical text always yields the identical vector.
@@ -139,7 +139,7 @@ class RedisTextModel(AtomicRedisModel):
     name: str = "default"
     body: RedisText = Field(default_factory=lambda: RedisText(""))
 
-    Meta: ClassVar[RedisConfig] = RedisConfig(vectorizer=_FakeTextEmbeddingAdapter())
+    Meta: ClassVar[RedisConfig] = RedisConfig(vectorizer=FakeTextEmbeddingAdapter())
 
 
 class VectorAnnotatedTextModel(AtomicRedisModel):
@@ -148,4 +148,4 @@ class VectorAnnotatedTextModel(AtomicRedisModel):
         default_factory=lambda: RedisText("")
     )
 
-    Meta: ClassVar[RedisConfig] = RedisConfig(vectorizer=_FakeTextEmbeddingAdapter())
+    Meta: ClassVar[RedisConfig] = RedisConfig(vectorizer=FakeTextEmbeddingAdapter())

@@ -210,7 +210,7 @@ async def test_module_level_aget_or_create_delegates_to_classmethod(monkeypatch)
 async def test_aduplicate_many_does_not_call_prepare(monkeypatch):
     prepare_mock = AsyncMock()
     monkeypatch.setattr(StrModel, "_aprepare_special_fields", prepare_mock)
-    monkeypatch.setattr(base_module, "ensure_pipeline", lambda meta: _NoopPipeline())
+    monkeypatch.setattr(base_module, "ensure_pipeline", lambda meta: FakeNoopPipeline())
 
     model = StrModel(name="x")
     await model.aduplicate_many(1)
@@ -222,7 +222,7 @@ async def test_aduplicate_many_does_not_call_prepare(monkeypatch):
 async def test_aupdate_does_not_call_prepare(monkeypatch):
     prepare_mock = AsyncMock()
     monkeypatch.setattr(StrModel, "_aprepare_special_fields", prepare_mock)
-    monkeypatch.setattr(base_module, "ensure_pipeline", lambda meta: _NoopPipeline())
+    monkeypatch.setattr(base_module, "ensure_pipeline", lambda meta: FakeNoopPipeline())
     monkeypatch.setattr(base_module, "get_pipe_json", lambda: MagicMock())
 
     model = StrModel(name="x")
@@ -231,7 +231,7 @@ async def test_aupdate_does_not_call_prepare(monkeypatch):
     prepare_mock.assert_not_awaited()
 
 
-class _NoopPipeline:
+class FakeNoopPipeline:
     async def __aenter__(self):
         return MagicMock()
 

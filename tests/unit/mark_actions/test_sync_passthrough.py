@@ -22,21 +22,22 @@ def test_sync_function_is_returned_unwrapped(mark_version):
 
 def test_sync_method_on_class_is_returned_unwrapped(mark_version):
     # Arrange
-    class _Holder:
+    class SyncMethodHolder:
         def do(self):
             return "ok"
 
-    original = _Holder.do
+    original = SyncMethodHolder.do
 
     # Act
-    _Holder.do = mark_actions(
+    SyncMethodHolder.do = mark_actions(
         ActionGroup.UPDATE, ActionGroup.READ, version=mark_version
-    )(_Holder.do)
+    )(SyncMethodHolder.do)
 
     # Assert
-    assert _Holder.do is original
+    assert SyncMethodHolder.do is original
     assert (
-        getattr(_Holder.do, ACTION_GROUPS_ATTR) == ActionGroup.UPDATE | ActionGroup.READ
+        getattr(SyncMethodHolder.do, ACTION_GROUPS_ATTR)
+        == ActionGroup.UPDATE | ActionGroup.READ
     )
 
 

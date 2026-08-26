@@ -8,7 +8,7 @@ from rapyer.config import RedisConfig
 from rapyer.init import init_rapyer
 
 
-class _FakeEmbeddingAdapter:
+class FakeEmbeddingAdapter:
     """Minimal EmbeddingAdapter double - structurally matches the Protocol."""
 
     @property
@@ -29,7 +29,7 @@ class NoPresetVectorizerModel(AtomicRedisModel):
 class PresetVectorizerModel(AtomicRedisModel):
     name: str = ""
 
-    Meta = RedisConfig(vectorizer=_FakeEmbeddingAdapter())
+    Meta = RedisConfig(vectorizer=FakeEmbeddingAdapter())
 
 
 @pytest.fixture
@@ -53,7 +53,7 @@ async def test_init_rapyer_with_vectorizer_sets_exact_instance_on_non_preset_mod
     mock_redis_client, vectorizer_models
 ):
     # Arrange
-    custom_adapter = _FakeEmbeddingAdapter()
+    custom_adapter = FakeEmbeddingAdapter()
 
     # Act
     with patch("rapyer.init.REDIS_MODELS", vectorizer_models):
@@ -81,7 +81,7 @@ async def test_init_rapyer_preset_vectorizer_survives_global_param_sanity(
 ):
     # Arrange
     preset_adapter = PresetVectorizerModel.Meta.vectorizer
-    other_adapter = _FakeEmbeddingAdapter()
+    other_adapter = FakeEmbeddingAdapter()
 
     # Act
     with patch("rapyer.init.REDIS_MODELS", vectorizer_models):
@@ -96,8 +96,8 @@ async def test_init_rapyer_reinit_updates_non_preset_model_without_flagging_pres
     mock_redis_client, vectorizer_models
 ):
     # Arrange
-    first_adapter = _FakeEmbeddingAdapter()
-    second_adapter = _FakeEmbeddingAdapter()
+    first_adapter = FakeEmbeddingAdapter()
+    second_adapter = FakeEmbeddingAdapter()
 
     # Act
     with patch("rapyer.init.REDIS_MODELS", vectorizer_models):

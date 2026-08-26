@@ -8,7 +8,7 @@ from rapyer.embeddings.adapter import (
 from rapyer.errors import EmbeddingsExtraNotInstalledError
 
 
-class _DummyVectorizerClass:
+class DummyVectorizerClass:
     """Stand-in for HFTextVectorizer's minimal (sync, thread-offloaded) call shape."""
 
     def __init__(self, model):
@@ -38,7 +38,7 @@ def test_default_embedding_adapter_returns_fresh_instance_each_call_sanity():
 def test_dims_resolves_hf_default_and_caches_resolution_sanity(monkeypatch):
     # Arrange
     monkeypatch.setattr(
-        adapter, "_try_import_hf_vectorizer", lambda: _DummyVectorizerClass
+        adapter, "_try_import_hf_vectorizer", lambda: DummyVectorizerClass
     )
     call_count = []
     original = adapter._try_import_hf_vectorizer
@@ -64,7 +64,7 @@ def test_dims_falls_back_to_openai_when_hf_absent_sanity(monkeypatch):
     # Arrange
     monkeypatch.setattr(adapter, "_try_import_hf_vectorizer", lambda: None)
     monkeypatch.setattr(
-        adapter, "_try_import_openai_vectorizer", lambda: _DummyVectorizerClass
+        adapter, "_try_import_openai_vectorizer", lambda: DummyVectorizerClass
     )
     default_adapter = DefaultEmbeddingAdapter()
 
@@ -95,7 +95,7 @@ async def test_aembed_and_aembed_many_delegate_to_resolved_adapter_sanity(
 ):
     # Arrange
     monkeypatch.setattr(
-        adapter, "_try_import_hf_vectorizer", lambda: _DummyVectorizerClass
+        adapter, "_try_import_hf_vectorizer", lambda: DummyVectorizerClass
     )
     default_adapter = DefaultEmbeddingAdapter()
 

@@ -11,7 +11,7 @@ from rapyer.init import init_rapyer
 from rapyer.types.text import RedisText
 
 
-class _FakeEmbeddingAdapter:
+class FakeEmbeddingAdapter:
     """Minimal EmbeddingAdapter double - structurally matches the Protocol."""
 
     @property
@@ -29,13 +29,13 @@ class _FakeEmbeddingAdapter:
 class MatchingDimModel(AtomicRedisModel):
     body: Annotated[RedisText, Vector(dim=3)] = ""
 
-    Meta: ClassVar[RedisConfig] = RedisConfig(vectorizer=_FakeEmbeddingAdapter())
+    Meta: ClassVar[RedisConfig] = RedisConfig(vectorizer=FakeEmbeddingAdapter())
 
 
 class MismatchedDimModel(AtomicRedisModel):
     body: Annotated[RedisText, Vector(dim=768)] = ""
 
-    Meta: ClassVar[RedisConfig] = RedisConfig(vectorizer=_FakeEmbeddingAdapter())
+    Meta: ClassVar[RedisConfig] = RedisConfig(vectorizer=FakeEmbeddingAdapter())
 
 
 # Permanently mismatched (768 vs 3), so it must never linger in the real global registry.
@@ -51,7 +51,7 @@ class BareTextNoVectorModel(AtomicRedisModel):
 class PresetVectorizerMatchingDimModel(AtomicRedisModel):
     body: Annotated[RedisText, Vector(dim=3)] = ""
 
-    Meta: ClassVar[RedisConfig] = RedisConfig(vectorizer=_FakeEmbeddingAdapter())
+    Meta: ClassVar[RedisConfig] = RedisConfig(vectorizer=FakeEmbeddingAdapter())
 
 
 @pytest.fixture

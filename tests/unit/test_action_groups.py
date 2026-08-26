@@ -71,7 +71,7 @@ def test_redis_config_rejects_delete_in_class_declaration(
     # Act / Assert
     with pytest.raises(InvalidRefreshTtlError):
 
-        class _BadModel(AtomicRedisModel):
+        class InvalidRefreshTtlModel(AtomicRedisModel):
             Meta = RedisConfig(ttl=60, refresh_ttl=bad_refresh_ttl)
 
 

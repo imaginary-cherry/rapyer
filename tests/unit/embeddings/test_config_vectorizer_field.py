@@ -4,7 +4,7 @@ from rapyer.config import RedisConfig
 from rapyer.errors import MetaFrozenError
 
 
-class _FakeEmbeddingAdapter:
+class FakeEmbeddingAdapter:
     """Minimal EmbeddingAdapter double - structurally matches the Protocol."""
 
     @property
@@ -29,7 +29,7 @@ def test_redis_config_vectorizer_defaults_to_none_unresolved_sanity():
 
 def test_redis_config_vectorizer_constructor_kwarg_flags_preset_sanity():
     # Arrange
-    adapter = _FakeEmbeddingAdapter()
+    adapter = FakeEmbeddingAdapter()
 
     # Act
     config = RedisConfig(vectorizer=adapter)
@@ -41,7 +41,7 @@ def test_redis_config_vectorizer_constructor_kwarg_flags_preset_sanity():
 
 def test_redis_config_vectorizer_post_construction_assignment_flags_preset_sanity():
     # Arrange
-    adapter = _FakeEmbeddingAdapter()
+    adapter = FakeEmbeddingAdapter()
     config = RedisConfig()
 
     # Act
@@ -54,7 +54,7 @@ def test_redis_config_vectorizer_post_construction_assignment_flags_preset_sanit
 
 def test_redis_config_vectorizer_assignment_raises_when_meta_locked_sanity():
     # Arrange
-    adapter = _FakeEmbeddingAdapter()
+    adapter = FakeEmbeddingAdapter()
     config = RedisConfig()
     config._meta_locked = True
 
@@ -65,7 +65,7 @@ def test_redis_config_vectorizer_assignment_raises_when_meta_locked_sanity():
 
 def test_resolve_sets_value_without_marking_it_preset_sanity():
     # Arrange
-    adapter = _FakeEmbeddingAdapter()
+    adapter = FakeEmbeddingAdapter()
     config = RedisConfig()
 
     # Act
@@ -78,7 +78,7 @@ def test_resolve_sets_value_without_marking_it_preset_sanity():
 
 def test_resolve_raises_when_meta_locked_sanity():
     # Arrange
-    adapter = _FakeEmbeddingAdapter()
+    adapter = FakeEmbeddingAdapter()
     config = RedisConfig()
     config._meta_locked = True
 
