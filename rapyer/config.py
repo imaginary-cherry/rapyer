@@ -43,12 +43,17 @@ class WritePolicy:
         if config._meta_locked and not self.frozen_exempt:
             raise MetaFrozenError(self.frozen_message(name))
 
-    def resolve(self, config: "RedisConfig", name: str, value: Any):
+    def check_resolvable(self, config: "RedisConfig", name: str):
+        if name not in type(config).model_fields:
+            raise UnsupportedArgumentValueError(f"Meta has no field named {name!r}.")
         if not self.resolvable:
             raise UnsupportedArgumentValueError(
                 f"Meta.{name} is not a resolvable field; annotate it with "
                 f"WritePolicy(resolvable=True) to allow init-time resolution."
             )
+
+    def resolve(self, config: "RedisConfig", name: str, value: Any):
+        self.check_resolvable(config, name)
         self.check_write(config, name)
         # Bypassing pydantic keeps the field out of model_fields_set, so it stays "not preset".
         object.__setattr__(config, name, value)
@@ -137,13 +142,20 @@ class RedisConfig(BaseModel):
             policy_for(cls, info.field_name).check_write(data, info.field_name)
         return handler(data)
 
-    def _resolve(self, name: str, value: Any):
+    def resolve_unset(self, **values: Any):
         """
-        Set a resolvable field without marking it as explicitly user-set.
+        Fill resolvable fields that the user did not set themselves.
         """
-        policy_for(type(self), name).resolve(self, name, value)
+        for name, value in values.items():
+            policy = policy_for(type(self), name)
+            # Validated up front so a bad name is rejected even when the field is preset.
+            policy.check_resolvable(self, name)
+            if not self.is_preset(name):
+                policy.resolve(self, name, value)
 
     def is_preset(self, name: str) -> bool:
+        if name not in type(self).model_fields:
+            raise UnsupportedArgumentValueError(f"Meta has no field named {name!r}.")
         return name in self.model_fields_set
 
     @field_validator("refresh_ttl", mode="after")
