@@ -29,9 +29,9 @@ DEFAULT_CONNECTION = "redis://localhost:6379/0"
 
 
 @dataclasses.dataclass(frozen=True)
-class MetaField:
+class WritePolicy:
     """
-    Owns a RedisConfig field's write policy: freezing, exemption and init-time resolution.
+    Governs who may write a RedisConfig field and when.
     """
 
     # Writable even while Meta is frozen, for values rapyer itself derives.
@@ -47,7 +47,7 @@ class MetaField:
         if not self.resolvable:
             raise UnsupportedArgumentValueError(
                 f"Meta.{name} is not a resolvable field; annotate it with "
-                f"MetaField(resolvable=True) to allow init-time resolution."
+                f"WritePolicy(resolvable=True) to allow init-time resolution."
             )
         self.check_write(config, name)
         # Bypassing pydantic keeps the field out of model_fields_set, so it stays "not preset".
@@ -63,16 +63,16 @@ class MetaField:
 
 
 # A field with no annotation gets the strictest policy, so new fields are guarded by default.
-DEFAULT_META_FIELD = MetaField()
+DEFAULT_WRITE_POLICY = WritePolicy()
 
 
-def policy_for(config_cls: type[BaseModel], name: str) -> MetaField:
+def policy_for(config_cls: type[BaseModel], name: str) -> WritePolicy:
     field = config_cls.model_fields.get(name)
     if field is not None:
         for meta in field.metadata:
-            if isinstance(meta, MetaField):
+            if isinstance(meta, WritePolicy):
                 return meta
-    return DEFAULT_META_FIELD
+    return DEFAULT_WRITE_POLICY
 
 
 def create_all_types():
@@ -99,10 +99,10 @@ class RedisConfig(BaseModel):
     # Global TTL-cascade default, disabled unless init_rapyer(cascade_ttl=...) sets it.
     cascade_ttl: CascadeTTL | None = None
     # Plan-hashed cascade Redis Function name, init-baked (None on fakeredis).
-    cascade_function_name: Annotated[str | None, MetaField(frozen_exempt=True)] = None
+    cascade_function_name: Annotated[str | None, WritePolicy(frozen_exempt=True)] = None
     # Per-model vectorizer; None falls back to the packaged default, unlike cascade_ttl.
     vectorizer: Annotated[
-        EmbeddingAdapter | None, SkipValidation, MetaField(resolvable=True)
+        EmbeddingAdapter | None, SkipValidation, WritePolicy(resolvable=True)
     ] = None
     init_with_rapyer: bool = True
     # Enable TTL refresh by default; bool (all/none) or ActionGroup for fine-grained control.

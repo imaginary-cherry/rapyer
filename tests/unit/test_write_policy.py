@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from rapyer.config import DEFAULT_META_FIELD, MetaField, RedisConfig, policy_for
+from rapyer.config import DEFAULT_WRITE_POLICY, RedisConfig, WritePolicy, policy_for
 from rapyer.errors import MetaFrozenError, UnsupportedArgumentValueError
 
 
@@ -17,16 +17,16 @@ def _locked_config() -> RedisConfig:
 
 
 def test_policy_comes_from_the_field_annotation():
-    assert policy_for(RedisConfig, "cascade_function_name") == MetaField(
+    assert policy_for(RedisConfig, "cascade_function_name") == WritePolicy(
         frozen_exempt=True
     )
-    assert policy_for(RedisConfig, "vectorizer") == MetaField(resolvable=True)
+    assert policy_for(RedisConfig, "vectorizer") == WritePolicy(resolvable=True)
 
 
 def test_unannotated_field_gets_the_strict_default_policy():
-    assert policy_for(RedisConfig, "max_delete_per_transaction") is DEFAULT_META_FIELD
-    assert DEFAULT_META_FIELD.frozen_exempt is False
-    assert DEFAULT_META_FIELD.resolvable is False
+    assert policy_for(RedisConfig, "max_delete_per_transaction") is DEFAULT_WRITE_POLICY
+    assert DEFAULT_WRITE_POLICY.frozen_exempt is False
+    assert DEFAULT_WRITE_POLICY.resolvable is False
 
 
 def test_unannotated_field_is_still_frozen_at_runtime():
