@@ -124,7 +124,7 @@ PRIVATE_INHERITED_METHODS = _group(
     SpecialFieldType.lua_type_name,
     SpecialFieldType.lua_save_snippet,
     SpecialFieldType.lua_load_snippet,
-    SpecialFieldType.lua_save_payload,
+    SpecialFieldType.lua_save_args,
     SpecialFieldType.has_lua_load_output,
     RedisPriorityQueue.aremove,
     AtomicRedisModel.redis_schema,

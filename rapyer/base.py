@@ -922,19 +922,21 @@ class AtomicRedisModel(BaseModel):
 
         await model._aprepare_special_fields()
 
-        # Build (type_name, special_key, save_payload) triples for every SF
-        # field — direct and nested — in a single pass so the ARGV order and
-        # the load plan stay aligned (the script appends load results
-        # positionally). The registered atomic_get_or_create script dispatches
-        # on type_name into the SF_SAVE / SF_LOAD tables that were baked in at
-        # register_scripts() time.
-        sf_args: list[str] = []
+        # Build (type_name, special_key, argc, *args) groups for every SF field
+        # — direct and nested — in a single pass so the ARGV order and the load
+        # plan stay aligned (the script appends load results positionally). The
+        # registered atomic_get_or_create script dispatches on type_name into
+        # the SF_SAVE / SF_LOAD tables baked in at register_scripts() time, and
+        # walks the groups by the argc it finds.
+        sf_args: list = []
         load_plan: list[list[str]] = []
         for field, path in model._iter_special_fields():
             field_cls = type(field)
+            field_args = field.lua_save_args()
             sf_args.append(field_cls.lua_type_name())
             sf_args.append(field.special_key)
-            sf_args.append(field.lua_save_payload())
+            sf_args.append(str(len(field_args)))
+            sf_args.extend(field_args)
             if field_cls.has_lua_load_output():
                 load_plan.append(list(path))
 

@@ -1,9 +1,8 @@
-function(special_key, payload)
+function(special_key, base, argc)
     redis.call('DEL', special_key)
-    if payload and payload ~= '' then
-        local members = cjson.decode(payload)
-        for i = 1, #members, 4000 do
-            redis.call('SADD', special_key, unpack(members, i, math.min(i + 3999, #members)))
-        end
+    -- Chunked: unpack hits a C-stack limit around 8000 elements.
+    for offset = 0, argc - 1, 4000 do
+        local last = math.min(offset + 3999, argc - 1)
+        redis.call('SADD', special_key, unpack(ARGV, base + offset, base + last))
     end
 end

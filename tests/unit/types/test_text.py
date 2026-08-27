@@ -1,5 +1,3 @@
-import base64
-import json
 from typing import ClassVar
 from unittest.mock import AsyncMock, MagicMock, call
 
@@ -130,32 +128,39 @@ async def test_asave_special_raises_real_redis_required_before_touching_client()
 
 
 @pytest.mark.asyncio
-async def test_lua_save_payload_raises_real_redis_required_when_fake():
+async def test_lua_save_args_raises_real_redis_required_when_fake():
     model = TextFixtureModel(body="hi")
     model.Meta.is_fake_redis = True
 
     with pytest.raises(RedisTextRealRedisRequiredError):
-        model.body.lua_save_payload()
+        model.body.lua_save_args()
 
 
-def test_lua_save_payload_raises_not_materialized_when_no_pending():
+def test_lua_save_args_raises_not_materialized_when_no_pending():
     model = TextFixtureModel(body="hi")
 
     with pytest.raises(RedisTextEmbeddingNotMaterializedError):
-        model.body.lua_save_payload()
+        model.body.lua_save_args()
 
 
-def test_lua_save_payload_base64_roundtrips():
+def test_lua_save_args_ships_the_embedding_as_raw_bytes():
     model = TextFixtureModel(body="hi")
     model.body._pending_embedding = b"\x00\x01\x02\x03"
 
-    payload = model.body.lua_save_payload()
-    decoded = json.loads(payload)
+    args = model.body.lua_save_args()
 
-    assert base64.b64decode(decoded["embedding_b64"]) == b"\x00\x01\x02\x03"
-    assert decoded["text"] == "hi"
-    assert decoded["field"] == "body"
-    assert decoded["model_label"] == "test-model@1:768"
+    # Flat HSET field/value list; ARGV is binary-safe so the blob is not encoded.
+    assert args == [
+        "text",
+        "hi",
+        "embedding",
+        b"\x00\x01\x02\x03",
+        "field",
+        "body",
+        "model_label",
+        "test-model@1:768",
+    ]
+    assert len(args) % 2 == 0
 
 
 def test_queue_special_loads_in_pipeline_calls_hget_text_only():

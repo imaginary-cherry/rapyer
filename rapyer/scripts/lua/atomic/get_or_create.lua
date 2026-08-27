@@ -12,6 +12,9 @@ if existed == 1 then
     local out = {0, current}
     local i = 3
     while i <= #ARGV do
+        -- (type, key, argc, arg1..argN): loaders need only the key, but the
+        -- walk still has to step over this field's args to reach the next one.
+        local argc = tonumber(ARGV[i + 2])
         local loader = SF_LOAD[ARGV[i]]
         if loader then
             local result = loader(ARGV[i + 1])
@@ -19,7 +22,7 @@ if existed == 1 then
                 out[#out + 1] = cjson.encode(result)
             end
         end
-        i = i + 3
+        i = i + 3 + argc
     end
     return out
 end
@@ -30,11 +33,14 @@ end
 -- leaving a committed main doc with only partial special-field state.
 local i = 3
 while i <= #ARGV do
+    local argc = tonumber(ARGV[i + 2])
     local saver = SF_SAVE[ARGV[i]]
     if saver then
-        saver(ARGV[i + 1], ARGV[i + 2])
+        -- Hand over a base offset rather than a copied table: ARGV is already a
+        -- table, so savers unpack straight off it and pay nothing per argument.
+        saver(ARGV[i + 1], i + 3, argc)
     end
-    i = i + 3
+    i = i + 3 + argc
 end
 redis.call('JSON.SET', main_key, path, main_data)
 return {1, main_data}

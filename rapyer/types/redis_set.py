@@ -250,10 +250,8 @@ class RedisSet(set, SpecialFieldType, Generic[T]):
         if members:
             await self.client.sadd(target_special_key, *members)
 
-    def lua_save_payload(self) -> str:
-        if not self:
-            return ""
-        return json.dumps(self._dump_members(self))
+    def lua_save_args(self) -> list:
+        return self._dump_members(self)
 
     @classmethod
     def queue_special_loads_in_pipeline(

@@ -1,7 +1,5 @@
 """D-15: mutating a RedisText field inside alock(save_at_end=True) holds a non-expiring lock across asave()'s embedding call - an accepted lock-hold-time cost, not guarded here."""
 
-import base64
-import json
 from collections import defaultdict
 from typing import Any
 
@@ -81,7 +79,7 @@ class RedisText(str, SpecialFieldType):
         # the source's path). A COPY of an absent source is a no-op that creates nothing.
         await self.client.copy(self.special_key, target_special_key)
 
-    def lua_save_payload(self) -> str:
+    def lua_save_args(self) -> list:
         if self.Meta.is_fake_redis:
             raise RedisTextRealRedisRequiredError(
                 self._base_model_link.__class__.__name__
@@ -89,14 +87,17 @@ class RedisText(str, SpecialFieldType):
         pending = getattr(self, "_pending_embedding", None)
         if pending is None:
             raise RedisTextEmbeddingNotMaterializedError(self.field_path)
-        return json.dumps(
-            {
-                "text": str(self),
-                "embedding_b64": base64.b64encode(pending).decode("ascii"),
-                "field": self.field_path.lstrip("."),
-                "model_label": self.Meta.vectorizer.label,
-            }
-        )
+        # Flat HSET field/value list, matching what asave_special writes.
+        return [
+            "text",
+            str(self),
+            "embedding",
+            pending,
+            "field",
+            self.field_path.lstrip("."),
+            "model_label",
+            self.Meta.vectorizer.label,
+        ]
 
     @classmethod
     def queue_special_loads_in_pipeline(

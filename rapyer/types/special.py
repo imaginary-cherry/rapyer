@@ -68,7 +68,7 @@ class SpecialFieldType(BaseRedisType, abc.ABC):
         existing SF subclass. ``RedisText`` overrides this to own its whole
         embedding strategy internally: filter to dirty fields, batch one
         ``aembed_many(...)`` per distinct vectorizer, then stash the result
-        for ``asave_special()``/``lua_save_payload()``.
+        for ``asave_special()``/``lua_save_args()``.
         """
 
     def adopt_state_from(self, previous):
@@ -117,15 +117,15 @@ class SpecialFieldType(BaseRedisType, abc.ABC):
             )
         return load_sf_load_snippet(cls.LUA_SNIPPET_DIR)
 
-    def lua_save_payload(self) -> str:
-        """Per-instance save data shipped in ``ARGV`` and passed to the
-        ``lua_save_snippet`` function as ``payload``.
+    def lua_save_args(self) -> list:
+        """Per-instance save data appended to ``ARGV``, reaching the
+        ``lua_save_snippet`` function as a base offset and a count.
 
-        Must be a string (JSON-encoded by convention; the snippet decodes).
-        Defaults to ``""`` for SF types whose save is a no-op (e.g.
+        Values may be ``bytes``; ARGV is binary-safe, so nothing needs encoding.
+        Defaults to empty for SF types whose save is a no-op (e.g.
         ``RedisPriorityQueue``). Override when save needs the in-memory value
         (e.g. ``RedisSet`` ships its members)."""
-        return ""
+        return []
 
     @classmethod
     def has_lua_load_output(cls) -> bool:
