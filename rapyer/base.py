@@ -89,7 +89,6 @@ from rapyer.types.special import (
     SPECIAL_FIELD_KEY_PREFIX,
     SpecialFieldType,
 )
-from rapyer.types.text import RedisText
 from rapyer.typing_support import Self, Unpack
 from rapyer.utils.annotation import (
     DYNAMIC_CLASS_DOC,
@@ -1161,13 +1160,10 @@ class AtomicRedisModel(BaseModel):
             if isinstance(attr, (BaseRedisType, AtomicRedisModel)):
                 attr._base_model_link = self
                 attr.field_name = f".{name}"
-            if isinstance(attr, RedisText):
-                # D-06: carry the OLD instance's dirty-check baseline forward.
-                attr._baseline_text = (
-                    getattr(previous, "_baseline_text", None)
-                    if isinstance(previous, RedisText)
-                    else None
-                )
+            if isinstance(attr, SpecialFieldType):
+                # Reassignment builds a new instance; let the type carry forward
+                # whatever per-instance state the old one held.
+                attr.adopt_state_from(previous)
 
         if skip_redis_set:
             return

@@ -24,6 +24,15 @@ class RedisText(str, SpecialFieldType):
     def clone(self):
         return self.__class__(str(self))
 
+    def adopt_state_from(self, previous):
+        # str is immutable, so `m.body = <same text>` builds a new instance with no
+        # baseline; without carrying it the field reads dirty and re-embeds.
+        self._baseline_text = (
+            getattr(previous, "_baseline_text", None)
+            if isinstance(previous, RedisText)
+            else None
+        )
+
     @classmethod
     async def aprepare_many(cls, fields: list["RedisText"]) -> None:
         dirty = [f for f in fields if str(f) != getattr(f, "_baseline_text", None)]

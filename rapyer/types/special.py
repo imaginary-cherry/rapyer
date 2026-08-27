@@ -71,6 +71,15 @@ class SpecialFieldType(BaseRedisType, abc.ABC):
         for ``asave_special()``/``lua_save_payload()``.
         """
 
+    def adopt_state_from(self, previous):
+        """
+        Carry per-instance bookkeeping forward when this field is reassigned.
+
+        Default no-op. Override for SF types whose Python value is immutable, so
+        reassignment builds a new instance and would otherwise drop the old
+        instance's state.
+        """
+
     @classmethod
     def lua_type_name(cls) -> str:
         """

@@ -60,6 +60,40 @@ async def test_redistext_dirty_check_skips_recompute_on_unchanged_resave(
 
 
 @pytest.mark.asyncio
+async def test_redistext_reassigning_identical_text_skips_recompute(real_redis_client):
+    # Arrange - str is immutable, so this builds a NEW RedisText instance. The
+    # baseline has to transplant onto it or the unchanged text re-embeds.
+    model = RedisTextModel(body=RedisText("steady text"))
+    await model.asave()
+    vectorizer = model.Meta.vectorizer
+    calls_after_first_save = vectorizer.call_count
+
+    # Act
+    model.body = RedisText("steady text")
+    await model.asave()
+
+    # Assert
+    assert vectorizer.call_count == calls_after_first_save
+    assert await real_redis_client.hget(model.body.special_key, "text") == "steady text"
+
+
+@pytest.mark.asyncio
+async def test_redistext_reassigning_over_a_plain_value_still_embeds(real_redis_client):
+    # Arrange - previous holds no baseline, so the new instance must read dirty.
+    model = RedisTextModel(body=RedisText("first text"))
+    await model.asave()
+    vectorizer = model.Meta.vectorizer
+    calls_after_first_save = vectorizer.call_count
+
+    # Act
+    model.body = RedisText("second text")
+    await model.asave()
+
+    # Assert
+    assert vectorizer.call_count == calls_after_first_save + 1
+
+
+@pytest.mark.asyncio
 async def test_redistext_get_or_create_writes_hash_atomically_via_lua_path(
     real_redis_client,
 ):
