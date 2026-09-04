@@ -37,6 +37,10 @@ class RedisSet(set, SpecialFieldType[None], Generic[T]):
         inner = get_origin(inner) or inner
         return safe_issubclass(inner, RelationalFieldType)
 
+    @classmethod
+    def cascade_container_kind(cls) -> Optional[str]:
+        return "set"
+
     # --- Serialization helpers ---
 
     def _dump_members(self, values: Iterable[T]) -> list[str]:

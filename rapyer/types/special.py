@@ -33,6 +33,11 @@ class SpecialFieldType(ExternalFieldType[ConfigT], abc.ABC):
     def owned_redis_keys(cls, model_key: str, field_path: str) -> list[str]:
         return [cls.special_field_key(model_key, field_path)]
 
+    @classmethod
+    def cascade_container_kind(cls) -> Optional[str]:
+        """The cascade plan's container tag for FKs held in this type, if any."""
+        return None
+
     @property
     def special_key(self) -> str:
         """

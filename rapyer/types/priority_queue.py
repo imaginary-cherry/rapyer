@@ -39,6 +39,10 @@ class RedisPriorityQueue(SpecialFieldType[None], Generic[T]):
         inner = get_origin(inner) or inner
         return safe_issubclass(inner, RelationalFieldType)
 
+    @classmethod
+    def cascade_container_kind(cls) -> Optional[str]:
+        return "zset"
+
     # --- Serialization helpers ---
 
     def _dump_members(self, values) -> list[str]:

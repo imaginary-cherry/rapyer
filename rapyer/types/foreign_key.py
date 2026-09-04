@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
 
+from rapyer.cascade.spec import CascadeSpec
 from rapyer.errors import NotResolvedError
 from rapyer.types.relational import RelationalFieldType
 
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="AtomicRedisModel")
 
 
-class ForeignKey(RelationalFieldType[None], Generic[T]):
+class ForeignKey(RelationalFieldType[CascadeSpec], Generic[T]):
     """
     Typed, lazy reference to another ``AtomicRedisModel``.
 
