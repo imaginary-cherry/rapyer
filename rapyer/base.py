@@ -657,7 +657,7 @@ class AtomicRedisModel(BaseModel):
         for fname in cls._special_field_names:
             field_cls = cls.model_fields[fname].annotation
             field_path = f"{parent_path}.{fname}"
-            keys.append(field_cls.special_field_key(key, field_path))
+            keys.extend(field_cls.owned_redis_keys(key, field_path))
         for fname in cls._contain_sf:
             field_cls = cls.model_fields[fname].annotation
             nested_path = f"{parent_path}.{fname}"

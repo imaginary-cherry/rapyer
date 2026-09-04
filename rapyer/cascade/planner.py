@@ -1,95 +1,33 @@
 import dataclasses
 import hashlib
 import json
-from types import UnionType
-from typing import TYPE_CHECKING, Any, ForwardRef, Union, get_args, get_origin
+from typing import TYPE_CHECKING, Annotated, Any, get_origin
 
-from rapyer.cascade.ttl import CascadeTTL
+from rapyer.cascade.spec import CascadeSpec
 from rapyer.errors.cascade import (
     CascadeKeyInitialsError,
     CascadeLuaLiteralError,
     CascadeTargetTtlMissingError,
 )
 from rapyer.scripts.constants import CASCADE_FUNCTION_PREFIX, CASCADE_LIBRARY_PREFIX
+from rapyer.types.foreign_key import ForeignKey
 from rapyer.types.relational import RelationalFieldType
 from rapyer.utils.annotation import strip_optional
-from rapyer.utils.pythonic import resolve_generic_args, safe_issubclass
+from rapyer.utils.pythonic import safe_issubclass
 
 if TYPE_CHECKING:
     from rapyer.base import AtomicRedisModel
 
 
-def _field_cascade_spec(model_cls: Any, field_name: str) -> CascadeTTL | None:
-    """Return the per-field CascadeTTL marker from the field's annotation metadata."""
+def _field_cascade_spec(model_cls: Any, field_name: str) -> CascadeSpec | None:
+    """Return the per-field cascade config from the field's Annotated metadata."""
     field_info = model_cls.model_fields.get(field_name)
     if field_info is None:
         return None
-    for metadata in field_info.metadata:
-        if isinstance(metadata, CascadeTTL):
-            return metadata
-    return None
-
-
-def _resolve_forward_ref(forward_ref: ForwardRef) -> Any | None:
-    """Resolve a forward-ref FK target to its model class, or None."""
-    # Lazy import avoids a cycle back into rapyer.cascade.planner.
-    from rapyer.base import REDIS_MODELS
-
-    # model_rebuild leaves SF-container forward refs unresolved, so match by name in the registry.
-    name = forward_ref.__forward_arg__
-    for model in REDIS_MODELS:
-        if model.__name__ == name:
-            return model
-    return None
-
-
-def _unwrap_relational_target(
-    annotation: Any, models: list[type["AtomicRedisModel"]]
-) -> list[type["AtomicRedisModel"]]:
-    """
-    Return every model class an FK-shaped annotation can point to, empty if it is not FK-shaped.
-    """
-    stripped = strip_optional(annotation)
-    origin = get_origin(stripped) or stripped
-    if safe_issubclass(origin, RelationalFieldType):
-        args = resolve_generic_args(stripped)
-        target = args[0] if args else None
-        if target is None:
-            return []
-        # Reference[A | B] contributes one candidate per union member.
-        if get_origin(target) in (Union, UnionType):
-            members = get_args(target)
-        else:
-            members = (target,)
-        candidates: list[type["AtomicRedisModel"]] = []
-        for member in members:
-            resolved = (
-                _resolve_forward_ref(member)
-                if isinstance(member, ForwardRef)
-                else member
-            )
-            if resolved is None:
-                continue
-            for candidate in _expand_candidates(resolved, models):
-                if candidate not in candidates:
-                    candidates.append(candidate)
-        return candidates
-    accumulated: list[type["AtomicRedisModel"]] = []
-    for arg in resolve_generic_args(stripped):
-        for candidate in _unwrap_relational_target(arg, models):
-            if candidate not in accumulated:
-                accumulated.append(candidate)
-    return accumulated
-
-
-def _expand_candidates(
-    target_cls: Any, models: list[type["AtomicRedisModel"]]
-) -> list[type["AtomicRedisModel"]]:
-    """
-    Return target_cls together with its registered subclasses, in declaration order.
-    """
-    # safe_issubclass(T, T) holds, so an unregistered base stays out: it carries no Meta.ttl.
-    return [m for m in models if safe_issubclass(m, target_cls)]
+    annotation = field_info.annotation
+    if field_info.metadata:
+        annotation = Annotated[(annotation, *field_info.metadata)]
+    return ForeignKey.extract_config(annotation)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -150,7 +88,7 @@ def _resolve_target_cls(
     model_cls: Any, field_name: str, models: list[type["AtomicRedisModel"]]
 ) -> list[type["AtomicRedisModel"]]:
     annotation = model_cls.model_fields[field_name].annotation
-    return _unwrap_relational_target(annotation, models)
+    return RelationalFieldType.relational_targets(annotation, models)
 
 
 def _unwrap_nested_model_cls(annotation: Any) -> Any | None:
@@ -202,7 +140,16 @@ def _static_walk_fk_edges(
             _static_walk_fk_edges(nested_cls, nested_path, fks, models, top_level=False)
             continue
 
-        sf_container = _sf_container_kind(annotation)
+        # Lazy import: priority_queue -> special -> scripts.loader -> planner is a real cycle.
+        from rapyer.types.special import SpecialFieldType
+
+        stripped = strip_optional(annotation)
+        sf_origin = get_origin(stripped) or stripped
+        sf_container = (
+            sf_origin.cascade_container_kind()
+            if safe_issubclass(sf_origin, SpecialFieldType)
+            else None
+        )
         if sf_container is not None:
             # Nested SF-held-ref traversal is deferred; direct fields only.
             if not top_level:
@@ -210,7 +157,7 @@ def _static_walk_fk_edges(
             edge = _classify_edge(model_cls, field_name)
             if not edge.enabled:
                 continue
-            cands = _unwrap_relational_target(annotation, models)
+            cands = RelationalFieldType.relational_targets(annotation, models)
             if not cands:
                 continue
             fks.append(
@@ -251,21 +198,6 @@ def _static_walk_fk_edges(
                 candidates=([c.__name__ for c in cands] if len(cands) > 1 else None),
             )
         )
-
-
-def _sf_container_kind(annotation: Any) -> str | None:
-    """Return "set"/"zset" if annotation is a RedisSet/RedisPriorityQueue, else None."""
-    # Lazy import: priority_queue -> special -> scripts.loader -> planner is a real cycle.
-    from rapyer.types.priority_queue import RedisPriorityQueue
-    from rapyer.types.redis_set import RedisSet
-
-    stripped = strip_optional(annotation)
-    origin = get_origin(stripped) or stripped
-    if safe_issubclass(origin, RedisSet):
-        return "set"
-    if safe_issubclass(origin, RedisPriorityQueue):
-        return "zset"
-    return None
 
 
 def _static_walk_special_suffixes(model_cls: Any, parent_path: str = "") -> list[str]:
