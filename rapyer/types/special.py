@@ -1,5 +1,6 @@
 import abc
-from typing import ClassVar, Optional, TypeVar
+import dataclasses
+from typing import ClassVar, Generic, Optional, TypeVar
 
 from rapyer.scripts.loader import load_sf_load_snippet, load_sf_save_snippet
 from rapyer.types.external import ExternalFieldType
@@ -7,6 +8,17 @@ from rapyer.types.external import ExternalFieldType
 SPECIAL_FIELD_KEY_PREFIX = "__rapyer_special__"
 
 ConfigT = TypeVar("ConfigT")
+
+
+@dataclasses.dataclass(frozen=True)
+class SpecialFieldSpec(Generic[ConfigT]):
+    """
+    One special field's class-level facts, resolved at class-build time.
+    """
+
+    name: str
+    field_type: type["SpecialFieldType[ConfigT]"]
+    config: Optional[ConfigT] = None
 
 
 class SpecialFieldType(ExternalFieldType[ConfigT], abc.ABC):
