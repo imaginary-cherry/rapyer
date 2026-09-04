@@ -94,8 +94,7 @@ class RedisDict(dict[str, T], GenericRedisType, Generic[T]):
 
     @mark_actions(ActionGroup.UPDATE, ActionGroup.ERASE)
     async def adel_item(self, key):
-        # Tolerant local pop so a stale mirror (key already missing locally)
-        # cannot raise after the Redis delete has been queued / issued.
+        # Tolerant pop so a stale mirror cannot raise after the Redis delete is queued.
         super().pop(key, None)
         result = await self.client_json.delete(self.key, self.json_field_path(key))  # type: ignore[misc]
         return result

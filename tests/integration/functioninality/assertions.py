@@ -40,14 +40,12 @@ async def _assert_special_fields_equal(
         actual_value = getattr(actual, field_name)
         expected_value = getattr(expected, field_name)
         if isinstance(actual_value, SpecialFieldType):
-            # Delegate the per-field comparison to its adapter (e.g. the
-            # priority queue checks the values stored in Redis).
+            # Delegate per-field comparison to the adapter (the queue checks what Redis holds).
             await _adapter_for_field(actual_value).assert_field_equal(
                 actual_value, expected_value
             )
         elif isinstance(actual_value, AtomicRedisModel):
-            # Nested (contained-SF) model: recurse so its special fields are
-            # compared too.
+            # Nested contained-SF model, so recurse to compare its special fields too.
             await _assert_special_fields_equal(actual_value, expected_value)
 
 
@@ -66,8 +64,10 @@ async def assert_atomic_models_equal(
 
 
 async def assert_all_round_trip(loaded, originals):
-    """Assert ``loaded`` and ``originals`` are equal model-for-model via
-    :func:`assert_atomic_models_equal` (same length, pairwise content equal)."""
+    """
+    Assert ``loaded`` and ``originals`` are equal model-for-model via
+    :func:`assert_atomic_models_equal` (same length, pairwise content equal).
+    """
     assert len(loaded) == len(originals)
     for found, original in zip(loaded, originals):
         await assert_atomic_models_equal(found, original)
@@ -85,8 +85,7 @@ async def assert_no_field_at_default(model_instance: AtomicRedisModel):
                 value_data != default_data
             ), f"SF field {field_name!r} extracted same data as default"
         elif isinstance(value, AtomicRedisModel):
-            # Nested container model: recurse so its (possibly special) fields
-            # are checked by value rather than by trivially-distinct identity.
+            # Recurse into a nested container so its fields compare by value, not by identity.
             await assert_no_field_at_default(value)
         else:
             assert (

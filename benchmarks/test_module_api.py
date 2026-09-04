@@ -116,8 +116,7 @@ class TestModuleAfindMany(AsyncBenchmarkTestWithTTL):
 
 
 class TestModuleAfindMixedClasses(AsyncBenchmarkTestWithTTL):
-    # This test exercises two model classes simultaneously. ``models`` only
-    # carries the "primary" — the secondary is fetched via ``_aux_models``.
+    # Two model classes at once: ``models`` carries the primary, ``_aux_models`` the secondary.
     models = {
         TTLMode.NO_TTL: StrModel,
         TTLMode.TTL: StrModelWithTTL,

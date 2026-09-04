@@ -4,9 +4,7 @@ from tests.models.complex_types import InnerMostModel, MiddleModel, OuterModel
 from tests.models.functionality_types import AllTypesModel
 from tests.models.simple_types import FloatModel
 
-# =============================================================================
-# String field
-# =============================================================================
+# --- String field ---
 
 
 @pytest.mark.asyncio
@@ -67,9 +65,7 @@ async def test_string_multiple_updates_changes_preserved_during_pipeline_committ
     assert final_model.str_field == "start_first_second"
 
 
-# =============================================================================
-# Integer field
-# =============================================================================
+# --- Integer field ---
 
 
 @pytest.mark.asyncio
@@ -111,9 +107,7 @@ async def test_integer_multiple_operations_changes_preserved_during_pipeline_com
     assert final_model.int_field == 80
 
 
-# =============================================================================
-# List field
-# =============================================================================
+# --- List field ---
 
 
 @pytest.mark.asyncio
@@ -178,9 +172,7 @@ async def test_list_mixed_operations_changes_preserved_during_pipeline_committed
     assert "extend2" in final_model.list_field
 
 
-# =============================================================================
-# Dict field
-# =============================================================================
+# --- Dict field ---
 
 
 @pytest.mark.asyncio
@@ -251,9 +243,7 @@ async def test_dict_mixed_operations_changes_preserved_during_pipeline_committed
     assert final_model.dict_field["another_key"] == "another_value"
 
 
-# =============================================================================
-# Bool field
-# =============================================================================
+# --- Bool field ---
 
 
 @pytest.mark.asyncio
@@ -275,9 +265,7 @@ async def test_bool_assignment_changes_persisted_after_pipeline_sanity():
     assert final_model.bool_field is True
 
 
-# =============================================================================
-# Float field
-# =============================================================================
+# --- Float field ---
 
 
 @pytest.mark.asyncio
@@ -373,15 +361,12 @@ async def test_float_multiple_operations_changes_preserved_during_pipeline_commi
         loaded_during_pipeline = await FloatModel.aget(model.key)
         assert loaded_during_pipeline.value == 100.0
 
-    # Assert - all accumulated changes committed after pipeline
-    # (100 + 50 - 25) * 2 / 5 = 125 * 2 / 5 = 250 / 5 = 50
+    # Assert - all changes commit after the pipeline: (100 + 50 - 25) * 2 / 5 == 50.
     final_model = await FloatModel.aget(model.key)
     assert final_model.value == 50.0
 
 
-# =============================================================================
-# Cross-type
-# =============================================================================
+# --- Cross-type ---
 
 
 @pytest.mark.asyncio
@@ -424,9 +409,7 @@ async def test_multiple_types_all_changes_preserved_during_pipeline_committed_af
     assert final_model.dict_field["update_key"] == "update_value"
 
 
-# =============================================================================
-# Nested model
-# =============================================================================
+# --- Nested model ---
 
 
 @pytest.mark.asyncio

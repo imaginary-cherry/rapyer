@@ -52,8 +52,7 @@ class GenericRedisType(RedisType, Generic[T], ABC):
 
         from rapyer.types.relational import RelationalFieldType
 
-        # inner may be a parameterized alias (e.g. ForeignKey[Author]); reduce
-        # it to its origin class before the subclass check.
+        # inner may be a parameterized alias (e.g. ForeignKey[Author]), so reduce it to its origin.
         inner = get_origin(inner) or inner
         if safe_issubclass(inner, RelationalFieldType):
             return True

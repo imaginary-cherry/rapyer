@@ -233,8 +233,7 @@ async def prefer_json_dump():
     ],
 )
 async def test_redis_dump_all_types_with_json_sanity(model_instance, expected_types):
-    # Arrange
-    # Model instance already created in parameterize
+    # Arrange - the model instance is already created in parametrize.
 
     # Act
     result = model_instance.redis_dump()

@@ -6,13 +6,8 @@ from tests.integration.actions.read import ReadActionTestBase
 from tests.integration.functioninality.assertions import assert_atomic_models_equal
 from tests.models.collection_types import ComprehensiveTestModel
 
-# ``aget_or_create`` has a dual nature: it CREATEs the model when the key is
-# absent and otherwise READs the persisted one. Each branch is exercised by its
-# own action-test class — the *Creates* classes never pre-insert (so the create
-# branch fires), while the *Finds* classes rely on the default ``setup_data``
-# insert (so the found branch fires). Both branches run eagerly off
-# ``cls.Meta.redis`` and return a value, so pipeline-deferral coverage is
-# skipped exactly like the read actions do.
+# aget_or_create CREATEs on a missing key and READs otherwise, so each branch gets its own class:
+# the *Creates* ones never pre-insert, the *Finds* ones rely on the default setup_data insert.
 
 _SKIP_PIPELINE_ATOMICITY = (
     "aget_or_create returns a value and runs eagerly; can't be deferred "
@@ -38,9 +33,7 @@ class TestModelAgetOrCreateCreates(CreateActionTestBase):
         return [self.build_model(name="fresh", counter=7)]
 
     async def setup_data(self):
-        # Don't insert: the create branch is the subject, so the key must be
-        # absent when ``perform_action`` runs. Populate the SF fields BEFORE the
-        # call so each one flows through ``aget_or_create``'s atomic save path.
+        # No insert (the create branch is the subject) and SF fields are populated before the call.
         models = self.create_models()
         return models
 

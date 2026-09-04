@@ -24,8 +24,8 @@ async def write_fixture_batch(models: list[AtomicRedisModel]) -> None:
     """
     Persist already-built fixture models straight through a Redis pipeline.
     """
-    # Not ainsert: it is quadratic in batch size for Reference-carrying models
-    # (4k nodes ~30s vs ~0.1s edge-free), so a million-node fixture never finishes.
+    # Not ainsert: it is quadratic in batch size for Reference-carrying models (4k nodes ~30s vs
+    # ~0.1s edge-free), so a million-node fixture would never finish.
     redis = AtomicRedisModel.Meta.redis
     async with redis.pipeline(transaction=False) as pipe:
         for model in models:
@@ -38,8 +38,7 @@ class LargeCascadeBenchmark(AsyncBenchmarkTest):
     Times one cascade over a graph of BENCHMARK_CASCADE_LARGE_SIZE nodes.
     """
 
-    # Building the graph dwarfs the call being timed, and the cascade does not
-    # mutate it, so the fixture is built once per test and reused across rounds.
+    # The cascade never mutates the graph, so build the fixture once and reuse it across rounds.
     rounds = 3
     warmup_rounds = 1
     # setup() assigns onto the instance, so the three shapes never share a fixture.
@@ -82,8 +81,7 @@ class TestCascadeTtlLargeChain(LargeCascadeBenchmark):
     models = {TTLMode.NO_TTL: BenchCascadeLargeChainNode}
 
     async def build(self, cls):
-        # Tail-first so each node references an already-minted child key, and only
-        # the current batch is held rather than the whole graph.
+        # Tail-first so each node references a minted child key and only one batch is held.
         head_key = None
         batch = []
         for index in range(BENCHMARK_CASCADE_LARGE_SIZE):

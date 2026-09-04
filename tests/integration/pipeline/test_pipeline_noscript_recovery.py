@@ -7,9 +7,7 @@ from tests.models.simple_types import TTL_TEST_SECONDS, TTLRefreshTestModel
 
 
 async def _flush_all_but_cascade(redis_client):
-    # SCRIPT FLUSH drops every EVALSHA data-op script (exercising _apipeline's
-    # NOSCRIPT self-heal) but leaves Redis Functions intact, so TTL-refresh
-    # (which now routes through FCALL) keeps working uninterrupted.
+    # SCRIPT FLUSH drops EVALSHA scripts but leaves Redis Functions, so FCALL TTL keeps working.
     await redis_client.execute_command("SCRIPT", "FLUSH")
 
 
@@ -81,8 +79,7 @@ async def test_pipeline_raises_persistent_noscript_error_when_scripts_keep_faili
     real_redis_client,
     disable_noscript_recovery,
 ):
-    # Arrange - save while scripts are loaded, then flush server-side so only
-    # the pipeline's remove_range call hits NOSCRIPT
+    # Arrange - save with scripts loaded, then flush so only remove_range hits NOSCRIPT.
     model = ComprehensiveTestModel(tags=["a", "b", "c"])
     await model.asave()
     await _flush_all_but_cascade(real_redis_client)

@@ -9,7 +9,8 @@ from tests.integration.actions.base import ActionTestBase
 
 
 class AsyncActionTestBase(ActionTestBase, ABC):
-    """Base for actions that execute against Redis immediately when awaited
+    """
+    Base for actions that execute against Redis immediately when awaited
     (e.g., ``RedisDict.aupdate``, ``AtomicRedisModel.asave``).
 
     Adds a sanity check that ``await perform_action(...)`` outside any

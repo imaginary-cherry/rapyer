@@ -78,9 +78,7 @@ def test_raises_on_a_non_first_candidate_that_lacks_ttl():
 
 
 def test_does_not_raise_when_target_ttl_is_set():
-    # Arrange
-    # The root ("A") also refreshes its own key, so it must carry a ttl
-    # too — give it one here so this test isolates the TARGET-ttl-set path.
+    # Arrange - the root refreshes its own key too, so give it a ttl to isolate the TARGET path.
     plan = _plan(a_ttl=30, b_ttl=60)
 
     # Act
@@ -88,10 +86,8 @@ def test_does_not_raise_when_target_ttl_is_set():
 
 
 def test_raises_when_cascade_root_has_edges_but_no_ttl():
-    # Arrange
-    # A root with outgoing cascade-enabled edges but Meta.ttl=None passed the
-    # old TARGET-only validator, then blew up at apply time EXPIREing its own
-    # key with a nil ttl. It must now be rejected up front.
+    # Arrange - a root with cascade edges but Meta.ttl=None passed the old TARGET-only validator,
+    # then blew up at apply time EXPIREing its own key with a nil ttl. Now rejected up front.
     plan = _plan(a_ttl=None, b_ttl=60)
 
     # Act
@@ -103,10 +99,7 @@ def test_raises_when_cascade_root_has_edges_but_no_ttl():
 
 
 def test_raises_rapyer_error_when_edge_target_absent_from_partial_plan():
-    # Arrange
-    # A plan built from a subset of models can reference a target class that is
-    # not itself in the plan; the lookup must raise a RapyerError, not a bare
-    # KeyError.
+    # Arrange - a plan can reference a target class not in it; the lookup must raise RapyerError.
     partial_plan = {
         "A": CascadePlanEntry(
             ttl=60,
@@ -184,6 +177,5 @@ def test_raises_on_first_violation_deterministically_sorted_by_class_name():
     with pytest.raises(CascadeTargetTtlMissingError) as exc_info:
         validate_cascade_ttl_targets(plan)
 
-    # Assert
-    # "A" sorts before "M" — A's edge (target "Z") must be the first violation.
+    # Assert - "A" sorts before "M", so A's edge (target "Z") is the first violation.
     assert exc_info.value.model_name == "Z"

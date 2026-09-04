@@ -59,8 +59,7 @@ class TestRapyerAinsert(AsyncActionTestBase):
         ]
 
     async def setup_data(self):
-        # Don't pre-insert — the ``ainsert`` call inside the pipeline is the
-        # test subject, so ``handle`` is the (unsaved) models themselves.
+        # No pre-insert: the pipelined ainsert is the subject, so ``handle`` is the unsaved models.
         return self.create_models()
 
     async def perform_action(self, piped):

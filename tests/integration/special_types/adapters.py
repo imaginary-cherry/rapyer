@@ -55,11 +55,13 @@ class SpecialFieldAdapter(ABC):
         """Assert two instances of this adapter's special-field type hold equal content."""
 
     def in_memory_assignments(self) -> list[tuple[tuple[str, ...], Any]]:
-        """``(field-path segments, value)`` pairs to assign on a freshly built
+        """
+        ``(field-path segments, value)`` pairs to assign on a freshly built
         model so this special field carries data at construction.
 
         Empty for SF types that hold no in-memory state (e.g. the pure-proxy
-        priority queue, which can only be populated through Redis)."""
+        priority queue, which can only be populated through Redis).
+        """
         return []
 
 
@@ -68,8 +70,10 @@ class PriorityQueueAdapter(SpecialFieldAdapter):
     EXPECTED_SIZE = 3
 
     def _queue_specs(self, model: ComprehensiveTestModel):
-        """Each queue with type-appropriate sample items: the top-level queue
-        holds ``int`` values, the nested one holds ``float`` values."""
+        """
+        Each queue with type-appropriate sample items: the top-level queue
+        holds ``int`` values, the nested one holds ``float`` values.
+        """
         return [
             (model.tasks, [(10, 1.0), (20, 2.0), (30, 3.0)]),
             (model.container.tasks, [(1.5, 1.0), (2.5, 2.0), (3.5, 3.0)]),
@@ -79,8 +83,7 @@ class PriorityQueueAdapter(SpecialFieldAdapter):
         return [pq.special_key for pq, _ in self._queue_specs(model)]
 
     async def populate(self, model: ComprehensiveTestModel) -> None:
-        # Batch the pushes: reuse an open pipeline if the caller already started
-        # one, otherwise open a fresh pipeline so all pushes go in one round-trip.
+        # Reuse an open pipeline if the caller started one, so all pushes take one round-trip.
         async with rapyer.apipeline(use_existing_pipe=True):
             for pq, items in self._queue_specs(model):
                 for value, priority in items:
@@ -103,8 +106,7 @@ class PriorityQueueAdapter(SpecialFieldAdapter):
     async def assert_field_equal(
         self, actual: RedisPriorityQueue, expected: RedisPriorityQueue
     ) -> None:
-        # The queue keeps no in-memory mirror, so compare the items stored in
-        # Redis under each field's special key.
+        # The queue keeps no in-memory mirror, so compare what Redis holds under the special key.
         actual_items = await actual.aitems()
         expected_items = await expected.aitems()
         assert actual_items == expected_items, (
@@ -139,8 +141,7 @@ class RedisSetAdapter(SpecialFieldAdapter):
         assert not exists, f"Set key {sp_key} unexpectedly still exists"
 
     async def assert_field_equal(self, actual: RedisSet, expected: RedisSet):
-        # ``RedisSet`` is a ``set`` subclass with a faithful in-memory mirror,
-        # so compare members directly.
+        # RedisSet is a set subclass with a faithful mirror, so compare members directly.
         actual_members = set(actual)
         expected_members = set(expected)
         assert actual_members == expected_members, (

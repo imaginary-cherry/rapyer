@@ -62,9 +62,11 @@ async def test_pq_ref_parent_refresh_ttl_calls_run_fcall_not_expire(
 async def test_set_ref_opt_out_refresh_ttl_gates_like_a_normal_opt_out_fk(
     fcall_pipeline_spy,
 ):
-    """A cascade-opt-out SF field gates like any opt-out FK: _needs_cascade_script is
+    """
+    A cascade-opt-out SF field gates like any opt-out FK: _needs_cascade_script is
     True, so refresh_ttl takes the FCALL path. The plan carries no enabled edge, so the
-    FCALL refreshes only the parent's own keys and follows no reference (no child)."""
+    FCALL refreshes only the parent's own keys and follows no reference (no child).
+    """
     mock_pipe, mock_run_fcall = fcall_pipeline_spy
     parent = CascadeSetRefOptOut()
 

@@ -10,8 +10,10 @@ from rapyer.types.integer import RedisInt
 
 
 def _count_action_wrappers(func):
-    """Count action wrappers in the ``__wrapped__`` chain. Anything more than
-    one means a previous install layer was stacked on top instead of peeled."""
+    """
+    Count action wrappers in the ``__wrapped__`` chain. Anything more than
+    one means a previous install layer was stacked on top instead of peeled.
+    """
     count = 0
     current = func
     while current is not None:
@@ -38,8 +40,7 @@ def test_inheriting_models_with_redis_int_keep_marks_redis_updated_wrapper():
             init_with_rapyer=False,
         )
 
-    # Assert
-    # ``aload`` is marked READ: parent wraps, child peels (READ ∉ APPEND|ARITHMETIC).
+    # Assert - ``aload`` is READ: parent wraps, child peels (READ not in APPEND|ARITHMETIC).
     assert _count_action_wrappers(vars(PeelParentModel)["aload"]) == 1
     assert _count_action_wrappers(vars(PeelChildModel)["aload"]) == 0
 
@@ -47,21 +48,15 @@ def test_inheriting_models_with_redis_int_keep_marks_redis_updated_wrapper():
     assert _count_action_wrappers(vars(PeelParentModel)["aupdate"]) == 1
     assert _count_action_wrappers(vars(PeelChildModel)["aupdate"]) == 0
 
-    # ``asave`` is UPDATE|CREATE: parent wraps via UPDATE match, child peels
-    # — refresh on first save now requires opting in via ``refresh_ttl=CREATE``,
-    # which child's APPEND|ARITHMETIC meta does not include.
+    # ``asave`` is UPDATE|CREATE: parent wraps on UPDATE, child's APPEND|ARITHMETIC peels.
     assert _count_action_wrappers(vars(PeelParentModel)["asave"]) == 1
     assert _count_action_wrappers(vars(PeelChildModel)["asave"]) == 0
 
-    # ``aset_ttl`` carries ``ignore_refresh=True`` — never wrapped, regardless
-    # of meta. If install ever stacked a wrapper here, count would be 1.
+    # ``aset_ttl`` has ignore_refresh=True, so it is never wrapped whatever the meta says.
     assert _count_action_wrappers(vars(PeelParentModel)["aset_ttl"]) == 0
     assert _count_action_wrappers(vars(PeelChildModel)["aset_ttl"]) == 0
 
-    # Per-field RedisInt subclass: built once with parent meta, reused by
-    # child. The methods inherited from RedisType / BaseRedisType (``asave``,
-    # ``aload``) and the RedisInt-specific async ``aincrease`` must all wrap
-    # exactly once under parent's UPDATE|READ meta.
+    # The per-field RedisInt subclass is built once with parent meta and reused by the child.
     field_type = PeelParentModel.model_fields["counter"].annotation
     assert PeelChildModel.model_fields["counter"].annotation is field_type
     assert issubclass(field_type, RedisInt)
@@ -73,9 +68,7 @@ def test_inheriting_models_with_redis_int_keep_marks_redis_updated_wrapper():
     # ``RedisInt.aincrease`` (UPDATE|ARITHMETIC, async) — wraps via UPDATE match.
     assert _count_action_wrappers(vars(field_type)["aincrease"]) == 1
 
-    # Sync ``__iadd__`` / ``__isub__`` are wrapped with ``marks_redis_updated``.
-    # install must leave them as that exact wrapper — no action wrapper added,
-    # ``marks_redis_updated`` not stripped.
+    # install must leave marks_redis_updated in place and add no action wrapper of its own.
     for op_name in ("__iadd__", "__isub__"):
         redis_int_op = vars(RedisInt)[op_name]
         installed_op = vars(field_type)[op_name]
@@ -109,8 +102,7 @@ def test_recursive_model_recurses_into_nested_atomic_model():
     inner_dynamic = Outer.model_fields["inner"].annotation
     inner_counter_type = inner_dynamic.model_fields["counter"].annotation
 
-    # Assert
-    # Pre-condition — bare on every level.
+    # Assert - pre-condition: bare on every level.
     assert _count_action_wrappers(vars(inner_counter_type)["asave"]) == 1
 
     assert Outer.Meta.ttl is None
@@ -118,10 +110,7 @@ def test_recursive_model_recurses_into_nested_atomic_model():
 
 
 def test_install_action_for_meta_returns_unmarked_func_unchanged():
-    # Coverage: install_action_for_meta's `params is None` early return — the
-    # path taken for any function that was never decorated as an action.
-    # A function with no MarkActionParams is not an action: install must return
-    # it untouched (no wrapping), regardless of meta.
+    # A function with no MarkActionParams is not an action, so install returns it untouched.
     def plain():
         return 1
 

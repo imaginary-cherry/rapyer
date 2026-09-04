@@ -271,24 +271,18 @@ async def test_pipeline_multiple_deletes__check_atomicity_sanity(real_redis_clie
 
 @pytest.mark.asyncio
 async def test_client_and_client_json_fall_back_to_meta(real_redis_client):
-    # Coverage: the `or self.Meta.redis(_json)` fallback in the client /
-    # client_json properties when no pipeline is bound to the context.
-    # Arrange
+    # Arrange - with no pipeline bound, client/client_json fall back to Meta.redis(_json).
     model = ComprehensiveTestModel(name="client_props")
     await model.asave()
 
-    # Act / Assert
-    # Outside a pipeline context both properties resolve to the configured
-    # Meta clients rather than a context-bound pipeline.
+    # Act / Assert - outside a pipeline both properties resolve to the configured Meta clients.
     assert model.client is model.Meta.redis
     assert model.client_json is model.Meta.redis_json
 
 
 @pytest.mark.asyncio
 async def test_client_returns_context_pipeline_inside_pipeline(real_redis_client):
-    # Coverage: the client property's other branch — returning the
-    # context-bound pipeline when one is active.
-    # Arrange
+    # Arrange - the client property's other branch returns the active context-bound pipeline.
     model = ComprehensiveTestModel(name="client_props")
     await model.asave()
 

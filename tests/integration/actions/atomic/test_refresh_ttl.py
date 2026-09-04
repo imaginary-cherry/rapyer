@@ -18,9 +18,7 @@ class TestRapyerRefreshTtl(ActionTestBase):
         return [ComprehensiveTestModel(name="ttl_test", counter=25)]
 
     def all_keys(self) -> list[str]:
-        # Every key ``refresh_ttl`` touches: the model key plus each special-field
-        # key, sourced from the adapters (``tasks``, ``container.labels``,
-        # ``container.tasks``).
+        # Every key refresh_ttl touches: the model key plus each adapter-sourced special-field key.
         model = self.created_models[0]
         keys = [model.key]
         for adapter in SPECIAL_FIELD_ADAPTERS:
@@ -30,8 +28,7 @@ class TestRapyerRefreshTtl(ActionTestBase):
     async def setup_data(self):
         models = await super().setup_data()
         self.created_models = models
-        # Lower every key's TTL (model + special fields) so there's a measurable
-        # gap to refresh.
+        # Lower every key's TTL (model + special fields) so there is a measurable gap to refresh.
         for key in self.all_keys():
             await self.real_redis_client.expire(key, self.reduced_ttl)
         ttls_before = [await self.real_redis_client.ttl(k) for k in self.all_keys()]

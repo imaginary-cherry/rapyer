@@ -277,9 +277,7 @@ async def test_rapyer_aget_with_key_without_class_name_edge_case():
 
 @pytest.mark.asyncio
 async def test_aget_corrupted_payload_raises_corrupted_model(real_redis_client):
-    # Coverage: aget's CorruptedModelError branch when create_redis_model can't
-    # validate the stored payload.
-    # Arrange
+    # Arrange - an unvalidatable stored payload hits aget's CorruptedModelError branch.
     model = IntModel()
     await model.asave()
     # Overwrite with a payload that cannot validate (count must be int).

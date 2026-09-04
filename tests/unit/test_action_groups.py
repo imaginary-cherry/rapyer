@@ -132,8 +132,7 @@ def test_action_group_all_for_ttl_accepted_by_redis_config():
     # Act
     config = RedisConfig(ttl=60, refresh_ttl=refresh_ttl)
 
-    # Assert
-    # ActionGroup.all(for_ttl=True) excludes DELETE → must not raise
+    # Assert — ActionGroup.all(for_ttl=True) excludes DELETE, so this must not raise.
     assert config.refresh_ttl == refresh_ttl
 
 
@@ -172,8 +171,7 @@ def test_dict_adel_item_has_update_and_erase_groups():
     # Act
     action_groups = method._action_groups
 
-    # Assert
-    # adel_item removes an item from the collection but keeps the model key → ERASE, not DELETE
+    # Assert — adel_item drops an item but keeps the model key, so ERASE not DELETE.
     assert ActionGroup.UPDATE in action_groups
     assert ActionGroup.ERASE in action_groups
 

@@ -8,7 +8,8 @@ SPECIAL_FIELD_KEY_PREFIX = "__rapyer_special__"
 
 
 class SpecialFieldType(BaseRedisType, abc.ABC):
-    """Base for field types stored separately from the model's JSON dump.
+    """
+    Base for field types stored separately from the model's JSON dump.
 
     Special field types are saved under a separate Redis key derived from
     the parent model's key and the field path. Each subclass defines its
@@ -28,7 +29,8 @@ class SpecialFieldType(BaseRedisType, abc.ABC):
 
     @property
     def special_key(self) -> str:
-        """Redis key for this field's separate data structure.
+        """
+        Redis key for this field's separate data structure.
 
         Format: ``__rapyer_special__:{model_key}:{dotted_field_path}``
         e.g., ``__rapyer_special__:MyModel:abc123:tasks`` for a top-level field,
@@ -38,21 +40,24 @@ class SpecialFieldType(BaseRedisType, abc.ABC):
 
     @abc.abstractmethod
     async def asave_special(self):
-        """Save this field's data to its separate Redis structure.
+        """
+        Save this field's data to its separate Redis structure.
 
         Uses ``self.client`` which is pipeline-aware.
         """
 
     @abc.abstractmethod
     async def adelete_special(self):
-        """Delete this field's separate Redis data.
+        """
+        Delete this field's separate Redis data.
 
         Uses ``self.client`` which is pipeline-aware.
         """
 
     @abc.abstractmethod
     async def aduplicate_special(self, target_special_key: str):
-        """Copy this field's data to a new key for a duplicated model.
+        """
+        Copy this field's data to a new key for a duplicated model.
 
         The *read* must use ``self.redis`` (direct client) so the data is
         available immediately; the *write* should use ``self.client`` so it
@@ -118,23 +123,27 @@ class SpecialFieldType(BaseRedisType, abc.ABC):
         return load_sf_load_snippet(cls.LUA_SNIPPET_DIR)
 
     def lua_save_args(self) -> list:
-        """Per-instance save data appended to ``ARGV``, reaching the
+        """
+        Per-instance save data appended to ``ARGV``, reaching the
         ``lua_save_snippet`` function as a base offset and a count.
 
         Values may be ``bytes``; ARGV is binary-safe, so nothing needs encoding.
         Defaults to empty for SF types whose save is a no-op (e.g.
         ``RedisPriorityQueue``). Override when save needs the in-memory value
-        (e.g. ``RedisSet`` ships its members)."""
+        (e.g. ``RedisSet`` ships its members).
+        """
         return []
 
     @classmethod
     def has_lua_load_output(cls) -> bool:
-        """Whether ``lua_load_snippet`` produces a value to inject into the
+        """
+        Whether ``lua_load_snippet`` produces a value to inject into the
         model dump on the found branch.
 
         Defaults to ``True``. Override to ``False`` for SF types whose load
         snippet always returns ``nil`` so the Python side knows not to expect
-        a slot in the script's return tuple for this field."""
+        a slot in the script's return tuple for this field.
+        """
         return True
 
     def clone(self):

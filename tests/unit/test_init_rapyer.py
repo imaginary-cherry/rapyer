@@ -289,12 +289,10 @@ async def test_init_rapyer_without_prefer_normal_json_dump_keeps_preconfigured_v
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ["script_name", "script_text"],
-    # Scripts carrying the SF dispatch placeholder are substituted by
-    # `register_scripts` before being uploaded, so their loaded text won't match
-    # the raw template verbatim. They are covered separately by
-    # `test_init_rapyer_loads_sf_injected_scripts_sanity`.
+    # SF-placeholder scripts are substituted before upload, so their loaded text differs.
     [
         [name, text]
+        # test_init_rapyer_loads_sf_injected_scripts_sanity covers the substituted ones.
         for name, text in SCRIPTS.items()
         if SF_DISPATCH_PLACEHOLDER not in text
     ],
@@ -336,9 +334,7 @@ async def test_init_rapyer_loads_cascade_function_with_full_plan_sanity(
     # Act
     await init_rapyer(mock_redis_client)
 
-    # Assert
-    # init_rapyer bakes the full plan into the cascade Redis Function and loads
-    # it once; the baked source must mention every registered class.
+    # Assert — the once-loaded cascade Function source must mention every registered class.
     load_calls = (
         mock_redis_client.function_load.await_args_list
         or mock_redis_client.function_load.call_args_list

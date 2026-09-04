@@ -644,8 +644,7 @@ async def test_strict_mixed_inheritance_non_pydantic_fields_not_persisted_sanity
     # Act
     await model.asave()
 
-    # Assert
-    # Check that non-pydantic fields exist in memory
+    # Assert - non-pydantic fields still exist in memory.
     assert hasattr(model, "non_pydantic_field")
     assert hasattr(model, "another_field")
     assert hasattr(model, "temp_data")

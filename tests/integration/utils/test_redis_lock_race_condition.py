@@ -107,8 +107,7 @@ async def test_new_lock_handles_expiration_correctly(redis_client):
         ),
     )
 
-    # Assert
-    # Check that WorkerA's lock was NOT stolen
+    # Assert - WorkerA's lock was NOT stolen.
     worker_a_events = [e for e in events if e.worker_name == "WorkerA"]
     stolen_events = [e for e in worker_a_events if e.event_type == "stolen"]
     assert (

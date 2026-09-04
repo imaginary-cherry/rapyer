@@ -118,7 +118,5 @@ async def test_refresh_ttl_if_needed_honors_action_groups(
 
 
 def test_should_refresh_classmethod_returns_bool():
-    # Coverage: the should_refresh() classmethod (a thin wrapper over
-    # should_refresh_for_action that nothing else exercised).
-    # Act / Assert
+    # Act / Assert — should_refresh() is a thin wrapper nothing else exercises.
     assert isinstance(TTLRefreshTestModel.should_refresh(), bool)

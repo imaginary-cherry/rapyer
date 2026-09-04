@@ -19,8 +19,7 @@ def event_loop():
 def redis_client(event_loop):
     meta_redis = rapyer.AtomicRedisModel.Meta.redis
     db_num = os.getenv("REDIS_DB", "0")
-    # CI points this at a unix socket on a tuned, host-networked Redis to keep
-    # walltime variance low; local runs fall back to TCP.
+    # CI points this at a unix socket on a tuned Redis; local runs fall back to TCP.
     redis_url = os.getenv("REDIS_URL", f"redis://localhost:6370/{db_num}")
     redis = meta_redis.from_url(redis_url, decode_responses=True)
 

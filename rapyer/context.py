@@ -40,7 +40,8 @@ def get_pipe_json() -> Optional["JSON"]:
 
 @contextlib.asynccontextmanager
 async def ensure_pipeline(meta, should_execute: bool = True):
-    """Yield existing pipeline from context, or create a new transactional one.
+    """
+    Yield existing pipeline from context, or create a new transactional one.
 
     If already inside an active pipeline context, yields that pipeline without
     creating a new one (the outer context owns execution). Otherwise, creates

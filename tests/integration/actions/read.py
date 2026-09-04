@@ -14,9 +14,11 @@ class ReadActionTestBase(AsyncActionTestBase, ABC):
     """If set to a reason string, :meth:`test_read_in_pipeline_returns_server_value` is skipped with that reason."""
 
     def expected_read_output(self) -> Any:
-        """Value the read action is expected to return. Defaults to
+        """
+        Value the read action is expected to return. Defaults to
         :meth:`expected_before`; override when the expected return value
-        differs from the pre-action server value (e.g., for pop semantics)."""
+        differs from the pre-action server value (e.g., for pop semantics).
+        """
         return self.expected_before()
 
     async def assert_action_effect(self, loaded: Any, action_result: Any):

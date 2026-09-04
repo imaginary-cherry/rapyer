@@ -18,7 +18,8 @@ class UpdateActionTestBase(ActionTestBase, ABC):
     skip_target_field_clobber_check: ClassVar[str | None] = None
 
     def local_mutate_target_field(self, model: PipelineActionModel) -> None:
-        """Apply a local-only mutation to the field ``perform_action`` targets.
+        """
+        Apply a local-only mutation to the field ``perform_action`` targets.
 
         Subclasses must override this (or set ``skip_target_field_clobber_check``)
         so the no-clobber test can verify that local-only changes don't leak

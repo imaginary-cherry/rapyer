@@ -126,8 +126,7 @@ async def test_adelete_many__expression_no_match_returns_zero(
 
 @pytest.mark.asyncio
 async def test_adelete_many__no_args_raises_type_error():
-    # Arrange
-    # Act & Assert
+    # Arrange / Act / Assert
     with pytest.raises(UnsupportedArgumentTypeError):
         await IndexTestModel.adelete_many()
 
@@ -180,8 +179,7 @@ async def test_adelete_many__full_key_no_prefix(real_redis_client):
 
 @pytest.mark.asyncio
 async def test_adelete_many__missing_key_silent_skip(real_redis_client):
-    # Arrange
-    # Act
+    # Arrange / Act
     result = await UserModel.adelete_many(RapyerKey("nonexistent-key"))
 
     # Assert

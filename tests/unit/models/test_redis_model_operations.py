@@ -554,8 +554,7 @@ class TestRedisModelUpdateOperations:
         # Act
         model.update(middle_model=updated_middle)
 
-        # Assert
-        # Check field update
+        # Assert - the field update landed.
         assert model.middle_model.tags == ["new_item"]
         assert model.middle_model.inner_model.lst == ["1"]
 

@@ -73,10 +73,7 @@ def test_registering_two_models_with_same_class_name_raises(clean_redis_models):
 def test_redis_schema_raises_for_indexed_field_with_unsupported_scalar_type_sanity(
     clean_redis_models,
 ):
-    # ``complex`` is a valid pydantic type but has no RedisType conversion, so its
-    # annotation reaches redis_schema unconverted. With the Index flag set it is not
-    # an AtomicRedisModel nor a RedisType, so it falls through to the final guard that
-    # rejects indexed fields whose type Redis cannot index.
+    # ``complex`` has no RedisType conversion, so Index[complex] hits the indexability guard.
     class IndexedComplexModel(AtomicRedisModel):
         name: str
         value: Index[complex]

@@ -32,10 +32,12 @@ class GuardConformingOwner(AtomicRedisModel):
 
 
 class GuardBadReachedTarget(AtomicRedisModel):
-    """A NON-root reached target overriding class_key_initials() to a constant
+    """
+    A NON-root reached target overriding class_key_initials() to a constant
     != __name__ — the exact silent-mis-resolve seam D-02 guards. It is never a
     cascade root (it owns no cascade edge); it participates only as the target
-    reached via GuardBadReachedOwner's edge, locking the participant-scope."""
+    reached via GuardBadReachedOwner's edge, locking the participant-scope.
+    """
 
     name: str = "bad_reached_target"
 

@@ -45,10 +45,8 @@ from tests.coverage_helpers import (
 
 @pytest.fixture(autouse=True)
 def reset_meta_freeze():
-    # Meta is frozen (all fields immutable) after init_rapyer(), and the config
-    # is a process-global shared singleton per model. Unfreeze around every test
-    # so a prior init can't leak MetaFrozenError into a later test that mutates
-    # Meta directly (tests own their other Meta cleanup, as they already did).
+    # Meta is frozen after init_rapyer() and is a process-global singleton per model, so unfreeze
+    # around every test or a prior init leaks MetaFrozenError into one that mutates Meta directly.
     for model in REDIS_MODELS:
         model.Meta._meta_locked = False
     yield
@@ -265,13 +263,11 @@ def pytest_runtest_makereport(item, call):
 
 
 def _iter_class_methods(cls, include_async: bool = True, include_sync: bool = True):
-    # When the caller wants only async methods, use ``inspect.getmembers`` so
-    # inherited async methods are picked up (e.g. RedisStr inheriting asave
-    # from RedisType). For sync-only or mixed, ``vars(cls).items()`` keeps the
-    # iteration to methods defined directly on cls.
+    # getmembers() also picks up inherited async methods (e.g. RedisStr inheriting asave).
     if include_async and not include_sync:
         members = inspect.getmembers(cls, predicate=_is_async_callable)
     else:
+        # vars() keeps sync-only and mixed iteration to methods defined directly on cls.
         members = vars(cls).items()
     for name, method in members:
         if isinstance(method, (classmethod, staticmethod)):
@@ -297,8 +293,10 @@ def _iter_module_functions(module: ModuleType):
 
 
 def _is_private_method(holder, method_name: str) -> bool:
-    """Private if (holder, method_name) is an exact match in PRIVATE_METHODS,
-    or if any ancestor class lists method_name in PRIVATE_INHERITED_METHODS."""
+    """
+    Private if (holder, method_name) is an exact match in PRIVATE_METHODS,
+    or if any ancestor class lists method_name in PRIVATE_INHERITED_METHODS.
+    """
     if (holder.__name__, method_name) in PRIVATE_METHODS:
         return True
     if inspect.isclass(holder):
@@ -322,7 +320,8 @@ def _collect_methods(
     include_redis_types: bool = True,
     include_non_redis_types: bool = True,
 ):
-    """Collect (class_name, method_name) tuples for methods that should be
+    """
+    Collect (class_name, method_name) tuples for methods that should be
     subject to a coverage check.
 
     Inclusion flags default to ``True``; set the relevant ones to ``False`` to
@@ -352,8 +351,7 @@ def _collect_methods(
                 include_sync=include_sync,
             )
         )
-        # Module-level rapyer functions (afind, ainsert, etc.) are async-only
-        # by convention.
+        # Module-level rapyer functions (afind, ainsert, ...) are async-only by convention.
         if include_async:
             candidates.extend(_iter_module_functions(rapyer))
 

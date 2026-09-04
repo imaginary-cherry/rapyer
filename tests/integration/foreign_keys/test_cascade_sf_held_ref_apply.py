@@ -156,11 +156,8 @@ async def test_malformed_and_non_string_sf_members_are_tolerated(real_redis_clie
 async def test_wrongtype_sf_container_key_is_tolerated_not_an_aborted_cascade(
     real_redis_client,
 ):
-    # Arrange
-    # This is the SOLE regression guard for the SF-container counterpart of the
-    # inline WRONGTYPE-degradation fix (test_cascade_apply_skips_corrupt_
-    # wrongtype_reached_target_sanity in test_cascade_ttl_apply.py): the sf_key
-    # is a STRING, not a SET, so SMEMBERS raises WRONGTYPE inside push_sf_edge.
+    # Arrange - the SOLE regression guard for the SF-container half of the WRONGTYPE fix: sf_key
+    # is written as a STRING, not a SET, so SMEMBERS raises WRONGTYPE inside push_sf_edge.
     parent = await CascadeSetRefParent().asave()
     sf_key = RedisSet.special_field_key(parent.key, "refs")
     await real_redis_client.set(sf_key, "not-a-set")

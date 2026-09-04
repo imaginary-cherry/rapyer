@@ -29,7 +29,8 @@ class MarkActionParams:
 
 
 class ActionGroup(enum.Flag):
-    """Categories of operations that can trigger TTL refresh.
+    """
+    Categories of operations that can trigger TTL refresh.
 
     - ``READ``: reading any value from Redis (field-level reads, contains-checks, etc.).
     - ``FETCH``: extracting a full model from Redis (``aget``, ``afind``, ``afind_one``).
@@ -66,7 +67,8 @@ class MarkVersion(enum.Enum):
 
 
 class TargetSource(enum.Enum):
-    """How the ``mark_actions`` decorator discovers the model(s) to refresh.
+    """
+    How the ``mark_actions`` decorator discovers the model(s) to refresh.
 
     - ``SELF``: the first positional arg is the target (standard instance methods).
     - ``RESULT``: the method's return value is the target (or an iterable of targets).
@@ -87,7 +89,8 @@ _action_context: contextvars.ContextVar[Optional[list[ActionContextEntryType]]] 
 
 
 def resolve_root_model(model):
-    """Walk ``_base_model_link`` to the top-level model that owns the Redis key
+    """
+    Walk ``_base_model_link`` to the top-level model that owns the Redis key
     and TTL config.
 
     TTL is a property of the root aggregate: a special field or a nested model
@@ -122,8 +125,10 @@ def register_from_result(result, action: "ActionGroup"):
 def _build_seen_v1(
     targets: list[ActionContextEntryType],
 ) -> Iterable[ActionContextEntryType]:
-    """v1 dedup: OR-merge action groups per key so refresh_ttl_if_needed sees
-    every action triggered for that key (e.g. nested READ + UPDATE)."""
+    """
+    v1 dedup: OR-merge action groups per key so refresh_ttl_if_needed sees
+    every action triggered for that key (e.g. nested READ + UPDATE).
+    """
     seen: dict[str, ActionContextEntryType] = {}
     for model, action in targets:
         existing = seen.get(model.key)
@@ -137,8 +142,10 @@ def _build_seen_v1(
 def _build_seen_v2(
     targets: list[ActionContextEntryType],
 ) -> Iterable[ActionContextEntryType]:
-    """v2 dedup: first registration per key wins. v2's refresh ignores the
-    action so OR-merging would be wasted work."""
+    """
+    v2 dedup: first registration per key wins. v2's refresh ignores the
+    action so OR-merging would be wasted work.
+    """
     seen: dict[str, ActionContextEntryType] = {}
     for model, action in targets:
         seen.setdefault(model.key, (model, action))
@@ -147,8 +154,10 @@ def _build_seen_v2(
 
 @dataclass(frozen=True, slots=True)
 class FlushVersion:
-    """Per-version flush strategy: how to dedup the registered targets and
-    how to refresh each one."""
+    """
+    Per-version flush strategy: how to dedup the registered targets and
+    how to refresh each one.
+    """
 
     build_seen: BuildSeenFn
     refresh: RefreshFN
@@ -254,30 +263,14 @@ def mark_actions(
     ignore_refresh: bool = False,
     version: MarkVersion = MarkVersion.V2,
 ):
-    """Tag a method with action groups for TTL refresh.
+    """
+    Tag a method with action groups for TTL refresh.
 
-    - For async methods, wraps the method so that, at the outermost decorator
-      boundary, TTL is refreshed for every model registered into the action
-      context during the call. Nested decorated calls only contribute targets;
-      they do not flush.
-    - For sync methods, only tags the method with ``ACTION_GROUPS_ATTR``;
-      TTL refresh is deferred to pipeline-exit via ``should_refresh()``.
-
-    ``target`` controls which models the wrapper auto-registers.
-
-    ``ignore_refresh=True`` skips wrapping entirely — the method is tagged with
-    ``ACTION_GROUPS_ATTR`` for inspection/grouping, but no action context is
-    opened and no TTL refresh is triggered (e.g. ``adelete``, ``aset_ttl``).
-
-    ``version`` selects when the wrap/no-wrap decision happens:
-
-    - ``MarkVersion.V1``: wrap at decoration time and re-check
-      ``Meta.refresh_ttl`` against the action group at every call (in
-      ``flush_action_targets_v1``).
-    - ``MarkVersion.V2`` (default): defer the wrap decision to model class
-      install time. If the method is wrapped, runtime refreshes unconditionally
-      (no per-call check). To opt creates into refresh while skipping other
-      actions, set ``Meta.refresh_ttl=ActionGroup.CREATE``.
+    Args:
+        groups: action groups this method belongs to.
+        target: which models the wrapper registers into the action context.
+        ignore_refresh: tag only — no action context is opened, no TTL refresh runs.
+        version: V1 decides wrapping at decoration time, V2 at model-install time.
     """
     combined = ActionGroup(0)
     for g in groups:
@@ -286,6 +279,7 @@ def mark_actions(
     def decorator(method):
         setattr(method, ACTION_GROUPS_ATTR, combined)
 
+        # V2 only records the params; install_action_for_meta wraps once Meta.refresh_ttl is known.
         if version is MarkVersion.V2:
             setattr(
                 method,
@@ -294,6 +288,7 @@ def mark_actions(
             )
             return method
 
+        # Sync methods are never wrapped — their refresh is deferred to pipeline exit.
         if not inspect.iscoroutinefunction(method) or ignore_refresh:
             return method
 
@@ -336,10 +331,8 @@ def install_action_for_meta(func: Callable, meta: "RedisConfig"):
     params: Optional[MarkActionParams] = getattr(func, MARK_ACTION_PARAMS_ATTR, None)
     if params is None:
         return func
-    # Peel back only past wrappers WE installed previously (e.g. parent class
-    # install of the same method with a different meta). Other wrappers like
-    # ``marks_redis_updated`` must stay in place so the call chain is preserved
-    # — both for the wrap branch and the no-wrap branch.
+    # Peel back only wrappers WE installed, e.g. a parent-class install under a different meta.
+    # Foreign wrappers like ``marks_redis_updated`` must stay, for wrap and no-wrap branch alike.
     base_func = func
     while getattr(base_func, ACTION_WRAPPER_SENTINEL, False):
         base_func = base_func.__wrapped__
@@ -357,12 +350,14 @@ def install_action_for_meta(func: Callable, meta: "RedisConfig"):
 
 
 def install_marked_action_methods(cls: type, meta: Optional["RedisConfig"] = None):
-    """Wrap methods that need ttl handling.
-
-    When ``meta`` is omitted, falls back to ``cls.Meta`` (the AtomicRedisModel
-    path). For BaseRedisType field subclasses, the owning model's meta is
-    passed in explicitly because they don't carry their own ``Meta`` class.
     """
+    Wrap the methods on ``cls`` that need TTL handling under ``meta``.
+
+    Args:
+        cls: the class whose MRO is scanned for marked methods.
+        meta: config to install against; defaults to ``cls.Meta``.
+    """
+    # BaseRedisType subclasses have no Meta of their own, so callers pass the owning model's.
     if meta is None:
         meta = cls.Meta
     seen: set[str] = set()

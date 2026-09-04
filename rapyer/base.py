@@ -469,8 +469,7 @@ class AtomicRedisModel(BaseModel):
             # Skip special fields — they handle their own serialization
             if attr_name in cls._special_field_names:
                 continue
-            # Skip relational fields — ForeignKey is left unconverted and
-            # serializes itself to a key string via its own core schema.
+            # ForeignKey stays unconverted and serializes itself to a key string.
             if attr_name in cls._relational_field_names:
                 continue
             if original_annotations[attr_name] == attr_type:
@@ -489,9 +488,7 @@ class AtomicRedisModel(BaseModel):
 
         cls.build_redis_model()
 
-        # Update the redis model list for initialization
-        # Skip dynamically created classes from type conversion.
-        # Skip generic origins
+        # Register for init_rapyer(), skipping type-conversion classes and generic origins.
         not_generic_origin = not bool(getattr(cls, "__parameters__", ()))
         if (
             cls.__doc__ != DYNAMIC_CLASS_DOC
@@ -587,8 +584,7 @@ class AtomicRedisModel(BaseModel):
 
     @mark_actions(ActionGroup.UPDATE)
     async def aupdate(self, **kwargs):
-        # Special fields (e.g. RedisPriorityQueue) manage their own separate
-        # Redis storage and cannot be serialized as JSON path updates.
+        # Special fields own separate Redis keys and cannot be written as JSON path updates.
         special_in_kwargs = self._special_field_names & set(kwargs.keys())
         if special_in_kwargs:
             raise UpdateAtomicModelError(
@@ -620,8 +616,7 @@ class AtomicRedisModel(BaseModel):
         if self.is_inner_model():
             raise RuntimeError("Can only set TTL from top level model")
 
-        # Check for an outer pipeline BEFORE entering the pipeline context,
-        # since ensure_pipeline itself pushes a pipeline into context.
+        # Read the outer pipeline BEFORE ensure_pipeline pushes its own into the context.
         in_outer_pipe = _context_pipe.get() is not None
         async with ensure_pipeline(self.Meta, should_execute=False) as pipe:
             # Native-EXPIRE fast path on fakeredis or when there is no graph to walk.
@@ -702,8 +697,7 @@ class AtomicRedisModel(BaseModel):
             plan = plans_per_key[0]
         if not model_dump:
             raise KeyNotFound(f"{key} is missing in redis")
-        # Under real redis with JSONPath "$" mget returns [<dict>] per key;
-        # under fakeredis the per-key result is already the dict.
+        # Real redis returns [<dict>] per key for JSONPath "$"; fakeredis returns the dict.
         model_dump = model_dump[0] if isinstance(model_dump, list) else model_dump
         inject_at_paths(model_dump, plan, sf_raw)
         model = cls.create_redis_model(model_dump, key)
@@ -922,14 +916,11 @@ class AtomicRedisModel(BaseModel):
 
         await model._aprepare_special_fields()
 
-        # Build (type_name, special_key, argc, *args) groups for every SF field
-        # — direct and nested — in a single pass so the ARGV order and the load
-        # plan stay aligned (the script appends load results positionally). The
-        # registered atomic_get_or_create script dispatches on type_name into
-        # the SF_SAVE / SF_LOAD tables baked in at register_scripts() time, and
-        # walks the groups by the argc it finds.
+        # Build (type_name, special_key, argc, *args) groups for every SF field, direct and
+        # nested, in one pass so ARGV order and load_plan stay aligned (the script walks by argc).
         sf_args: list = []
         load_plan: list[list[str]] = []
+        # type_name dispatches into the SF_SAVE/SF_LOAD tables baked in at register_scripts().
         for field, path in model._iter_special_fields():
             field_cls = type(field)
             field_args = field.lua_save_args()
@@ -1201,10 +1192,8 @@ class AtomicRedisModel(BaseModel):
         return values
 
     def model_post_init(self, __context: Any) -> None:
-        # Wire child redis types / nested models back to this model once, after
-        # construction or full validation. validate_assignment does NOT call this,
-        # so per-field reassignment is handled in __setattr__ instead — keeping
-        # repeated assignments from re-linking every sibling field every time.
+        # Wire child redis types / nested models back to this model once, after full validation.
+        # validate_assignment skips this hook, so __setattr__ re-links single fields instead.
         link_fields = self.__class__._redis_link_field_names
         if not link_fields:
             return

@@ -7,9 +7,11 @@ TTL_SECONDS = 300
 
 
 def _all_ttl_keys(models) -> list[str]:
-    """Every key ``aset_ttl`` touches: each model's main key plus its
+    """
+    Every key ``aset_ttl`` touches: each model's main key plus its
     special-field keys, sourced from the special-field adapters (``tasks``,
-    ``container.labels``, ``container.tasks``)."""
+    ``container.labels``, ``container.tasks``).
+    """
     keys: list[str] = []
     for model in models:
         keys.append(model.key)
@@ -92,8 +94,7 @@ class TestAsetTtl(ActionTestBase):
         ]
 
     def expected_before(self):
-        # Every key (model + special fields) is still unset while the pipeline
-        # is open.
+        # Every key (model + special fields) is still unset while the pipeline is open.
         return [-1] * len(_all_ttl_keys(self.created_models))
 
     async def assert_after_pipeline(self, loaded):

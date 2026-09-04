@@ -223,8 +223,7 @@ def test_default_annotated_model_creation_sanity():
     assert isinstance(model.title, RedisStr)
     assert isinstance(model.count, RedisInt)
     assert isinstance(model.active, bool)
-    # NOTE: Fields with default_factory in Field() don't convert to Redis types
-    # This is a known limitation with the current implementation
+    # Known limitation: fields with default_factory in Field() don't convert to Redis types.
     assert isinstance(model.items, list)
     assert isinstance(model.attributes, dict)
 

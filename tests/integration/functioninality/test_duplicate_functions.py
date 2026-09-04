@@ -125,8 +125,7 @@ async def test_duplicate_redis_operations_on_duplicated_models_sanity():
     await duplicate.items.aappend(3)
     await duplicate.user_data.aset_item("new_key", 20)
 
-    # Assert
-    # Original should remain unchanged
+    # Assert - the original should remain unchanged.
     original.items = await original.items.aload()
     original.user_data = await original.user_data.aload()
     assert original.items == [1, 2]
@@ -151,8 +150,7 @@ async def test_duplicate_redis_operations_on_nested_models_sanity():
     await duplicate.middle_model.metadata.aset_item("nested_key", "nested_value")
     await duplicate.middle_model.inner_model.names.aappend("nested_name")
 
-    # Assert
-    # Original should remain unchanged
+    # Assert - the original should remain unchanged.
     original.middle_model.tags = await original.middle_model.tags.aload()
     original.middle_model.metadata = await original.middle_model.metadata.aload()
     original.middle_model.inner_model.names = (
@@ -212,8 +210,7 @@ async def test_duplicate_redis_operations_on_redis_nested_models_sanity():
     )
     await duplicate.outer_data.aappend(300)
 
-    # Assert
-    # Original should remain unchanged
+    # Assert - the original should remain unchanged.
     original.container.inner_redis.tags = (
         await original.container.inner_redis.tags.aload()
     )
@@ -239,8 +236,7 @@ async def test_cannot_duplicate_inner_model_edge_case():
     original = TestRedisModel()
     await original.asave()
 
-    # Act & Assert
-    # Try to duplicate inner model - should fail
+    # Act & Assert - duplicating an inner model must fail.
     with pytest.raises(RuntimeError, match="Can only duplicate from top level model"):
         await original.middle_model.aduplicate()
 
@@ -254,8 +250,7 @@ async def test_cannot_duplicate_redis_inner_model_edge_case():
     original = OuterModelWithRedisNested()
     await original.asave()
 
-    # Act & Assert
-    # Try to duplicate Redis inner model - should fail
+    # Act & Assert - duplicating a Redis inner model must fail.
     with pytest.raises(RuntimeError, match="Can only duplicate from top level model"):
         await original.container.inner_redis.aduplicate()
 

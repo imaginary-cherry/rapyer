@@ -35,7 +35,8 @@ class TestForeignKeySaveWithSavedFk(AsyncBenchmarkTest):
 
 
 class TestForeignKeySaveWithUnsavedFk(AsyncBenchmarkTest):
-    """Save a parent whose foreign-key target has not been persisted yet.
+    """
+    Save a parent whose foreign-key target has not been persisted yet.
 
     Identical to the saved-target case today (save serializes the FK to its key
     only); once save cascades to the target this path will also persist it.

@@ -8,7 +8,8 @@ T = TypeVar("T")
 
 
 class ComprehensiveOpBase(UpdateActionTestBase, ABC, Generic[T]):
-    """Base for tests that read one field of ``ComprehensiveTestModel``.
+    """
+    Base for tests that read one field of ``ComprehensiveTestModel``.
 
     Subclasses implement ``field_getter`` with a typed attribute access, e.g.
     ``return m.amount`` — no string field names.
@@ -104,10 +105,8 @@ class ComprehensiveMetadataOpBase(ComprehensiveOpBase[dict]):
         return dict(m.metadata)
 
     def corrupt_local_mirror(self, m: ComprehensiveTestModel) -> None:
-        # Inject a ghost key into the local mirror only (via native
-        # dict.__setitem__ so no Redis op is queued). A pipelined op that
-        # rewrote the whole mirror to Redis would leak it; the incremental
-        # per-key JSON.SET ops must not, so Redis stays correct.
+        # Inject a ghost into the local mirror only, via native dict.__setitem__ so nothing is
+        # queued: a whole-mirror rewrite would leak it, the incremental JSON.SETs must not.
         dict.__setitem__(m.metadata, "__ghost__", "__ghost__")
 
 
@@ -146,8 +145,6 @@ class ComprehensiveTagsOpBase(ComprehensiveOpBase[list]):
         return list(m.tags)
 
     def corrupt_local_mirror(self, m: ComprehensiveTestModel) -> None:
-        # Inject a ghost into the local mirror only (via native list.append so
-        # no Redis op is queued). A pipelined op that rewrote the whole mirror
-        # to Redis would leak the ghost; the incremental server-side ops must
-        # not, so Redis stays correct despite the stale mirror.
+        # Inject a ghost into the local mirror only, via native list.append so nothing is queued:
+        # a whole-mirror rewrite would leak it, the incremental server-side ops must not.
         list.append(m.tags, "__ghost__")

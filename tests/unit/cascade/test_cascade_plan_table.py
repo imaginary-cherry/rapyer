@@ -27,10 +27,7 @@ def test_every_model_gets_exactly_one_entry_even_a_plain_leaf():
     # Act
     plan = build_cascade_plan([CascadeAuthor])
 
-    # Assert
-    # CascadeAuthor now carries CASCADE_FIXTURE_TTL_SECONDS so it
-    # can never fail a nil-ttl target/root check; read the ttl back off the
-    # class itself rather than hardcoding a stale None.
+    # Assert - read the ttl off the class; CascadeAuthor carries CASCADE_FIXTURE_TTL_SECONDS.
     assert plan == {
         "CascadeAuthor": CascadePlanEntry(
             ttl=CascadeAuthor.Meta.ttl,
@@ -99,8 +96,7 @@ def test_shape3_nested_submodel_edge_lands_on_holder_and_hides_nested_class():
     assert edges[0].path == "$.profile.mentor"
     assert edges[0].target == "CascadeAuthor"
 
-    # CascadeProfile still gets its own top-level entry (it was passed in
-    # `models`) reflecting its OWN field, but is never anyone else's target.
+    # CascadeProfile gets its own entry for its OWN field but is never anyone else's target.
     all_targets = {edge.target for entry in plan.values() for edge in entry.fks}
     assert "CascadeProfile" not in all_targets
 
@@ -149,11 +145,8 @@ def test_build_cascade_plan_over_redis_models_never_uses_none_as_unbounded_signa
 
 
 def test_every_cascade_fixture_has_the_shared_fixture_ttl_sanity():
-    # Assert
-    # Every fixture that might root a real cascade-apply
-    # invocation — not just cascade TARGETS — must carry a non-None
-    # Meta.ttl, or the Lua write phase's `classes[<class>].ttl` lookup for
-    # the root's own EXPIRE would resolve to nil (a Lua runtime error).
+    # Assert - every possible cascade-apply ROOT needs a non-None Meta.ttl, not just cascade
+    # TARGETS, or the Lua write phase's classes[<class>].ttl lookup resolves to nil and errors.
     for model_cls in CASCADE_PLANNER_MODELS:
         assert model_cls.Meta.ttl == CASCADE_FIXTURE_TTL_SECONDS, model_cls.__name__
 
@@ -168,8 +161,5 @@ def test_every_cascade_fixture_has_the_shared_fixture_ttl_sanity():
     ],
 )
 def test_flagged_invocation_root_only_fixtures_have_ttl_sanity(model_cls):
-    # Assert
-    # The three concrete invocation roots will exercise that the
-    # TARGET-only validator never required a ttl on (they're roots, never
-    # someone else's cascade-enabled target).
+    # Assert - these three roots are never anyone else's target, so the old validator skipped them.
     assert model_cls.Meta.ttl == CASCADE_FIXTURE_TTL_SECONDS

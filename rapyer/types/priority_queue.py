@@ -149,9 +149,8 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
             if isinstance(v, cls):
                 return v
             if isinstance(v, RedisPriorityQueue):
-                # Unconverted instance (e.g. from ``default_factory``). RedisPriorityQueue
-                # is a pure Redis proxy with no local state, so re-wrap as the
-                # per-field converted subclass so ``cls.field_name`` is available.
+                # An unconverted instance, e.g. from ``default_factory``. RedisPriorityQueue is a
+                # pure Redis proxy with no local state, so re-wrapping only rebinds field_name.
                 return cls()
             if isinstance(v, list):
                 if (info.context or {}).get(REDIS_DUMP_FLAG_NAME):

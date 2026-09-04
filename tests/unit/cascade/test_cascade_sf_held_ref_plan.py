@@ -145,8 +145,10 @@ def test_positive_control_all_ttl_present_does_not_raise():
 
 
 def test_sf_of_fk_field_lands_in_both_contain_fk_and_special_field_names():
-    """Unified detection (reverses D-02): an SF-of-FK field is both a traversal edge
-    source (_contain_fk) and a refresh-suffix source (_special_field_names)."""
+    """
+    Unified detection (reverses D-02): an SF-of-FK field is both a traversal edge
+    source (_contain_fk) and a refresh-suffix source (_special_field_names).
+    """
     assert CascadeSetRefParent.contains_fk_field() is True
     assert CascadePQRefParent.contains_fk_field() is True
     assert "refs" in CascadeSetRefParent._contain_fk

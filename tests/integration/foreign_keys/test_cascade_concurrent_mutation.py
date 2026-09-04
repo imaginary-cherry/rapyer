@@ -47,33 +47,17 @@ async def test_cascade_races_concurrent_fk_reassignment_reflects_one_consistent_
         _reassign_child_and_save(),
     )
 
-    # Assert
-    # The explicit cascade never resolved to a dangling/garbage
-    # reference -- whichever consistent snapshot of parent.child it observed
-    # (the old graph, child_a, or the already-reassigned new graph, child_b),
-    # that child genuinely existed. A torn/mixed read spanning both graphs
-    # could only manifest here as a bogus dangling count.
+    # Assert - a torn read spanning both graphs could only show up as a bogus dangling count.
     assert cascade_result.dangling_children == 0
     assert cascade_result.dangling_special == 0
 
     child_a_ttl = await real_redis_client.ttl(child_a.key)
     child_b_ttl = await real_redis_client.ttl(child_b.key)
 
-    # child_b is unconditionally reached: the concurrent write's own asave()
-    # call auto-cascades inside the SAME atomic transaction as its
-    # JSON.SET of the reassigned `child` field, so once that transaction
-    # commits, child_b has already been refreshed by its own cascade --
-    # independent of how the explicit aset_ttl(cascade=True) call's EVALSHA
-    # interleaves with it.
+    # child_b is unconditionally reached: the concurrent write's own asave() auto-cascades inside
+    # the SAME transaction as its JSON.SET, so it refreshes however the explicit call interleaves.
     assert 0 < child_b_ttl <= CASCADE_FIXTURE_TTL_SECONDS
 
-    # child_a is reached if and only if the explicit aset_ttl(cascade=True)
-    # call's EVALSHA executed against the pre-mutation snapshot
-    # (parent.child == child_a, read server-side via a single atomic
-    # JSON.GET) BEFORE the concurrent transaction reassigned it -- a fully
-    # valid "old graph" read. If the concurrent transaction committed first
-    # instead, aset_ttl's EVALSHA observes the already-reassigned child_b (a
-    # fully valid "new graph" read) and child_a is never touched. Either
-    # state is legitimate; a mixed/torn read is not -- ruled out above by
-    # dangling_children == 0 and dangling_special == 0.
+    # child_a is reached only if aset_ttl's EVALSHA read the pre-mutation snapshot first; if the
+    # concurrent commit won, it observes child_b instead. Either is valid, a torn read is not.
     assert child_a_ttl in (-1, -2) or 0 < child_a_ttl <= CASCADE_FIXTURE_TTL_SECONDS

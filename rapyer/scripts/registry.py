@@ -86,16 +86,13 @@ def _inject_sf_dispatch(template: str, sf_base) -> str:
 
 
 def build_script_texts(is_fakeredis: bool = False) -> dict[str, str]:
-    # Late import: SpecialFieldType lives under rapyer.types, which depends on
-    # this module via the SCRIPT_REGISTRY constants. Importing at call time
-    # avoids the circular import while still letting __subclasses__() see every
-    # type that was loaded before init_rapyer() ran.
+    # rapyer.types depends on this module via the SCRIPT_REGISTRY constants, so import at call
+    # time. That also lets __subclasses__() see every SF type loaded before init_rapyer() ran.
     from rapyer.types.special import SpecialFieldType
 
     variant = FAKEREDIS_VARIANT if is_fakeredis else REDIS_VARIANT
     scripts = _build_scripts(variant)
-    # Any script in the registry may opt into SF dispatch injection by including
-    # the placeholder; templates without it pass through unchanged.
+    # Templates opt into SF dispatch via the placeholder; the rest pass through unchanged.
     for name, script_text in scripts.items():
         scripts[name] = _inject_sf_dispatch(script_text, SpecialFieldType)
     return scripts

@@ -25,8 +25,7 @@ async def test_nested_decorated_calls_flush_only_once(flush_mock, mark_version):
     # Act
     await outer(model)
 
-    # Assert: both outer and inner registered the same instance → two entries
-    # in the targets list (flush handles dedup later).
+    # Assert - outer and inner registered the same instance, so two entries (dedup is later).
     flush_mock.assert_awaited_once_with(
         [
             (model, ActionGroup.UPDATE),
@@ -119,8 +118,7 @@ async def test_dedup_by_key_with_different_instance_data(
     # Act: outer registers m1 via target=SELF; inner registers m2 via target=SELF.
     await outer(m1, m2)
 
-    # Assert: only one refresh call (deduped by key), action groups OR-merged,
-    # the first registered instance is the one that's kept.
+    # Assert - one refresh (deduped by key), groups OR-merged, first registered instance kept.
     assert len(refresh_calls) == 1
     assert refresh_calls[0].model is m1
     assert_action(refresh_calls[0], ActionGroup.UPDATE | ActionGroup.READ, mark_version)
