@@ -17,8 +17,12 @@ from tests.models.foreign_key_types import FkAuthor, FkBook
 
 def test_book_class_classifies_relational_fields():
     # Arrange / Act / Assert
-    assert FkBook._relational_field_names == {"author", "publisher"}
-    assert FkBook._contain_fk == {"co_authors"}
+    specs = FkBook._field_specs
+    assert {n for n, s in specs.items() if s.relational is not None} == {
+        "author",
+        "publisher",
+    }
+    assert {n for n, s in specs.items() if s.contains_fk} == {"co_authors"}
 
 
 def test_model_contains_fk_field_reflects_relational_fields():
@@ -28,7 +32,7 @@ def test_model_contains_fk_field_reflects_relational_fields():
 
 def test_relational_fields_are_also_redis_link_fields():
     # Arrange / Act
-    link_fields = FkBook._redis_link_field_names
+    link_fields = FkBook.redis_link_fields()
 
     # Assert - the metaclass adds every BaseRedisType field, so link wiring is uniform.
     assert "author" in link_fields

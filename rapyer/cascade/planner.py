@@ -27,7 +27,13 @@ def _field_cascade_spec(model_cls: Any, field_name: str) -> CascadeSpec | None:
     annotation = field_info.annotation
     if field_info.metadata:
         annotation = Annotated[(annotation, *field_info.metadata)]
-    return ForeignKey.extract_config(annotation)
+    spec = model_cls._field_specs.get(field_name)
+    field_type = (
+        spec.relational.field_type
+        if spec is not None and spec.relational is not None
+        else ForeignKey
+    )
+    return field_type.extract_config(annotation)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -109,7 +115,9 @@ def _static_walk_fk_edges(
     top_level: bool = True,
 ):
     """Append every enabled FK edge reachable from model_cls's own fields."""
-    for field_name in model_cls._relational_field_names:
+    for field_name, spec in model_cls._field_specs.items():
+        if spec.relational is None:
+            continue
         edge = _classify_edge(model_cls, field_name)
         if not edge.enabled:
             continue
@@ -131,7 +139,9 @@ def _static_walk_fk_edges(
             )
         )
 
-    for field_name in model_cls._contain_fk:
+    for field_name, spec in model_cls._field_specs.items():
+        if not spec.contains_fk:
+            continue
         annotation = model_cls.model_fields[field_name].annotation
         nested_cls = _unwrap_nested_model_cls(annotation)
         if nested_cls is not None:
@@ -205,10 +215,14 @@ def _static_walk_special_suffixes(model_cls: Any, parent_path: str = "") -> list
     from rapyer.base import AtomicRedisModel
 
     suffixes: list[str] = []
-    for field_name in model_cls._special_field_names:
+    for field_name, spec in model_cls._field_specs.items():
+        if spec.special is None:
+            continue
         field_path = f"{parent_path}.{field_name}"
         suffixes.append(field_path.lstrip("."))
-    for field_name in model_cls._contain_sf:
+    for field_name, spec in model_cls._field_specs.items():
+        if not spec.contains_sf:
+            continue
         annotation = model_cls.model_fields[field_name].annotation
         # Unwrap Optional/generic origins so a nested model behind them is still recognized.
         stripped = strip_optional(annotation)
