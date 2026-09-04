@@ -13,7 +13,7 @@ from rapyer.utils.pythonic import resolve_generic_args, safe_issubclass
 T = TypeVar("T")
 
 
-class RedisSet(set, SpecialFieldType, Generic[T]):
+class RedisSet(set, SpecialFieldType[None], Generic[T]):
     """
     Unordered, unique-member collection backed by a Redis SET. Pure Redis proxy —
     no local state.

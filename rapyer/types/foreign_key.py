@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="AtomicRedisModel")
 
 
-class ForeignKey(RelationalFieldType, Generic[T]):
+class ForeignKey(RelationalFieldType[None], Generic[T]):
     """
     Typed, lazy reference to another ``AtomicRedisModel``.
 

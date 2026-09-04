@@ -1,13 +1,15 @@
 import abc
-from typing import ClassVar, Optional
+from typing import ClassVar, Optional, TypeVar
 
 from rapyer.scripts.loader import load_sf_load_snippet, load_sf_save_snippet
-from rapyer.types.base import BaseRedisType
+from rapyer.types.external import ExternalFieldType
 
 SPECIAL_FIELD_KEY_PREFIX = "__rapyer_special__"
 
+ConfigT = TypeVar("ConfigT")
 
-class SpecialFieldType(BaseRedisType, abc.ABC):
+
+class SpecialFieldType(ExternalFieldType[ConfigT], abc.ABC):
     """
     Base for field types stored separately from the model's JSON dump.
 
@@ -26,6 +28,10 @@ class SpecialFieldType(BaseRedisType, abc.ABC):
         path = field_path
         clean_name = path.lstrip(".")
         return f"{SPECIAL_FIELD_KEY_PREFIX}:{model_key}:{clean_name}"
+
+    @classmethod
+    def owned_redis_keys(cls, model_key: str, field_path: str) -> list[str]:
+        return [cls.special_field_key(model_key, field_path)]
 
     @property
     def special_key(self) -> str:

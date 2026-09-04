@@ -1,13 +1,15 @@
 import abc
-from typing import TYPE_CHECKING, Any, get_args
+from typing import TYPE_CHECKING, Any, TypeVar, get_args
 
-from rapyer.types.base import BaseRedisType
+from rapyer.types.external import ExternalFieldType
 
 if TYPE_CHECKING:
     from rapyer.base import AtomicRedisModel
 
+ConfigT = TypeVar("ConfigT")
 
-class RelationalFieldType(BaseRedisType, abc.ABC):
+
+class RelationalFieldType(ExternalFieldType[ConfigT], abc.ABC):
     """
     Base for field types that reference another ``AtomicRedisModel`` by key.
 

@@ -81,6 +81,7 @@ from rapyer.types.base import (
     is_redis_field_value,
 )
 from rapyer.types.convert import RedisConverter
+from rapyer.types.external import ExternalFieldType
 from rapyer.types.generic import GenericRedisType
 from rapyer.types.relational import RelationalFieldType
 from rapyer.types.special import (
@@ -418,6 +419,7 @@ class AtomicRedisModel(BaseModel):
         )
         cls._contain_sf = set(getattr(cls, "_contain_sf", set()))
         cls._contain_fk = set(getattr(cls, "_contain_fk", set()))
+        field_external_types: dict[str, type[ExternalFieldType]] = {}
         for field_name, annotation in cls.__annotations__.items():
             # If the field was redfined, we remove it from list
             cls._redis_link_field_names.discard(field_name)
@@ -432,12 +434,14 @@ class AtomicRedisModel(BaseModel):
             origin = get_origin(unwrapped) or unwrapped
             if safe_issubclass(origin, SpecialFieldType):
                 cls._special_field_names.add(field_name)
+                field_external_types[field_name] = origin
 
             # Foreign keys: Check if field is a foreign key or has a FK
             fk_origin = strip_optional(unwrapped)
             fk_origin = get_origin(fk_origin) or fk_origin
             if safe_issubclass(fk_origin, RelationalFieldType):
                 cls._relational_field_names.add(field_name)
+                field_external_types[field_name] = fk_origin
             elif (
                 safe_issubclass(fk_origin, (BaseRedisType, AtomicRedisModel))
                 and fk_origin.contains_fk_field()
@@ -457,11 +461,9 @@ class AtomicRedisModel(BaseModel):
                 continue
             if safe_issubclass(attr_type, RapyerKey):
                 continue
-            # Skip special fields — they handle their own serialization
-            if attr_name in cls._special_field_names:
-                continue
-            # ForeignKey stays unconverted and serializes itself to a key string.
-            if attr_name in cls._relational_field_names:
+            # Special/relational fields own their serialization — skip pickle setup
+            external_type = field_external_types.get(attr_name)
+            if external_type is not None and external_type.owns_serialization():
                 continue
             if original_annotations[attr_name] == attr_type:
                 default_value = cls.__dict__.get(attr_name, None)

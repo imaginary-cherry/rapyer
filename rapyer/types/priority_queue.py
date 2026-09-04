@@ -20,7 +20,7 @@ class PriorityQueueItem(Generic[T]):
     priority: float
 
 
-class RedisPriorityQueue(SpecialFieldType, Generic[T]):
+class RedisPriorityQueue(SpecialFieldType[None], Generic[T]):
     """
     Priority queue backed by a Redis Sorted Set. Pure Redis proxy — no local state.
     """
