@@ -194,8 +194,7 @@ async def test_redistext_aduplicate_of_unsaved_model_creates_no_orphan_hash(
     # Act
     duplicates = await model.aduplicate_many(2)
 
-    # Assert - COPY is a no-op here; the parent rewrite must not conjure a stub
-    # HASH holding only `parent` (no text/embedding), the way RedisSet and
-    # RedisPriorityQueue write nothing at all in the same situation.
+    # Assert - COPY is a no-op here, so nothing must conjure a stub HASH with no text/embedding;
+    # RedisSet and RedisPriorityQueue write nothing at all in the same situation.
     for duplicate in duplicates:
         assert await real_redis_client.exists(duplicate.body.special_key) == 0

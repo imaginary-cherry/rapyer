@@ -66,7 +66,8 @@ class SpecialFieldType(BaseRedisType, abc.ABC):
 
     @classmethod
     async def aprepare_many(cls, fields: list["SpecialFieldType"]) -> None:
-        """Pre-``ensure_pipeline()`` batch materialization seam (D-07/D-08/EMBED-05).
+        """
+        Pre-``ensure_pipeline()`` batch materialization seam.
 
         Ready a batch of same-``lua_type_name()`` fields for save/insert,
         before any pipeline opens. Default no-op, inherited unchanged by every

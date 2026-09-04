@@ -64,7 +64,8 @@ def _ensure_redisvl_installed() -> None:
 
 
 class RedisvlEmbeddingAdapter:
-    """Wraps a redisvl vectorizer (+ optional EmbeddingsCache) as an EmbeddingAdapter.
+    """
+    Wraps a redisvl vectorizer (+ optional EmbeddingsCache) as an EmbeddingAdapter.
 
     Normalizes redisvl's uneven async surface (local/CPU-bound vectorizers via
     asyncio.to_thread, real-async API vectorizers awaited directly) and batches

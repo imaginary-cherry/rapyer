@@ -74,9 +74,8 @@ class RedisText(str, SpecialFieldType):
         await self.client.delete(self.special_key)
 
     async def aduplicate_special(self, target_special_key: str):
-        # Server-side COPY needs no follow-up rewrite: every field the HASH carries is either
-        # content (text/embedding/model_label) or identical for the duplicate (`field` shares
-        # the source's path). A COPY of an absent source is a no-op that creates nothing.
+        # COPY needs no follow-up rewrite: every HASH field is either content or identical for
+        # the duplicate. A COPY of an absent source is a no-op that creates nothing.
         await self.client.copy(self.special_key, target_special_key)
 
     def lua_save_args(self) -> list:
