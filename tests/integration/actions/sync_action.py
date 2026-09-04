@@ -35,8 +35,7 @@ class SyncActionTestBase(ActionTestBase, ABC):
         self.created_models = await self.setup_data()
         native = self.get_target_field(self.created_models[0])
 
-        # Act — sync action mutates the redis-backed field locally;
-        # apply_native_action does the equivalent on the native object.
+        # Act - the sync action mutates locally; apply_native_action does the same to the native.
         await self.perform_action(self.created_models[0])
         native_after = self.apply_native_action(native)
 
@@ -54,9 +53,7 @@ class SyncActionTestBase(ActionTestBase, ABC):
         self.created_models = await self.setup_data()
         self.corrupt_local_mirror(self.created_models[0])
 
-        # Determine the expected exception by applying the native equivalent
-        # on a plain-Python copy of the corrupted state. Whatever it raises is
-        # what ``perform_action`` (outside any pipeline) should raise too.
+        # Whatever the native equivalent raises on the corrupted copy is what perform_action must.
         native = self.get_target_field(self.created_models[0])
         try:
             self.apply_native_action(native)
@@ -68,8 +65,7 @@ class SyncActionTestBase(ActionTestBase, ABC):
                 "the corruption is not a meaningful failure mode for this action."
             )
 
-        # The sync action (outside any pipeline) must raise the same exception
-        # type — proving the local-only execution matches native Python.
+        # Outside a pipeline the sync action must raise the same type, proving local-only parity.
         with pytest.raises(expected_error):
             await self.perform_action(self.created_models[0])
 

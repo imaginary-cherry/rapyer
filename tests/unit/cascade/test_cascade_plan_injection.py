@@ -45,8 +45,7 @@ def test_cascade_is_not_an_evalsha_script():
 
 
 def test_cascade_plan_json_omits_none_depth_and_ttl():
-    # Arrange
-    # ttl=None on the entry and depth=None on the edge (its default).
+    # Arrange - ttl=None on the entry and depth=None on the edge (its default).
     plan = {"A": _entry("B", ttl=None), "B": _entry(ttl=None)}
 
     # Act
@@ -105,8 +104,7 @@ def test_cascade_plan_json_serializes_every_class_in_the_plan():
     # Act
     decoded = json.loads(cascade_plan_json(plan))
 
-    # Assert
-    # The full plan carries every class, including ones not reachable from A.
+    # Assert - the full plan carries every class, including ones unreachable from A.
     assert set(decoded) == {"A", "B", "C", "Unrelated"}
 
 

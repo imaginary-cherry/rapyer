@@ -20,7 +20,8 @@ BENCHMARK_TTL_SECONDS = 3600
 
 
 class BenchmarkPipelineModel(AtomicRedisModel):
-    """Scalar/list/dict-only model for pipeline benchmarks.
+    """
+    Scalar/list/dict-only model for pipeline benchmarks.
 
     Deliberately omits special fields (RedisPriorityQueue, RedisSet) so the
     benchmark exercises the inline-JSON pipeline path without dragging in the
@@ -130,7 +131,8 @@ class BenchCascadeTwoFkRoot(AtomicRedisModel):
 
 
 class BenchCascadeChainNode(AtomicRedisModel):
-    """Self-referencing chain node whose ``next`` cascades one hop deeper.
+    """
+    Self-referencing chain node whose ``next`` cascades one hop deeper.
 
     The marker lives on the field (not ``Meta.cascade_ttl``) because
     ``init_rapyer()`` resets every model's blanket ``Meta.cascade_ttl`` to None
@@ -156,8 +158,7 @@ class BenchCascadeListRoot(AtomicRedisModel):
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=BENCHMARK_TTL_SECONDS)
 
 
-# Large-graph cascade benchmarks: ~1M-node walks in three shapes. Size is env
-# overridable so a constrained runner can dial it down without editing code.
+# Env-overridable so a constrained runner can dial the ~1M-node cascade walks down.
 BENCHMARK_CASCADE_LARGE_SIZE = int(os.getenv("BENCHMARK_CASCADE_LARGE_SIZE", "1000000"))
 BENCHMARK_CASCADE_LARGE_BRANCH = 10
 

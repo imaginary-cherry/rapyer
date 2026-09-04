@@ -11,7 +11,8 @@ from tests.models.simple_types import TTLRefreshTestModel
 
 @pytest.fixture(params=[MarkVersion.V1, MarkVersion.V2])
 def mark_version(request):
-    """Run each test against both ``mark_actions`` versions.
+    """
+    Run each test against both ``mark_actions`` versions.
 
     For v2 the wrap is decided at install time, not decoration time, so tests
     that exercise wrapper behavior must route the decorated function through
@@ -21,15 +22,18 @@ def mark_version(request):
 
 
 class RefreshAllMeta:
-    """Meta stub that opts into refresh for every action group — used by tests
-    that just want the v2 wrap to fire so the v1 and v2 codepaths converge."""
+    """
+    Meta stub that opts into refresh for every action group — used by tests
+    that just want the v2 wrap to fire so the v1 and v2 codepaths converge.
+    """
 
     ttl = 60
     refresh_ttl = ActionGroup.all(for_ttl=True)
 
 
 def maybe_install_v2(mark_version, *funcs):
-    """No-op for v1; for v2, install each func against a refresh-all Meta.
+    """
+    No-op for v1; for v2, install each func against a refresh-all Meta.
 
     Returns a single func or a tuple matching the input arity.
     """
@@ -50,8 +54,10 @@ class RefreshCall:
 def assert_action(
     refresh_call: "RefreshCall", expected: ActionGroup, mark_version: MarkVersion
 ):
-    """v2's refresh path doesn't pass ``action`` (the wrap decision is made at
-    install time), so the recorder always sees ``None``. Only assert on v1."""
+    """
+    v2's refresh path doesn't pass ``action`` (the wrap decision is made at
+    install time), so the recorder always sees ``None``. Only assert on v1.
+    """
     if mark_version is MarkVersion.V1:
         assert refresh_call.action == expected
 

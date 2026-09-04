@@ -36,7 +36,8 @@ class RelationalFieldType(BaseRedisType, abc.ABC):
     @property
     @abc.abstractmethod
     def value(self) -> "AtomicRedisModel":
-        """Return the hydrated target instance.
+        """
+        Return the hydrated target instance.
 
         Raises ``NotResolvedError`` when called before ``afetch``.
         """

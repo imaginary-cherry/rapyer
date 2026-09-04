@@ -276,8 +276,7 @@ async def test_redis_dict_setitem_with_existing_redis_operations_sanity():
     model.metadata["new_key"] = "updated_value"
     await model.metadata["new_key"].asave()
 
-    # Also use setitem to convert existing key to Redis type
-    # Convert to Redis type via setitem
+    # setitem also converts an existing key to its Redis type.
     model.metadata["existing_key"] = "existing_value"
     model.metadata["existing_key"] = "updated_existing"
     await model.metadata["existing_key"].asave()
@@ -486,8 +485,7 @@ async def test_redis_dict_setitem_basemodel_mixed_with_regular_operations_sanity
         dict(street="666 Regular Ave", city="Phoenix", zip_code="85001"),
     )
 
-    # Assert - check both setitem and aset_item work
-    # setitem-created address should be a Redis BaseModel
+    # Assert - the setitem-created address should be a Redis BaseModel.
     setitem_address = model.addresses["setitem_key"]
     assert isinstance(setitem_address, AtomicRedisModel)
     assert setitem_address.street == "555 Mixed St"

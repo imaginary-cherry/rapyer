@@ -15,8 +15,10 @@ from tests.models.collection_types import ComprehensiveTestModel
 
 @dataclass
 class SpecialFieldCase:
-    """One parametrization case for a create-action test: whether the model's
-    special fields are assigned data at construction."""
+    """
+    One parametrization case for a create-action test: whether the model's
+    special fields are assigned data at construction.
+    """
 
     assigned_sf: bool
 
@@ -26,9 +28,11 @@ class SpecialFieldCase:
 
 
 def _assign_at_path(model: ComprehensiveTestModel, path: tuple[str, ...], value):
-    """Assign ``value`` at the nested attribute ``path`` (e.g.
+    """
+    Assign ``value`` at the nested attribute ``path`` (e.g.
     ``("container", "labels")``). Special fields re-link to their parent on
-    assignment, so ``special_key`` resolves correctly."""
+    assignment, so ``special_key`` resolves correctly.
+    """
     obj = model
     for segment in path[:-1]:
         obj = getattr(obj, segment)
@@ -43,9 +47,7 @@ class CreateActionTestBase(TTLActionTestBase, ABC):
     params = [SpecialFieldCase(assigned_sf=True), SpecialFieldCase(assigned_sf=False)]
 
     def _assigned_sf(self) -> bool:
-        # Non-parametrized tests (TTL refresh, special-field lifecycle,
-        # no_ttl_when_not_configured) run with test_input=None — default to
-        # assigned; those tests don't assert SF round-trip, so it's harmless.
+        # Non-parametrized tests run with test_input=None and never assert SF round-trip.
         return getattr(self.test_input, "assigned_sf", True)
 
     def build_model(self, **kwargs) -> ComprehensiveTestModel:
@@ -65,9 +67,7 @@ class CreateActionTestBase(TTLActionTestBase, ABC):
 
     @pytest.mark.asyncio
     async def test_no_ttl_set_when_ttl_not_configured(self):
-        # Arrange
-        # Determine the model class without persisting anything so the
-        # patch can wrap any pre-inserts in ``setup_for_creation``.
+        # Arrange - resolve the class without persisting, so the patch can wrap any pre-inserts.
         model_cls = type(self.create_models()[0])
 
         # Act

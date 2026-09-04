@@ -94,8 +94,7 @@ class TestRedisListClear(ComprehensiveTagsOpBase, SyncActionTestBase):
 
 
 class TestRedisListRemoveRange(ComprehensiveTagsOpBase):
-    # remove_range is pipeline-only; it does not mutate the local mirror
-    # outside an open pipeline, so it is exempt from COVER_SYNC_NATIVE_EFFECT.
+    # remove_range is pipeline-only, so it is exempt from COVER_SYNC_NATIVE_EFFECT.
     covered_method = RedisList.remove_range
     skip_stale_mirror_in_pipeline = (
         "remove_range is pipeline-only; no local mirror to corrupt outside a pipeline"
@@ -234,8 +233,7 @@ class TestListApop(ReadActionTestBase, ComprehensiveTagsOpBase, TTLActionTestBas
         return await piped.tags.apop()
 
     def corrupt_local_mirror(self, m: ComprehensiveTestModel) -> None:
-        # Wipe the local mirror — native list.pop() on an empty list raises
-        # IndexError, but apop() still returns a value from Redis.
+        # Wipe the mirror: native list.pop() would raise, but apop() still returns from Redis.
         list.clear(m.tags)
 
     def expected_before(self):

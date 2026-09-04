@@ -5,8 +5,10 @@ from tests.models.collection_types import ComprehensiveTestModel
 
 
 class TestRapyerAupdate(UpdateActionTestBase, TTLActionTestBase):
-    """After aupdate was switched to ``ensure_pipeline``, it defers to an outer
-    pipeline like every other mutation."""
+    """
+    After aupdate was switched to ``ensure_pipeline``, it defers to an outer
+    pipeline like every other mutation.
+    """
 
     covered_method = AtomicRedisModel.aupdate
     skip_stale_mirror_in_pipeline = (
@@ -30,8 +32,7 @@ class TestRapyerAupdate(UpdateActionTestBase, TTLActionTestBase):
         return "updated", 99
 
     def local_mutate_target_field(self, m: ComprehensiveTestModel) -> None:
-        # aupdate only writes name + counter; mutate tags locally to verify
-        # that fields outside its kwargs don't leak into Redis.
+        # aupdate only writes name + counter, so a local tags edit must not leak into Redis.
         m.tags.append("__local_marker__")
 
     def get_target_field(self, m: ComprehensiveTestModel) -> list:

@@ -80,8 +80,7 @@ async def test_basic_index_creation(
     # Arrange & Act
     await init_rapyer(redis=redis_client)
 
-    # Assert
-    # Check index exists
+    # Assert - the index exists.
     index_name = f"idx:{model.class_key_initials()}"
     info = await redis_client.ft(index_name).info()
 

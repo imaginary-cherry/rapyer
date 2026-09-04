@@ -73,8 +73,7 @@ def test_async_without_ignore_refresh_decoration_shape(mark_version):
         # v1 wraps async methods immediately.
         assert decorated is not original
     else:
-        # v2 defers the wrap decision to install time — original is returned
-        # and carries the params for `install_marked_action_methods` to consume.
+        # v2 returns the original, which carries the params for install_marked_action_methods.
         assert decorated is original
         assert hasattr(original, MARK_ACTION_PARAMS_ATTR)
 

@@ -48,10 +48,12 @@ class TTLActionTestBase(AsyncActionTestBase, ABC):
         return self.created_models
 
     def model_to_refresh(self):
-        """Model whose class receives the refresh-ttl wrapper and whose
+        """
+        Model whose class receives the refresh-ttl wrapper and whose
         configured TTL is the reference for the assertion. Defaults to the
         acted-on model; override when the action refreshes a different model
-        (e.g. afetch refreshes the resolved target, not the owner)."""
+        (e.g. afetch refreshes the resolved target, not the owner).
+        """
         return self.created_models[0]
 
     def all_keys_to_check(self):
@@ -70,7 +72,8 @@ class TTLActionTestBase(AsyncActionTestBase, ABC):
             recursive_build_redis_model(model_cls)
 
     def ttl_keys(self, model: AtomicRedisModel) -> list[str]:
-        """Redis keys whose TTL should be asserted. Default: ``[model.key]``.
+        """
+        Redis keys whose TTL should be asserted. Default: ``[model.key]``.
 
         Override for actions on special fields to include extra keys such
         as ``model.<field>.special_key``.

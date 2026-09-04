@@ -30,8 +30,7 @@ class TestModelAsave(UpdateActionTestBase, CreateActionTestBase):
         return await ComprehensiveTestModel.aget(self.created_models[0].key)
 
     def assert_during_pipeline(self, loaded):
-        # asave is deferred inside the pipeline: the persisted model is still
-        # at its pre-action values.
+        # asave is deferred inside the pipeline, so the persisted model is still at pre-action values.
         assert loaded.name == "original" and loaded.counter == 10
 
     async def assert_after_pipeline(self, loaded):

@@ -21,8 +21,7 @@ from tests.models.index_types import IndexTestModel
 async def test_rapyer_adelete_many__bad_type_raises_unsupport_argument_type_error(
     bad_arg,
 ):
-    # Arrange
-    # Act & Assert
+    # Arrange / Act / Assert
     with pytest.raises(UnsupportedArgumentTypeError):
         await rapyer.adelete_many(bad_arg)
 
@@ -43,7 +42,6 @@ async def test_rapyer_adelete_many__bad_type_raises_unsupport_argument_type_erro
 async def test_model_adelete_many__bad_type_raises_unsupport_argument_type_error(
     bad_arg,
 ):
-    # Arrange
-    # Act & Assert
+    # Arrange / Act / Assert
     with pytest.raises(UnsupportedArgumentTypeError):
         await IndexTestModel.adelete_many(bad_arg)

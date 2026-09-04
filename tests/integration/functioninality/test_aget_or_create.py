@@ -169,10 +169,7 @@ async def test_aget_or_create__priority_queue_smoke():
 async def test_aget_or_create__create_co_persists_main_doc_and_sf_state(
     real_redis_client,
 ):
-    # Regression: the create branch runs special-field savers *before* writing
-    # the main document, so a successful create must leave both the main key and
-    # the SF state present together — never the main doc without its SF members.
-    # Arrange
+    # Regression - SF savers run before the main document, so both must end up present.
     model = GenericRedisSetModel[str](name="int-co-persist")
     model.tags.update({"x", "y", "z"})
 
@@ -227,9 +224,7 @@ async def test_aget_or_create__rejects_inner_model():
 async def test_aget_or_create_corrupted_existing_raises_corrupted_model(
     real_redis_client,
 ):
-    # Coverage: aget_or_create's CorruptedModelError branch when the already-
-    # existing record can't be validated.
-    # Arrange
+    # Arrange - an existing record that cannot be validated hits the CorruptedModelError branch.
     model = IntModel()
     await model.asave()
     await real_redis_client.json().set(model.key, "$", {"count": "nope", "score": 1})

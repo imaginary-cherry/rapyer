@@ -21,10 +21,7 @@ def _group(*methods: Callable) -> frozenset[tuple[str, str]]:
     return frozenset(cover_tuple(m) for m in methods)
 
 
-# ── Private helpers: single-underscore internals, not Redis operations ────
-#
-# PRIVATE_METHODS — exact match. Only the listed (class, method_name) pair is
-# filtered; subclass overrides are NOT auto-filtered.
+# PRIVATE_METHODS — exact (class, method) match; subclass overrides are NOT auto-filtered.
 PRIVATE_METHODS = _group(
     # RedisBytes
     RedisBytes._validate_pickle,
@@ -63,8 +60,7 @@ PRIVATE_METHODS = _group(
     AtomicRedisModel._resolve_key,
     # Pure in-memory identity minting (lazily fills _pk); no Redis round trip.
     AtomicRedisModel._ensure_pk,
-    # Pure in-memory traversal / key enumeration for special fields — no
-    # Redis round trips, so pipeline/TTL coverage doesn't apply.
+    # Pure in-memory traversal over special fields; no round trip, so coverage doesn't apply.
     AtomicRedisModel._iter_special_fields,
     AtomicRedisModel._ttl_keys,
     # Pure in-memory FK-field check gating the TTL cascade fast path; no Redis.
@@ -81,17 +77,14 @@ PRIVATE_METHODS = _group(
     AtomicRedisModel.contains_sf_field,
     AtomicRedisModel.contains_fk_field,
     AtomicRedisModel.queue_special_loads_in_pipeline,
-    # Abstract relational stub — never executed; the concrete ForeignKey.afetch
-    # override is the real READ|FETCH action and is covered as one.
+    # Abstract stub, never executed; ForeignKey.afetch is the real READ|FETCH action.
     RelationalFieldType.afetch,
-    # Pure in-memory cache drop (sets self._value = None); no Redis round trip,
-    # so the pipeline/TTL/effect action matrix doesn't apply.
+    # Pure in-memory cache drop (self._value = None); no Redis round trip.
     ForeignKey.aunload,
 )
 
-# PRIVATE_INHERITED_METHODS — MRO-aware. Any subclass that inherits OR
-# overrides one of these methods is also filtered. Use this for internal
-# helpers whose contract is shared across the type hierarchy
+# PRIVATE_INHERITED_METHODS — MRO-aware: inheritors and overriders are filtered too, so this is
+# the home for internal helpers whose contract is shared across the type hierarchy.
 PRIVATE_INHERITED_METHODS = _group(
     BaseRedisType.sub_field_path,
     RedisType.redis_schema,
@@ -113,10 +106,8 @@ PRIVATE_INHERITED_METHODS = _group(
     SpecialFieldType.asave_special,
     SpecialFieldType.adelete_special,
     SpecialFieldType.aduplicate_special,
-    # Lua codegen / payload helpers for aget_or_create's server-side SF
-    # dispatch: they build script source and ARGV strings, not Redis round
-    # trips, so they aren't actions subject to pipeline/TTL coverage. Shared
-    # contract across the SF hierarchy (subclasses override several of them).
+    # Lua codegen / ARGV helpers for SF dispatch: they build strings, not Redis round trips.
+    # Shared contract across the SF hierarchy — subclasses override several of them.
     SpecialFieldType.lua_type_name,
     SpecialFieldType.lua_save_snippet,
     SpecialFieldType.lua_load_snippet,
@@ -124,19 +115,15 @@ PRIVATE_INHERITED_METHODS = _group(
     SpecialFieldType.has_lua_load_output,
     RedisPriorityQueue.aremove,
     AtomicRedisModel.redis_schema,
-    # Pydantic schema hook — a fixed-contract pydantic method (build a core
-    # schema at class-definition time); structurally never a Redis action, so
-    # every override across the hierarchy is filtered. One entry per branch
-    # root: RedisType covers its whole branch (GenericRedisType, RedisBytes,
-    # RedisDatetimeTimestamp, ...) via MRO name-matching.
+    # Fixed-contract pydantic hook, structurally never an action, so every override is filtered.
+    # One entry per branch root: RedisType covers its whole branch via MRO name-matching.
     RedisType.__get_pydantic_core_schema__,
     RedisSet.__get_pydantic_core_schema__,
     RedisPriorityQueue.__get_pydantic_core_schema__,
     ForeignKey.__get_pydantic_core_schema__,
 )
 
-# NON_ACTION_METHODS — module-level helpers that aren't Redis actions and
-# therefore don't participate in coverage checks.
+# NON_ACTION_METHODS — helpers that aren't Redis actions, so they skip the coverage checks.
 NON_ACTION_METHODS = _group(
     init_rapyer,
     teardown_rapyer,
@@ -149,24 +136,16 @@ NON_ACTION_METHODS = _group(
     AtomicRedisModel.aset_ttl,
     AtomicRedisModel.refresh_ttl_if_needed,
     AtomicRedisModel.refresh_ttl,
-    # afind_keys / aexists are lightweight queries (keys / existence only) that
-    # never load model data, so TTL refresh doesn't apply.
+    # afind_keys / aexists return keys or existence only, never model data, so no TTL refresh.
     AtomicRedisModel.afind_keys,
     AtomicRedisModel.aexists,
     rapyer.aexists,
     rapyer.apipeline,  # TODO - this should change once we add update on each action in the ttl
-    # ── Python protocol dunders ───────────────────────────────────────────
-    # Construction, equality, hashing, repr, attribute access, generic
-    # parameterization, and class-build hooks. Language/pydantic protocol
-    # methods, not Redis actions. Listed by exact (class, name) so a NEW
-    # subclass that overrides one surfaces for a conscious decision rather than
-    # being silently skipped (unlike __get_pydantic_core_schema__, whose
-    # contract can never be an action — see PRIVATE_INHERITED_METHODS).
+    # Language/pydantic protocol dunders, listed by exact (class, name) so a NEW override surfaces
+    # for a decision — unlike __get_pydantic_core_schema__, which can never be an action at all.
     AtomicRedisModel.__eq__,
     AtomicRedisModel.__init_subclass__,
-    # __setattr__ DOES queue pipeline writes on field assignment, but that
-    # behavior is covered by the dedicated pipeline field-assignment tests,
-    # not the per-method action matrix.
+    # __setattr__ does queue pipeline writes; the pipeline field-assignment tests cover that.
     AtomicRedisModel.__setattr__,
     ForeignKey.__init__,
     ForeignKey.__eq__,
@@ -183,17 +162,13 @@ NON_ACTION_METHODS = _group(
 )
 
 
-# SYNC_NATIVE_EFFECT_GROUP — sync action methods that are pipeline-only by
-# design: outside an open pipeline they do not mutate the local mirror, so
-# they cannot satisfy the "same effect as native Python" contract checked by
-# COVER_SYNC_NATIVE_EFFECT. Subtracted from that coverage check's expected set.
+# Pipeline-only sync actions: outside an open pipeline they don't mutate the local mirror, so they
+# can't satisfy the native-Python-effect contract. Subtracted from COVER_SYNC_NATIVE_EFFECT.
 SYNC_NATIVE_EFFECT_GROUP = _group(RedisList.remove_range)
 
 
-# STALE_MIRROR_GROUP — async ERASE actions that cannot be corrupted because
-# they have no local mirror. RedisPriorityQueue is a pure Redis proxy with no
-# inherited Python container, so there is nothing to mutate locally.
-# Subtracted from the COVER_STALE_MIRROR_IN_PIPELINE expected set.
+# Async ERASE actions that cannot be corrupted because they have no local mirror at all
+# (RedisPriorityQueue is a pure Redis proxy). Subtracted from COVER_STALE_MIRROR_IN_PIPELINE.
 STALE_MIRROR_GROUP = frozenset(
     {
         ("RedisPriorityQueue", "aclear"),
@@ -202,11 +177,10 @@ STALE_MIRROR_GROUP = frozenset(
 )
 
 
-# SYNC_NATIVE_RAISES_GROUP — sync ERASE methods whose native equivalent never
-# raises after local-mirror corruption (only ``set.remove`` raises KeyError;
-# discard, clear, and the bulk-update variants are tolerant by design).
+# Sync ERASE methods whose native form never raises after local-mirror corruption.
 # Subtracted from the COVER_SYNC_NATIVE_RAISES_ON_CORRUPTION expected set.
 SYNC_NATIVE_RAISES_GROUP = SYNC_NATIVE_EFFECT_GROUP | _group(
+    # Only ``set.remove`` raises KeyError; discard/clear/bulk-update are tolerant by design.
     RedisSet.discard,
     RedisSet.clear,
     RedisSet.difference_update,
@@ -216,9 +190,6 @@ SYNC_NATIVE_RAISES_GROUP = SYNC_NATIVE_EFFECT_GROUP | _group(
 )
 
 
-# ADDITIONAL_READ_ACTIONS — read/fetch actions that are not marked with the
-# READ action group, so the group-based ``ignore_groups=READ`` exclusion misses
-# them. They resolve and return a value and cannot be deferred inside a pipeline,
-# so pipeline-atomicity does not apply. Excluded from COVER_PIPELINE_ATOM
-# alongside the marked READ actions.
+# Read/fetch actions not marked READ, so the ignore_groups=READ exclusion misses them. They return
+# a value and cannot be deferred in a pipeline, so they leave COVER_PIPELINE_ATOM too.
 ADDITIONAL_READ_ACTIONS = _group(ForeignKey.afetch)

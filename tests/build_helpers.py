@@ -6,9 +6,7 @@ from rapyer.types.base import BaseRedisType
 
 def _iter_annotation_types(annotation):
     origin = get_origin(annotation)
-    # On Python 3.10, ``isinstance(list[int], type)`` is True for
-    # ``types.GenericAlias`` instances, so gate the direct yield on the
-    # annotation having no parameterization.
+    # On 3.10 isinstance(list[int], type) is True, so gate the yield on no parameterization.
     if origin is None and isinstance(annotation, type):
         yield annotation
     elif isinstance(origin, type):
@@ -22,7 +20,8 @@ def recursive_build_redis_model(
     _seen: set[int] | None = None,
     _root_meta=None,
 ):
-    """Rebuild ``cls``, its per-field ``BaseRedisType`` subclasses, and any
+    """
+    Rebuild ``cls``, its per-field ``BaseRedisType`` subclasses, and any
     nested ``AtomicRedisModel`` fields (each rebuilt against its own ``Meta``).
     """
     if _seen is None:
@@ -42,8 +41,6 @@ def recursive_build_redis_model(
                 _seen.add(id(t))
                 t.build_redis_model(_root_meta)
             elif issubclass(t, AtomicRedisModel):
-                # Nested model — recurse, keeping the root model's meta as the
-                # TTL authority for its special fields. Don't mark it ``_seen``
-                # here; the recursive call does that to also block re-entry from
-                # inside the nested walk.
+                # Recurse with the root model's meta as TTL authority for its special fields.
+                # The callee marks _seen, which also blocks re-entry from inside the nested walk.
                 recursive_build_redis_model(t, _seen, _root_meta)

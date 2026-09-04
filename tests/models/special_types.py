@@ -99,6 +99,5 @@ class RedisSetContainerModel(AtomicRedisModel):
 
 
 class ListOfSetsModel(AtomicRedisModel):
-    # A plain list of bare special fields: the metaclass detects the nested
-    # special field via GenericRedisType.contains_sf_field.
+    # A plain list of bare SFs; the metaclass detects it via GenericRedisType.contains_sf_field.
     buckets: list[RedisSet] = Field(default_factory=list)

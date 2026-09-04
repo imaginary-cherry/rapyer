@@ -89,8 +89,7 @@ async def test_sf_model_afind_one_with_missing_key_returns_none_with_fakeredis(
     setup_fake_redis_for_models,
     fake_redis_client,
 ):
-    # Act - fakeredis returns [] (not None) per missing JSON.MGET slot; this
-    # used to raise IndexError instead of returning None
+    # Act - fakeredis returns [] per missing JSON.MGET slot; this used to raise IndexError.
     result = await SubSubRedisSetModel.afind_one("does-not-exist")
 
     # Assert

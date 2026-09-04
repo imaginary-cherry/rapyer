@@ -100,7 +100,8 @@ class TestPipelineWithAupdate(AsyncBenchmarkTestWithTTL):
 
 
 class TestPipelineWithSpecialField(AsyncBenchmarkTestWithTTL):
-    """Isolates the SF prefetch cost in instance-level ``apipeline()``.
+    """
+    Isolates the SF prefetch cost in instance-level ``apipeline()``.
 
     Same shape as ``TestPipelineMultiAssign`` but on a model that contains a
     ``RedisPriorityQueue`` — exercises the ``execute_load_pipeline`` branch of

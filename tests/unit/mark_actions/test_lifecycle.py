@@ -52,9 +52,7 @@ async def test_exception_inside_wrapped_function_resets_context_and_skips_flush(
     with pytest.raises(RuntimeError, match="boom"):
         await boom(model)
 
-    # Assert: contextvar is reset (finally block) and flush was NOT called
-    # (line 189 sits outside the try, so a raise from `await method(...)`
-    # bypasses it — current behavior pinned down here).
+    # Assert - the contextvar resets in the finally block, but a raise bypasses the flush.
     assert _action_context.get() is None
     flush_mock.assert_not_awaited()
 
@@ -95,8 +93,7 @@ async def test_flush_raising_still_resets_action_context(flush_mock, mark_versio
     with pytest.raises(RuntimeError, match="flush-failed"):
         await update(model)
 
-    # Assert: the contextvar was reset by the wrapper's finally block before
-    # flush ran, so it's None even though flush blew up.
+    # Assert - the wrapper's finally reset the contextvar before flush blew up.
     assert _action_context.get() is None
 
 

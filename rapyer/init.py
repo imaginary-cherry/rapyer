@@ -44,9 +44,8 @@ async def init_rapyer(
 
     is_fake_redis = is_fakeredis(redis)
 
-    # Unfreeze -> (re)configure -> bake -> refreeze, wrapped so a failure mid-way
-    # (e.g. a mis-configured graph or an index error) still refreezes every model
-    # in the finally block rather than leaving Meta silently mutable.
+    # Unfreeze -> (re)configure -> bake -> refreeze. The finally block refreezes even when a
+    # mis-configured graph or an index error aborts mid-way, never leaving Meta silently mutable.
     try:
         for model in REDIS_MODELS:
             model.Meta._meta_locked = False
@@ -57,8 +56,7 @@ async def init_rapyer(
                 model.Meta.ttl = ttl
             if prefer_normal_json_dump is not None:
                 model.Meta.prefer_normal_json_dump = prefer_normal_json_dump
-            # cascade_ttl=None means "off", not "unset", so always reset it —
-            # unlike ttl/prefer_normal_json_dump which only apply when passed.
+            # cascade_ttl=None means "off", not "unset", so it is always reassigned.
             model.Meta.cascade_ttl = cascade_ttl
 
             # Initialize model fields
@@ -80,15 +78,13 @@ async def init_rapyer(
                         if override_old_idx:
                             raise
 
-        # Fail fast on a mis-configured cascade graph before any script is
-        # registered. Pure config check; needs no Redis connection.
+        # Pure config check, so a mis-configured graph fails before any script is registered.
         plan = build_cascade_plan(REDIS_MODELS)
         validate_cascade_ttl_targets(plan)
         # Divergent class_key_initials() would silently dead-end traversal; fail fast.
         validate_cascade_key_initials(REDIS_MODELS)
     finally:
-        # Refreeze now that the plan is baked; further Meta mutation is blocked
-        # until the next init_rapyer() call. Runs even on failure.
+        # Refreeze the baked plan, blocking Meta mutation until the next init_rapyer().
         for model in REDIS_MODELS:
             model.Meta._meta_locked = True
 
@@ -110,6 +106,5 @@ async def teardown_rapyer():
         if id(model.Meta.redis) not in closed_clients:
             closed_clients.add(id(model.Meta.redis))
             await model.Meta.redis.aclose()
-        # Clear the freeze on teardown so a torn-down model doesn't leak
-        # MetaFrozenError into a later path that mutates Meta without re-init.
+        # Unfreeze so a torn-down model doesn't raise MetaFrozenError before the next init.
         model.Meta._meta_locked = False

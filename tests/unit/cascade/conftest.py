@@ -74,9 +74,7 @@ CASCADE_PLANNER_MODELS = [
     CascadeSetRefOptOut,
 ]
 
-# init_rapyer() authoritatively resets Meta.cascade_ttl to None on every registered
-# model (see test_init_rapyer_cascade_ttl.py). Snapshotting here, at conftest import
-# time, captures each class's declared value before any test can call init_rapyer().
+# Snapshot at import time: init_rapyer() resets Meta.cascade_ttl to None on every model.
 _DECLARED_CASCADE_TTL = {
     model: model.Meta.cascade_ttl for model in CASCADE_PLANNER_MODELS
 }
@@ -108,10 +106,12 @@ def setup_fake_redis_for_cascade_models(fake_redis_client):
 
 @pytest.fixture
 def fcall_pipeline_spy():
-    """Patches ensure_pipeline + scripts_registry.run_fcall so a refresh_ttl()/
+    """
+    Patches ensure_pipeline + scripts_registry.run_fcall so a refresh_ttl()/
     aset_ttl() call can be asserted against the FCALL args without touching real
     Redis. Accepts the optional should_execute kwarg aset_ttl's call site passes.
-    Yields (mock_pipe, mock_run_fcall)."""
+    Yields (mock_pipe, mock_run_fcall).
+    """
     mock_pipe = MagicMock()
 
     @asynccontextmanager

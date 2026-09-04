@@ -11,8 +11,7 @@ def test_hybrid_model_inherited_fields_converted_to_redis_types_sanity():
     # Act
     model = HybridModel()
 
-    # Assert
-    # Check that inherited fields from SimpleBaseModel are converted to Redis types
+    # Assert - fields inherited from SimpleBaseModel are converted to Redis types too.
     assert isinstance(model.username, RedisStr)
     assert isinstance(model.score, RedisInt)
     # Note: bool is pickled, not converted to Redis type
@@ -40,8 +39,7 @@ def test_hybrid_model_custom_values_preserve_redis_types_sanity():
     # Arrange & Act
     model = HybridModel(username="custom_user", score=200, redis_field="custom_redis")
 
-    # Assert
-    # Check values are set correctly
+    # Assert - values are set correctly.
     assert model.username == "custom_user"
     assert model.score == 200
     assert model.redis_field == "custom_redis"
@@ -76,8 +74,7 @@ def test_hybrid_model_inherits_from_person_redis_types_and_json_path_sanity(
     # Act
     model = PersonRedisModel(name="John", age=30, email="john@test.com")
 
-    # Assert
-    # Check values are correct
+    # Assert - values are correct.
     assert model.name == "John"
     assert model.age == 30
     assert model.email == "john@test.com"
@@ -122,8 +119,7 @@ def test_hybrid_model_with_various_values_types_and_json_path_sanity(
     # Act
     model = PersonRedisModel(name=test_name, age=test_age, email=test_email, level=10)
 
-    # Assert
-    # Check values
+    # Assert - values are correct.
     assert model.name == test_name
     assert model.age == test_age
     assert model.email == test_email

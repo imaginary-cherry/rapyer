@@ -42,10 +42,7 @@ async def test_ttl_refresh_maintains_original_ttl_value__sanity(
 
 @pytest.mark.asyncio
 async def test_refresh_ttl_without_pipeline_executes_real_pipeline(real_redis_client):
-    # Coverage: context.pipeline_with_execution — the standalone transactional
-    # pipeline used when refresh_ttl runs with can_use_pipeline=False (other
-    # tests mock it, so its real body was never executed otherwise).
-    # Arrange
+    # Arrange - refresh_ttl with can_use_pipeline=False runs pipeline_with_execution for real.
     model = TTLRefreshTestModel(name="x", age=1, score=1.0)
     await model.asave()
     await real_redis_client.expire(model.key, 5)

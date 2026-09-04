@@ -26,8 +26,7 @@ def cascade_models():
 
 
 def test_fresh_redis_config_ttl_assignment_never_raises_sanity():
-    # Arrange
-    # Act
+    # Arrange / Act
     config = RedisConfig(ttl=30)
 
     # Assert
@@ -51,10 +50,7 @@ def test_frozen_redis_config_ttl_assignment_raises_and_leaves_ttl_unchanged_sani
 async def test_two_sequential_init_rapyer_calls_with_different_ttls_both_succeed_sanity(
     mock_redis_client, cascade_models
 ):
-    # Arrange
-    # Scope to two edge-free fixtures so build_cascade_plan's
-    # validate_cascade_ttl_targets is trivially satisfied, matching the
-    # pattern in test_init_rapyer_cascade_ttl.py.
+    # Arrange - two edge-free fixtures satisfy validate_cascade_ttl_targets trivially.
     with patch("rapyer.init.REDIS_MODELS", cascade_models):
         # Act
         await init_rapyer(mock_redis_client, ttl=30)

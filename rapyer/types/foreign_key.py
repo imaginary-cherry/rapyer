@@ -70,14 +70,13 @@ class ForeignKey(RelationalFieldType, Generic[T]):
         """
         Delegate field access to the resolved target, e.g. ``fk.name``.
 
-        Raises ``NotResolvedError`` until the target is fetched; never
-        triggers I/O, since attribute access cannot await.
+        Raises:
+            NotResolvedError: the target has not been fetched yet.
         """
-        # __getattr__ only fires when normal lookup misses. Private/dunder
-        # names (including during __init__ before _value is set) get the
-        # standard AttributeError to avoid masking real errors and recursion.
+        # Private/dunder misses (e.g. before __init__ sets _value) must not mask real errors.
         if name.startswith("_"):
             raise AttributeError(name)
+        # Attribute access cannot await, so an unresolved target raises instead of fetching.
         value = self.__dict__.get("_value")
         if value is None:
             raise NotResolvedError(
@@ -136,11 +135,8 @@ class ForeignKey(RelationalFieldType, Generic[T]):
 
 
 if TYPE_CHECKING:
-    # Field-declaration alias. To type checkers a reference field accepts the
-    # target model, its key string, or an already-built ForeignKey, so assigning
-    # any of them doesn't raise an annotation error. At runtime it is exactly
-    # ``ForeignKey``, so pydantic builds the unchanged ForeignKey schema and the
-    # stored value is always a ForeignKey (``isinstance(field, ForeignKey)``).
+    # Type checkers accept the target model, its key string, or a built ForeignKey.
     Reference = Union[ForeignKey[T], T, str]
 else:
+    # At runtime the field is always a ForeignKey, so pydantic builds its schema unchanged.
     Reference = ForeignKey

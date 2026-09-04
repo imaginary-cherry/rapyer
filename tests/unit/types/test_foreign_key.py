@@ -30,9 +30,7 @@ def test_relational_fields_are_also_redis_link_fields():
     # Arrange / Act
     link_fields = FkBook._redis_link_field_names
 
-    # Assert
-    # The metaclass adds every BaseRedisType field to _redis_link_field_names
-    # so _base_model_link wiring happens uniformly.
+    # Assert - the metaclass adds every BaseRedisType field, so link wiring is uniform.
     assert "author" in link_fields
 
 
@@ -42,19 +40,14 @@ def test_reference_is_relational_field_type():
 
 
 def test_foreign_key_fields_are_not_dynamically_subclassed():
-    # The converter leaves relational types untouched, so every FK field uses the
-    # one shared ForeignKey class (parameterized or bare) — never a per-field
-    # dynamic subclass.
-    # Arrange
+    # Arrange - the converter leaves relational types alone, so all FK fields share one class.
     def fk_origin(annotation):
         annotation_origin = get_origin(annotation) or annotation
         if isinstance(annotation_origin, type) and issubclass(
             annotation_origin, ForeignKey
         ):
             return annotation_origin
-        # Converted containers (e.g. list[ForeignKey[X]]) are concrete subclasses
-        # that carry their args in __orig_bases__, not get_args — descend via the
-        # same helper the runtime uses.
+        # Converted containers carry their args in __orig_bases__, so descend the runtime helper.
         for arg in resolve_generic_args(annotation):
             found = fk_origin(arg)
             if found is not None:
@@ -137,8 +130,7 @@ def test_resolved_attribute_delegates_to_target():
     name = book.author.name
     age = book.author.age
 
-    # Assert
-    # Target fields are reachable directly through the wrapper.
+    # Assert - target fields are reachable directly through the wrapper.
     assert name == "alice"
     assert age == 30
 
@@ -167,8 +159,7 @@ def test_wrapper_state_api_not_shadowed_by_delegation():
     alice = FkAuthor(name="alice")
     book = FkBook(title="x", author=alice)
 
-    # Act / Assert
-    # Wrapper-owned attributes resolve to the wrapper, not the target.
+    # Act / Assert - wrapper-owned attributes resolve to the wrapper, not the target.
     assert book.author.is_resolved is True
     assert book.author.target_key == alice.key
     assert book.author.value is alice
@@ -231,11 +222,7 @@ def test_optional_foreign_key_round_trips_as_null():
 
 @pytest.mark.asyncio
 async def test_afetch_unresolved_target_type_raises_type_error():
-    # Coverage: ForeignKey.afetch's guard that raises when the target type was
-    # never resolved (_relational_target is None).
-    # Arrange
-    # A bare ForeignKey (not a metaclass per-field subclass) never had its
-    # target type resolved, so ``_relational_target`` stays None.
+    # Arrange - a bare ForeignKey never had its target resolved, so _relational_target is None.
     fk = ForeignKey("FkAuthor:1")
 
     # Act / Assert
@@ -245,39 +232,30 @@ async def test_afetch_unresolved_target_type_raises_type_error():
 
 @pytest.mark.asyncio
 async def test_getattr_private_name_raises_attribute_error():
-    # Coverage: ForeignKey.__getattr__ early branch for underscore-prefixed
-    # names (returns AttributeError instead of delegating).
-    # Arrange
+    # Arrange - __getattr__'s underscore branch raises rather than delegating.
     fk = ForeignKey("FkAuthor:1")
 
-    # Act / Assert
-    # Underscore-prefixed misses must raise AttributeError, not NotResolvedError,
-    # to avoid masking real errors / recursion before _value is set.
+    # Act / Assert - underscore misses raise AttributeError so real errors aren't masked.
     with pytest.raises(AttributeError):
         fk._not_a_real_attribute
 
 
 def test_foreign_key_is_hashable():
-    # Coverage: ForeignKey.__hash__ (so ForeignKeys work in sets / as dict keys).
-    # Arrange
+    # Arrange - __hash__ is what lets ForeignKeys work in sets and as dict keys.
     fk_a = ForeignKey("FkAuthor:1")
     fk_b = ForeignKey("FkAuthor:1")
     fk_c = ForeignKey("FkAuthor:2")
 
-    # Act / Assert
-    # Equal keys hash equal and collapse in a set; a different key stays distinct.
+    # Act / Assert - equal keys hash equal and collapse in a set; a different key stays.
     assert hash(fk_a) == hash(fk_b)
     assert {fk_a, fk_b, fk_c} == {fk_a, fk_c}
 
 
 def test_validate_passes_through_existing_foreign_key():
-    # Coverage: the validator branch that returns an input value unchanged when
-    # it is already a ForeignKey (rather than re-wrapping a key/model).
-    # Arrange
+    # Arrange - the validator returns an already-built ForeignKey unchanged.
     fk = ForeignKey("FkAuthor:99")
 
-    # Act
-    # Building a model from an already-built ForeignKey returns it unchanged.
+    # Act - building a model from an already-built ForeignKey returns it unchanged.
     book = FkBook(title="x", author=fk)
 
     # Assert
@@ -285,7 +263,5 @@ def test_validate_passes_through_existing_foreign_key():
 
 
 def test_serializer_handles_none():
-    # Coverage: the ForeignKey serializer's None guard. Reachable only by
-    # serializing None directly through the type adapter, hence a unit test.
-    # Act / Assert
+    # Act / Assert - the serializer's None guard is only reachable via the type adapter.
     assert TypeAdapter(ForeignKey).dump_python(None) is None

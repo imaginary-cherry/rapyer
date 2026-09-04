@@ -50,9 +50,11 @@ async def fetch_models_with_sf_loads(
     classes: list[type["AtomicRedisModel"]],
     keys: list[str],
 ) -> tuple[Any, list[Plan], list[Any]]:
-    """Fetch model dumps for ``keys`` plus any nested-SF loads. Uses the
+    """
+    Fetch model dumps for ``keys`` plus any nested-SF loads. Uses the
     transaction pipeline when any class has SF; otherwise a direct ``JSON.MGET``.
-    Returns ``(models_dump, plans_per_key, sf_raw_results)``."""
+    Returns ``(models_dump, plans_per_key, sf_raw_results)``.
+    """
     if any(c.contains_sf_field() for c in classes):
         return await execute_load_pipeline(meta, classes, keys)
     models = await meta.redis_json.mget(keys=keys, path="$")
@@ -67,10 +69,12 @@ def build_models_from_dumps(
     sf_raw: list,
     raise_on_missing: bool,
 ) -> list:
-    """Walk the per-key (model_dump, plan) pairs from a load pipeline, slice
+    """
+    Walk the per-key (model_dump, plan) pairs from a load pipeline, slice
     ``sf_raw`` by plan length, inject the special-field data into each dump,
     and call ``create_redis_model``. Missing entries raise ``KeyNotFound``
-    when ``raise_on_missing`` is True; otherwise they are skipped."""
+    when ``raise_on_missing`` is True; otherwise they are skipped.
+    """
     instances: list = []
     cursor = 0
     for data, key, klass, key_plan in zip(models_dump, keys, classes, plans_per_key):

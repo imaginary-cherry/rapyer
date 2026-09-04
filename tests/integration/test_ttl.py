@@ -20,9 +20,7 @@ async def test_base_redis_model_with_ttl__save__check_ttl_set_sanity(real_redis_
 
 @pytest.mark.asyncio
 async def test_aset_ttl_on_inner_model_raises(real_redis_client):
-    # Coverage: aset_ttl's guard that rejects being called on a nested (inner)
-    # model. TTL can only be set from the top-level model.
-    # Arrange
+    # Arrange - aset_ttl rejects nested models; TTL can only be set from the top level.
     model = OuterModel()
     await model.asave()
 

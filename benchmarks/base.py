@@ -7,7 +7,8 @@ from rapyer import AtomicRedisModel
 
 
 class TTLMode(enum.Enum):
-    """Which model variant a benchmark iteration is exercising.
+    """
+    Which model variant a benchmark iteration is exercising.
 
     Each test class declares a ``models`` mapping from this enum to the model
     class it should construct in setup. The TTL variant is a separate, pristine
@@ -21,20 +22,14 @@ class TTLMode(enum.Enum):
 
 class AsyncBenchmarkTest:
     pytestmark = [pytest.mark.benchmark]
-    # ``warmup_rounds`` are run and discarded before measurement so the timed
-    # rounds never pay cold-connection / cold-Redis-cache cost. That cold
-    # component is the main source of run-to-run walltime drift on identical
-    # code; warming it out is what keeps the numbers stable. ``rounds`` is the
-    # measured sample size — more samples, tighter aggregate. ``iterations`` is
-    # intentionally left at 1: pytest-codspeed forbids it alongside ``setup``,
-    # which every benchmark here needs to get fresh per-round state.
+    # warmup_rounds burn off cold-connection / cold-cache cost, the main source of walltime drift.
+    # iterations stays 1: pytest-codspeed forbids it alongside ``setup``, which every bench needs.
+    rounds = 30
     rounds = 30
     warmup_rounds = 5
     expected = None
 
-    # Subclasses override. ``TTLMode.NO_TTL`` is required (used by
-    # ``test_benchmark``); ``TTLMode.TTL`` is required by subclasses that also
-    # run ``test_benchmark_with_ttl``.
+    # Subclasses override; TTLMode.NO_TTL is required, TTLMode.TTL only for the with-ttl test.
     models: ClassVar[dict[TTLMode, type[AtomicRedisModel]]] = {}
 
     async def setup(self, mode: TTLMode) -> Any:

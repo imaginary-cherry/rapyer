@@ -10,9 +10,7 @@ from rapyer.types.foreign_key import Reference
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.redis_set import RedisSet
 
-# Every cascade fixture below gets this ttl so no `classes[<class>].ttl`
-# lookup in the Lua write phase can ever resolve to nil, regardless of which
-# fixture roots a real cascade-apply invocation at.
+# Every cascade fixture carries this ttl so no Lua classes[<class>].ttl lookup hits nil.
 CASCADE_FIXTURE_TTL_SECONDS = 3600
 
 
@@ -152,9 +150,11 @@ class CascadeMultiDepthRoot(AtomicRedisModel):
 
 
 class CascadeBlanketLeaf(AtomicRedisModel):
-    """Plain leaf reached purely via a blanket-enabled global default; also
+    """
+    Plain leaf reached purely via a blanket-enabled global default; also
     carries an onward blanket edge so a node reached at budget=0 (via
-    another class's blanket decrement) proves depth-budget truncation."""
+    another class's blanket decrement) proves depth-budget truncation.
+    """
 
     name: str = "leaf"
     onward: Optional[Reference["CascadeBlanketLeaf"]] = None
@@ -400,9 +400,11 @@ class CascadeSetRefRootNoTtl(AtomicRedisModel):
 
 
 class CascadeSetRefSelfNode(AtomicRedisModel):
-    """Self-reference held inside a RedisSet: the node's own key can be a
+    """
+    Self-reference held inside a RedisSet: the node's own key can be a
     member of its own ``peers`` field. Proves the shared visited map
-    terminates this cycle via the SMEMBERS read branch instead of hanging."""
+    terminates this cycle via the SMEMBERS read branch instead of hanging.
+    """
 
     name: str = "set_ref_self"
     peers: Annotated[RedisSet[Reference["CascadeSetRefSelfNode"]], CascadeTTL()] = (
@@ -413,9 +415,11 @@ class CascadeSetRefSelfNode(AtomicRedisModel):
 
 
 class CascadePQRefSelfNode(AtomicRedisModel):
-    """Same self-reference shape as CascadeSetRefSelfNode but held inside a
+    """
+    Same self-reference shape as CascadeSetRefSelfNode but held inside a
     RedisPriorityQueue instead of a RedisSet — proves the cycle-safety
-    guarantee holds independently for the ZRANGE read branch."""
+    guarantee holds independently for the ZRANGE read branch.
+    """
 
     name: str = "pq_ref_self"
     peers: Annotated[
@@ -426,9 +430,11 @@ class CascadePQRefSelfNode(AtomicRedisModel):
 
 
 class CascadeMixedEdgeSharedChild(AtomicRedisModel):
-    """Chain node reached by CascadeMixedEdgeSharedChildRoot via both an
+    """
+    Chain node reached by CascadeMixedEdgeSharedChildRoot via both an
     inline edge and an SF-held-ref edge. Blanket (non-override) cascade so
-    depth genuinely decrements on every established hop."""
+    depth genuinely decrements on every established hop.
+    """
 
     name: str = "mixed_edge_shared_child"
     onward: Optional[Reference["CascadeMixedEdgeSharedChild"]] = None
@@ -439,12 +445,14 @@ class CascadeMixedEdgeSharedChild(AtomicRedisModel):
 
 
 class CascadeMixedEdgeSharedChildRoot(AtomicRedisModel):
-    """Two fields point at the SAME saved CascadeMixedEdgeSharedChild
+    """
+    Two fields point at the SAME saved CascadeMixedEdgeSharedChild
     instance: ``shallow_inline`` (inline FK, override, depth=1) and
     ``deep_set`` (SF-held-ref, override, depth=4). Proves SF edges
     participate in the SAME best-budget-per-node visited map as inline
     edges — the shared child is walked at the larger SF budget regardless
-    of which edge's push_child call happens first."""
+    of which edge's push_child call happens first.
+    """
 
     name: str = "mixed_edge_shared_child_root"
     shallow_inline: Annotated[
@@ -458,8 +466,10 @@ class CascadeMixedEdgeSharedChildRoot(AtomicRedisModel):
 
 
 class CascadeSfDiamondChild(AtomicRedisModel):
-    """Plain leaf reached by CascadeSfDiamondRoot via two different
-    SF-container kinds on the same root (SET and ZSET)."""
+    """
+    Plain leaf reached by CascadeSfDiamondRoot via two different
+    SF-container kinds on the same root (SET and ZSET).
+    """
 
     name: str = "sf_diamond_child"
 
@@ -467,11 +477,13 @@ class CascadeSfDiamondChild(AtomicRedisModel):
 
 
 class CascadeSfDiamondRoot(AtomicRedisModel):
-    """Two independent SF-held-ref fields (one RedisSet, one
+    """
+    Two independent SF-held-ref fields (one RedisSet, one
     RedisPriorityQueue) both pointing at the SAME saved
     CascadeSfDiamondChild instance. Proves a child reached via two
     different SF-container kinds converges through the shared visited map
-    and is re-armed exactly once, with no double-processing error."""
+    and is re-armed exactly once, with no double-processing error.
+    """
 
     name: str = "sf_diamond_root"
     left: Annotated[RedisSet[Reference[CascadeSfDiamondChild]], CascadeTTL()] = Field(

@@ -165,10 +165,7 @@ class ComprehensiveTestModelNoRefreshTTL(ComprehensiveTestModel):
 
 
 class ComprehensiveRefOwner(AtomicRedisModel):
-    # Owner of a ForeignKey to the comprehensive model. afetch resolves and
-    # refreshes that comprehensive target (target=RESULT), so the afetch action
-    # test exercises the full comprehensive key set — main key + special fields.
-    # TTL on so afetch's owner-gated refresh is installed.
+    # TTL is on so afetch's owner-gated refresh is installed on the comprehensive target.
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=TTL_REFRESH_TEST_SECONDS)
     ref: Reference[ComprehensiveTestModel]
 

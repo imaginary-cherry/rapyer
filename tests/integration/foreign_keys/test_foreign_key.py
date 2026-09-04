@@ -20,8 +20,7 @@ from tests.models.foreign_key_types import (
 
 @pytest.mark.asyncio
 async def test_loading_parent_tolerates_dangling_required_fk(book_with_missing_author):
-    # Arrange / Act
-    # The target was never created; loading the parent must still succeed.
+    # Arrange / Act - the target was never created, so loading the parent must still succeed.
     loaded = await FkBook.aget(book_with_missing_author.key)
 
     # Assert
@@ -116,8 +115,7 @@ async def test_afetch_existing_optional_target_extracts_all_values(book_with_pub
 
 @pytest.mark.asyncio
 async def test_resolution_state_is_in_memory_only(saved_author):
-    # Arrange
-    # Build the book from a resolved instance, then persist + reload.
+    # Arrange - build the book from a resolved instance, then persist and reload.
     book = FkBook(title="x", author=saved_author)
     assert book.author.is_resolved is True
     await book.asave()
@@ -125,8 +123,7 @@ async def test_resolution_state_is_in_memory_only(saved_author):
     # Act
     loaded = await FkBook.aget(book.key)
 
-    # Assert
-    # Resolution does not survive a save/load cycle — only the key is stored.
+    # Assert - resolution does not survive a save/load cycle; only the key is stored.
     assert loaded.author.is_resolved is False
     assert loaded.author.target_key == saved_author.key
 
@@ -141,8 +138,7 @@ async def test_afetch_is_idempotent(book_with_author):
     first = await loaded.author.afetch()
     second = await loaded.author.afetch()
 
-    # Assert
-    # Second call returns the cached value (no re-fetch from Redis).
+    # Assert - the second call returns the cached value with no re-fetch from Redis.
     assert first is second
 
 
@@ -169,13 +165,11 @@ async def test_resolved_fk_reserializes_to_target_key(book_with_author):
     loaded = await FkBook.aget(book.key)
     await loaded.author.afetch()
 
-    # Act
-    # Re-save the parent while the FK is resolved, then reload.
+    # Act - re-save the parent while the FK is resolved, then reload.
     await loaded.asave()
     reloaded = await FkBook.aget(book.key)
 
-    # Assert
-    # The wrapper serializes back to the key string, not the hydrated model.
+    # Assert - the wrapper serializes back to the key string, not the hydrated model.
     assert reloaded.author.is_resolved is False
     assert reloaded.author.target_key == author.key
 
@@ -185,10 +179,7 @@ async def test_resolved_fk_reserializes_to_target_key(book_with_author):
 
 @pytest.mark.asyncio
 async def test_resolved_target_uses_its_own_paths_not_parent_path():
-    # Arrange
-    # The target carries its own nested + special fields; if it were treated as
-    # embedded in the parent, those would be prefixed with the FK's path
-    # (".head_author") and read the wrong Redis keys.
+    # Arrange - if the target were treated as embedded, its paths would carry the FK's prefix.
     author = FkRichAuthor(name="alice")
     await author.asave()
     await author.tags.aadd("python")
@@ -228,8 +219,7 @@ async def test_list_of_foreign_keys_resolve_independently():
     # Act
     await loaded.co_authors[0].afetch()
 
-    # Assert
-    # Resolving one element does not resolve the others.
+    # Assert - resolving one element does not resolve the others.
     assert loaded.co_authors[0].value.name == "a1"
     assert loaded.co_authors[1].is_resolved is False
 
@@ -259,8 +249,10 @@ async def test_forward_ref_self_link():
 
 @pytest_asyncio.fixture
 async def owner_with_referee(real_redis_client):
-    """Saved owner -> referee pair, with the referee's TTL manually reduced so a
-    refresh would be observable as a jump back toward FK_TTL_SECONDS."""
+    """
+    Saved owner -> referee pair, with the referee's TTL manually reduced so a
+    refresh would be observable as a jump back toward FK_TTL_SECONDS.
+    """
     referee = FkTTLReferee(name="referee")
     await referee.asave()
     owner = FkTTLOwner(title="owner", referee=referee.key)
@@ -288,8 +280,7 @@ async def test_afetch_does_not_refresh_referenced_model_ttl(
     loaded = await FkTTLOwner.aget(owner.key)
     await loaded.referee.afetch()
 
-    # Assert - the referee does not refresh on read/fetch, so its TTL stays in
-    # the reduced window instead of jumping back up to FK_TTL_SECONDS.
+    # Assert - the referee never refreshes on read, so its TTL stays in the reduced window.
     referee_ttl = await real_redis_client.ttl(referee.key)
     assert 0 < referee_ttl <= REDUCED_TTL_SECONDS
 

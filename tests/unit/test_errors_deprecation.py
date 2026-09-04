@@ -7,9 +7,7 @@ from rapyer.errors import UnsupportedArgumentTypeError
 
 
 def test_deprecated_alias_warns_and_returns_new_class():
-    # Coverage: errors.__getattr__'s deprecated-alias branch — emits the
-    # DeprecationWarning and returns the renamed class.
-    # Act / Assert
+    # Act / Assert — errors.__getattr__'s deprecated-alias branch.
     with pytest.warns(DeprecationWarning):
         aliased = errors.UnsupportArgumentTypeError
 
@@ -17,8 +15,6 @@ def test_deprecated_alias_warns_and_returns_new_class():
 
 
 def test_unknown_attribute_still_raises_attribute_error():
-    # Coverage: errors.__getattr__'s fallback `raise AttributeError` for any
-    # name that is not the deprecated alias.
-    # Act / Assert
+    # Act / Assert — errors.__getattr__'s fallback AttributeError for unknown names.
     with pytest.raises(AttributeError):
         errors.ThisAttributeDoesNotExist

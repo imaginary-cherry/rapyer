@@ -7,9 +7,7 @@ from benchmarks.models import (
 )
 from tests.models.simple_types import StrModel
 
-# Members shipped in ARGV on the create branch / loaded back on the found
-# branch. Kept modest so the benchmark measures the get_or_create round-trip
-# and SF dispatch overhead rather than raw set throughput.
+# Kept modest so the benchmark measures round-trip and SF dispatch, not raw set throughput.
 SF_MEMBERS = [f"tag_{i}" for i in range(50)]
 
 
@@ -81,8 +79,10 @@ class TestModuleGetOrCreateFoundBranch(AsyncBenchmarkTestWithTTL):
 
 
 class TestGetOrCreateCreatedBranchWithSet(AsyncBenchmarkTestWithTTL):
-    """Create branch with a populated RedisSet: members ship in ARGV and the
-    baked-in SF_SAVE snippet persists them in the same round-trip."""
+    """
+    Create branch with a populated RedisSet: members ship in ARGV and the
+    baked-in SF_SAVE snippet persists them in the same round-trip.
+    """
 
     models = {
         TTLMode.NO_TTL: GenericRedisSetModelNoTTL,
@@ -101,8 +101,10 @@ class TestGetOrCreateCreatedBranchWithSet(AsyncBenchmarkTestWithTTL):
 
 
 class TestGetOrCreateFoundBranchWithSet(AsyncBenchmarkTestWithTTL):
-    """Found branch with a populated RedisSet: the SF_LOAD snippet returns the
-    members in the same round-trip that confirms existence."""
+    """
+    Found branch with a populated RedisSet: the SF_LOAD snippet returns the
+    members in the same round-trip that confirms existence.
+    """
 
     models = {
         TTLMode.NO_TTL: GenericRedisSetModelNoTTL,

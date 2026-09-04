@@ -14,8 +14,7 @@ from tests.models.foreign_key_types import FkBook
 
 
 def test_direct_fk_field_records_exact_cascade_ttl_instance():
-    # Act
-    # Assert
+    # Act / Assert
     assert _field_cascade_spec(CascadeBookDirect, "author") == CascadeTTL(enabled=False)
 
 
@@ -23,8 +22,7 @@ def test_direct_fk_field_records_exact_cascade_ttl_instance():
 
 
 def test_collection_fk_field_records_cascade_ttl_on_the_collection_field():
-    # Act
-    # Assert
+    # Act / Assert
     assert _field_cascade_spec(CascadeBookCollection, "co_authors") == CascadeTTL()
 
 
@@ -32,8 +30,7 @@ def test_collection_fk_field_records_cascade_ttl_on_the_collection_field():
 
 
 def test_nested_submodel_records_marker_on_the_nested_class_not_the_outer_one():
-    # Act
-    # Assert
+    # Act / Assert
     assert _field_cascade_spec(CascadeProfile, "mentor") == CascadeTTL()
     assert _field_cascade_spec(CascadeBookNested, "profile") is None
 
@@ -42,20 +39,17 @@ def test_nested_submodel_records_marker_on_the_nested_class_not_the_outer_one():
 
 
 def test_plain_fk_field_without_cascade_ttl_has_empty_cascade_ttl_fields():
-    # Act
-    # Assert
+    # Act / Assert
     assert _field_cascade_spec(CascadeBookPlain, "author") is None
 
 
 def test_plain_fk_field_classification_is_unaffected():
-    # Act
-    # Assert
+    # Act / Assert
     assert CascadeBookPlain._relational_field_names == {"author"}
 
 
 def test_cascade_author_leaf_model_has_no_cascade_ttl_fields():
-    # Act
-    # Assert
+    # Act / Assert
     assert _field_cascade_spec(CascadeAuthor, "name") is None
 
 
@@ -63,8 +57,7 @@ def test_cascade_author_leaf_model_has_no_cascade_ttl_fields():
 
 
 def test_existing_fk_book_classification_remains_byte_identical():
-    # Act
-    # Assert
+    # Act / Assert
     assert FkBook._relational_field_names == {"author", "publisher"}
     assert FkBook._contain_fk == {"co_authors"}
     assert _field_cascade_spec(FkBook, "author") is None

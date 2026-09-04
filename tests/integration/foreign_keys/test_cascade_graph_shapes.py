@@ -37,8 +37,7 @@ async def test_multi_level_chain_reaches_expected_prefix_sanity(real_redis_clien
     # Act
     await apply_cascade(real_redis_client, root)
 
-    # Assert
-    # Root, a, b, c refreshed; d (beyond the depth-2 budget) untouched.
+    # Assert - root, a, b, c refreshed; d is beyond the depth-2 budget and untouched.
     refreshed = {key for key in all_keys if await real_redis_client.ttl(key) > 0}
     assert refreshed == {root.key, a.key, b.key, c.key}
     assert await real_redis_client.ttl(d.key) in (-1, -2)
@@ -63,8 +62,7 @@ async def test_cyclic_two_node_cycle_does_not_hang_or_error_sanity(real_redis_cl
     await real_redis_client.persist(a.key)
     await real_redis_client.persist(b.key)
 
-    # Act
-    # Bounded by the visited-set; must complete without hanging/erroring.
+    # Act - bounded by the visited-set, so this must complete without hanging or erroring.
     await apply_cascade(real_redis_client, a)
 
     # Assert
@@ -92,8 +90,7 @@ async def test_genuine_single_node_self_loop_does_not_hang_or_error_sanity(
     await node.asave()
     await real_redis_client.persist(node.key)
 
-    # Act
-    # Bounded by the visited-set; must complete without hanging/erroring.
+    # Act - bounded by the visited-set, so this must complete without hanging or erroring.
     await apply_cascade(real_redis_client, node)
 
     # Assert
@@ -119,8 +116,7 @@ async def test_diamond_shared_child_refreshed_exactly_once_via_either_edge_sanit
     await real_redis_client.persist(child.key)
     await real_redis_client.persist(root.key)
 
-    # Act
-    # Must not error from the double-visit (visited-set dedup).
+    # Act - the visited-set dedup must keep the double visit from erroring.
     await apply_cascade(real_redis_client, root)
 
     # Assert
@@ -149,8 +145,7 @@ async def test_shared_child_via_two_independent_roots_refreshed_from_either_root
     for key in (child.key, root_a.key, root_b.key):
         await real_redis_client.persist(key)
 
-    # Act
-    # Apply cascade from EACH root independently.
+    # Act - apply the cascade from EACH root independently.
     await apply_cascade(real_redis_client, root_a)
     assert await real_redis_client.ttl(root_a.key) > 0
     assert await real_redis_client.ttl(child.key) > 0
@@ -158,7 +153,6 @@ async def test_shared_child_via_two_independent_roots_refreshed_from_either_root
     await real_redis_client.persist(child.key)
     await apply_cascade(real_redis_client, root_b)
 
-    # Assert
-    # The shared child refreshes from either independent root.
+    # Assert - the shared child refreshes from either independent root.
     assert await real_redis_client.ttl(root_b.key) > 0
     assert await real_redis_client.ttl(child.key) > 0

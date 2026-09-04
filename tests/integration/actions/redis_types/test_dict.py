@@ -181,8 +181,7 @@ class TestDictApopitem(
         return await piped.metadata.apopitem()
 
     def corrupt_local_mirror(self, m: ComprehensiveTestModel) -> None:
-        # Wipe the local mirror — native dict.popitem() on an empty dict
-        # raises KeyError, but apopitem() should still pop from Redis.
+        # Wipe the mirror: native dict.popitem() would raise, but apopitem() still pops from Redis.
         dict.clear(m.metadata)
 
     def expected_before(self):

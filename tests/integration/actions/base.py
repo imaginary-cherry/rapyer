@@ -88,11 +88,13 @@ class ActionTestBase(ABC):
         """Perform the mutation inside the pipeline."""
 
     def corrupt_local_mirror(self, model: PipelineActionModel) -> None:
-        """Mutate the local Python mirror of the field that ``perform_action``
+        """
+        Mutate the local Python mirror of the field that ``perform_action``
         targets in a way that would make a native-Python equivalent fail
         (e.g. ``set.discard`` the value before ``aremove``, or clear before
         ``apop``). Subclasses must override unless
-        ``skip_stale_mirror_in_pipeline`` is set."""
+        ``skip_stale_mirror_in_pipeline`` is set.
+        """
         raise NotImplementedError(
             f"{type(self).__name__} must implement corrupt_local_mirror "
             f"or set skip_stale_mirror_in_pipeline"
@@ -186,8 +188,7 @@ class ActionTestBase(ABC):
 
     @pytest.mark.asyncio
     async def test_action_in_pipeline_tolerates_stale_local_mirror(self, test_input):
-        # Arrange — set up data, then corrupt the local mirror in a way that
-        # would make a native-Python equivalent of perform_action fail.
+        # Arrange - corrupt the local mirror so a native-Python equivalent would fail.
         self.test_input = test_input
         self.created_models = await self.setup_data()
         self.corrupt_local_mirror(self.created_models[0])
@@ -196,8 +197,7 @@ class ActionTestBase(ABC):
         async with rapyer.apipeline():
             await self.perform_action(self.created_models[0])
 
-        # Assert — the action still produced the correct Redis state, despite
-        # the stale local mirror.
+        # Assert - the action still produced the correct Redis state despite the stale mirror.
         loaded_after = await self.load_data()
         await self.assert_after_pipeline(loaded_after)
 
@@ -211,7 +211,8 @@ class ActionTestBase(ABC):
         parametrize: bool,
         **test_params,
     ):
-        """Wrap, parametrize, cover-mark and skip-mark one test method on ``cls``.
+        """
+        Wrap, parametrize, cover-mark and skip-mark one test method on ``cls``.
 
         Each concrete subclass gets its own fresh function object so pytest
         markers applied here don't leak to sibling subclasses.

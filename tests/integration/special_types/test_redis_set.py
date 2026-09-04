@@ -259,8 +259,7 @@ async def test_optional_redis_set_set_after_init(real_redis_client):
 
 @pytest.mark.asyncio
 async def test_auto_mapped_set_field_persists_through_redis_set(real_redis_client):
-    # Arrange
-    # `tags: set[str]` should be auto-converted to `RedisSet[str]` via ALL_TYPES.
+    # Arrange - `tags: set[str]` should auto-convert to `RedisSet[str]` via ALL_TYPES.
     model = AutoMappedSetModel()
     await model.asave()
     assert isinstance(model.tags, RedisSet)
@@ -279,15 +278,12 @@ async def test_auto_mapped_set_field_persists_through_redis_set(real_redis_clien
 
 @pytest.mark.asyncio
 async def test_empty_update_difference_and_aadd_many_are_noops(real_redis_client):
-    # Coverage: the empty-input early returns in RedisSet.update /
-    # difference_update / aadd_many.
-    # Arrange
+    # Arrange - the empty-input early returns in update / difference_update / aadd_many.
     model = GenericRedisSetModel[str]()
     await model.asave()
     await model.tags.aadd_many(["a", "b"])
 
-    # Act
-    # Empty iterables must early-return without touching Redis.
+    # Act - empty iterables must early-return without touching Redis.
     model.tags.update()
     model.tags.difference_update()
     await model.tags.aadd_many([])
@@ -298,8 +294,7 @@ async def test_empty_update_difference_and_aadd_many_are_noops(real_redis_client
 
 @pytest.mark.asyncio
 async def test_clone_returns_independent_local_copy(real_redis_client):
-    # Coverage: RedisSet.clone() — returns a detached local copy of the members.
-    # Arrange
+    # Arrange - clone() returns a detached local copy of the members.
     model = GenericRedisSetModel[str]()
     await model.asave()
     await model.tags.aadd_many(["a", "b"])
@@ -315,10 +310,7 @@ async def test_clone_returns_independent_local_copy(real_redis_client):
 
 @pytest.mark.asyncio
 async def test_list_of_bare_redis_sets_is_detected_as_special(real_redis_client):
-    # Coverage: GenericRedisType.contains_sf_field's branch that returns True
-    # when the generic's inner element is itself a SpecialFieldType. Reached via
-    # a plain ``list[RedisSet]`` field (the only construct that produces it).
-    # Arrange / Assert
+    # Arrange / Assert - a plain list[RedisSet] is the only construct with an SF inner element.
     annotation = ListOfSetsModel.model_fields["buckets"].annotation
     assert annotation.contains_sf_field() is True
 

@@ -87,8 +87,7 @@ async def test_rapyer_adelete_many__multiple_same_class(real_redis_client):
 
 @pytest.mark.asyncio
 async def test_rapyer_adelete_many__no_args_raises_type_error():
-    # Arrange
-    # Act & Assert
+    # Arrange / Act / Assert
     with pytest.raises(
         MissingParameterError, match="adelete_many requires at least one argument"
     ):
@@ -97,8 +96,7 @@ async def test_rapyer_adelete_many__no_args_raises_type_error():
 
 @pytest.mark.asyncio
 async def test_rapyer_adelete_many__unknown_class_raises_error():
-    # Arrange
-    # Act & Assert
+    # Arrange / Act / Assert
     with pytest.raises(RapyerModelDoesntExistError):
         await rapyer.adelete_many(RapyerKey("UnknownClass:some_id"))
 

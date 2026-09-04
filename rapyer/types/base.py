@@ -32,15 +32,15 @@ class BaseRedisType(ABC):
     def __init_subclass__(cls, *, owner_meta: Optional["RedisConfig"] = None, **kwargs):
         super().__init_subclass__(**kwargs)
         if owner_meta is None:
-            # Static (module-load-time) subclass — no Atomic to specialize for yet.
-            # Methods stay tagged with v2 MarkActionParams; the dynamic per-field
-            # subclass created by RedisConverter will install them with its meta.
+            # Static module-load-time subclass: no Atomic to specialize for, so methods stay
+            # tagged with v2 MarkActionParams for RedisConverter's per-field subclass to install.
             return
         cls.build_redis_model(owner_meta)
 
     @classmethod
     def build_redis_model(cls, meta: "RedisConfig"):
-        """Re-install marked-action methods on this per-field subclass.
+        """
+        Re-install marked-action methods on this per-field subclass.
 
         Mirror of ``AtomicRedisModel.build_redis_model`` for the field-type
         side: dynamic per-field subclasses (created by ``RedisConverter``)

@@ -198,8 +198,7 @@ async def test_redis_list_remove_range_without_pipeline_no_changes_sanity(
 
 @pytest.mark.asyncio
 async def test_remove_range_raises_scripts_not_initialized_error_when_init_rapyer_not_called_error():
-    # Arrange - save while scripts are loaded, then clear the registry so only
-    # the pipeline's remove_range call hits the missing script
+    # Arrange - save with scripts loaded, then clear the registry so only remove_range misses.
     model = ComprehensiveTestModel(tags=["a", "b", "c", "d", "e"])
     await model.asave()
 

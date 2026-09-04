@@ -104,13 +104,11 @@ class TestSetApop(ReadActionTestBase, RedisSetActionBase):
         return set(INITIAL_ITEMS)
 
     def corrupt_local_mirror(self, m: ComprehensiveTestModel) -> None:
-        # Wipe the local mirror entirely — native set.pop() on an empty set
-        # raises KeyError, but apop() still returns a value from Redis.
+        # Wipe the mirror: native set.pop() would raise, but apop() still returns from Redis.
         set.clear(m.container.labels)
 
     async def assert_after_pipeline(self, loaded):
-        # apop's choice of value is non-deterministic, so just verify Redis
-        # state shrank by one and remains a subset of the initial items.
+        # apop's choice is non-deterministic, so only check Redis shrank by one and stayed a subset.
         assert len(loaded) == len(INITIAL_ITEMS) - 1
         assert loaded <= INITIAL_SERIALIZED
 
@@ -219,10 +217,12 @@ class TestSetAdifference(TwoSetActionBase):
 
 
 class RedisSetSyncActionBase(UpdateActionTestBase, SyncActionTestBase, ABC):
-    """Sync set methods queue Redis ops onto an open pipeline; outside a
+    """
+    Sync set methods queue Redis ops onto an open pipeline; outside a
     pipeline they only mutate the local mirror. They aren't async, so TTL
     refresh / action-effect coverage doesn't apply — pipeline atomicity and
-    no-clobber are what we need."""
+    no-clobber are what we need.
+    """
 
     initial_items: ClassVar[list[str]] = INITIAL_ITEMS
 

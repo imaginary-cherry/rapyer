@@ -10,8 +10,7 @@ def test_cascade_library_source_has_all_tokens_substituted():
     # Act
     library_name, function_name, source = build_cascade_library(plan_json)
 
-    # Assert
-    # Real FUNCTION LOAD validation lives in the integration suite.
+    # Assert - real FUNCTION LOAD validation lives in the integration suite.
     assert source.splitlines()[0] == f"#!lua name={library_name}"
     assert "RAPYER_CASCADE_PLAN_LITERAL" not in source
     assert "RAPYER_CASCADE_LIB" not in source

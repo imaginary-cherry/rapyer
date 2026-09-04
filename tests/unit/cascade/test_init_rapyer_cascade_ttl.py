@@ -31,13 +31,8 @@ async def test_init_rapyer_with_cascade_ttl_sets_exact_instance_on_every_model_s
     # Arrange
     cascade_ttl = CascadeTTL()
 
-    # Act
-    # Scope the blanket-enable to just the two fixtures under test — both
-    # have zero relational/FK fields of their own, so patching REDIS_MODELS
-    # down to this pair keeps the cascade graph edge-free and
-    # validate_cascade_ttl_targets trivially passes, instead of newly
-    # requiring Meta.ttl on every unrelated FK-target class in the whole
-    # global registry (FkAuthor, FkTree, ...).
+    # Act - both fixtures have no FK fields, so patching REDIS_MODELS to this pair keeps the graph
+    # edge-free instead of newly requiring Meta.ttl on every FK target in the global registry.
     with patch("rapyer.init.REDIS_MODELS", cascade_models):
         await init_rapyer(mock_redis_client, cascade_ttl=cascade_ttl)
 

@@ -225,12 +225,10 @@ async def test_optional_priority_queue_set_after_init(real_redis_client):
 
 @pytest.mark.asyncio
 async def test_apush_many_empty_is_noop(real_redis_client):
-    # Coverage: RedisPriorityQueue.apush_many's empty-input early return.
-    # Arrange
+    # Arrange - apush_many's empty-input early return is the subject.
     model = GenericPriorityQueueModel[str]()
     await model.asave()
 
-    # Act / Assert
-    # Empty input must early-return without touching Redis.
+    # Act / Assert - empty input must early-return without touching Redis.
     await model.tasks.apush_many([])
     assert await model.tasks.asize() == 0

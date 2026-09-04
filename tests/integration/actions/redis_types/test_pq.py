@@ -7,12 +7,8 @@ from tests.integration.actions.ttl import TTLActionTestBase
 from tests.integration.actions.update import UpdateActionTestBase
 from tests.models.collection_types import ComprehensiveTestModel
 
-# Initial items every PQ test class starts with. Kept in class-level constants
-# so test classes can assemble their ``expected_before`` / ``expected_after``
-# from them without re-declaring the serialized form inline.
-# ``ComprehensiveTestModel.tasks`` is a ``RedisPriorityQueue[int]``, so values
-# are integers (their serialized ZSET member is the bare JSON number, e.g.
-# ``json.dumps(10) == '10'`` — no quotes).
+# Initial items in class-level constants so test classes build expected_before / expected_after
+# from them. tasks is RedisPriorityQueue[int], so a ZSET member is a bare number ('10', no quotes).
 INITIAL_ITEMS: list[tuple[int, float]] = [
     (10, 1.0),
     (20, 2.0),
@@ -42,8 +38,10 @@ class PQActionBase(UpdateActionTestBase, TTLActionTestBase, ABC):
         return [model.key, model.tasks.special_key]
 
     async def setup_data(self):
-        """Insert the model AND populate the PQ special field with
-        ``initial_items`` so actions run against a non-empty queue."""
+        """
+        Insert the model AND populate the PQ special field with
+        ``initial_items`` so actions run against a non-empty queue.
+        """
         models = await super().setup_data()
         for inst in models:
             for value, priority in self.initial_items:
