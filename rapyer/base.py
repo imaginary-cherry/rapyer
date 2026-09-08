@@ -82,7 +82,7 @@ from rapyer.types.base import (
     is_redis_field_value,
 )
 from rapyer.types.convert import RedisConverter
-from rapyer.types.external import ExternalFieldSpec
+from rapyer.types.external import Capability, ExternalFieldSpec
 from rapyer.types.generic import GenericRedisType
 from rapyer.types.relational import RelationalFieldType
 from rapyer.types.special import (
@@ -161,6 +161,15 @@ def make_pickle_field_serializer(
     return pickle_field_serializer, pickle_field_validator
 
 
+# Every capability a SpecialFieldType can contribute; disjoint from REFERENCES_ROOT.
+_SF_CAPABILITY_MASK = (
+    Capability.OWNS_KEYS
+    | Capability.EXCLUDED_FROM_DOC
+    | Capability.PIPELINE_LOAD
+    | Capability.INSTANCE_STATE
+)
+
+
 @dataclasses.dataclass(frozen=True)
 class FieldSpec:
     """
@@ -172,8 +181,8 @@ class FieldSpec:
     # Special and relational are provably mutually exclusive, and their specs carry the
     # same three facts, so one slot holds either; external.is_special says which.
     external: Optional[ExternalFieldSpec[Any]] = None
-    contains_fk: bool = False
-    contains_sf: bool = False
+    # Union of capabilities reachable anywhere in this field's subtree.
+    reaches: Capability = Capability(0)
     is_redis_link: bool = False
     safe_load: bool = False
 
@@ -184,6 +193,14 @@ class FieldSpec:
     @property
     def is_relational(self) -> bool:
         return self.external is not None and not self.external.is_special
+
+    @property
+    def contains_fk(self) -> bool:
+        return bool(self.reaches & Capability.REFERENCES_ROOT)
+
+    @property
+    def contains_sf(self) -> bool:
+        return bool(self.reaches & _SF_CAPABILITY_MASK)
 
     def is_classified(self) -> bool:
         return bool(
@@ -469,17 +486,36 @@ class AtomicRedisModel(BaseModel):
                     config=fk_origin.extract_config(annotation),
                 )
 
+            sf_reach = Capability(0)
+            if is_redis_link and origin.contains_sf_field():
+                # Non-model SF containers (e.g. list[RedisSet]) fall back to the full
+                # bundle; walk()'s AtomicRedisModel guard never descends into them.
+                sf_reach = (
+                    origin.reachable_capabilities()
+                    if safe_issubclass(origin, AtomicRedisModel)
+                    else _SF_CAPABILITY_MASK
+                )
+
+            fk_reach = Capability(0)
+            if (
+                not is_relational
+                and safe_issubclass(fk_origin, (BaseRedisType, AtomicRedisModel))
+                and fk_origin.contains_fk_field()
+            ):
+                # ForeignKey is the sole RelationalFieldType concrete class, so a
+                # non-model container-of-FK can only ever contribute REFERENCES_ROOT.
+                fk_reach = (
+                    fk_origin.reachable_capabilities()
+                    if safe_issubclass(fk_origin, AtomicRedisModel)
+                    else Capability.REFERENCES_ROOT
+                )
+
             spec = FieldSpec(
                 name=field_name,
                 field_type=origin,
                 external=external,
-                contains_fk=(
-                    not is_relational
-                    and safe_issubclass(fk_origin, (BaseRedisType, AtomicRedisModel))
-                    and fk_origin.contains_fk_field()
-                ),
+                reaches=sf_reach | fk_reach,
                 is_redis_link=is_redis_link,
-                contains_sf=is_redis_link and origin.contains_sf_field(),
                 safe_load=field_name in safe_load_field_names,
             )
             # Fields on no axis are plain values; skip them so views below stay pre-filtered.
@@ -787,6 +823,17 @@ class AtomicRedisModel(BaseModel):
         return frozenset(
             name for name, spec in cls._field_specs.items() if spec.contains_sf
         )
+
+    @classmethod
+    @functools.cache
+    def reachable_capabilities(cls) -> Capability:
+        """Per-bit union of every capability reachable in this class's own field tree."""
+        mask = Capability(0)
+        for spec in cls._field_specs.values():
+            if spec.external is not None:
+                mask |= spec.external.field_type.capabilities()
+            mask |= spec.reaches
+        return mask
 
     @classmethod
     def contains_sf_field(cls) -> bool:

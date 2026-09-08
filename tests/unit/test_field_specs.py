@@ -1,9 +1,13 @@
 from typing import ClassVar, Optional
 
+from pydantic import Field
+
 from rapyer.base import AtomicRedisModel, FieldSpec, RedisConfig
 from rapyer.cascade import CascadeTTL
 from rapyer.fields.safe_load import SafeLoad
+from rapyer.types.external import Capability
 from rapyer.types.foreign_key import ForeignKey
+from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.redis_set import RedisSet
 from tests.models.cascade_types import CascadeBookDirect
 
@@ -22,6 +26,18 @@ class SpecParent(AtomicRedisModel):
     refs: RedisSet[ForeignKey[SpecTarget]] = None
     child: SpecChild = None
     safe: SafeLoad[str] = ""
+    Meta: ClassVar[RedisConfig] = RedisConfig()
+
+
+class PQOnlyChild(AtomicRedisModel):
+    tasks: RedisPriorityQueue[str] = Field(
+        default_factory=RedisPriorityQueue, exclude=True
+    )
+    Meta: ClassVar[RedisConfig] = RedisConfig()
+
+
+class PQOnlyParent(AtomicRedisModel):
+    child: PQOnlyChild = None
     Meta: ClassVar[RedisConfig] = RedisConfig()
 
 
@@ -117,11 +133,37 @@ def test_relational_and_contains_fk_are_mutually_exclusive():
 def test_an_unclassified_spec_is_not_kept():
     # Arrange
     plain = FieldSpec(name="x", field_type=str)
-    classified = FieldSpec(name="x", field_type=str, contains_sf=True)
+    classified = FieldSpec(name="x", field_type=str, reaches=Capability.OWNS_KEYS)
 
     # Act / Assert
     assert plain.is_classified() is False
     assert classified.is_classified() is True
+
+
+def test_reaches_carries_per_bit_precision_for_a_pq_only_subtree():
+    # Arrange - a subtree holding only a priority queue owns keys but never loads.
+    spec = PQOnlyParent._field_specs["child"]
+    expected_owns_keys, expected_pipeline_load = True, False
+
+    # Act
+    owns_keys = bool(spec.reaches & Capability.OWNS_KEYS)
+    pipeline_load = bool(spec.reaches & Capability.PIPELINE_LOAD)
+
+    # Assert
+    assert owns_keys is expected_owns_keys
+    assert pipeline_load is expected_pipeline_load
+
+
+def test_reaches_excludes_references_root_when_only_an_sf_is_nested():
+    # Arrange - SpecChild only holds an SF, no FK.
+    spec = SpecParent._field_specs["child"]
+    expected_references_root = False
+
+    # Act
+    references_root = bool(spec.reaches & Capability.REFERENCES_ROOT)
+
+    # Assert
+    assert references_root is expected_references_root
 
 
 def test_subclass_override_rewrites_the_spec_rather_than_leaving_a_stale_one():
