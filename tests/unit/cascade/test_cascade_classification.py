@@ -1,5 +1,6 @@
 from rapyer.cascade import CascadeTTL
 from rapyer.cascade.planner import _field_cascade_spec
+from rapyer.types.external import Capability
 from tests.models.cascade_types import (
     CascadeAuthor,
     CascadeBookCollection,
@@ -49,9 +50,15 @@ def test_plain_fk_field_classification_is_unaffected():
 
     # Act
     specs = CascadeBookPlain._field_specs
+    is_relational = {
+        n
+        for n, s in specs.items()
+        if s.external
+        and s.external.field_type.capabilities() & Capability.REFERENCES_ROOT
+    }
 
     # Assert
-    assert {n for n, s in specs.items() if s.is_relational} == expected_relational
+    assert is_relational == expected_relational
 
 
 def test_cascade_author_leaf_model_has_no_cascade_ttl_fields():
@@ -69,9 +76,18 @@ def test_existing_fk_book_classification_remains_byte_identical():
 
     # Act
     specs = FkBook._field_specs
+    is_relational = {
+        n
+        for n, s in specs.items()
+        if s.external
+        and s.external.field_type.capabilities() & Capability.REFERENCES_ROOT
+    }
+    contains_fk = {
+        n for n, s in specs.items() if s.reaches & Capability.REFERENCES_ROOT
+    }
 
     # Assert
-    assert {n for n, s in specs.items() if s.is_relational} == expected_relational
-    assert {n for n, s in specs.items() if s.contains_fk} == expected_contains_fk
+    assert is_relational == expected_relational
+    assert contains_fk == expected_contains_fk
     assert _field_cascade_spec(FkBook, "author") is None
     assert _field_cascade_spec(FkBook, "publisher") is None

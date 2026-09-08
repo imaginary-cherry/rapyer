@@ -9,6 +9,7 @@ from rapyer.cascade.planner import (
     validate_cascade_ttl_targets,
 )
 from rapyer.errors import CascadeTargetTtlMissingError
+from rapyer.types.external import Capability
 from tests.models.cascade_types import (
     CascadeAuthor,
     CascadeBlanketRoot,
@@ -147,19 +148,26 @@ def test_positive_control_all_ttl_present_does_not_raise():
 def test_sf_of_fk_field_lands_in_both_contain_fk_and_special_fields():
     """
     Unified detection (reverses D-02): an SF-of-FK field is both a traversal edge
-    source (contains_fk) and a refresh-suffix source (special_fields()).
+    source (reaches REFERENCES_ROOT) and a refresh-suffix source (own OWNS_KEYS).
     """
     # Arrange
-    set_spec = CascadeSetRefParent._field_specs["refs"]
-    queue_spec = CascadePQRefParent._field_specs["queue"]
+    expected_set_field, expected_queue_field = "refs", "queue"
+    set_spec = CascadeSetRefParent._field_specs[expected_set_field]
+    queue_spec = CascadePQRefParent._field_specs[expected_queue_field]
 
     # Act / Assert
-    assert CascadeSetRefParent.contains_fk_field() is True
-    assert CascadePQRefParent.contains_fk_field() is True
-    assert set_spec.contains_fk
-    assert "refs" in CascadeSetRefParent.special_fields()
-    assert queue_spec.contains_fk
-    assert "queue" in CascadePQRefParent.special_fields()
+    assert (
+        bool(CascadeSetRefParent.inner_capabilities() & Capability.REFERENCES_ROOT)
+        is True
+    )
+    assert (
+        bool(CascadePQRefParent.inner_capabilities() & Capability.REFERENCES_ROOT)
+        is True
+    )
+    assert set_spec.reaches & Capability.REFERENCES_ROOT
+    assert expected_set_field in CascadeSetRefParent.fields_with(Capability.OWNS_KEYS)
+    assert queue_spec.reaches & Capability.REFERENCES_ROOT
+    assert expected_queue_field in CascadePQRefParent.fields_with(Capability.OWNS_KEYS)
 
 
 def test_plain_sf_container_is_not_an_fk_edge_but_needs_the_cascade_script():
@@ -167,8 +175,8 @@ def test_plain_sf_container_is_not_an_fk_edge_but_needs_the_cascade_script():
     specs = CascadeSpecialChild._field_specs
 
     # Act / Assert
-    assert not specs["tags"].contains_fk
-    assert not specs["scores"].contains_fk
+    assert not specs["tags"].reaches & Capability.REFERENCES_ROOT
+    assert not specs["scores"].reaches & Capability.REFERENCES_ROOT
     assert CascadeSpecialChild._needs_cascade_script() is True
 
 

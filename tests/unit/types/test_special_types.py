@@ -3,6 +3,7 @@ from pydantic import TypeAdapter
 
 from rapyer.errors import RapyerSerializationError, UpdateAtomicModelError
 from rapyer.types.base import BaseRedisType
+from rapyer.types.external import Capability
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX, SpecialFieldType
 from tests.models.special_types import (
@@ -51,20 +52,25 @@ def test_special_fields_detected():
     expected_plain = ("name", "count")
 
     # Act / Assert
-    assert expected_special in PriorityQueueModel.special_fields()
-    assert expected_special in MixedSpecialModel.special_fields()
-    assert expected_special in PriorityQueueIntModel.special_fields()
-    assert expected_plain[0] not in PriorityQueueModel.special_fields()
-    assert expected_plain[1] not in MixedSpecialModel.special_fields()
+    assert expected_special in PriorityQueueModel.fields_with(Capability.OWNS_KEYS)
+    assert expected_special in MixedSpecialModel.fields_with(Capability.OWNS_KEYS)
+    assert expected_special in PriorityQueueIntModel.fields_with(Capability.OWNS_KEYS)
+    assert expected_plain[0] not in PriorityQueueModel.fields_with(Capability.OWNS_KEYS)
+    assert expected_plain[1] not in MixedSpecialModel.fields_with(Capability.OWNS_KEYS)
 
 
 def test_overridden_special_field_not_special():
     # Arrange - override to a non-special type must not leave a stale entry
     expected_keys = ["X:1"]
+    expected_field = "tasks"
 
     # Act / Assert
-    assert "tasks" not in OverriddenSpecialFieldModel.special_fields()
-    assert "tasks" not in OverriddenSpecialFieldModel.fields_containing_sf()
+    assert expected_field not in OverriddenSpecialFieldModel.fields_with(
+        Capability.OWNS_KEYS
+    )
+    assert expected_field not in OverriddenSpecialFieldModel.fields_reaching(
+        Capability.OWNS_KEYS
+    )
     # _all_keys_for_key no longer crashes on the stale name
     assert OverriddenSpecialFieldModel._all_keys_for_key("X:1") == expected_keys
 
@@ -74,7 +80,9 @@ def test_inherited_special_field_still_special():
     expected_special = "tasks"
 
     # Act / Assert
-    assert expected_special in SubSubPriorityQueueModel.special_fields()
+    assert expected_special in SubSubPriorityQueueModel.fields_with(
+        Capability.OWNS_KEYS
+    )
 
 
 def test_mixed_redis_dump_excludes_special_fields():

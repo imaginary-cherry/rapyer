@@ -40,10 +40,7 @@ PRIVATE_METHODS = _group(
     RedisSet.queue_special_loads_in_pipeline,
     RedisSet._tmp_key,
     # Generic
-    GenericRedisType.contains_sf_field,
-    GenericRedisType.contains_fk_field,
-    RedisSet.contains_fk_field,
-    RedisPriorityQueue.contains_fk_field,
+    GenericRedisType.inner_capabilities,
     # AtomicRedisModel
     AtomicRedisModel._search_keys_by_query,
     AtomicRedisModel.build_redis_model,
@@ -74,8 +71,9 @@ PRIVATE_METHODS = _group(
     AtomicRedisModel.should_refresh,
     AtomicRedisModel.should_refresh_for_action,
     AtomicRedisModel.build_redis_dump_exclude,
-    AtomicRedisModel.contains_sf_field,
-    AtomicRedisModel.contains_fk_field,
+    AtomicRedisModel.inner_capabilities,
+    AtomicRedisModel.fields_with,
+    AtomicRedisModel.fields_reaching,
     AtomicRedisModel.queue_special_loads_in_pipeline,
     # Abstract stub, never executed; ForeignKey.afetch is the real READ|FETCH action.
     RelationalFieldType.afetch,
