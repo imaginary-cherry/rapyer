@@ -81,6 +81,27 @@ def test_optional_nested_model_is_not_seen_as_containing_a_special_field():
     assert OptionalChildParent.fields_containing_sf() == frozenset()
 
 
+def test_the_two_containment_axes_can_hold_at_once():
+    # Arrange - a nested model owning both an SF and an FK puts the parent's field
+    # on both containment axes, so they cannot collapse into one flag. No shipped
+    # fixture nests such a class, which is why nothing else covers this.
+    class BothInner(AtomicRedisModel):
+        tags: RedisSet[str] = None
+        ref: ForeignKey[SpecTarget] = None
+        Meta: ClassVar[RedisConfig] = RedisConfig()
+
+    class BothOuter(AtomicRedisModel):
+        child: BothInner = None
+        Meta: ClassVar[RedisConfig] = RedisConfig()
+
+    # Act
+    spec = BothOuter._field_specs["child"]
+
+    # Assert
+    assert spec.contains_sf is True
+    assert spec.contains_fk is True
+
+
 def test_relational_and_contains_fk_are_mutually_exclusive():
     # Arrange - a ForeignKey itself is relational; it does not also "contain" one.
     expected_relational, expected_contains_fk = True, False
