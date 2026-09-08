@@ -29,8 +29,8 @@ def _field_cascade_spec(model_cls: Any, field_name: str) -> CascadeSpec | None:
         annotation = Annotated[(annotation, *field_info.metadata)]
     spec = model_cls._field_specs.get(field_name)
     field_type = (
-        spec.relational.field_type
-        if spec is not None and spec.relational is not None
+        spec.external.field_type
+        if spec is not None and spec.is_relational
         else ForeignKey
     )
     return field_type.extract_config(annotation)
@@ -116,7 +116,7 @@ def _static_walk_fk_edges(
 ):
     """Append every enabled FK edge reachable from model_cls's own fields."""
     for field_name, spec in model_cls._field_specs.items():
-        if spec.relational is None:
+        if not spec.is_relational:
             continue
         edge = _classify_edge(model_cls, field_name)
         if not edge.enabled:
@@ -216,7 +216,7 @@ def _static_walk_special_suffixes(model_cls: Any, parent_path: str = "") -> list
 
     suffixes: list[str] = []
     for field_name, spec in model_cls._field_specs.items():
-        if spec.special is None:
+        if not spec.is_special:
             continue
         field_path = f"{parent_path}.{field_name}"
         suffixes.append(field_path.lstrip("."))

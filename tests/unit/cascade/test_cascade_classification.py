@@ -44,9 +44,14 @@ def test_plain_fk_field_without_cascade_ttl_has_empty_cascade_ttl_fields():
 
 
 def test_plain_fk_field_classification_is_unaffected():
-    # Act / Assert
+    # Arrange
+    expected_relational = {"author"}
+
+    # Act
     specs = CascadeBookPlain._field_specs
-    assert {n for n, s in specs.items() if s.relational is not None} == {"author"}
+
+    # Assert
+    assert {n for n, s in specs.items() if s.is_relational} == expected_relational
 
 
 def test_cascade_author_leaf_model_has_no_cascade_ttl_fields():
@@ -58,12 +63,15 @@ def test_cascade_author_leaf_model_has_no_cascade_ttl_fields():
 
 
 def test_existing_fk_book_classification_remains_byte_identical():
-    # Act / Assert
+    # Arrange
+    expected_relational = {"author", "publisher"}
+    expected_contains_fk = {"co_authors"}
+
+    # Act
     specs = FkBook._field_specs
-    assert {n for n, s in specs.items() if s.relational is not None} == {
-        "author",
-        "publisher",
-    }
-    assert {n for n, s in specs.items() if s.contains_fk} == {"co_authors"}
+
+    # Assert
+    assert {n for n, s in specs.items() if s.is_relational} == expected_relational
+    assert {n for n, s in specs.items() if s.contains_fk} == expected_contains_fk
     assert _field_cascade_spec(FkBook, "author") is None
     assert _field_cascade_spec(FkBook, "publisher") is None

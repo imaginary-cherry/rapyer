@@ -1,9 +1,24 @@
 import abc
+import dataclasses
 from typing import Annotated, Generic, Optional, TypeVar, get_args, get_origin
 
 from rapyer.types.base import BaseRedisType
 
 ConfigT = TypeVar("ConfigT")
+
+
+@dataclasses.dataclass(frozen=True)
+class ExternalFieldSpec(Generic[ConfigT]):
+    """
+    One external field's class-level facts, resolved at class-build time.
+    """
+
+    name: str
+    field_type: type["ExternalFieldType[ConfigT]"]
+    config: Optional[ConfigT] = None
+    # Special and relational never co-occur, so the kind is one flag rather than two
+    # slots; __setattr__ reads it per assignment and cannot afford an issubclass call.
+    is_special: bool = False
 
 
 class ExternalFieldType(BaseRedisType, abc.ABC, Generic[ConfigT]):

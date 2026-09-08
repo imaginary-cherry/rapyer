@@ -1,12 +1,9 @@
 import abc
-import dataclasses
 from types import UnionType
 from typing import (
     TYPE_CHECKING,
     Any,
     ForwardRef,
-    Generic,
-    Optional,
     TypeVar,
     Union,
     get_args,
@@ -20,17 +17,6 @@ if TYPE_CHECKING:
     from rapyer.base import AtomicRedisModel
 
 ConfigT = TypeVar("ConfigT")
-
-
-@dataclasses.dataclass(frozen=True)
-class RelationalFieldSpec(Generic[ConfigT]):
-    """
-    One relational field's class-level facts, resolved at class-build time.
-    """
-
-    name: str
-    field_type: type["RelationalFieldType[ConfigT]"]
-    config: Optional[ConfigT] = None
 
 
 class RelationalFieldType(ExternalFieldType[ConfigT], abc.ABC):

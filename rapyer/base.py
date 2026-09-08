@@ -82,11 +82,11 @@ from rapyer.types.base import (
     is_redis_field_value,
 )
 from rapyer.types.convert import RedisConverter
+from rapyer.types.external import ExternalFieldSpec
 from rapyer.types.generic import GenericRedisType
-from rapyer.types.relational import RelationalFieldSpec, RelationalFieldType
+from rapyer.types.relational import RelationalFieldType
 from rapyer.types.special import (
     SPECIAL_FIELD_KEY_PREFIX,
-    SpecialFieldSpec,
     SpecialFieldType,
 )
 from rapyer.typing_support import Self, Unpack
@@ -169,17 +169,25 @@ class FieldSpec:
 
     name: str
     field_type: type
-    special: Optional[SpecialFieldSpec[Any]] = None
-    relational: Optional[RelationalFieldSpec[Any]] = None
+    # Special and relational are provably mutually exclusive, and their specs carry the
+    # same three facts, so one slot holds either; external.is_special says which.
+    external: Optional[ExternalFieldSpec[Any]] = None
     contains_fk: bool = False
     contains_sf: bool = False
     is_redis_link: bool = False
     safe_load: bool = False
 
+    @property
+    def is_special(self) -> bool:
+        return self.external is not None and self.external.is_special
+
+    @property
+    def is_relational(self) -> bool:
+        return self.external is not None and not self.external.is_special
+
     def is_classified(self) -> bool:
         return bool(
-            self.special is not None
-            or self.relational is not None
+            self.external is not None
             or self.contains_fk
             or self.contains_sf
             or self.is_redis_link
@@ -446,17 +454,16 @@ class AtomicRedisModel(BaseModel):
             is_relational = safe_issubclass(fk_origin, RelationalFieldType)
             is_redis_link = safe_issubclass(origin, (BaseRedisType, AtomicRedisModel))
 
-            special = None
+            external = None
             if safe_issubclass(origin, SpecialFieldType):
-                special = SpecialFieldSpec(
+                external = ExternalFieldSpec(
                     name=field_name,
                     field_type=origin,
                     config=origin.extract_config(annotation),
+                    is_special=True,
                 )
-
-            relational = None
-            if is_relational:
-                relational = RelationalFieldSpec(
+            elif is_relational:
+                external = ExternalFieldSpec(
                     name=field_name,
                     field_type=fk_origin,
                     config=fk_origin.extract_config(annotation),
@@ -465,8 +472,7 @@ class AtomicRedisModel(BaseModel):
             spec = FieldSpec(
                 name=field_name,
                 field_type=origin,
-                special=special,
-                relational=relational,
+                external=external,
                 contains_fk=(
                     not is_relational
                     and safe_issubclass(fk_origin, (BaseRedisType, AtomicRedisModel))
@@ -488,15 +494,10 @@ class AtomicRedisModel(BaseModel):
                 continue
             if safe_issubclass(attr_type, RapyerKey):
                 continue
-            # Special/relational fields own their serialization — skip pickle setup
+            # External fields own their serialization — skip pickle setup
             attr_spec = cls._field_specs.get(attr_name)
-            external_type = None
-            if attr_spec is not None:
-                if attr_spec.special is not None:
-                    external_type = attr_spec.special.field_type
-                elif attr_spec.relational is not None:
-                    external_type = attr_spec.relational.field_type
-            if external_type is not None and external_type.owns_serialization():
+            external = attr_spec.external if attr_spec is not None else None
+            if external is not None and external.field_type.owns_serialization():
                 continue
             if original_annotations[attr_name] == attr_type:
                 default_value = cls.__dict__.get(attr_name, None)
@@ -764,7 +765,7 @@ class AtomicRedisModel(BaseModel):
         Fields that are themselves a special field type (e.g. RedisSet, RedisPriorityQueue).
         """
         return frozenset(
-            name for name, spec in cls._field_specs.items() if spec.special is not None
+            name for name, spec in cls._field_specs.items() if spec.is_special
         )
 
     @classmethod
@@ -794,8 +795,7 @@ class AtomicRedisModel(BaseModel):
     @classmethod
     def contains_fk_field(cls) -> bool:
         return any(
-            spec.relational is not None or spec.contains_fk
-            for spec in cls._field_specs.values()
+            spec.is_relational or spec.contains_fk for spec in cls._field_specs.values()
         )
 
     @classmethod
@@ -1199,7 +1199,8 @@ class AtomicRedisModel(BaseModel):
 
         # Special fields manage their own Redis storage
         spec = self.__class__._field_specs.get(name)
-        if spec is not None and spec.special is not None:
+        # Raw fields, not the is_special property: this runs per attribute assignment.
+        if spec is not None and spec.external is not None and spec.external.is_special:
             return
 
         pipeline = _context_pipe.get()

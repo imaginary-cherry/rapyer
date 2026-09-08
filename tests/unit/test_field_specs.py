@@ -26,42 +26,48 @@ class SpecParent(AtomicRedisModel):
 
 
 def test_derived_views_match_their_axis_on_the_specs():
+    # Arrange
     specs = SpecParent._field_specs
+    expected_special = {n for n, s in specs.items() if s.is_special}
+    expected_links = frozenset(n for n, s in specs.items() if s.is_redis_link)
+    expected_contains_sf = frozenset(n for n, s in specs.items() if s.contains_sf)
 
-    assert set(SpecParent.special_fields()) == {
-        n for n, s in specs.items() if s.special is not None
-    }
-    assert SpecParent.redis_link_fields() == frozenset(
-        n for n, s in specs.items() if s.is_redis_link
-    )
-    assert SpecParent.fields_containing_sf() == frozenset(
-        n for n, s in specs.items() if s.contains_sf
-    )
+    # Act / Assert
+    assert set(SpecParent.special_fields()) == expected_special
+    assert SpecParent.redis_link_fields() == expected_links
+    assert SpecParent.fields_containing_sf() == expected_contains_sf
 
 
 def test_redis_link_fields_is_a_strict_superset():
-    # `plain`/`safe` convert to RedisStr, so they're links on no other axis.
-    assert SpecParent.redis_link_fields() == {"plain", "refs", "child", "safe"}
+    # Arrange - `plain`/`safe` convert to RedisStr, so they're links on no other axis.
+    expected_links = {"plain", "refs", "child", "safe"}
+
+    # Act / Assert
+    assert SpecParent.redis_link_fields() == expected_links
     assert "plain" not in SpecParent.special_fields()
 
 
 def test_each_class_caches_its_own_derived_view():
+    # Arrange
     class SpecSubclass(SpecParent):
         child: str = ""
         Meta: ClassVar[RedisConfig] = RedisConfig()
 
+    # Act / Assert
     assert "child" in SpecParent.fields_containing_sf()
     assert "child" not in SpecSubclass.fields_containing_sf()
 
 
 def test_a_field_can_sit_on_several_axes_at_once():
-    # RedisSet[ForeignKey[...]] sits on special AND contains_fk AND link at once.
+    # Arrange - RedisSet[ForeignKey[...]] is special AND contains_fk AND a link.
+    expected_axes = (True, True, True, False)
+
+    # Act
     spec = SpecParent._field_specs["refs"]
 
-    assert spec.special is not None
-    assert spec.contains_fk is True
-    assert spec.is_redis_link is True
-    assert spec.relational is None
+    # Assert
+    axes = (spec.is_special, spec.contains_fk, spec.is_redis_link, spec.is_relational)
+    assert axes == expected_axes
 
 
 def test_optional_nested_model_is_not_seen_as_containing_a_special_field():
@@ -70,32 +76,52 @@ def test_optional_nested_model_is_not_seen_as_containing_a_special_field():
         child: Optional[SpecChild] = None
         Meta: ClassVar[RedisConfig] = RedisConfig()
 
+    # Act / Assert
     assert "child" not in OptionalChildParent._field_specs
     assert OptionalChildParent.fields_containing_sf() == frozenset()
 
 
 def test_relational_and_contains_fk_are_mutually_exclusive():
-    # A ForeignKey itself is relational; it does not also "contain" one.
-    assert SpecParent._field_specs["ref"].relational is not None
-    assert SpecParent._field_specs["ref"].contains_fk is False
+    # Arrange - a ForeignKey itself is relational; it does not also "contain" one.
+    expected_relational, expected_contains_fk = True, False
+
+    # Act
+    spec = SpecParent._field_specs["ref"]
+
+    # Assert
+    assert spec.is_relational is expected_relational
+    assert spec.contains_fk is expected_contains_fk
 
 
 def test_an_unclassified_spec_is_not_kept():
-    assert FieldSpec(name="x", field_type=str).is_classified() is False
-    assert FieldSpec(name="x", field_type=str, contains_sf=True).is_classified() is True
+    # Arrange
+    plain = FieldSpec(name="x", field_type=str)
+    classified = FieldSpec(name="x", field_type=str, contains_sf=True)
+
+    # Act / Assert
+    assert plain.is_classified() is False
+    assert classified.is_classified() is True
 
 
 def test_subclass_override_rewrites_the_spec_rather_than_leaving_a_stale_one():
+    # Arrange - one pop drops the inherited spec, so every axis clears together.
     class SpecOverride(SpecParent):
         refs: str = ""
         Meta: ClassVar[RedisConfig] = RedisConfig()
 
-    # One pop drops the inherited spec, so every axis it was on clears together.
+    expected_cleared = (False, False, False, False)
+
+    # Act
     overridden = SpecOverride._field_specs["refs"]
-    assert overridden.special is None
-    assert overridden.relational is None
-    assert overridden.contains_fk is False
-    assert overridden.contains_sf is False
+
+    # Assert
+    cleared = (
+        overridden.is_special,
+        overridden.is_relational,
+        overridden.contains_fk,
+        overridden.contains_sf,
+    )
+    assert cleared == expected_cleared
     assert overridden.is_redis_link is True
     # The parent keeps its own classification.
     assert "refs" in SpecParent.special_fields()
@@ -103,13 +129,21 @@ def test_subclass_override_rewrites_the_spec_rather_than_leaving_a_stale_one():
 
 
 def test_safe_load_annotation_is_folded_into_the_spec():
-    assert SpecParent._field_specs["safe"].safe_load is True
-    assert SpecParent._field_specs["plain"].safe_load is False
+    # Arrange
+    specs = SpecParent._field_specs
+
+    # Act / Assert
+    assert specs["safe"].safe_load is True
+    assert specs["plain"].safe_load is False
 
 
 def test_relational_config_is_extracted_at_class_build():
-    # Direct proof of RelationalFieldSpec.config; planner.py never reads it.
-    spec = CascadeBookDirect._field_specs["author"].relational
+    # Arrange - direct proof of ExternalFieldSpec.config; planner.py never reads it.
+    expected_config = CascadeTTL(enabled=False)
 
-    assert spec.config == CascadeTTL(enabled=False)
-    assert spec.field_type is ForeignKey
+    # Act
+    external = CascadeBookDirect._field_specs["author"].external
+
+    # Assert
+    assert external.config == expected_config
+    assert external.field_type is ForeignKey
