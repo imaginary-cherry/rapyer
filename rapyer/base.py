@@ -8,7 +8,7 @@ import pickle
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from contextlib import AbstractAsyncContextManager
-from typing import Annotated, Any, ClassVar, Optional, get_args, get_origin
+from typing import Any, ClassVar, Optional, get_origin
 
 from pydantic import (
     BaseModel,
@@ -82,9 +82,8 @@ from rapyer.types.base import (
     is_redis_field_value,
 )
 from rapyer.types.convert import RedisConverter
-from rapyer.types.external import Capability, ExternalFieldSpec
+from rapyer.types.external import Capability, ExternalFieldSpec, ExternalFieldType
 from rapyer.types.generic import GenericRedisType
-from rapyer.types.relational import RelationalFieldType
 from rapyer.types.special import (
     SPECIAL_FIELD_KEY_PREFIX,
     SpecialFieldType,
@@ -96,7 +95,6 @@ from rapyer.utils.annotation import (
     field_with_flag,
     has_annotation,
     replace_to_redis_types_in_annotation,
-    strip_optional,
 )
 from rapyer.utils.fields import (
     get_all_pydantic_annotation,
@@ -161,15 +159,6 @@ def make_pickle_field_serializer(
     return pickle_field_serializer, pickle_field_validator
 
 
-# Every capability a SpecialFieldType can contribute; disjoint from REFERENCES_ROOT.
-_SF_CAPABILITY_MASK = (
-    Capability.OWNS_KEYS
-    | Capability.EXCLUDED_FROM_DOC
-    | Capability.PIPELINE_LOAD
-    | Capability.INSTANCE_STATE
-)
-
-
 @dataclasses.dataclass(frozen=True)
 class FieldSpec:
     """
@@ -178,35 +167,16 @@ class FieldSpec:
 
     name: str
     field_type: type
-    # Special and relational are provably mutually exclusive, and their specs carry the
-    # same three facts, so one slot holds either; external.is_special says which.
     external: Optional[ExternalFieldSpec[Any]] = None
     # Union of capabilities reachable anywhere in this field's subtree.
     reaches: Capability = Capability(0)
     is_redis_link: bool = False
     safe_load: bool = False
 
-    @property
-    def is_special(self) -> bool:
-        return self.external is not None and self.external.is_special
-
-    @property
-    def is_relational(self) -> bool:
-        return self.external is not None and not self.external.is_special
-
-    @property
-    def contains_fk(self) -> bool:
-        return bool(self.reaches & Capability.REFERENCES_ROOT)
-
-    @property
-    def contains_sf(self) -> bool:
-        return bool(self.reaches & _SF_CAPABILITY_MASK)
-
     def is_classified(self) -> bool:
         return bool(
             self.external is not None
-            or self.contains_fk
-            or self.contains_sf
+            or self.reaches
             or self.is_redis_link
             or self.safe_load
         )
@@ -302,7 +272,8 @@ class AtomicRedisModel(BaseModel):
     @functools.cache
     def _needs_cascade_script(cls) -> bool:
         # Any FK edge or special-field key needs the script; plain scalars use EXPIRE.
-        return cls.contains_sf_field() or cls.contains_fk_field()
+        cap = Capability.OWNS_KEYS | Capability.REFERENCES_ROOT
+        return bool(cls.inner_capabilities() & cap)
 
     async def refresh_ttl(self, can_use_pipeline: bool = False):
         """Refresh TTL unconditionally."""
@@ -463,63 +434,26 @@ class AtomicRedisModel(BaseModel):
             # A redefined field drops its inherited spec, clearing every axis at once.
             cls._field_specs.pop(field_name, None)
 
-            unwrapped = annotation
-            while get_origin(unwrapped) is Annotated:
-                unwrapped = get_args(unwrapped)[0]
-            origin = get_origin(unwrapped) or unwrapped
-
-            # A1 (pre-existing, out of scope): the FK branch strips Optional; the rest don't.
-            fk_origin = strip_optional(unwrapped)
-            fk_origin = get_origin(fk_origin) or fk_origin
-
-            is_relational = safe_issubclass(fk_origin, RelationalFieldType)
-            is_redis_link = safe_issubclass(origin, (BaseRedisType, AtomicRedisModel))
-
-            external = None
-            if safe_issubclass(origin, SpecialFieldType):
-                external = ExternalFieldSpec(
-                    name=field_name,
-                    field_type=origin,
-                    config=origin.extract_config(annotation),
-                    is_special=True,
-                )
-            elif is_relational:
-                external = ExternalFieldSpec(
-                    name=field_name,
-                    field_type=fk_origin,
-                    config=fk_origin.extract_config(annotation),
-                )
-
-            sf_reach = Capability(0)
-            if is_redis_link and origin.contains_sf_field():
-                # Non-model SF containers (e.g. list[RedisSet]) fall back to the full
-                # bundle; walk()'s AtomicRedisModel guard never descends into them.
-                sf_reach = (
-                    origin.reachable_capabilities()
-                    if safe_issubclass(origin, AtomicRedisModel)
-                    else _SF_CAPABILITY_MASK
-                )
-
-            fk_reach = Capability(0)
-            if (
-                not is_relational
-                and safe_issubclass(fk_origin, (BaseRedisType, AtomicRedisModel))
-                and fk_origin.contains_fk_field()
-            ):
-                # ForeignKey is the sole RelationalFieldType concrete class, so a
-                # non-model container-of-FK can only ever contribute REFERENCES_ROOT.
-                fk_reach = (
-                    fk_origin.reachable_capabilities()
-                    if safe_issubclass(fk_origin, AtomicRedisModel)
-                    else Capability.REFERENCES_ROOT
-                )
+            origin = annotation_origin(annotation)  # ONE peel
+            caps = (
+                origin.capabilities()
+                if safe_issubclass(origin, ExternalFieldType)
+                else Capability(0)
+            )
+            is_link = safe_issubclass(origin, (BaseRedisType, AtomicRedisModel))
 
             spec = FieldSpec(
                 name=field_name,
                 field_type=origin,
-                external=external,
-                reaches=sf_reach | fk_reach,
-                is_redis_link=is_redis_link,
+                external=(
+                    ExternalFieldSpec(
+                        field_name, origin, origin.extract_config(annotation)
+                    )
+                    if caps
+                    else None
+                ),
+                reaches=origin.inner_capabilities() if is_link else Capability(0),
+                is_redis_link=is_link,
                 safe_load=field_name in safe_load_field_names,
             )
             # Fields on no axis are plain values; skip them so views below stay pre-filtered.
@@ -650,7 +584,9 @@ class AtomicRedisModel(BaseModel):
     @mark_actions(ActionGroup.UPDATE)
     async def aupdate(self, **kwargs):
         # Special fields own separate Redis keys and cannot be written as JSON path updates.
-        special_in_kwargs = self.special_fields() & set(kwargs.keys())
+        special_in_kwargs = self.fields_with(Capability.EXCLUDED_FROM_DOC) & set(
+            kwargs.keys()
+        )
         if special_in_kwargs:
             raise UpdateAtomicModelError(
                 f"Cannot update special fields via aupdate: {special_in_kwargs}. "
@@ -773,7 +709,7 @@ class AtomicRedisModel(BaseModel):
         key = cls._resolve_key(key)
         plan = []
         sf_raw = []
-        if not cls.contains_sf_field():
+        if not cls.inner_capabilities() & Capability.OWNS_KEYS:
             model_dump = await cls.Meta.redis_json.get(key, "$")  # type: ignore[misc]
         else:
             models_dump, plans_per_key, sf_raw = await execute_load_pipeline(
@@ -796,7 +732,7 @@ class AtomicRedisModel(BaseModel):
         cls = self.__class__
         plan: list[list[str]] = []
         sf_raw = []
-        if not cls.contains_sf_field():
+        if not cls.inner_capabilities() & Capability.OWNS_KEYS:
             model_dump = await self.Meta.redis_json.get(self.key, self.json_path)  # type: ignore[misc]
             if not model_dump:
                 raise KeyNotFound(f"{self.key} is missing in redis")
@@ -821,16 +757,6 @@ class AtomicRedisModel(BaseModel):
 
     @classmethod
     @functools.cache
-    def special_fields(cls) -> frozenset[str]:
-        """
-        Fields that are themselves a special field type (e.g. RedisSet, RedisPriorityQueue).
-        """
-        return frozenset(
-            name for name, spec in cls._field_specs.items() if spec.is_special
-        )
-
-    @classmethod
-    @functools.cache
     def redis_link_fields(cls) -> frozenset[str]:
         """
         Fields that are themselves a Redis type, a strict superset of the rest.
@@ -841,17 +767,26 @@ class AtomicRedisModel(BaseModel):
 
     @classmethod
     @functools.cache
-    def fields_containing_sf(cls) -> frozenset[str]:
-        """
-        Nested models that hold a special field somewhere beneath them.
-        """
+    def fields_with(cls, cap: Capability) -> frozenset[str]:
+        """Field names whose own external capabilities include ``cap``."""
         return frozenset(
-            name for name, spec in cls._field_specs.items() if spec.contains_sf
+            name
+            for name, spec in cls._field_specs.items()
+            if spec.external is not None
+            and spec.external.field_type.capabilities() & cap
         )
 
     @classmethod
     @functools.cache
-    def reachable_capabilities(cls) -> Capability:
+    def fields_reaching(cls, cap: Capability) -> frozenset[str]:
+        """Field names whose subtree reaches ``cap`` without providing it themselves."""
+        return frozenset(
+            name for name, spec in cls._field_specs.items() if spec.reaches & cap
+        )
+
+    @classmethod
+    @functools.cache
+    def inner_capabilities(cls) -> Capability:
         """Per-bit union of every capability reachable in this class's own field tree."""
         mask = Capability(0)
         for spec in cls._field_specs.values():
@@ -861,26 +796,15 @@ class AtomicRedisModel(BaseModel):
         return mask
 
     @classmethod
-    def contains_sf_field(cls) -> bool:
-        return bool(cls.fields_containing_sf()) or bool(cls.special_fields())
-
-    @classmethod
-    def contains_fk_field(cls) -> bool:
-        return any(
-            spec.is_relational or spec.contains_fk for spec in cls._field_specs.values()
-        )
-
-    @classmethod
     @functools.cache
     def build_redis_dump_exclude(cls) -> dict:
         exclude: dict = {}
-        for fname in cls.special_fields():
+        for fname in cls.fields_with(Capability.EXCLUDED_FROM_DOC):
             exclude[fname] = True
-        for fname in cls.fields_containing_sf():
-            annotation = cls.model_fields[fname].annotation
-            inner = get_origin(annotation) or annotation
-            if isinstance(inner, type) and issubclass(inner, AtomicRedisModel):
-                nested = inner.build_redis_dump_exclude()
+        for fname in cls.fields_reaching(Capability.EXCLUDED_FROM_DOC):
+            field_type = cls._field_specs[fname].field_type
+            if safe_issubclass(field_type, AtomicRedisModel):
+                nested = field_type.build_redis_dump_exclude()
                 if nested:
                     exclude[fname] = nested
         return exclude
@@ -890,16 +814,16 @@ class AtomicRedisModel(BaseModel):
         cls, pipe, key: str, plan: list, parent_path: str = "", field_name: str = ""
     ):
         """Queue load ops for every SF reachable from this model. both directly and nested (in a list or container model)"""
-        for fname in cls.special_fields():
-            field_cls = cls.model_fields[fname].annotation
-            field_cls.queue_special_loads_in_pipeline(
+        for fname in cls.fields_with(Capability.PIPELINE_LOAD):
+            field_type = cls._field_specs[fname].field_type
+            field_type.queue_special_loads_in_pipeline(
                 pipe, key, plan, parent_path, field_name=f".{fname}"
             )
-        for fname in cls.fields_containing_sf():
-            field_cls = cls.model_fields[fname].annotation
+        for fname in cls.fields_reaching(Capability.PIPELINE_LOAD):
+            field_type = cls._field_specs[fname].field_type
             nested_path = f"{parent_path}.{fname}"
             max_before_queueing = len(plan)
-            field_cls.queue_special_loads_in_pipeline(pipe, key, plan, nested_path)
+            field_type.queue_special_loads_in_pipeline(pipe, key, plan, nested_path)
             for i in range(max_before_queueing, len(plan)):
                 plan[i].insert(0, fname)
 
@@ -1003,10 +927,14 @@ class AtomicRedisModel(BaseModel):
         reachable from this model — both directly declared and nested inside
         child models — depth-first.
         """
-        for fname in self.special_fields():
+        cls = self.__class__
+        for fname in cls.fields_with(Capability.INSTANCE_STATE):
             field = getattr(self, fname)
+            # A1 knock-on: Optional[SF] = None is a legitimate unset value, not a stale spec.
+            if field is None:
+                continue
             yield field, (*prefix, fname)
-        for fname in self.fields_containing_sf():
+        for fname in cls.fields_reaching(Capability.INSTANCE_STATE):
             child = getattr(self, fname)
             if isinstance(child, AtomicRedisModel):
                 yield from child._iter_special_fields((*prefix, fname))
@@ -1269,10 +1197,13 @@ class AtomicRedisModel(BaseModel):
         if skip_redis_set:
             return
 
-        # Special fields manage their own Redis storage
+        # Not-in-document fields manage their own storage; ForeignKey still writes inline.
         spec = self.__class__._field_specs.get(name)
-        # Raw fields, not the is_special property: this runs per attribute assignment.
-        if spec is not None and spec.external is not None and spec.external.is_special:
+        if (
+            spec is not None
+            and spec.external is not None
+            and spec.external.field_type.capabilities() & Capability.EXCLUDED_FROM_DOC
+        ):
             return
 
         pipeline = _context_pipe.get()
