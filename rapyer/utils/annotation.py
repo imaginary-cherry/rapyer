@@ -93,11 +93,19 @@ def strip_optional(annotation: Any) -> Any:
 
 
 def annotation_origin(annotation: Any) -> Any:
-    """Peel ``Annotated`` and ``Optional`` wrappers and return the underlying origin type."""
+    """
+    Peel ``Annotated`` and ``Optional`` wrappers, alternating until neither
+    applies (so nesting order doesn't matter), and return the origin type.
+    """
     unwrapped = annotation
-    while get_origin(unwrapped) is Annotated:
-        unwrapped = get_args(unwrapped)[0]
-    unwrapped = strip_optional(unwrapped)
+    while True:
+        if get_origin(unwrapped) is Annotated:
+            unwrapped = get_args(unwrapped)[0]
+            continue
+        stripped = strip_optional(unwrapped)
+        if stripped is unwrapped:
+            break
+        unwrapped = stripped
     return get_origin(unwrapped) or unwrapped
 
 
