@@ -8,6 +8,7 @@ from rapyer.types.base import BaseRedisType, RedisType
 from rapyer.types.byte import RedisBytes
 from rapyer.types.datetime import RedisDatetime, RedisDatetimeTimestamp
 from rapyer.types.dct import RedisDict
+from rapyer.types.external import ExternalFieldType
 from rapyer.types.foreign_key import ForeignKey
 from rapyer.types.generic import GenericRedisType
 from rapyer.types.lst import RedisList
@@ -111,6 +112,25 @@ PRIVATE_INHERITED_METHODS = _group(
     SpecialFieldType.lua_load_snippet,
     SpecialFieldType.lua_save_payload,
     SpecialFieldType.has_lua_load_output,
+    # Capability declarations and the walks that read them: pure class-level
+    # introspection over _field_specs, no Redis round trip. Shared contract across the
+    # hierarchy, so subclasses override several of them.
+    ExternalFieldType.capabilities,
+    ExternalFieldType.inner_capabilities,
+    ExternalFieldType.config_type,
+    ExternalFieldType.extract_config,
+    ExternalFieldType.owns_serialization,
+    ExternalFieldType.owned_redis_keys,
+    SpecialFieldType.owned_redis_keys,
+    SpecialFieldType.cascade_container_kind,
+    RedisSet.capabilities,
+    RedisSet.cascade_container_kind,
+    RedisPriorityQueue.capabilities,
+    RedisPriorityQueue.cascade_container_kind,
+    ForeignKey.capabilities,
+    RelationalFieldType.relational_targets,
+    AtomicRedisModel.walk,
+    AtomicRedisModel.redis_link_fields,
     RedisPriorityQueue.aremove,
     AtomicRedisModel.redis_schema,
     # Fixed-contract pydantic hook, structurally never an action, so every override is filtered.
