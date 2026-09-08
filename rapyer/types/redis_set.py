@@ -1,6 +1,6 @@
 import json
 import uuid
-from typing import Any, Generic, Iterable, Optional, TypeVar, get_origin
+from typing import Any, Generic, Iterable, Optional, TypeVar
 
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
@@ -9,7 +9,7 @@ from rapyer.actions import ActionGroup, mark_actions
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME
 from rapyer.types.external import Capability
 from rapyer.types.special import SpecialFieldType
-from rapyer.utils.pythonic import resolve_generic_args, safe_issubclass
+from rapyer.utils.pythonic import resolve_generic_args
 
 T = TypeVar("T")
 
@@ -25,18 +25,6 @@ class RedisSet(set, SpecialFieldType[None], Generic[T]):
     def __init__(self, *args, **kwargs):
         set.__init__(self, *args, **kwargs)
         SpecialFieldType.__init__(self)
-
-    @classmethod
-    def contains_fk_field(cls) -> bool:
-        """True when this set's member type is a foreign-key reference."""
-        from rapyer.types.relational import RelationalFieldType
-
-        args = resolve_generic_args(cls)
-        inner = args[0] if args else Any
-        if inner is Any:
-            return False
-        inner = get_origin(inner) or inner
-        return safe_issubclass(inner, RelationalFieldType)
 
     @classmethod
     def cascade_container_kind(cls) -> Optional[str]:

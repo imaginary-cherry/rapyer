@@ -1,9 +1,10 @@
 import abc
 import dataclasses
 import enum
-from typing import Annotated, Generic, Optional, TypeVar, get_args, get_origin
+from typing import Annotated, Any, Generic, Optional, TypeVar, get_args, get_origin
 
 from rapyer.types.base import BaseRedisType
+from rapyer.utils.pythonic import resolve_generic_args, safe_issubclass
 
 ConfigT = TypeVar("ConfigT")
 
@@ -28,8 +29,6 @@ class ExternalFieldSpec(Generic[ConfigT]):
     name: str
     field_type: type["ExternalFieldType[ConfigT]"]
     config: Optional[ConfigT] = None
-    # Special and relational never co-occur, so one flag holds the kind.
-    is_special: bool = False
 
 
 class ExternalFieldType(BaseRedisType, abc.ABC, Generic[ConfigT]):
@@ -75,6 +74,18 @@ class ExternalFieldType(BaseRedisType, abc.ABC, Generic[ConfigT]):
     def capabilities(cls) -> Capability:
         """What this type contributes to a walk."""
         return Capability(0)
+
+    @classmethod
+    def inner_capabilities(cls) -> Capability:
+        """What is reachable through this type's generic element, e.g. RedisSet[ForeignKey[X]]."""
+        args = resolve_generic_args(cls)
+        inner = args[0] if args else Any
+        if inner is Any:
+            return Capability(0)
+        inner = get_origin(inner) or inner
+        if not safe_issubclass(inner, BaseRedisType):
+            return Capability(0)
+        return inner.capabilities() | inner.inner_capabilities()
 
     @classmethod
     def owned_redis_keys(cls, model_key: str, field_path: str) -> list[str]:

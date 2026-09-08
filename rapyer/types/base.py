@@ -51,14 +51,18 @@ class BaseRedisType(ABC):
         install_marked_action_methods(cls, meta)
 
     @classmethod
-    def contains_sf_field(cls) -> bool:
-        """Check if this type contains special field (in generic value - like list[RedisSet]"""
-        return False
+    def capabilities(cls) -> "Capability":
+        """What this type itself contributes to a walk."""
+        from rapyer.types.external import Capability
+
+        return Capability(0)
 
     @classmethod
-    def contains_fk_field(cls) -> bool:
-        """Check if this type contains a foreign-key field (e.g. list[ForeignKey])."""
-        return False
+    def inner_capabilities(cls) -> "Capability":
+        """What is reachable strictly inside this type, never including its own."""
+        from rapyer.types.external import Capability
+
+        return Capability(0)
 
     @classmethod
     def queue_special_loads_in_pipeline(
