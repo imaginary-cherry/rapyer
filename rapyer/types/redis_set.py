@@ -7,6 +7,7 @@ from pydantic_core import core_schema
 
 from rapyer.actions import ActionGroup, mark_actions
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME
+from rapyer.types.external import Capability
 from rapyer.types.special import SpecialFieldType
 from rapyer.utils.pythonic import resolve_generic_args, safe_issubclass
 
@@ -40,6 +41,15 @@ class RedisSet(set, SpecialFieldType[None], Generic[T]):
     @classmethod
     def cascade_container_kind(cls) -> Optional[str]:
         return "set"
+
+    @classmethod
+    def capabilities(cls) -> Capability:
+        return (
+            Capability.OWNS_KEYS
+            | Capability.EXCLUDED_FROM_DOC
+            | Capability.PIPELINE_LOAD
+            | Capability.INSTANCE_STATE
+        )
 
     # --- Serialization helpers ---
 

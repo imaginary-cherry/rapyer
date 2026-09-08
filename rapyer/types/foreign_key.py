@@ -5,6 +5,7 @@ from pydantic_core import core_schema
 
 from rapyer.cascade.spec import CascadeSpec
 from rapyer.errors import NotResolvedError
+from rapyer.types.external import Capability
 from rapyer.types.relational import RelationalFieldType
 
 if TYPE_CHECKING:
@@ -31,6 +32,10 @@ class ForeignKey(RelationalFieldType[CascadeSpec], Generic[T]):
             # Anything else is assumed to be the target AtomicRedisModel.
             self._value = ref
             self._target_key = ref.key
+
+    @classmethod
+    def capabilities(cls) -> Capability:
+        return Capability.REFERENCES_ROOT
 
     @property
     def target_key(self) -> str | None:

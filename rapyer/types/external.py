@@ -1,10 +1,22 @@
 import abc
 import dataclasses
+import enum
 from typing import Annotated, Generic, Optional, TypeVar, get_args, get_origin
 
 from rapyer.types.base import BaseRedisType
 
 ConfigT = TypeVar("ConfigT")
+
+
+class Capability(enum.Flag):
+    """What a field type contributes to a walk."""
+
+    # INDEXED is deliberately absent — add it only once a walk needs it.
+    OWNS_KEYS = enum.auto()
+    EXCLUDED_FROM_DOC = enum.auto()
+    PIPELINE_LOAD = enum.auto()
+    INSTANCE_STATE = enum.auto()
+    REFERENCES_ROOT = enum.auto()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -16,8 +28,7 @@ class ExternalFieldSpec(Generic[ConfigT]):
     name: str
     field_type: type["ExternalFieldType[ConfigT]"]
     config: Optional[ConfigT] = None
-    # Special and relational never co-occur, so the kind is one flag rather than two
-    # slots; __setattr__ reads it per assignment and cannot afford an issubclass call.
+    # Special and relational never co-occur, so one flag holds the kind.
     is_special: bool = False
 
 
@@ -59,6 +70,11 @@ class ExternalFieldType(BaseRedisType, abc.ABC, Generic[ConfigT]):
     def owns_serialization(cls) -> bool:
         """Whether the type serializes itself, so no pickle serializer is installed."""
         return True
+
+    @classmethod
+    def capabilities(cls) -> Capability:
+        """What this type contributes to a walk."""
+        return Capability(0)
 
     @classmethod
     def owned_redis_keys(cls, model_key: str, field_path: str) -> list[str]:
