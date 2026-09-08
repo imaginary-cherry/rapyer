@@ -754,14 +754,9 @@ class AtomicRedisModel(BaseModel):
     @classmethod
     def _all_keys_for_key(cls, key: str, parent_path: str = "") -> list[str]:
         keys = [key] if not parent_path else []
-        for fname in cls.special_fields():
-            field_cls = cls.model_fields[fname].annotation
-            field_path = f"{parent_path}.{fname}"
-            keys.extend(field_cls.owned_redis_keys(key, field_path))
-        for fname in cls.fields_containing_sf():
-            field_cls = cls.model_fields[fname].annotation
-            nested_path = f"{parent_path}.{fname}"
-            keys.extend(field_cls._all_keys_for_key(key, nested_path))
+        for spec, path in cls.walk(Capability.OWNS_KEYS, hop_roots=False):
+            field_path = f"{parent_path}.{'.'.join(path)}"
+            keys.extend(spec.field_type.owned_redis_keys(key, field_path))
         return keys
 
     @classmethod

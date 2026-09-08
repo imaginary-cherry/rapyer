@@ -7,8 +7,10 @@ from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX, SpecialFieldType
 from tests.models.special_types import (
     GenericPriorityQueueModel,
+    ListOfSetsModel,
     MixedSpecialModel,
     OverriddenSpecialFieldModel,
+    PQContainerModel,
     PriorityQueueIntModel,
     PriorityQueueModel,
     SubSubPriorityQueueModel,
@@ -170,3 +172,38 @@ def test_init_from_invalid_type_raises():
     # Neither a queue, a list, nor a dump-context value hits the serialization error.
     with pytest.raises(RapyerSerializationError):
         GenericPriorityQueueModel[str](tasks=123)
+
+
+def test_all_keys_for_key_includes_a_direct_special_field_key():
+    # Arrange
+    key = "PriorityQueueModel:1"
+    expected_keys = [key, f"{SPECIAL_FIELD_KEY_PREFIX}:{key}:tasks"]
+
+    # Act
+    keys = PriorityQueueModel._all_keys_for_key(key)
+
+    # Assert
+    assert keys == expected_keys
+
+
+def test_all_keys_for_key_includes_a_nested_models_special_key():
+    # Arrange
+    key = "PQContainerModel:1"
+    expected_keys = [key, f"{SPECIAL_FIELD_KEY_PREFIX}:{key}:inner_pq.tasks"]
+
+    # Act
+    keys = PQContainerModel._all_keys_for_key(key)
+
+    # Assert
+    assert keys == expected_keys
+
+
+def test_all_keys_for_key_skips_container_of_sf_without_raising():
+    # Arrange - a bare list[RedisSet] cannot be descended into; it must not raise.
+    expected_keys = ["X:1"]
+
+    # Act
+    keys = ListOfSetsModel._all_keys_for_key("X:1")
+
+    # Assert
+    assert keys == expected_keys
