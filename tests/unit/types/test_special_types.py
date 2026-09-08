@@ -44,24 +44,35 @@ def test_mixed_special_model_creation_sanity():
 
 
 def test_special_fields_detected():
-    assert "tasks" in PriorityQueueModel.special_fields()
-    assert "tasks" in MixedSpecialModel.special_fields()
-    assert "tasks" in PriorityQueueIntModel.special_fields()
-    assert "name" not in PriorityQueueModel.special_fields()
-    assert "count" not in MixedSpecialModel.special_fields()
+    # Arrange
+    expected_special = "tasks"
+    expected_plain = ("name", "count")
+
+    # Act / Assert
+    assert expected_special in PriorityQueueModel.special_fields()
+    assert expected_special in MixedSpecialModel.special_fields()
+    assert expected_special in PriorityQueueIntModel.special_fields()
+    assert expected_plain[0] not in PriorityQueueModel.special_fields()
+    assert expected_plain[1] not in MixedSpecialModel.special_fields()
 
 
 def test_overridden_special_field_not_special():
-    # override to non-special type must not leave a stale entry
+    # Arrange - override to a non-special type must not leave a stale entry
+    expected_keys = ["X:1"]
+
+    # Act / Assert
     assert "tasks" not in OverriddenSpecialFieldModel.special_fields()
     assert "tasks" not in OverriddenSpecialFieldModel.fields_containing_sf()
     # _all_keys_for_key no longer crashes on the stale name
-    assert OverriddenSpecialFieldModel._all_keys_for_key("X:1") == ["X:1"]
+    assert OverriddenSpecialFieldModel._all_keys_for_key("X:1") == expected_keys
 
 
 def test_inherited_special_field_still_special():
-    # guards against an over-eager fix that prunes inherited fields
-    assert "tasks" in SubSubPriorityQueueModel.special_fields()
+    # Arrange - guards against an over-eager fix that prunes inherited fields
+    expected_special = "tasks"
+
+    # Act / Assert
+    assert expected_special in SubSubPriorityQueueModel.special_fields()
 
 
 def test_mixed_redis_dump_excludes_special_fields():

@@ -149,18 +149,26 @@ def test_sf_of_fk_field_lands_in_both_contain_fk_and_special_fields():
     Unified detection (reverses D-02): an SF-of-FK field is both a traversal edge
     source (contains_fk) and a refresh-suffix source (special_fields()).
     """
+    # Arrange
+    set_spec = CascadeSetRefParent._field_specs["refs"]
+    queue_spec = CascadePQRefParent._field_specs["queue"]
+
+    # Act / Assert
     assert CascadeSetRefParent.contains_fk_field() is True
     assert CascadePQRefParent.contains_fk_field() is True
-    assert CascadeSetRefParent._field_specs["refs"].contains_fk
+    assert set_spec.contains_fk
     assert "refs" in CascadeSetRefParent.special_fields()
-    assert CascadePQRefParent._field_specs["queue"].contains_fk
+    assert queue_spec.contains_fk
     assert "queue" in CascadePQRefParent.special_fields()
 
 
 def test_plain_sf_container_is_not_an_fk_edge_but_needs_the_cascade_script():
-    # Not an FK edge, but its special key still routes through the cascade script.
-    assert not CascadeSpecialChild._field_specs["tags"].contains_fk
-    assert not CascadeSpecialChild._field_specs["scores"].contains_fk
+    # Arrange - not an FK edge, but its special key still routes through the script.
+    specs = CascadeSpecialChild._field_specs
+
+    # Act / Assert
+    assert not specs["tags"].contains_fk
+    assert not specs["scores"].contains_fk
     assert CascadeSpecialChild._needs_cascade_script() is True
 
 
