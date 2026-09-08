@@ -10,7 +10,7 @@ from typing import (
     get_origin,
 )
 
-from rapyer.types.external import ExternalFieldType
+from rapyer.types.external import Capability, ExternalFieldType
 from rapyer.utils.pythonic import resolve_generic_args, safe_issubclass
 
 if TYPE_CHECKING:
@@ -131,5 +131,5 @@ def resolve_relational_targets(models) -> None:
     instance at validation time, so this only needs to force that rebuild.
     """
     for model in models:
-        if model.contains_fk_field():
+        if model.inner_capabilities() & Capability.REFERENCES_ROOT:
             model.model_rebuild(force=True)

@@ -6,6 +6,7 @@ from redis.asyncio import Redis
 
 from rapyer.context import _context_pipe
 from rapyer.errors import KeyNotFound
+from rapyer.types.external import Capability
 from rapyer.utils.pythonic import inject_at_paths
 
 if TYPE_CHECKING:
@@ -55,7 +56,7 @@ async def fetch_models_with_sf_loads(
     transaction pipeline when any class has SF; otherwise a direct ``JSON.MGET``.
     Returns ``(models_dump, plans_per_key, sf_raw_results)``.
     """
-    if any(c.contains_sf_field() for c in classes):
+    if any(c.inner_capabilities() & Capability.OWNS_KEYS for c in classes):
         return await execute_load_pipeline(meta, classes, keys)
     models = await meta.redis_json.mget(keys=keys, path="$")
     return models, [[] for _ in keys], []

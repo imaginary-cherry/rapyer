@@ -1,7 +1,7 @@
 import dataclasses
 import hashlib
 import json
-from typing import TYPE_CHECKING, Annotated, Any, get_origin
+from typing import TYPE_CHECKING, Annotated, Any
 
 from rapyer.cascade.spec import CascadeSpec
 from rapyer.errors.cascade import (
@@ -10,9 +10,9 @@ from rapyer.errors.cascade import (
     CascadeTargetTtlMissingError,
 )
 from rapyer.scripts.constants import CASCADE_FUNCTION_PREFIX, CASCADE_LIBRARY_PREFIX
+from rapyer.types.external import Capability
 from rapyer.types.foreign_key import ForeignKey
 from rapyer.types.relational import RelationalFieldType
-from rapyer.utils.annotation import strip_optional
 from rapyer.utils.pythonic import safe_issubclass
 
 if TYPE_CHECKING:
@@ -28,11 +28,12 @@ def _field_cascade_spec(model_cls: Any, field_name: str) -> CascadeSpec | None:
     if field_info.metadata:
         annotation = Annotated[(annotation, *field_info.metadata)]
     spec = model_cls._field_specs.get(field_name)
-    field_type = (
-        spec.external.field_type
-        if spec is not None and spec.is_relational
-        else ForeignKey
+    is_relational = (
+        spec is not None
+        and spec.external is not None
+        and spec.external.field_type.capabilities() & Capability.REFERENCES_ROOT
     )
+    field_type = spec.external.field_type if is_relational else ForeignKey
     return field_type.extract_config(annotation)
 
 
@@ -97,16 +98,6 @@ def _resolve_target_cls(
     return RelationalFieldType.relational_targets(annotation, models)
 
 
-def _unwrap_nested_model_cls(annotation: Any) -> Any | None:
-    """Return the class if annotation is a nested inline sub-model, else None."""
-    # Lazy import breaks the rapyer.base -> rapyer.cascade module cycle.
-    from rapyer.base import AtomicRedisModel
-
-    stripped = strip_optional(annotation)
-    origin = get_origin(stripped) or stripped
-    return origin if safe_issubclass(origin, AtomicRedisModel) else None
-
-
 def _static_walk_fk_edges(
     model_cls: Any,
     parent_path: str,
@@ -115,8 +106,14 @@ def _static_walk_fk_edges(
     top_level: bool = True,
 ):
     """Append every enabled FK edge reachable from model_cls's own fields."""
+    # Lazy import breaks the rapyer.base -> rapyer.cascade module cycle.
+    from rapyer.base import AtomicRedisModel
+
     for field_name, spec in model_cls._field_specs.items():
-        if not spec.is_relational:
+        if not (
+            spec.external is not None
+            and spec.external.field_type.capabilities() & Capability.REFERENCES_ROOT
+        ):
             continue
         edge = _classify_edge(model_cls, field_name)
         if not edge.enabled:
@@ -140,24 +137,21 @@ def _static_walk_fk_edges(
         )
 
     for field_name, spec in model_cls._field_specs.items():
-        if not spec.contains_fk:
+        if not spec.reaches & Capability.REFERENCES_ROOT:
             continue
-        annotation = model_cls.model_fields[field_name].annotation
-        nested_cls = _unwrap_nested_model_cls(annotation)
-        if nested_cls is not None:
+        field_cls = spec.field_type
+        if safe_issubclass(field_cls, AtomicRedisModel):
             # Nested inline sub-model: same RedisJSON document, zero-hop recursion.
             nested_path = f"{parent_path}.{field_name}"
-            _static_walk_fk_edges(nested_cls, nested_path, fks, models, top_level=False)
+            _static_walk_fk_edges(field_cls, nested_path, fks, models, top_level=False)
             continue
 
         # Lazy import: priority_queue -> special -> scripts.loader -> planner is a real cycle.
         from rapyer.types.special import SpecialFieldType
 
-        stripped = strip_optional(annotation)
-        sf_origin = get_origin(stripped) or stripped
         sf_container = (
-            sf_origin.cascade_container_kind()
-            if safe_issubclass(sf_origin, SpecialFieldType)
+            field_cls.cascade_container_kind()
+            if safe_issubclass(field_cls, SpecialFieldType)
             else None
         )
         if sf_container is not None:
@@ -167,6 +161,7 @@ def _static_walk_fk_edges(
             edge = _classify_edge(model_cls, field_name)
             if not edge.enabled:
                 continue
+            annotation = model_cls.model_fields[field_name].annotation
             cands = RelationalFieldType.relational_targets(annotation, models)
             if not cands:
                 continue
@@ -212,25 +207,24 @@ def _static_walk_fk_edges(
 
 def _static_walk_special_suffixes(model_cls: Any, parent_path: str = "") -> list[str]:
     """Dotted-path special-field suffixes for model_cls, recursing into nested sub-models."""
+    # Lazy import breaks the rapyer.base -> rapyer.cascade module cycle.
     from rapyer.base import AtomicRedisModel
 
     suffixes: list[str] = []
     for field_name, spec in model_cls._field_specs.items():
-        if not spec.is_special:
+        if not (
+            spec.external is not None
+            and spec.external.field_type.capabilities() & Capability.OWNS_KEYS
+        ):
             continue
         field_path = f"{parent_path}.{field_name}"
         suffixes.append(field_path.lstrip("."))
     for field_name, spec in model_cls._field_specs.items():
-        if not spec.contains_sf:
+        if not spec.reaches & Capability.OWNS_KEYS:
             continue
-        annotation = model_cls.model_fields[field_name].annotation
-        # Unwrap Optional/generic origins so a nested model behind them is still recognized.
-        stripped = strip_optional(annotation)
-        field_cls = get_origin(stripped) or stripped
+        field_cls = spec.field_type
         # Only nested models have a per-class suffix set; container-of-SF (list[RedisSet]) don't.
         if not safe_issubclass(field_cls, AtomicRedisModel):
-            continue
-        if not field_cls.contains_sf_field():
             continue
         nested_path = f"{parent_path}.{field_name}"
         suffixes.extend(_static_walk_special_suffixes(field_cls, nested_path))
