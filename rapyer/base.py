@@ -212,6 +212,10 @@ class FieldSpec:
         )
 
 
+# A cycle-safety backstop for walk(), not a cascade depth budget.
+MAX_WALK_DEPTH = 32
+
+
 class AtomicRedisModel(BaseModel):
     _pk: str | None = PrivateAttr(default=None)
     _base_model_link: Self | BaseRedisType = PrivateAttr(default=None)
@@ -720,6 +724,32 @@ class AtomicRedisModel(BaseModel):
     @functools.cached_property
     def all_keys(self) -> list[str]:
         return self._all_keys_for_key(self.key)
+
+    @classmethod
+    def walk(
+        cls,
+        requires: Capability,
+        *,
+        hop_roots: bool = False,
+        path: tuple[str, ...] = (),
+        _seen: frozenset = frozenset(),
+    ) -> Iterator[tuple[FieldSpec, tuple[str, ...]]]:
+        """Yield (spec, path) for every field reachable under the required capability."""
+        if cls in _seen or len(path) > MAX_WALK_DEPTH:
+            return
+        _seen = _seen | {cls}  # path-local: rebound per frame, never merged upward
+        for name, spec in cls._field_specs.items():
+            if (
+                spec.external is not None
+                and requires & spec.external.field_type.capabilities()
+            ):
+                yield spec, (*path, name)
+            if requires & spec.reaches and safe_issubclass(
+                spec.field_type, AtomicRedisModel
+            ):
+                yield from spec.field_type.walk(
+                    requires, hop_roots=hop_roots, path=(*path, name), _seen=_seen
+                )
 
     @classmethod
     def _all_keys_for_key(cls, key: str, parent_path: str = "") -> list[str]:
