@@ -9,6 +9,7 @@ from pydantic_core.core_schema import CoreSchema, SerializationInfo, ValidationI
 
 from rapyer.errors import CantSerializeRedisValueError
 from rapyer.types.base import BaseRedisType, RedisType
+from rapyer.types.convert import RedisConverter
 from rapyer.types.traits import FieldTrait
 from rapyer.utils.pythonic import resolve_generic_args, safe_issubclass
 
@@ -86,8 +87,6 @@ class GenericRedisType(RedisType, Generic[T], ABC):
     ) -> CoreSchema:
         # Extract the generic type argument T from source_type
         element_type = cls.find_inner_type(source_type)
-        from rapyer.types.convert import RedisConverter
-
         checker = RedisConverter({}, "")
         should_pickle = not checker.is_redis_type(element_type)
 
