@@ -131,5 +131,5 @@ def resolve_relational_targets(models) -> None:
     instance at validation time, so this only needs to force that rebuild.
     """
     for model in models:
-        if model.inner_traits() & FieldTrait.REFERENCES_ROOT:
+        if model.inner_field_traits() & FieldTrait.REFERENCES_ROOT:
             model.model_rebuild(force=True)

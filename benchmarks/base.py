@@ -1,4 +1,4 @@
-import enum
+from enum import Enum
 from typing import Any, ClassVar
 
 import pytest
@@ -6,7 +6,7 @@ import pytest
 from rapyer import AtomicRedisModel
 
 
-class TTLMode(enum.Enum):
+class TTLMode(Enum):
     """
     Which model variant a benchmark iteration is exercising.
 

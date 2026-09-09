@@ -156,8 +156,14 @@ def test_sf_of_fk_field_lands_in_both_contain_fk_and_special_fields():
     queue_spec = CascadePQRefParent._field_specs[expected_queue_field]
 
     # Act / Assert
-    assert bool(CascadeSetRefParent.inner_traits() & FieldTrait.REFERENCES_ROOT) is True
-    assert bool(CascadePQRefParent.inner_traits() & FieldTrait.REFERENCES_ROOT) is True
+    assert (
+        bool(CascadeSetRefParent.inner_field_traits() & FieldTrait.REFERENCES_ROOT)
+        is True
+    )
+    assert (
+        bool(CascadePQRefParent.inner_field_traits() & FieldTrait.REFERENCES_ROOT)
+        is True
+    )
     assert set_spec.reaches & FieldTrait.REFERENCES_ROOT
     assert expected_set_field in CascadeSetRefParent.fields_with(FieldTrait.OWNS_KEYS)
     assert queue_spec.reaches & FieldTrait.REFERENCES_ROOT

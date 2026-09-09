@@ -1,11 +1,11 @@
 import abc
 import dataclasses
-import enum
+from enum import Enum
 
 from rapyer.errors.cascade import InvalidCascadeDepthError
 
 
-class TTLCascadeMode(enum.Enum):
+class TTLCascadeMode(Enum):
     """
     How a cascaded TTL is applied relative to the child's existing TTL.
 
