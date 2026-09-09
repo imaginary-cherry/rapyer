@@ -659,34 +659,6 @@ class AtomicRedisModel(BaseModel):
             mismatched_class=mismatched_class,
         )
 
-    # Traverses the class tree in Python. Where the answer is a key set, that work belongs
-    # in Lua next to the TTL cascade function; see _all_keys_for_key.
-    @classmethod
-    def walk(
-        cls,
-        requires: FieldTrait,
-        *,
-        hop_roots: bool = False,
-        path: tuple[str, ...] = (),
-        _seen: frozenset = frozenset(),
-    ) -> Iterator[tuple[FieldSpec, tuple[str, ...]]]:
-        """Yield (spec, path) for every field reachable under the required trait."""
-        if cls in _seen or len(path) > MAX_WALK_DEPTH:
-            return
-        _seen = _seen | {cls}  # path-local: rebound per frame, never merged upward
-        for name, spec in cls._field_specs.items():
-            if (
-                spec.external is not None
-                and requires & spec.external.field_type.traits()
-            ):
-                yield spec, (*path, name)
-            if requires & spec.reaches and safe_issubclass(
-                spec.field_type, AtomicRedisModel
-            ):
-                yield from spec.field_type.walk(
-                    requires, hop_roots=hop_roots, path=(*path, name), _seen=_seen
-                )
-
     @classmethod
     def _resolve_key(cls, key: str | Self) -> str:
         if isinstance(key, AtomicRedisModel):
@@ -1237,6 +1209,34 @@ class AtomicRedisModel(BaseModel):
                 attr.field_name = f".{name}"
 
     # --- Client-side key discovery: a fakeredis fallback ---
+
+    # The generic traversal, kept here because key discovery is its only caller so far.
+    # Five more walks are meant to move onto it; see capability-walks-design step 4.
+    @classmethod
+    def walk(
+        cls,
+        requires: FieldTrait,
+        *,
+        hop_roots: bool = False,
+        path: tuple[str, ...] = (),
+        _seen: frozenset = frozenset(),
+    ) -> Iterator[tuple[FieldSpec, tuple[str, ...]]]:
+        """Yield (spec, path) for every field reachable under the required trait."""
+        if cls in _seen or len(path) > MAX_WALK_DEPTH:
+            return
+        _seen = _seen | {cls}  # path-local: rebound per frame, never merged upward
+        for name, spec in cls._field_specs.items():
+            if (
+                spec.external is not None
+                and requires & spec.external.field_type.traits()
+            ):
+                yield spec, (*path, name)
+            if requires & spec.reaches and safe_issubclass(
+                spec.field_type, AtomicRedisModel
+            ):
+                yield from spec.field_type.walk(
+                    requires, hop_roots=hop_roots, path=(*path, name), _seen=_seen
+                )
 
     @functools.cached_property
     def all_keys(self) -> list[str]:
