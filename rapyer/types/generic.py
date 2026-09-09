@@ -33,7 +33,7 @@ class GenericRedisType(RedisType, Generic[T], ABC):
         return args[0] if args else Any
 
     @classmethod
-    def inner_field_traits(cls) -> FieldTrait:
+    def reachable_fields_w_traits(cls) -> FieldTrait:
         """What is reachable through this container's element type, e.g. list[RedisSet]."""
         inner = cls.find_inner_type(cls)
         if inner is Any:
@@ -42,7 +42,7 @@ class GenericRedisType(RedisType, Generic[T], ABC):
         inner = get_origin(inner) or inner
         if not safe_issubclass(inner, BaseRedisType):
             return FieldTrait(0)
-        return inner.traits() | inner.inner_field_traits()
+        return inner.traits() | inner.reachable_fields_w_traits()
 
     @classmethod
     @abc.abstractmethod

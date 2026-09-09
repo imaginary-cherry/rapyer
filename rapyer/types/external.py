@@ -87,7 +87,7 @@ class ExternalFieldType(BaseRedisType, abc.ABC, Generic[ConfigT]):
         return FieldTrait(0)
 
     @classmethod
-    def inner_field_traits(cls) -> FieldTrait:
+    def reachable_fields_w_traits(cls) -> FieldTrait:
         """What is reachable through this type's generic element, e.g. RedisSet[ForeignKey[X]]."""
         args = resolve_generic_args(cls)
         inner = args[0] if args else Any
@@ -96,7 +96,7 @@ class ExternalFieldType(BaseRedisType, abc.ABC, Generic[ConfigT]):
         inner = get_origin(inner) or inner
         if not safe_issubclass(inner, BaseRedisType):
             return FieldTrait(0)
-        return inner.traits() | inner.inner_field_traits()
+        return inner.traits() | inner.reachable_fields_w_traits()
 
     @classmethod
     def owned_redis_keys(cls, model_key: str, field_path: str) -> list[str]:

@@ -58,7 +58,7 @@ class BaseRedisType(ABC):
         return FieldTrait(0)
 
     @classmethod
-    def inner_field_traits(cls) -> "FieldTrait":
+    def reachable_fields_w_traits(cls) -> "FieldTrait":
         """What is reachable strictly inside this type, never including its own."""
         from rapyer.types.external import FieldTrait
 

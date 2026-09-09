@@ -48,7 +48,9 @@ async def test_aload_missing_special_field_model_raises_key_not_found(
     model = GenericRedisSetModel[str]()
     await model.asave()
     assert (
-        bool(GenericRedisSetModel[str].inner_field_traits() & FieldTrait.OWNS_KEYS)
+        bool(
+            GenericRedisSetModel[str].reachable_fields_w_traits() & FieldTrait.OWNS_KEYS
+        )
         is True
     )
 

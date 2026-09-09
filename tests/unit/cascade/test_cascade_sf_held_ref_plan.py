@@ -157,11 +157,15 @@ def test_sf_of_fk_field_lands_in_both_contain_fk_and_special_fields():
 
     # Act / Assert
     assert (
-        bool(CascadeSetRefParent.inner_field_traits() & FieldTrait.REFERENCES_ROOT)
+        bool(
+            CascadeSetRefParent.reachable_fields_w_traits() & FieldTrait.REFERENCES_ROOT
+        )
         is True
     )
     assert (
-        bool(CascadePQRefParent.inner_field_traits() & FieldTrait.REFERENCES_ROOT)
+        bool(
+            CascadePQRefParent.reachable_fields_w_traits() & FieldTrait.REFERENCES_ROOT
+        )
         is True
     )
     assert set_spec.reaches & FieldTrait.REFERENCES_ROOT

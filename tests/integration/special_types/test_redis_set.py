@@ -313,7 +313,7 @@ async def test_clone_returns_independent_local_copy(real_redis_client):
 async def test_list_of_bare_redis_sets_is_detected_as_special(real_redis_client):
     # Arrange / Assert - a plain list[RedisSet] is the only construct with an SF inner element.
     annotation = ListOfSetsModel.model_fields["buckets"].annotation
-    assert bool(annotation.inner_field_traits() & FieldTrait.OWNS_KEYS) is True
+    assert bool(annotation.reachable_fields_w_traits() & FieldTrait.OWNS_KEYS) is True
 
     # Act
     model = ListOfSetsModel()

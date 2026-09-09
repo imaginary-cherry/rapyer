@@ -39,7 +39,7 @@ def test_book_class_classifies_relational_fields():
 
 def test_model_contains_fk_field_reflects_relational_fields():
     # Arrange / Act / Assert
-    assert bool(FkBook.inner_field_traits() & FieldTrait.REFERENCES_ROOT) is True
+    assert bool(FkBook.reachable_fields_w_traits() & FieldTrait.REFERENCES_ROOT) is True
 
 
 def test_relational_fields_are_also_redis_link_fields():

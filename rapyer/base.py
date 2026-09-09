@@ -273,7 +273,7 @@ class AtomicRedisModel(BaseModel):
     def _needs_cascade_script(cls) -> bool:
         # Any FK edge or special-field key needs the script; plain scalars use EXPIRE.
         trait = FieldTrait.OWNS_KEYS | FieldTrait.REFERENCES_ROOT
-        return bool(cls.inner_field_traits() & trait)
+        return bool(cls.reachable_fields_w_traits() & trait)
 
     async def refresh_ttl(self, can_use_pipeline: bool = False):
         """Refresh TTL unconditionally."""
@@ -452,7 +452,9 @@ class AtomicRedisModel(BaseModel):
                     if traits
                     else None
                 ),
-                reaches=origin.inner_field_traits() if is_link else FieldTrait(0),
+                reaches=(
+                    origin.reachable_fields_w_traits() if is_link else FieldTrait(0)
+                ),
                 is_redis_link=is_link,
                 safe_load=field_name in safe_load_field_names,
             )
@@ -709,7 +711,7 @@ class AtomicRedisModel(BaseModel):
         key = cls._resolve_key(key)
         plan = []
         sf_raw = []
-        if not cls.inner_field_traits() & FieldTrait.OWNS_KEYS:
+        if not cls.reachable_fields_w_traits() & FieldTrait.OWNS_KEYS:
             model_dump = await cls.Meta.redis_json.get(key, "$")  # type: ignore[misc]
         else:
             models_dump, plans_per_key, sf_raw = await execute_load_pipeline(
@@ -732,7 +734,7 @@ class AtomicRedisModel(BaseModel):
         cls = self.__class__
         plan: list[list[str]] = []
         sf_raw = []
-        if not cls.inner_field_traits() & FieldTrait.OWNS_KEYS:
+        if not cls.reachable_fields_w_traits() & FieldTrait.OWNS_KEYS:
             model_dump = await self.Meta.redis_json.get(self.key, self.json_path)  # type: ignore[misc]
             if not model_dump:
                 raise KeyNotFound(f"{self.key} is missing in redis")
@@ -785,7 +787,7 @@ class AtomicRedisModel(BaseModel):
 
     @classmethod
     @functools.cache
-    def inner_field_traits(cls) -> FieldTrait:
+    def reachable_fields_w_traits(cls) -> FieldTrait:
         """Per-bit union of every trait reachable in this class's own field tree."""
         mask = FieldTrait(0)
         for spec in cls._field_specs.values():

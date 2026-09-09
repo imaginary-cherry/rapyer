@@ -41,7 +41,7 @@ PRIVATE_METHODS = _group(
     RedisSet.queue_special_loads_in_pipeline,
     RedisSet._tmp_key,
     # Generic
-    GenericRedisType.inner_field_traits,
+    GenericRedisType.reachable_fields_w_traits,
     # AtomicRedisModel
     AtomicRedisModel._search_keys_by_query,
     AtomicRedisModel.build_redis_model,
@@ -72,7 +72,7 @@ PRIVATE_METHODS = _group(
     AtomicRedisModel.should_refresh,
     AtomicRedisModel.should_refresh_for_action,
     AtomicRedisModel.build_redis_dump_exclude,
-    AtomicRedisModel.inner_field_traits,
+    AtomicRedisModel.reachable_fields_w_traits,
     AtomicRedisModel.fields_with,
     AtomicRedisModel.fields_reaching,
     AtomicRedisModel.queue_special_loads_in_pipeline,
@@ -116,7 +116,7 @@ PRIVATE_INHERITED_METHODS = _group(
     # introspection over _field_specs, no Redis round trip. Shared contract across the
     # hierarchy, so subclasses override several of them.
     ExternalFieldType.traits,
-    ExternalFieldType.inner_field_traits,
+    ExternalFieldType.reachable_fields_w_traits,
     ExternalFieldType.config_type,
     ExternalFieldType.extract_config,
     ExternalFieldType.owns_serialization,
