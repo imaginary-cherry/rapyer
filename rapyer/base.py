@@ -659,10 +659,6 @@ class AtomicRedisModel(BaseModel):
             mismatched_class=mismatched_class,
         )
 
-    @functools.cached_property
-    def all_keys(self) -> list[str]:
-        return self._all_keys_for_key(self.key)
-
     # Traverses the class tree in Python. Where the answer is a key set, that work belongs
     # in Lua next to the TTL cascade function; see _all_keys_for_key.
     @classmethod
@@ -690,16 +686,6 @@ class AtomicRedisModel(BaseModel):
                 yield from spec.field_type.walk(
                     requires, hop_roots=hop_roots, path=(*path, name), _seen=_seen
                 )
-
-    # Client-side key discovery, which should be a fakeredis fallback only: the TTL cascade
-    # function already resolves these keys in Lua, but delete has no server-side equivalent.
-    @classmethod
-    def _all_keys_for_key(cls, key: str, parent_path: str = "") -> list[str]:
-        keys = [key] if not parent_path else []
-        for spec, path in cls.walk(FieldTrait.OWNS_KEYS, hop_roots=False):
-            field_path = f"{parent_path}.{'.'.join(path)}"
-            keys.extend(spec.field_type.owned_redis_keys(key, field_path))
-        return keys
 
     @classmethod
     def _resolve_key(cls, key: str | Self) -> str:
@@ -1249,6 +1235,22 @@ class AtomicRedisModel(BaseModel):
             if isinstance(attr, (BaseRedisType, AtomicRedisModel)):
                 attr._base_model_link = self
                 attr.field_name = f".{name}"
+
+    # --- Client-side key discovery: a fakeredis fallback ---
+
+    @functools.cached_property
+    def all_keys(self) -> list[str]:
+        return self._all_keys_for_key(self.key)
+
+    # Real Redis resolves these keys in the Lua cascade function; delete has no server-side
+    # equivalent yet, so it is the one real-Redis caller still walking the tree in Python.
+    @classmethod
+    def _all_keys_for_key(cls, key: str, parent_path: str = "") -> list[str]:
+        keys = [key] if not parent_path else []
+        for spec, path in cls.walk(FieldTrait.OWNS_KEYS, hop_roots=False):
+            field_path = f"{parent_path}.{'.'.join(path)}"
+            keys.extend(spec.field_type.owned_redis_keys(key, field_path))
+        return keys
 
 
 REDIS_MODELS: list[type[AtomicRedisModel]] = []
