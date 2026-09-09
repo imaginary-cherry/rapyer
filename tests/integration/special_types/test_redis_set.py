@@ -332,7 +332,8 @@ async def test_list_of_bare_redis_sets_is_detected_as_special(real_redis_client)
 async def test_optional_redis_set_gets_its_own_key_excluded_from_the_dump(
     real_redis_client,
 ):
-    # A1 regression: Optional[RedisSet[str]] must classify like RedisSet[str]; members are JSON-encoded.
+    # Arrange - A1 regression: Optional[RedisSet[str]] classifies like RedisSet[str],
+    # and members are JSON-encoded.
     expected_field, expected_members = "tags", {'"alpha"'}
     model = OptionalRedisSetModel()
     model.tags = RedisSet()

@@ -177,9 +177,13 @@ def test_init_from_list_without_context_raises():
 
 
 def test_init_from_invalid_type_raises():
-    # Neither a queue, a list, nor a dump-context value hits the serialization error.
+    # Arrange - neither a queue, a list, nor a dump-context value, so it reaches the
+    # serialization error.
+    invalid_value = 123
+
+    # Act / Assert
     with pytest.raises(RapyerSerializationError):
-        GenericPriorityQueueModel[str](tasks=123)
+        GenericPriorityQueueModel[str](tasks=invalid_value)
 
 
 def test_all_keys_for_key_includes_a_direct_special_field_key():

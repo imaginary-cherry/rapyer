@@ -112,7 +112,7 @@ def test_a_field_can_sit_on_several_axes_at_once():
 
 
 def test_optional_nested_model_is_seen_as_containing_a_special_field():
-    # A1 fixed: one peel strips Optional the same way the FK axis always did.
+    # Arrange - A1 fixed: one peel strips Optional the same way the FK axis always did.
     class OptionalChildParent(AtomicRedisModel):
         child: Optional[SpecChild] = None
         Meta: ClassVar[RedisConfig] = RedisConfig()
@@ -120,11 +120,13 @@ def test_optional_nested_model_is_seen_as_containing_a_special_field():
     expected_field = "child"
     expected_reaching = frozenset({expected_field})
 
-    # Act / Assert
-    assert expected_field in OptionalChildParent._field_specs
-    assert (
-        OptionalChildParent.fields_reaching(FieldTrait.OWNS_KEYS) == expected_reaching
-    )
+    # Act
+    specs = OptionalChildParent._field_specs
+    reaching = OptionalChildParent.fields_reaching(FieldTrait.OWNS_KEYS)
+
+    # Assert
+    assert expected_field in specs
+    assert reaching == expected_reaching
 
 
 def test_the_two_containment_axes_can_hold_at_once():
@@ -243,7 +245,7 @@ def test_relational_config_is_extracted_at_class_build():
 
 
 def test_a_novel_external_field_type_classifies_with_zero_base_py_changes():
-    # A new kind needs one row (traits()) and zero edits to __init_subclass__.
+    # Arrange - a new kind needs one row (traits()) and zero edits to __init_subclass__.
     class NovelFieldType(ExternalFieldType[None]):
         def __init__(self, value: Any = None):
             super().__init__()
@@ -270,9 +272,10 @@ def test_a_novel_external_field_type_classifies_with_zero_base_py_changes():
 
     # Act
     spec = NovelFieldModel._field_specs[expected_field]
+    fields_with_trait = NovelFieldModel.fields_with(expected_trait)
 
     # Assert
     assert spec.external is not None
     assert issubclass(spec.external.field_type, NovelFieldType)
     assert spec.external.field_type.traits() == expected_trait
-    assert expected_field in NovelFieldModel.fields_with(expected_trait)
+    assert expected_field in fields_with_trait

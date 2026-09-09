@@ -21,4 +21,8 @@ from rapyer.utils.annotation import annotation_origin
     ],
 )
 def test_annotation_origin_peels_wrappers_in_either_order(annotation, expected):
-    assert annotation_origin(annotation) is expected
+    # Act - annotation and expected are arranged by the parametrize table above.
+    origin = annotation_origin(annotation)
+
+    # Assert
+    assert origin is expected
