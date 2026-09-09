@@ -1214,7 +1214,7 @@ class AtomicRedisModel(BaseModel):
         """Yield (spec, path) for every field reachable under the required trait."""
         if cls in _seen or len(path) > MAX_WALK_DEPTH:
             return
-        _seen = _seen | {cls}  # path-local: rebound per frame, never merged upward
+        _seen |= {cls}  # path-local: rebound per frame, never merged upward
         for name, spec in cls._field_specs.items():
             if (
                 spec.external is not None
