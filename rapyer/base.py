@@ -1252,6 +1252,8 @@ class AtomicRedisModel(BaseModel):
             keys.extend(spec.field_type.owned_redis_keys(key, field_path))
         return keys
 
+    # --- END ---
+
 
 REDIS_MODELS: list[type[AtomicRedisModel]] = []
 
