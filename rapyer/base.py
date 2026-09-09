@@ -586,9 +586,9 @@ class AtomicRedisModel(BaseModel):
     @mark_actions(ActionGroup.UPDATE)
     async def aupdate(self, **kwargs):
         # Special fields own separate Redis keys and cannot be written as JSON path updates.
-        special_in_kwargs = self.fields_with(FieldTrait.EXCLUDED_FROM_DOC) & set(
-            kwargs.keys()
-        )
+        field_names = set(kwargs.keys())
+        field_not_in_doc = self.fields_with(FieldTrait.EXCLUDED_FROM_DOC)
+        special_in_kwargs = field_not_in_doc & field_names
         if special_in_kwargs:
             raise UpdateAtomicModelError(
                 f"Cannot update special fields via aupdate: {special_in_kwargs}. "
@@ -601,7 +601,7 @@ class AtomicRedisModel(BaseModel):
         serialized_fields = self.model_dump(
             mode="json",
             context={REDIS_DUMP_FLAG_NAME: True},
-            include=set(kwargs.keys()),
+            include=field_names,
         )
         json_path_kwargs = {
             f"{self.json_path}.{field_name}": serialized_fields[field_name]
