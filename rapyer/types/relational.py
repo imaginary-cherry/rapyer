@@ -1,13 +1,27 @@
 import abc
-from typing import TYPE_CHECKING, Any, get_args
+from types import UnionType
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ForwardRef,
+    TypeVar,
+    Union,
+    get_args,
+    get_origin,
+)
 
-from rapyer.types.base import BaseRedisType
+from rapyer.types.external import ExternalFieldType
+from rapyer.types.traits import FieldTrait
+from rapyer.utils.annotation import strip_optional
+from rapyer.utils.pythonic import resolve_generic_args, safe_issubclass
 
 if TYPE_CHECKING:
     from rapyer.base import AtomicRedisModel
 
+ConfigT = TypeVar("ConfigT")
 
-class RelationalFieldType(BaseRedisType, abc.ABC):
+
+class RelationalFieldType(ExternalFieldType[ConfigT], abc.ABC):
     """
     Base for field types that reference another ``AtomicRedisModel`` by key.
 
@@ -46,6 +60,69 @@ class RelationalFieldType(BaseRedisType, abc.ABC):
     async def afetch(self) -> Any:
         """Resolve the target from Redis and cache it in-place."""
 
+    @classmethod
+    def relational_targets(
+        cls, annotation: Any, models: "list[type[AtomicRedisModel]]"
+    ) -> "list[type[AtomicRedisModel]]":
+        """
+        Every model class an annotation of this type can point to, empty if
+        the annotation is not FK-shaped anywhere within it.
+        """
+        stripped = strip_optional(annotation)
+        origin = get_origin(stripped) or stripped
+        if safe_issubclass(origin, RelationalFieldType):
+            args = resolve_generic_args(stripped)
+            target = args[0] if args else None
+            if target is None:
+                return []
+            # Reference[A | B] contributes one candidate per union member.
+            if get_origin(target) in (Union, UnionType):
+                members = get_args(target)
+            else:
+                members = (target,)
+            candidates: "list[type[AtomicRedisModel]]" = []
+            for member in members:
+                resolved = (
+                    _resolve_forward_ref(member, models)
+                    if isinstance(member, ForwardRef)
+                    else member
+                )
+                if resolved is None:
+                    continue
+                for candidate in _expand_candidates(resolved, models):
+                    if candidate not in candidates:
+                        candidates.append(candidate)
+            return candidates
+        accumulated: "list[type[AtomicRedisModel]]" = []
+        for arg in resolve_generic_args(stripped):
+            for candidate in cls.relational_targets(arg, models):
+                if candidate not in accumulated:
+                    accumulated.append(candidate)
+        return accumulated
+
+
+def _resolve_forward_ref(
+    forward_ref: ForwardRef, models: "list[type[AtomicRedisModel]]" = ()
+) -> Any | None:
+    """Resolve a forward-ref FK target to its model class, or None."""
+    # Lazy import avoids a cycle back into rapyer.base.
+    from rapyer.base import REDIS_MODELS
+
+    name = forward_ref.__forward_arg__
+    # The caller's collection wins: it may hold a target the global registry skipped,
+    # such as a generic origin or a model opting out with Meta.init_with_rapyer=False.
+    for model in (*models, *REDIS_MODELS):
+        if model.__name__ == name:
+            return model
+    return None
+
+
+def _expand_candidates(
+    target_cls: Any, models: "list[type[AtomicRedisModel]]"
+) -> "list[type[AtomicRedisModel]]":
+    """Return target_cls together with its registered subclasses, in declaration order."""
+    return [m for m in models if safe_issubclass(m, target_cls)]
+
 
 def resolve_relational_targets(models) -> None:
     """
@@ -57,5 +134,5 @@ def resolve_relational_targets(models) -> None:
     instance at validation time, so this only needs to force that rebuild.
     """
     for model in models:
-        if model.contains_fk_field():
+        if model.reachable_fields_w_traits() & FieldTrait.REFERENCES_ROOT:
             model.model_rebuild(force=True)

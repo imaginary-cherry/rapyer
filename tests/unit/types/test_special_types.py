@@ -5,10 +5,13 @@ from rapyer.errors import RapyerSerializationError, UpdateAtomicModelError
 from rapyer.types.base import BaseRedisType
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX, SpecialFieldType
+from rapyer.types.traits import FieldTrait
 from tests.models.special_types import (
     GenericPriorityQueueModel,
+    ListOfSetsModel,
     MixedSpecialModel,
     OverriddenSpecialFieldModel,
+    PQContainerModel,
     PriorityQueueIntModel,
     PriorityQueueModel,
     SubSubPriorityQueueModel,
@@ -43,25 +46,43 @@ def test_mixed_special_model_creation_sanity():
     assert model.count == 42
 
 
-def test_special_field_names_detected():
-    assert "tasks" in PriorityQueueModel._special_field_names
-    assert "tasks" in MixedSpecialModel._special_field_names
-    assert "tasks" in PriorityQueueIntModel._special_field_names
-    assert "name" not in PriorityQueueModel._special_field_names
-    assert "count" not in MixedSpecialModel._special_field_names
+def test_special_fields_detected():
+    # Arrange
+    expected_special = "tasks"
+    expected_plain = ("name", "count")
+
+    # Act / Assert
+    assert expected_special in PriorityQueueModel.fields_with(FieldTrait.OWNS_KEYS)
+    assert expected_special in MixedSpecialModel.fields_with(FieldTrait.OWNS_KEYS)
+    assert expected_special in PriorityQueueIntModel.fields_with(FieldTrait.OWNS_KEYS)
+    assert expected_plain[0] not in PriorityQueueModel.fields_with(FieldTrait.OWNS_KEYS)
+    assert expected_plain[1] not in MixedSpecialModel.fields_with(FieldTrait.OWNS_KEYS)
 
 
 def test_overridden_special_field_not_special():
-    # override to non-special type must not leave a stale entry
-    assert "tasks" not in OverriddenSpecialFieldModel._special_field_names
-    assert "tasks" not in OverriddenSpecialFieldModel._contain_sf
+    # Arrange - override to a non-special type must not leave a stale entry
+    expected_keys = ["X:1"]
+    expected_field = "tasks"
+
+    # Act / Assert
+    assert expected_field not in OverriddenSpecialFieldModel.fields_with(
+        FieldTrait.OWNS_KEYS
+    )
+    assert expected_field not in OverriddenSpecialFieldModel.fields_reaching(
+        FieldTrait.OWNS_KEYS
+    )
     # _all_keys_for_key no longer crashes on the stale name
-    assert OverriddenSpecialFieldModel._all_keys_for_key("X:1") == ["X:1"]
+    assert OverriddenSpecialFieldModel._all_keys_for_key("X:1") == expected_keys
 
 
 def test_inherited_special_field_still_special():
-    # guards against an over-eager fix that prunes inherited fields
-    assert "tasks" in SubSubPriorityQueueModel._special_field_names
+    # Arrange - guards against an over-eager fix that prunes inherited fields
+    expected_special = "tasks"
+
+    # Act / Assert
+    assert expected_special in SubSubPriorityQueueModel.fields_with(
+        FieldTrait.OWNS_KEYS
+    )
 
 
 def test_mixed_redis_dump_excludes_special_fields():
@@ -156,6 +177,45 @@ def test_init_from_list_without_context_raises():
 
 
 def test_init_from_invalid_type_raises():
-    # Neither a queue, a list, nor a dump-context value hits the serialization error.
+    # Arrange - neither a queue, a list, nor a dump-context value, so it reaches the
+    # serialization error.
+    invalid_value = 123
+
+    # Act / Assert
     with pytest.raises(RapyerSerializationError):
-        GenericPriorityQueueModel[str](tasks=123)
+        GenericPriorityQueueModel[str](tasks=invalid_value)
+
+
+def test_all_keys_for_key_includes_a_direct_special_field_key():
+    # Arrange
+    key = "PriorityQueueModel:1"
+    expected_keys = [key, f"{SPECIAL_FIELD_KEY_PREFIX}:{key}:tasks"]
+
+    # Act
+    keys = PriorityQueueModel._all_keys_for_key(key)
+
+    # Assert
+    assert keys == expected_keys
+
+
+def test_all_keys_for_key_includes_a_nested_models_special_key():
+    # Arrange
+    key = "PQContainerModel:1"
+    expected_keys = [key, f"{SPECIAL_FIELD_KEY_PREFIX}:{key}:inner_pq.tasks"]
+
+    # Act
+    keys = PQContainerModel._all_keys_for_key(key)
+
+    # Assert
+    assert keys == expected_keys
+
+
+def test_all_keys_for_key_skips_container_of_sf_without_raising():
+    # Arrange - a bare list[RedisSet] cannot be descended into; it must not raise.
+    expected_keys = ["X:1"]
+
+    # Act
+    keys = ListOfSetsModel._all_keys_for_key("X:1")
+
+    # Assert
+    assert keys == expected_keys

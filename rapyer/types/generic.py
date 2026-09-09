@@ -8,8 +8,8 @@ from pydantic_core import core_schema
 from pydantic_core.core_schema import CoreSchema, SerializationInfo, ValidationInfo
 
 from rapyer.errors import CantSerializeRedisValueError
-from rapyer.types.base import RedisType
-from rapyer.types.special import SpecialFieldType
+from rapyer.types.base import BaseRedisType, RedisType
+from rapyer.types.traits import FieldTrait
 from rapyer.utils.pythonic import resolve_generic_args, safe_issubclass
 
 logger = logging.getLogger("rapyer")
@@ -33,33 +33,16 @@ class GenericRedisType(RedisType, Generic[T], ABC):
         return args[0] if args else Any
 
     @classmethod
-    def contains_sf_field(cls) -> bool:
+    def reachable_fields_w_traits(cls) -> FieldTrait:
+        """What is reachable through this container's element type, e.g. list[RedisSet]."""
         inner = cls.find_inner_type(cls)
         if inner is Any:
-            return False
-        if safe_issubclass(inner, SpecialFieldType):
-            return True
-        contains = getattr(inner, "contains_sf_field", None)
-        if contains is None:
-            return False
-        return contains()
-
-    @classmethod
-    def contains_fk_field(cls) -> bool:
-        inner = cls.find_inner_type(cls)
-        if inner is Any:
-            return False
-
-        from rapyer.types.relational import RelationalFieldType
-
+            return FieldTrait(0)
         # inner may be a parameterized alias (e.g. ForeignKey[Author]), so reduce it to its origin.
         inner = get_origin(inner) or inner
-        if safe_issubclass(inner, RelationalFieldType):
-            return True
-        contains = getattr(inner, "contains_fk_field", None)
-        if contains is None:
-            return False
-        return contains()
+        if not safe_issubclass(inner, BaseRedisType):
+            return FieldTrait(0)
+        return inner.traits() | inner.reachable_fields_w_traits()
 
     @classmethod
     @abc.abstractmethod

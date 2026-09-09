@@ -9,6 +9,7 @@ from rapyer.errors import NotResolvedError
 from rapyer.types import Reference
 from rapyer.types.foreign_key import ForeignKey
 from rapyer.types.relational import RelationalFieldType
+from rapyer.types.traits import FieldTrait
 from rapyer.utils.pythonic import resolve_generic_args
 from tests.models.foreign_key_types import FkAuthor, FkBook
 
@@ -16,19 +17,34 @@ from tests.models.foreign_key_types import FkAuthor, FkBook
 
 
 def test_book_class_classifies_relational_fields():
-    # Arrange / Act / Assert
-    assert FkBook._relational_field_names == {"author", "publisher"}
-    assert FkBook._contain_fk == {"co_authors"}
+    # Arrange
+    expected_relational = {"author", "publisher"}
+    expected_contains_fk = {"co_authors"}
+
+    # Act
+    specs = FkBook._field_specs
+    is_relational = {
+        n
+        for n, s in specs.items()
+        if s.external and s.external.field_type.traits() & FieldTrait.REFERENCES_ROOT
+    }
+    contains_fk = {
+        n for n, s in specs.items() if s.reaches & FieldTrait.REFERENCES_ROOT
+    }
+
+    # Assert
+    assert is_relational == expected_relational
+    assert contains_fk == expected_contains_fk
 
 
 def test_model_contains_fk_field_reflects_relational_fields():
     # Arrange / Act / Assert
-    assert FkBook.contains_fk_field() is True
+    assert bool(FkBook.reachable_fields_w_traits() & FieldTrait.REFERENCES_ROOT) is True
 
 
 def test_relational_fields_are_also_redis_link_fields():
     # Arrange / Act
-    link_fields = FkBook._redis_link_field_names
+    link_fields = FkBook.redis_link_fields()
 
     # Assert - the metaclass adds every BaseRedisType field, so link wiring is uniform.
     assert "author" in link_fields

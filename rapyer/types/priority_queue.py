@@ -1,6 +1,6 @@
 import json
 from dataclasses import dataclass
-from typing import Any, Generic, Optional, TypeVar, get_origin
+from typing import Any, Generic, Optional, TypeVar
 
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
@@ -9,7 +9,8 @@ from rapyer.actions import ActionGroup, mark_actions
 from rapyer.errors.base import RapyerSerializationError
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME
 from rapyer.types.special import SpecialFieldType
-from rapyer.utils.pythonic import resolve_generic_args, safe_issubclass
+from rapyer.types.traits import FieldTrait
+from rapyer.utils.pythonic import resolve_generic_args
 
 T = TypeVar("T")
 
@@ -20,7 +21,7 @@ class PriorityQueueItem(Generic[T]):
     priority: float
 
 
-class RedisPriorityQueue(SpecialFieldType, Generic[T]):
+class RedisPriorityQueue(SpecialFieldType[None], Generic[T]):
     """
     Priority queue backed by a Redis Sorted Set. Pure Redis proxy — no local state.
     """
@@ -28,16 +29,17 @@ class RedisPriorityQueue(SpecialFieldType, Generic[T]):
     LUA_SNIPPET_DIR = "redis_priority_queue"
 
     @classmethod
-    def contains_fk_field(cls) -> bool:
-        """True when this queue's member type is a foreign-key reference."""
-        from rapyer.types.relational import RelationalFieldType
+    def cascade_container_kind(cls) -> Optional[str]:
+        return "zset"
 
-        args = resolve_generic_args(cls)
-        inner = args[0] if args else Any
-        if inner is Any:
-            return False
-        inner = get_origin(inner) or inner
-        return safe_issubclass(inner, RelationalFieldType)
+    @classmethod
+    def traits(cls) -> FieldTrait:
+        # No LOADS_WITH_DOC: items are fetched lazily by apeek/aitems.
+        return (
+            FieldTrait.OWNS_KEYS
+            | FieldTrait.EXCLUDED_FROM_DOC
+            | FieldTrait.HOLDS_LIVE_STATE
+        )
 
     # --- Serialization helpers ---
 

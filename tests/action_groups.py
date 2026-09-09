@@ -8,6 +8,7 @@ from rapyer.types.base import BaseRedisType, RedisType
 from rapyer.types.byte import RedisBytes
 from rapyer.types.datetime import RedisDatetime, RedisDatetimeTimestamp
 from rapyer.types.dct import RedisDict
+from rapyer.types.external import ExternalFieldType
 from rapyer.types.foreign_key import ForeignKey
 from rapyer.types.generic import GenericRedisType
 from rapyer.types.lst import RedisList
@@ -40,10 +41,7 @@ PRIVATE_METHODS = _group(
     RedisSet.queue_special_loads_in_pipeline,
     RedisSet._tmp_key,
     # Generic
-    GenericRedisType.contains_sf_field,
-    GenericRedisType.contains_fk_field,
-    RedisSet.contains_fk_field,
-    RedisPriorityQueue.contains_fk_field,
+    GenericRedisType.reachable_fields_w_traits,
     # AtomicRedisModel
     AtomicRedisModel._search_keys_by_query,
     AtomicRedisModel.build_redis_model,
@@ -56,13 +54,13 @@ PRIVATE_METHODS = _group(
     AtomicRedisModel.model_post_init,
     AtomicRedisModel.validate_sub_model,
     AtomicRedisModel._all_keys_for_key,
+    AtomicRedisModel._owned_key_paths,
     AtomicRedisModel._iter_expanded_filter_batches,
     AtomicRedisModel._resolve_key,
     # Pure in-memory identity minting (lazily fills _pk); no Redis round trip.
     AtomicRedisModel._ensure_pk,
     # Pure in-memory traversal over special fields; no round trip, so coverage doesn't apply.
     AtomicRedisModel._iter_special_fields,
-    AtomicRedisModel._ttl_keys,
     # Pure in-memory FK-field check gating the TTL cascade fast path; no Redis.
     AtomicRedisModel._needs_cascade_script,
     AtomicRedisModel.class_key_initials,
@@ -74,8 +72,9 @@ PRIVATE_METHODS = _group(
     AtomicRedisModel.should_refresh,
     AtomicRedisModel.should_refresh_for_action,
     AtomicRedisModel.build_redis_dump_exclude,
-    AtomicRedisModel.contains_sf_field,
-    AtomicRedisModel.contains_fk_field,
+    AtomicRedisModel.reachable_fields_w_traits,
+    AtomicRedisModel.fields_with,
+    AtomicRedisModel.fields_reaching,
     AtomicRedisModel.queue_special_loads_in_pipeline,
     # Abstract stub, never executed; ForeignKey.afetch is the real READ|FETCH action.
     RelationalFieldType.afetch,
@@ -113,6 +112,25 @@ PRIVATE_INHERITED_METHODS = _group(
     SpecialFieldType.lua_load_snippet,
     SpecialFieldType.lua_save_payload,
     SpecialFieldType.has_lua_load_output,
+    # FieldTrait declarations and the walks that read them: pure class-level
+    # introspection over _field_specs, no Redis round trip. Shared contract across the
+    # hierarchy, so subclasses override several of them.
+    ExternalFieldType.traits,
+    ExternalFieldType.reachable_fields_w_traits,
+    ExternalFieldType.config_type,
+    ExternalFieldType.extract_config,
+    ExternalFieldType.owns_serialization,
+    ExternalFieldType.owned_redis_keys,
+    SpecialFieldType.owned_redis_keys,
+    SpecialFieldType.cascade_container_kind,
+    RedisSet.traits,
+    RedisSet.cascade_container_kind,
+    RedisPriorityQueue.traits,
+    RedisPriorityQueue.cascade_container_kind,
+    ForeignKey.traits,
+    RelationalFieldType.relational_targets,
+    AtomicRedisModel.walk,
+    AtomicRedisModel.redis_link_fields,
     RedisPriorityQueue.aremove,
     AtomicRedisModel.redis_schema,
     # Fixed-contract pydantic hook, structurally never an action, so every override is filtered.

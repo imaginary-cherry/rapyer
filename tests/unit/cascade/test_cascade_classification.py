@@ -1,5 +1,6 @@
 from rapyer.cascade import CascadeTTL
 from rapyer.cascade.planner import _field_cascade_spec
+from rapyer.types.traits import FieldTrait
 from tests.models.cascade_types import (
     CascadeAuthor,
     CascadeBookCollection,
@@ -44,8 +45,19 @@ def test_plain_fk_field_without_cascade_ttl_has_empty_cascade_ttl_fields():
 
 
 def test_plain_fk_field_classification_is_unaffected():
-    # Act / Assert
-    assert CascadeBookPlain._relational_field_names == {"author"}
+    # Arrange
+    expected_relational = {"author"}
+
+    # Act
+    specs = CascadeBookPlain._field_specs
+    is_relational = {
+        n
+        for n, s in specs.items()
+        if s.external and s.external.field_type.traits() & FieldTrait.REFERENCES_ROOT
+    }
+
+    # Assert
+    assert is_relational == expected_relational
 
 
 def test_cascade_author_leaf_model_has_no_cascade_ttl_fields():
@@ -57,8 +69,23 @@ def test_cascade_author_leaf_model_has_no_cascade_ttl_fields():
 
 
 def test_existing_fk_book_classification_remains_byte_identical():
-    # Act / Assert
-    assert FkBook._relational_field_names == {"author", "publisher"}
-    assert FkBook._contain_fk == {"co_authors"}
+    # Arrange
+    expected_relational = {"author", "publisher"}
+    expected_contains_fk = {"co_authors"}
+
+    # Act
+    specs = FkBook._field_specs
+    is_relational = {
+        n
+        for n, s in specs.items()
+        if s.external and s.external.field_type.traits() & FieldTrait.REFERENCES_ROOT
+    }
+    contains_fk = {
+        n for n, s in specs.items() if s.reaches & FieldTrait.REFERENCES_ROOT
+    }
+
+    # Assert
+    assert is_relational == expected_relational
+    assert contains_fk == expected_contains_fk
     assert _field_cascade_spec(FkBook, "author") is None
     assert _field_cascade_spec(FkBook, "publisher") is None
