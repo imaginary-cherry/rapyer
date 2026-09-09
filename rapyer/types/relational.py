@@ -84,7 +84,7 @@ class RelationalFieldType(ExternalFieldType[ConfigT], abc.ABC):
             candidates: "list[type[AtomicRedisModel]]" = []
             for member in members:
                 resolved = (
-                    _resolve_forward_ref(member)
+                    _resolve_forward_ref(member, models)
                     if isinstance(member, ForwardRef)
                     else member
                 )
@@ -102,13 +102,17 @@ class RelationalFieldType(ExternalFieldType[ConfigT], abc.ABC):
         return accumulated
 
 
-def _resolve_forward_ref(forward_ref: ForwardRef) -> Any | None:
+def _resolve_forward_ref(
+    forward_ref: ForwardRef, models: "list[type[AtomicRedisModel]]" = ()
+) -> Any | None:
     """Resolve a forward-ref FK target to its model class, or None."""
     # Lazy import avoids a cycle back into rapyer.base.
     from rapyer.base import REDIS_MODELS
 
     name = forward_ref.__forward_arg__
-    for model in REDIS_MODELS:
+    # The caller's collection wins: it may hold a target the global registry skipped,
+    # such as a generic origin or a model opting out with Meta.init_with_rapyer=False.
+    for model in (*models, *REDIS_MODELS):
         if model.__name__ == name:
             return model
     return None

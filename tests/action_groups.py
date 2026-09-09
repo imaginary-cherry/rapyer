@@ -54,13 +54,13 @@ PRIVATE_METHODS = _group(
     AtomicRedisModel.model_post_init,
     AtomicRedisModel.validate_sub_model,
     AtomicRedisModel._all_keys_for_key,
+    AtomicRedisModel._owned_key_paths,
     AtomicRedisModel._iter_expanded_filter_batches,
     AtomicRedisModel._resolve_key,
     # Pure in-memory identity minting (lazily fills _pk); no Redis round trip.
     AtomicRedisModel._ensure_pk,
     # Pure in-memory traversal over special fields; no round trip, so coverage doesn't apply.
     AtomicRedisModel._iter_special_fields,
-    AtomicRedisModel._ttl_keys,
     # Pure in-memory FK-field check gating the TTL cascade fast path; no Redis.
     AtomicRedisModel._needs_cascade_script,
     AtomicRedisModel.class_key_initials,

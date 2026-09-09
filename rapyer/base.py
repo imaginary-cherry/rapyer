@@ -902,16 +902,6 @@ class AtomicRedisModel(BaseModel):
             if isinstance(child, AtomicRedisModel):
                 yield from child._iter_special_fields((*prefix, fname))
 
-    def _ttl_keys(self) -> list[str]:
-        """
-        Every Redis key whose TTL tracks this model: the main key plus each
-        special-field key (direct and nested).
-        """
-        return [
-            self.key,
-            *(field.special_key for field, _ in self._iter_special_fields()),
-        ]
-
     @classmethod
     @mark_actions(
         ActionGroup.CREATE,
@@ -1242,14 +1232,23 @@ class AtomicRedisModel(BaseModel):
     def all_keys(self) -> list[str]:
         return self._all_keys_for_key(self.key)
 
+    # adelete_many walks this per key, so the traversal is resolved once per class and the
+    # dotted paths are pre-joined; only owned_redis_keys() runs per call.
+    @classmethod
+    @functools.cache
+    def _owned_key_paths(cls) -> tuple[tuple[type, str], ...]:
+        return tuple(
+            (spec.field_type, ".".join(path))
+            for spec, path in cls.walk(FieldTrait.OWNS_KEYS, hop_roots=False)
+        )
+
     # Real Redis resolves these keys in the Lua cascade function; delete has no server-side
     # equivalent yet, so it is the one real-Redis caller still walking the tree in Python.
     @classmethod
     def _all_keys_for_key(cls, key: str, parent_path: str = "") -> list[str]:
         keys = [key] if not parent_path else []
-        for spec, path in cls.walk(FieldTrait.OWNS_KEYS, hop_roots=False):
-            field_path = f"{parent_path}.{'.'.join(path)}"
-            keys.extend(spec.field_type.owned_redis_keys(key, field_path))
+        for field_type, dotted in cls._owned_key_paths():
+            keys.extend(field_type.owned_redis_keys(key, f"{parent_path}.{dotted}"))
         return keys
 
     # --- END ---
