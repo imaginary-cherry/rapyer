@@ -173,6 +173,8 @@ class FieldSpec:
     # Union of traits reachable anywhere in this field's subtree.
     reaches: FieldTrait = FieldTrait(0)
     is_redis_link: bool = False
+    # A model stored inline in this document: recursing into it stays on the same Redis key.
+    is_nested_model: bool = False
     safe_load: bool = False
 
     def has(self, trait: FieldTrait) -> bool:
@@ -453,6 +455,7 @@ class AtomicRedisModel(ParentLinked, BaseModel):
                 else FieldTrait(0)
             )
             is_link = safe_issubclass(origin, ParentLinked)
+            is_nested = safe_issubclass(origin, AtomicRedisModel)
 
             spec = FieldSpec(
                 name=field_name,
@@ -468,6 +471,7 @@ class AtomicRedisModel(ParentLinked, BaseModel):
                     origin.reachable_fields_w_traits() if is_link else FieldTrait(0)
                 ),
                 is_redis_link=is_link,
+                is_nested_model=is_nested,
                 safe_load=field_name in safe_load_field_names,
             )
             # Fields on no axis are plain values; skip them so views below stay pre-filtered.
@@ -775,9 +779,9 @@ class AtomicRedisModel(ParentLinked, BaseModel):
             fname: True for fname in cls.fields_with(FieldTrait.EXCLUDED_FROM_DOC)
         }
         for fname in cls.fields_reaching(FieldTrait.EXCLUDED_FROM_DOC):
-            field_type = cls._field_specs[fname].field_type
-            if safe_issubclass(field_type, AtomicRedisModel):
-                nested = field_type.build_redis_dump_exclude()
+            spec = cls._field_specs[fname]
+            if spec.is_nested_model:
+                nested = spec.field_type.build_redis_dump_exclude()
                 if nested:
                     exclude[fname] = nested
         return exclude
@@ -1221,8 +1225,7 @@ class AtomicRedisModel(ParentLinked, BaseModel):
         for name, spec in cls._field_specs.items():
             if spec.has(requires):
                 yield spec, (*path, name)
-            is_nested_model = safe_issubclass(spec.field_type, AtomicRedisModel)
-            if requires & spec.reaches and is_nested_model:
+            if requires & spec.reaches and spec.is_nested_model:
                 yield from spec.field_type.walk(
                     requires, path=(*path, name), _seen=_seen
                 )

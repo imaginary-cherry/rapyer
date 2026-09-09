@@ -103,9 +103,6 @@ def _static_walk_fk_edges(
     top_level: bool = True,
 ):
     """Append every enabled FK edge reachable from model_cls's own fields."""
-    # Lazy import breaks the rapyer.base -> rapyer.cascade module cycle.
-    from rapyer.base import AtomicRedisModel
-
     for field_name, spec in model_cls._field_specs.items():
         if not spec.has(FieldTrait.REFERENCES_ROOT):
             continue
@@ -134,8 +131,8 @@ def _static_walk_fk_edges(
         if not spec.reaches & FieldTrait.REFERENCES_ROOT:
             continue
         field_cls = spec.field_type
-        if safe_issubclass(field_cls, AtomicRedisModel):
-            # Nested inline sub-model: same RedisJSON document, zero-hop recursion.
+        if spec.is_nested_model:
+            # Same RedisJSON document, so this is zero-hop recursion.
             nested_path = f"{parent_path}.{field_name}"
             _static_walk_fk_edges(field_cls, nested_path, fks, models, top_level=False)
             continue
@@ -198,9 +195,6 @@ def _static_walk_fk_edges(
 
 def _static_walk_special_suffixes(model_cls: Any, parent_path: str = "") -> list[str]:
     """Dotted-path special-field suffixes for model_cls, recursing into nested sub-models."""
-    # Lazy import breaks the rapyer.base -> rapyer.cascade module cycle.
-    from rapyer.base import AtomicRedisModel
-
     # Declaration order, not fields_with's frozenset: this list feeds the plan hash (A3).
     suffixes: list[str] = [
         f"{parent_path}.{field_name}".lstrip(".")
@@ -212,7 +206,7 @@ def _static_walk_special_suffixes(model_cls: Any, parent_path: str = "") -> list
             continue
         field_cls = spec.field_type
         # Only nested models have a per-class suffix set; container-of-SF (list[RedisSet]) don't.
-        if not safe_issubclass(field_cls, AtomicRedisModel):
+        if not spec.is_nested_model:
             continue
         nested_path = f"{parent_path}.{field_name}"
         suffixes.extend(_static_walk_special_suffixes(field_cls, nested_path))
