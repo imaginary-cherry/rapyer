@@ -1,6 +1,6 @@
 from rapyer.cascade import CascadeTTL
 from rapyer.cascade.planner import _field_cascade_spec
-from rapyer.types.external import Capability
+from rapyer.types.external import FieldTrait
 from tests.models.cascade_types import (
     CascadeAuthor,
     CascadeBookCollection,
@@ -53,8 +53,7 @@ def test_plain_fk_field_classification_is_unaffected():
     is_relational = {
         n
         for n, s in specs.items()
-        if s.external
-        and s.external.field_type.capabilities() & Capability.REFERENCES_ROOT
+        if s.external and s.external.field_type.traits() & FieldTrait.REFERENCES_ROOT
     }
 
     # Assert
@@ -79,11 +78,10 @@ def test_existing_fk_book_classification_remains_byte_identical():
     is_relational = {
         n
         for n, s in specs.items()
-        if s.external
-        and s.external.field_type.capabilities() & Capability.REFERENCES_ROOT
+        if s.external and s.external.field_type.traits() & FieldTrait.REFERENCES_ROOT
     }
     contains_fk = {
-        n for n, s in specs.items() if s.reaches & Capability.REFERENCES_ROOT
+        n for n, s in specs.items() if s.reaches & FieldTrait.REFERENCES_ROOT
     }
 
     # Assert

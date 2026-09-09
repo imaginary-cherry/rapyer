@@ -82,7 +82,7 @@ from rapyer.types.base import (
     is_redis_field_value,
 )
 from rapyer.types.convert import RedisConverter
-from rapyer.types.external import Capability, ExternalFieldSpec, ExternalFieldType
+from rapyer.types.external import ExternalFieldSpec, ExternalFieldType, FieldTrait
 from rapyer.types.generic import GenericRedisType
 from rapyer.types.special import (
     SPECIAL_FIELD_KEY_PREFIX,
@@ -168,8 +168,8 @@ class FieldSpec:
     name: str
     field_type: type
     external: Optional[ExternalFieldSpec[Any]] = None
-    # Union of capabilities reachable anywhere in this field's subtree.
-    reaches: Capability = Capability(0)
+    # Union of traits reachable anywhere in this field's subtree.
+    reaches: FieldTrait = FieldTrait(0)
     is_redis_link: bool = False
     safe_load: bool = False
 
@@ -272,8 +272,8 @@ class AtomicRedisModel(BaseModel):
     @functools.cache
     def _needs_cascade_script(cls) -> bool:
         # Any FK edge or special-field key needs the script; plain scalars use EXPIRE.
-        cap = Capability.OWNS_KEYS | Capability.REFERENCES_ROOT
-        return bool(cls.inner_capabilities() & cap)
+        trait = FieldTrait.OWNS_KEYS | FieldTrait.REFERENCES_ROOT
+        return bool(cls.inner_traits() & trait)
 
     async def refresh_ttl(self, can_use_pipeline: bool = False):
         """Refresh TTL unconditionally."""
@@ -435,10 +435,10 @@ class AtomicRedisModel(BaseModel):
             cls._field_specs.pop(field_name, None)
 
             origin = annotation_origin(annotation)  # ONE peel
-            caps = (
-                origin.capabilities()
+            traits = (
+                origin.traits()
                 if safe_issubclass(origin, ExternalFieldType)
-                else Capability(0)
+                else FieldTrait(0)
             )
             is_link = safe_issubclass(origin, (BaseRedisType, AtomicRedisModel))
 
@@ -449,10 +449,10 @@ class AtomicRedisModel(BaseModel):
                     ExternalFieldSpec(
                         field_name, origin, origin.extract_config(annotation)
                     )
-                    if caps
+                    if traits
                     else None
                 ),
-                reaches=origin.inner_capabilities() if is_link else Capability(0),
+                reaches=origin.inner_traits() if is_link else FieldTrait(0),
                 is_redis_link=is_link,
                 safe_load=field_name in safe_load_field_names,
             )
@@ -584,7 +584,7 @@ class AtomicRedisModel(BaseModel):
     @mark_actions(ActionGroup.UPDATE)
     async def aupdate(self, **kwargs):
         # Special fields own separate Redis keys and cannot be written as JSON path updates.
-        special_in_kwargs = self.fields_with(Capability.EXCLUDED_FROM_DOC) & set(
+        special_in_kwargs = self.fields_with(FieldTrait.EXCLUDED_FROM_DOC) & set(
             kwargs.keys()
         )
         if special_in_kwargs:
@@ -664,20 +664,20 @@ class AtomicRedisModel(BaseModel):
     @classmethod
     def walk(
         cls,
-        requires: Capability,
+        requires: FieldTrait,
         *,
         hop_roots: bool = False,
         path: tuple[str, ...] = (),
         _seen: frozenset = frozenset(),
     ) -> Iterator[tuple[FieldSpec, tuple[str, ...]]]:
-        """Yield (spec, path) for every field reachable under the required capability."""
+        """Yield (spec, path) for every field reachable under the required trait."""
         if cls in _seen or len(path) > MAX_WALK_DEPTH:
             return
         _seen = _seen | {cls}  # path-local: rebound per frame, never merged upward
         for name, spec in cls._field_specs.items():
             if (
                 spec.external is not None
-                and requires & spec.external.field_type.capabilities()
+                and requires & spec.external.field_type.traits()
             ):
                 yield spec, (*path, name)
             if requires & spec.reaches and safe_issubclass(
@@ -690,7 +690,7 @@ class AtomicRedisModel(BaseModel):
     @classmethod
     def _all_keys_for_key(cls, key: str, parent_path: str = "") -> list[str]:
         keys = [key] if not parent_path else []
-        for spec, path in cls.walk(Capability.OWNS_KEYS, hop_roots=False):
+        for spec, path in cls.walk(FieldTrait.OWNS_KEYS, hop_roots=False):
             field_path = f"{parent_path}.{'.'.join(path)}"
             keys.extend(spec.field_type.owned_redis_keys(key, field_path))
         return keys
@@ -709,7 +709,7 @@ class AtomicRedisModel(BaseModel):
         key = cls._resolve_key(key)
         plan = []
         sf_raw = []
-        if not cls.inner_capabilities() & Capability.OWNS_KEYS:
+        if not cls.inner_traits() & FieldTrait.OWNS_KEYS:
             model_dump = await cls.Meta.redis_json.get(key, "$")  # type: ignore[misc]
         else:
             models_dump, plans_per_key, sf_raw = await execute_load_pipeline(
@@ -732,7 +732,7 @@ class AtomicRedisModel(BaseModel):
         cls = self.__class__
         plan: list[list[str]] = []
         sf_raw = []
-        if not cls.inner_capabilities() & Capability.OWNS_KEYS:
+        if not cls.inner_traits() & FieldTrait.OWNS_KEYS:
             model_dump = await self.Meta.redis_json.get(self.key, self.json_path)  # type: ignore[misc]
             if not model_dump:
                 raise KeyNotFound(f"{self.key} is missing in redis")
@@ -767,31 +767,30 @@ class AtomicRedisModel(BaseModel):
 
     @classmethod
     @functools.cache
-    def fields_with(cls, cap: Capability) -> frozenset[str]:
-        """Field names whose own external capabilities include ``cap``."""
+    def fields_with(cls, trait: FieldTrait) -> frozenset[str]:
+        """Field names whose own external traits include ``trait``."""
         return frozenset(
             name
             for name, spec in cls._field_specs.items()
-            if spec.external is not None
-            and spec.external.field_type.capabilities() & cap
+            if spec.external is not None and spec.external.field_type.traits() & trait
         )
 
     @classmethod
     @functools.cache
-    def fields_reaching(cls, cap: Capability) -> frozenset[str]:
-        """Field names whose subtree reaches ``cap`` without providing it themselves."""
+    def fields_reaching(cls, trait: FieldTrait) -> frozenset[str]:
+        """Field names whose subtree reaches ``trait`` without providing it themselves."""
         return frozenset(
-            name for name, spec in cls._field_specs.items() if spec.reaches & cap
+            name for name, spec in cls._field_specs.items() if spec.reaches & trait
         )
 
     @classmethod
     @functools.cache
-    def inner_capabilities(cls) -> Capability:
-        """Per-bit union of every capability reachable in this class's own field tree."""
-        mask = Capability(0)
+    def inner_traits(cls) -> FieldTrait:
+        """Per-bit union of every trait reachable in this class's own field tree."""
+        mask = FieldTrait(0)
         for spec in cls._field_specs.values():
             if spec.external is not None:
-                mask |= spec.external.field_type.capabilities()
+                mask |= spec.external.field_type.traits()
             mask |= spec.reaches
         return mask
 
@@ -799,9 +798,9 @@ class AtomicRedisModel(BaseModel):
     @functools.cache
     def build_redis_dump_exclude(cls) -> dict:
         exclude: dict = {}
-        for fname in cls.fields_with(Capability.EXCLUDED_FROM_DOC):
+        for fname in cls.fields_with(FieldTrait.EXCLUDED_FROM_DOC):
             exclude[fname] = True
-        for fname in cls.fields_reaching(Capability.EXCLUDED_FROM_DOC):
+        for fname in cls.fields_reaching(FieldTrait.EXCLUDED_FROM_DOC):
             field_type = cls._field_specs[fname].field_type
             if safe_issubclass(field_type, AtomicRedisModel):
                 nested = field_type.build_redis_dump_exclude()
@@ -814,12 +813,12 @@ class AtomicRedisModel(BaseModel):
         cls, pipe, key: str, plan: list, parent_path: str = "", field_name: str = ""
     ):
         """Queue load ops for every SF reachable from this model. both directly and nested (in a list or container model)"""
-        for fname in cls.fields_with(Capability.PIPELINE_LOAD):
+        for fname in cls.fields_with(FieldTrait.LOADS_WITH_DOC):
             field_type = cls._field_specs[fname].field_type
             field_type.queue_special_loads_in_pipeline(
                 pipe, key, plan, parent_path, field_name=f".{fname}"
             )
-        for fname in cls.fields_reaching(Capability.PIPELINE_LOAD):
+        for fname in cls.fields_reaching(FieldTrait.LOADS_WITH_DOC):
             field_type = cls._field_specs[fname].field_type
             nested_path = f"{parent_path}.{fname}"
             max_before_queueing = len(plan)
@@ -928,13 +927,13 @@ class AtomicRedisModel(BaseModel):
         child models — depth-first.
         """
         cls = self.__class__
-        for fname in cls.fields_with(Capability.INSTANCE_STATE):
+        for fname in cls.fields_with(FieldTrait.HOLDS_LIVE_STATE):
             field = getattr(self, fname)
             # A1 knock-on: Optional[SF] = None is a legitimate unset value, not a stale spec.
             if field is None:
                 continue
             yield field, (*prefix, fname)
-        for fname in cls.fields_reaching(Capability.INSTANCE_STATE):
+        for fname in cls.fields_reaching(FieldTrait.HOLDS_LIVE_STATE):
             child = getattr(self, fname)
             if isinstance(child, AtomicRedisModel):
                 yield from child._iter_special_fields((*prefix, fname))
@@ -1202,7 +1201,7 @@ class AtomicRedisModel(BaseModel):
         if (
             spec is not None
             and spec.external is not None
-            and spec.external.field_type.capabilities() & Capability.EXCLUDED_FROM_DOC
+            and spec.external.field_type.traits() & FieldTrait.EXCLUDED_FROM_DOC
         ):
             return
 

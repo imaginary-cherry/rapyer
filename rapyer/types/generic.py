@@ -9,7 +9,7 @@ from pydantic_core.core_schema import CoreSchema, SerializationInfo, ValidationI
 
 from rapyer.errors import CantSerializeRedisValueError
 from rapyer.types.base import BaseRedisType, RedisType
-from rapyer.types.external import Capability
+from rapyer.types.external import FieldTrait
 from rapyer.utils.pythonic import resolve_generic_args, safe_issubclass
 
 logger = logging.getLogger("rapyer")
@@ -33,16 +33,16 @@ class GenericRedisType(RedisType, Generic[T], ABC):
         return args[0] if args else Any
 
     @classmethod
-    def inner_capabilities(cls) -> Capability:
+    def inner_traits(cls) -> FieldTrait:
         """What is reachable through this container's element type, e.g. list[RedisSet]."""
         inner = cls.find_inner_type(cls)
         if inner is Any:
-            return Capability(0)
+            return FieldTrait(0)
         # inner may be a parameterized alias (e.g. ForeignKey[Author]), so reduce it to its origin.
         inner = get_origin(inner) or inner
         if not safe_issubclass(inner, BaseRedisType):
-            return Capability(0)
-        return inner.capabilities() | inner.inner_capabilities()
+            return FieldTrait(0)
+        return inner.traits() | inner.inner_traits()
 
     @classmethod
     @abc.abstractmethod

@@ -7,7 +7,7 @@ from pydantic import TypeAdapter
 from rapyer.base import AtomicRedisModel
 from rapyer.errors import NotResolvedError
 from rapyer.types import Reference
-from rapyer.types.external import Capability
+from rapyer.types.external import FieldTrait
 from rapyer.types.foreign_key import ForeignKey
 from rapyer.types.relational import RelationalFieldType
 from rapyer.utils.pythonic import resolve_generic_args
@@ -26,11 +26,10 @@ def test_book_class_classifies_relational_fields():
     is_relational = {
         n
         for n, s in specs.items()
-        if s.external
-        and s.external.field_type.capabilities() & Capability.REFERENCES_ROOT
+        if s.external and s.external.field_type.traits() & FieldTrait.REFERENCES_ROOT
     }
     contains_fk = {
-        n for n, s in specs.items() if s.reaches & Capability.REFERENCES_ROOT
+        n for n, s in specs.items() if s.reaches & FieldTrait.REFERENCES_ROOT
     }
 
     # Assert
@@ -40,7 +39,7 @@ def test_book_class_classifies_relational_fields():
 
 def test_model_contains_fk_field_reflects_relational_fields():
     # Arrange / Act / Assert
-    assert bool(FkBook.inner_capabilities() & Capability.REFERENCES_ROOT) is True
+    assert bool(FkBook.inner_traits() & FieldTrait.REFERENCES_ROOT) is True
 
 
 def test_relational_fields_are_also_redis_link_fields():

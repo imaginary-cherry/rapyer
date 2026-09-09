@@ -7,7 +7,7 @@ from pydantic_core import core_schema
 
 from rapyer.actions import ActionGroup, mark_actions
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME
-from rapyer.types.external import Capability
+from rapyer.types.external import FieldTrait
 from rapyer.types.special import SpecialFieldType
 from rapyer.utils.pythonic import resolve_generic_args
 
@@ -31,12 +31,12 @@ class RedisSet(set, SpecialFieldType[None], Generic[T]):
         return "set"
 
     @classmethod
-    def capabilities(cls) -> Capability:
+    def traits(cls) -> FieldTrait:
         return (
-            Capability.OWNS_KEYS
-            | Capability.EXCLUDED_FROM_DOC
-            | Capability.PIPELINE_LOAD
-            | Capability.INSTANCE_STATE
+            FieldTrait.OWNS_KEYS
+            | FieldTrait.EXCLUDED_FROM_DOC
+            | FieldTrait.LOADS_WITH_DOC
+            | FieldTrait.HOLDS_LIVE_STATE
         )
 
     # --- Serialization helpers ---

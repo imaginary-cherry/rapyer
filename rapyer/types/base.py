@@ -51,18 +51,18 @@ class BaseRedisType(ABC):
         install_marked_action_methods(cls, meta)
 
     @classmethod
-    def capabilities(cls) -> "Capability":
+    def traits(cls) -> "FieldTrait":
         """What this type itself contributes to a walk."""
-        from rapyer.types.external import Capability
+        from rapyer.types.external import FieldTrait
 
-        return Capability(0)
+        return FieldTrait(0)
 
     @classmethod
-    def inner_capabilities(cls) -> "Capability":
+    def inner_traits(cls) -> "FieldTrait":
         """What is reachable strictly inside this type, never including its own."""
-        from rapyer.types.external import Capability
+        from rapyer.types.external import FieldTrait
 
-        return Capability(0)
+        return FieldTrait(0)
 
     @classmethod
     def queue_special_loads_in_pipeline(

@@ -41,7 +41,7 @@ PRIVATE_METHODS = _group(
     RedisSet.queue_special_loads_in_pipeline,
     RedisSet._tmp_key,
     # Generic
-    GenericRedisType.inner_capabilities,
+    GenericRedisType.inner_traits,
     # AtomicRedisModel
     AtomicRedisModel._search_keys_by_query,
     AtomicRedisModel.build_redis_model,
@@ -72,7 +72,7 @@ PRIVATE_METHODS = _group(
     AtomicRedisModel.should_refresh,
     AtomicRedisModel.should_refresh_for_action,
     AtomicRedisModel.build_redis_dump_exclude,
-    AtomicRedisModel.inner_capabilities,
+    AtomicRedisModel.inner_traits,
     AtomicRedisModel.fields_with,
     AtomicRedisModel.fields_reaching,
     AtomicRedisModel.queue_special_loads_in_pipeline,
@@ -112,22 +112,22 @@ PRIVATE_INHERITED_METHODS = _group(
     SpecialFieldType.lua_load_snippet,
     SpecialFieldType.lua_save_payload,
     SpecialFieldType.has_lua_load_output,
-    # Capability declarations and the walks that read them: pure class-level
+    # FieldTrait declarations and the walks that read them: pure class-level
     # introspection over _field_specs, no Redis round trip. Shared contract across the
     # hierarchy, so subclasses override several of them.
-    ExternalFieldType.capabilities,
-    ExternalFieldType.inner_capabilities,
+    ExternalFieldType.traits,
+    ExternalFieldType.inner_traits,
     ExternalFieldType.config_type,
     ExternalFieldType.extract_config,
     ExternalFieldType.owns_serialization,
     ExternalFieldType.owned_redis_keys,
     SpecialFieldType.owned_redis_keys,
     SpecialFieldType.cascade_container_kind,
-    RedisSet.capabilities,
+    RedisSet.traits,
     RedisSet.cascade_container_kind,
-    RedisPriorityQueue.capabilities,
+    RedisPriorityQueue.traits,
     RedisPriorityQueue.cascade_container_kind,
-    ForeignKey.capabilities,
+    ForeignKey.traits,
     RelationalFieldType.relational_targets,
     AtomicRedisModel.walk,
     AtomicRedisModel.redis_link_fields,

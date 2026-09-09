@@ -9,7 +9,7 @@ from rapyer.cascade.planner import (
     validate_cascade_ttl_targets,
 )
 from rapyer.errors import CascadeTargetTtlMissingError
-from rapyer.types.external import Capability
+from rapyer.types.external import FieldTrait
 from tests.models.cascade_types import (
     CascadeAuthor,
     CascadeBlanketRoot,
@@ -156,18 +156,12 @@ def test_sf_of_fk_field_lands_in_both_contain_fk_and_special_fields():
     queue_spec = CascadePQRefParent._field_specs[expected_queue_field]
 
     # Act / Assert
-    assert (
-        bool(CascadeSetRefParent.inner_capabilities() & Capability.REFERENCES_ROOT)
-        is True
-    )
-    assert (
-        bool(CascadePQRefParent.inner_capabilities() & Capability.REFERENCES_ROOT)
-        is True
-    )
-    assert set_spec.reaches & Capability.REFERENCES_ROOT
-    assert expected_set_field in CascadeSetRefParent.fields_with(Capability.OWNS_KEYS)
-    assert queue_spec.reaches & Capability.REFERENCES_ROOT
-    assert expected_queue_field in CascadePQRefParent.fields_with(Capability.OWNS_KEYS)
+    assert bool(CascadeSetRefParent.inner_traits() & FieldTrait.REFERENCES_ROOT) is True
+    assert bool(CascadePQRefParent.inner_traits() & FieldTrait.REFERENCES_ROOT) is True
+    assert set_spec.reaches & FieldTrait.REFERENCES_ROOT
+    assert expected_set_field in CascadeSetRefParent.fields_with(FieldTrait.OWNS_KEYS)
+    assert queue_spec.reaches & FieldTrait.REFERENCES_ROOT
+    assert expected_queue_field in CascadePQRefParent.fields_with(FieldTrait.OWNS_KEYS)
 
 
 def test_plain_sf_container_is_not_an_fk_edge_but_needs_the_cascade_script():
@@ -175,8 +169,8 @@ def test_plain_sf_container_is_not_an_fk_edge_but_needs_the_cascade_script():
     specs = CascadeSpecialChild._field_specs
 
     # Act / Assert
-    assert not specs["tags"].reaches & Capability.REFERENCES_ROOT
-    assert not specs["scores"].reaches & Capability.REFERENCES_ROOT
+    assert not specs["tags"].reaches & FieldTrait.REFERENCES_ROOT
+    assert not specs["scores"].reaches & FieldTrait.REFERENCES_ROOT
     assert CascadeSpecialChild._needs_cascade_script() is True
 
 

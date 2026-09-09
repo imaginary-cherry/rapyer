@@ -8,7 +8,7 @@ from pydantic_core import core_schema
 from rapyer.actions import ActionGroup, mark_actions
 from rapyer.errors.base import RapyerSerializationError
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME
-from rapyer.types.external import Capability
+from rapyer.types.external import FieldTrait
 from rapyer.types.special import SpecialFieldType
 from rapyer.utils.pythonic import resolve_generic_args
 
@@ -33,12 +33,12 @@ class RedisPriorityQueue(SpecialFieldType[None], Generic[T]):
         return "zset"
 
     @classmethod
-    def capabilities(cls) -> Capability:
-        # No PIPELINE_LOAD: items are fetched lazily by apeek/aitems.
+    def traits(cls) -> FieldTrait:
+        # No LOADS_WITH_DOC: items are fetched lazily by apeek/aitems.
         return (
-            Capability.OWNS_KEYS
-            | Capability.EXCLUDED_FROM_DOC
-            | Capability.INSTANCE_STATE
+            FieldTrait.OWNS_KEYS
+            | FieldTrait.EXCLUDED_FROM_DOC
+            | FieldTrait.HOLDS_LIVE_STATE
         )
 
     # --- Serialization helpers ---

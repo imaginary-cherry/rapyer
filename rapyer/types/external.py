@@ -1,6 +1,6 @@
 import abc
 import dataclasses
-import enum
+from enum import Flag, auto
 from typing import Annotated, Any, Generic, Optional, TypeVar, get_args, get_origin
 
 from rapyer.types.base import BaseRedisType
@@ -9,26 +9,26 @@ from rapyer.utils.pythonic import resolve_generic_args, safe_issubclass
 ConfigT = TypeVar("ConfigT")
 
 
-class Capability(enum.Flag):
+class FieldTrait(Flag):
     """What a field type contributes to a walk."""
 
     # INDEXED is deliberately absent — add it only once a walk needs it.
 
     # Owns a Redis key that dies with the parent; the delete and TTL sweeps collect it.
     # RedisSet: _all_keys_for_key adds __rapyer_special__:{key}:tags to the doc key.
-    OWNS_KEYS = enum.auto()
+    OWNS_KEYS = auto()
     # Never serialized into the parent JSON, so the document dump excludes the field.
     # RedisSet: build_redis_dump_exclude drops "tags" before JSON.SET writes the doc.
-    EXCLUDED_FROM_DOC = enum.auto()
+    EXCLUDED_FROM_DOC = auto()
     # Contributes a slot to the load pipeline; lazily-fetched types declare none.
     # RedisSet has it, RedisPriorityQueue does not — apeek/aitems fetch on demand.
-    PIPELINE_LOAD = enum.auto()
+    LOADS_WITH_DOC = auto()
     # The live instance must be visited to save it, not just its class-level facts.
     # asave walks _iter_special_fields and calls asave_special() on each RedisSet.
-    INSTANCE_STATE = enum.auto()
+    HOLDS_LIVE_STATE = auto()
     # Names a separate document with its own key and TTL; cascade decides the hop.
     # ForeignKey only: the planner's FK-edge walk turns each into a CascadeEdge.
-    REFERENCES_ROOT = enum.auto()
+    REFERENCES_ROOT = auto()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -82,21 +82,21 @@ class ExternalFieldType(BaseRedisType, abc.ABC, Generic[ConfigT]):
         return True
 
     @classmethod
-    def capabilities(cls) -> Capability:
+    def traits(cls) -> FieldTrait:
         """What this type contributes to a walk."""
-        return Capability(0)
+        return FieldTrait(0)
 
     @classmethod
-    def inner_capabilities(cls) -> Capability:
+    def inner_traits(cls) -> FieldTrait:
         """What is reachable through this type's generic element, e.g. RedisSet[ForeignKey[X]]."""
         args = resolve_generic_args(cls)
         inner = args[0] if args else Any
         if inner is Any:
-            return Capability(0)
+            return FieldTrait(0)
         inner = get_origin(inner) or inner
         if not safe_issubclass(inner, BaseRedisType):
-            return Capability(0)
-        return inner.capabilities() | inner.inner_capabilities()
+            return FieldTrait(0)
+        return inner.traits() | inner.inner_traits()
 
     @classmethod
     def owned_redis_keys(cls, model_key: str, field_path: str) -> list[str]:

@@ -1,7 +1,7 @@
 import pytest
 import pytest_asyncio
 
-from rapyer.types.external import Capability
+from rapyer.types.external import FieldTrait
 from rapyer.types.redis_set import RedisSet
 from tests.models.special_types import (
     AutoMappedSetModel,
@@ -313,7 +313,7 @@ async def test_clone_returns_independent_local_copy(real_redis_client):
 async def test_list_of_bare_redis_sets_is_detected_as_special(real_redis_client):
     # Arrange / Assert - a plain list[RedisSet] is the only construct with an SF inner element.
     annotation = ListOfSetsModel.model_fields["buckets"].annotation
-    assert bool(annotation.inner_capabilities() & Capability.OWNS_KEYS) is True
+    assert bool(annotation.inner_traits() & FieldTrait.OWNS_KEYS) is True
 
     # Act
     model = ListOfSetsModel()

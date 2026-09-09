@@ -6,7 +6,7 @@ from pydantic_core import core_schema
 from rapyer.base import AtomicRedisModel, FieldSpec, RedisConfig
 from rapyer.cascade import CascadeTTL
 from rapyer.fields.safe_load import SafeLoad
-from rapyer.types.external import Capability, ExternalFieldType
+from rapyer.types.external import ExternalFieldType, FieldTrait
 from rapyer.types.foreign_key import ForeignKey
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.redis_set import RedisSet
@@ -44,14 +44,13 @@ class PQOnlyParent(AtomicRedisModel):
 
 def _owns_keys(spec: FieldSpec) -> bool:
     return bool(
-        spec.external and spec.external.field_type.capabilities() & Capability.OWNS_KEYS
+        spec.external and spec.external.field_type.traits() & FieldTrait.OWNS_KEYS
     )
 
 
 def _references_root(spec: FieldSpec) -> bool:
     return bool(
-        spec.external
-        and spec.external.field_type.capabilities() & Capability.REFERENCES_ROOT
+        spec.external and spec.external.field_type.traits() & FieldTrait.REFERENCES_ROOT
     )
 
 
@@ -61,14 +60,14 @@ def test_fields_with_and_fields_reaching_match_a_manual_axis_scan():
     expected_owns_keys = {n for n, s in specs.items() if _owns_keys(s)}
     expected_links = frozenset(n for n, s in specs.items() if s.is_redis_link)
     expected_reaching_owns_keys = frozenset(
-        n for n, s in specs.items() if s.reaches & Capability.OWNS_KEYS
+        n for n, s in specs.items() if s.reaches & FieldTrait.OWNS_KEYS
     )
 
     # Act / Assert
-    assert set(SpecParent.fields_with(Capability.OWNS_KEYS)) == expected_owns_keys
+    assert set(SpecParent.fields_with(FieldTrait.OWNS_KEYS)) == expected_owns_keys
     assert SpecParent.redis_link_fields() == expected_links
     assert (
-        SpecParent.fields_reaching(Capability.OWNS_KEYS) == expected_reaching_owns_keys
+        SpecParent.fields_reaching(FieldTrait.OWNS_KEYS) == expected_reaching_owns_keys
     )
 
 
@@ -79,7 +78,7 @@ def test_redis_link_fields_is_a_strict_superset():
 
     # Act / Assert
     assert SpecParent.redis_link_fields() == expected_links
-    assert expected_field not in SpecParent.fields_with(Capability.OWNS_KEYS)
+    assert expected_field not in SpecParent.fields_with(FieldTrait.OWNS_KEYS)
 
 
 def test_each_class_caches_its_own_derived_view():
@@ -91,8 +90,8 @@ def test_each_class_caches_its_own_derived_view():
     expected_field = "child"
 
     # Act / Assert
-    assert expected_field in SpecParent.fields_reaching(Capability.OWNS_KEYS)
-    assert expected_field not in SpecSubclass.fields_reaching(Capability.OWNS_KEYS)
+    assert expected_field in SpecParent.fields_reaching(FieldTrait.OWNS_KEYS)
+    assert expected_field not in SpecSubclass.fields_reaching(FieldTrait.OWNS_KEYS)
 
 
 def test_a_field_can_sit_on_several_axes_at_once():
@@ -105,7 +104,7 @@ def test_a_field_can_sit_on_several_axes_at_once():
     # Assert
     axes = (
         _owns_keys(spec),
-        bool(spec.reaches & Capability.REFERENCES_ROOT),
+        bool(spec.reaches & FieldTrait.REFERENCES_ROOT),
         spec.is_redis_link,
     )
     assert axes == expected_axes
@@ -123,7 +122,7 @@ def test_optional_nested_model_is_seen_as_containing_a_special_field():
     # Act / Assert
     assert expected_field in OptionalChildParent._field_specs
     assert (
-        OptionalChildParent.fields_reaching(Capability.OWNS_KEYS) == expected_reaching
+        OptionalChildParent.fields_reaching(FieldTrait.OWNS_KEYS) == expected_reaching
     )
 
 
@@ -144,26 +143,26 @@ def test_the_two_containment_axes_can_hold_at_once():
     spec = BothOuter._field_specs["child"]
 
     # Assert
-    assert bool(spec.reaches & Capability.OWNS_KEYS) is True
-    assert bool(spec.reaches & Capability.REFERENCES_ROOT) is True
+    assert bool(spec.reaches & FieldTrait.OWNS_KEYS) is True
+    assert bool(spec.reaches & FieldTrait.REFERENCES_ROOT) is True
 
 
-def test_relational_capability_and_reaches_references_root_are_mutually_exclusive():
+def test_relational_trait_and_reaches_references_root_are_mutually_exclusive():
     # Arrange - a ForeignKey itself provides REFERENCES_ROOT; it does not also "reach" one.
-    expected_capability, expected_reach = True, False
+    expected_trait, expected_reach = True, False
 
     # Act
     spec = SpecParent._field_specs["ref"]
 
     # Assert
-    assert _references_root(spec) is expected_capability
-    assert bool(spec.reaches & Capability.REFERENCES_ROOT) is expected_reach
+    assert _references_root(spec) is expected_trait
+    assert bool(spec.reaches & FieldTrait.REFERENCES_ROOT) is expected_reach
 
 
 def test_an_unclassified_spec_is_not_kept():
     # Arrange
     plain = FieldSpec(name="x", field_type=str)
-    classified = FieldSpec(name="x", field_type=str, reaches=Capability.OWNS_KEYS)
+    classified = FieldSpec(name="x", field_type=str, reaches=FieldTrait.OWNS_KEYS)
 
     # Act / Assert
     assert plain.is_classified() is False
@@ -176,8 +175,8 @@ def test_reaches_carries_per_bit_precision_for_a_pq_only_subtree():
     expected_owns_keys, expected_pipeline_load = True, False
 
     # Act
-    owns_keys = bool(spec.reaches & Capability.OWNS_KEYS)
-    pipeline_load = bool(spec.reaches & Capability.PIPELINE_LOAD)
+    owns_keys = bool(spec.reaches & FieldTrait.OWNS_KEYS)
+    pipeline_load = bool(spec.reaches & FieldTrait.LOADS_WITH_DOC)
 
     # Assert
     assert owns_keys is expected_owns_keys
@@ -190,7 +189,7 @@ def test_reaches_excludes_references_root_when_only_an_sf_is_nested():
     expected_references_root = False
 
     # Act
-    references_root = bool(spec.reaches & Capability.REFERENCES_ROOT)
+    references_root = bool(spec.reaches & FieldTrait.REFERENCES_ROOT)
 
     # Assert
     assert references_root is expected_references_root
@@ -211,14 +210,14 @@ def test_subclass_override_rewrites_the_spec_rather_than_leaving_a_stale_one():
     # Assert
     cleared = (
         _owns_keys(overridden),
-        bool(overridden.reaches & Capability.REFERENCES_ROOT),
+        bool(overridden.reaches & FieldTrait.REFERENCES_ROOT),
         bool(overridden.reaches),
     )
     assert cleared == expected_cleared
     assert overridden.is_redis_link is True
     # The parent keeps its own classification.
-    assert expected_field in SpecParent.fields_with(Capability.OWNS_KEYS)
-    assert SpecParent._field_specs[expected_field].reaches & Capability.REFERENCES_ROOT
+    assert expected_field in SpecParent.fields_with(FieldTrait.OWNS_KEYS)
+    assert SpecParent._field_specs[expected_field].reaches & FieldTrait.REFERENCES_ROOT
 
 
 def test_safe_load_annotation_is_folded_into_the_spec():
@@ -243,15 +242,15 @@ def test_relational_config_is_extracted_at_class_build():
 
 
 def test_a_novel_external_field_type_classifies_with_zero_base_py_changes():
-    # A new kind needs one row (capabilities()) and zero edits to __init_subclass__.
+    # A new kind needs one row (traits()) and zero edits to __init_subclass__.
     class NovelFieldType(ExternalFieldType[None]):
         def __init__(self, value: Any = None):
             super().__init__()
             self.value = value
 
         @classmethod
-        def capabilities(cls) -> Capability:
-            return Capability.PIPELINE_LOAD
+        def traits(cls) -> FieldTrait:
+            return FieldTrait.LOADS_WITH_DOC
 
         @classmethod
         def __get_pydantic_core_schema__(cls, source_type, handler):
@@ -266,7 +265,7 @@ def test_a_novel_external_field_type_classifies_with_zero_base_py_changes():
         widget: NovelFieldType = None
         Meta: ClassVar[RedisConfig] = RedisConfig()
 
-    expected_field, expected_capability = "widget", Capability.PIPELINE_LOAD
+    expected_field, expected_trait = "widget", FieldTrait.LOADS_WITH_DOC
 
     # Act
     spec = NovelFieldModel._field_specs[expected_field]
@@ -274,5 +273,5 @@ def test_a_novel_external_field_type_classifies_with_zero_base_py_changes():
     # Assert
     assert spec.external is not None
     assert issubclass(spec.external.field_type, NovelFieldType)
-    assert spec.external.field_type.capabilities() == expected_capability
-    assert expected_field in NovelFieldModel.fields_with(expected_capability)
+    assert spec.external.field_type.traits() == expected_trait
+    assert expected_field in NovelFieldModel.fields_with(expected_trait)

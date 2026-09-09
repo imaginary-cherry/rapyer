@@ -1,7 +1,7 @@
 import pytest
 
 from rapyer.errors import KeyNotFound
-from rapyer.types.external import Capability
+from rapyer.types.external import FieldTrait
 from tests.models.simple_types import UserModelWithTTL
 from tests.models.special_types import GenericRedisSetModel
 
@@ -47,10 +47,7 @@ async def test_aload_missing_special_field_model_raises_key_not_found(
     # Arrange - a missing special-field key makes the load pipeline return an empty dump.
     model = GenericRedisSetModel[str]()
     await model.asave()
-    assert (
-        bool(GenericRedisSetModel[str].inner_capabilities() & Capability.OWNS_KEYS)
-        is True
-    )
+    assert bool(GenericRedisSetModel[str].inner_traits() & FieldTrait.OWNS_KEYS) is True
 
     # Act
     await real_redis_client.delete(model.key)

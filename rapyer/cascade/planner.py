@@ -10,7 +10,7 @@ from rapyer.errors.cascade import (
     CascadeTargetTtlMissingError,
 )
 from rapyer.scripts.constants import CASCADE_FUNCTION_PREFIX, CASCADE_LIBRARY_PREFIX
-from rapyer.types.external import Capability
+from rapyer.types.external import FieldTrait
 from rapyer.types.foreign_key import ForeignKey
 from rapyer.types.relational import RelationalFieldType
 from rapyer.utils.pythonic import safe_issubclass
@@ -31,7 +31,7 @@ def _field_cascade_spec(model_cls: Any, field_name: str) -> CascadeSpec | None:
     is_relational = (
         spec is not None
         and spec.external is not None
-        and spec.external.field_type.capabilities() & Capability.REFERENCES_ROOT
+        and spec.external.field_type.traits() & FieldTrait.REFERENCES_ROOT
     )
     field_type = spec.external.field_type if is_relational else ForeignKey
     return field_type.extract_config(annotation)
@@ -112,7 +112,7 @@ def _static_walk_fk_edges(
     for field_name, spec in model_cls._field_specs.items():
         if not (
             spec.external is not None
-            and spec.external.field_type.capabilities() & Capability.REFERENCES_ROOT
+            and spec.external.field_type.traits() & FieldTrait.REFERENCES_ROOT
         ):
             continue
         edge = _classify_edge(model_cls, field_name)
@@ -137,7 +137,7 @@ def _static_walk_fk_edges(
         )
 
     for field_name, spec in model_cls._field_specs.items():
-        if not spec.reaches & Capability.REFERENCES_ROOT:
+        if not spec.reaches & FieldTrait.REFERENCES_ROOT:
             continue
         field_cls = spec.field_type
         if safe_issubclass(field_cls, AtomicRedisModel):
@@ -214,13 +214,13 @@ def _static_walk_special_suffixes(model_cls: Any, parent_path: str = "") -> list
     for field_name, spec in model_cls._field_specs.items():
         if not (
             spec.external is not None
-            and spec.external.field_type.capabilities() & Capability.OWNS_KEYS
+            and spec.external.field_type.traits() & FieldTrait.OWNS_KEYS
         ):
             continue
         field_path = f"{parent_path}.{field_name}"
         suffixes.append(field_path.lstrip("."))
     for field_name, spec in model_cls._field_specs.items():
-        if not spec.reaches & Capability.OWNS_KEYS:
+        if not spec.reaches & FieldTrait.OWNS_KEYS:
             continue
         field_cls = spec.field_type
         # Only nested models have a per-class suffix set; container-of-SF (list[RedisSet]) don't.
