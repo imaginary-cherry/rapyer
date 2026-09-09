@@ -23,7 +23,8 @@ from rapyer.scripts.constants import (
     STR_APPEND_SCRIPT_NAME,
     STR_MUL_SCRIPT_NAME,
 )
-from rapyer.scripts.loader import build_cascade_library, load_script
+from rapyer.scripts.loader import build_cascade_library
+from rapyer.scripts.templates import load_script
 
 if TYPE_CHECKING:
     from rapyer.config import RedisConfig

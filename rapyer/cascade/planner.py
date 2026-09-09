@@ -12,6 +12,7 @@ from rapyer.errors.cascade import (
 from rapyer.scripts.constants import CASCADE_FUNCTION_PREFIX, CASCADE_LIBRARY_PREFIX
 from rapyer.types.foreign_key import ForeignKey
 from rapyer.types.relational import RelationalFieldType
+from rapyer.types.special import SpecialFieldType
 from rapyer.types.traits import FieldTrait
 from rapyer.utils.pythonic import safe_issubclass
 
@@ -138,9 +139,6 @@ def _static_walk_fk_edges(
             nested_path = f"{parent_path}.{field_name}"
             _static_walk_fk_edges(field_cls, nested_path, fks, models, top_level=False)
             continue
-
-        # Lazy import: priority_queue -> special -> scripts.loader -> planner is a real cycle.
-        from rapyer.types.special import SpecialFieldType
 
         sf_container = (
             field_cls.cascade_container_kind()

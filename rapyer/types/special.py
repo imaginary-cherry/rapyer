@@ -1,7 +1,7 @@
 import abc
 from typing import ClassVar, Optional, TypeVar
 
-from rapyer.scripts.loader import load_sf_load_snippet, load_sf_save_snippet
+from rapyer.scripts.templates import load_sf_load_snippet, load_sf_save_snippet
 from rapyer.types.external import ExternalFieldType
 
 SPECIAL_FIELD_KEY_PREFIX = "__rapyer_special__"
