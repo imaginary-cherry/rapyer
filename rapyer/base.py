@@ -174,6 +174,13 @@ class FieldSpec:
     is_redis_link: bool = False
     safe_load: bool = False
 
+    def has(self, trait: FieldTrait) -> bool:
+        """Whether this field's own type contributes ``trait``."""
+        own_traits = (
+            self.external.field_type.traits() if self.external else FieldTrait(0)
+        )
+        return bool(own_traits & trait)
+
     def is_classified(self) -> bool:
         return bool(
             self.external is not None
@@ -735,9 +742,7 @@ class AtomicRedisModel(BaseModel):
     def fields_with(cls, trait: FieldTrait) -> frozenset[str]:
         """Field names whose own external traits include ``trait``."""
         return frozenset(
-            name
-            for name, spec in cls._field_specs.items()
-            if spec.external is not None and spec.external.field_type.traits() & trait
+            name for name, spec in cls._field_specs.items() if spec.has(trait)
         )
 
     @classmethod
@@ -762,9 +767,9 @@ class AtomicRedisModel(BaseModel):
     @classmethod
     @functools.cache
     def build_redis_dump_exclude(cls) -> dict:
-        exclude: dict = {}
-        for fname in cls.fields_with(FieldTrait.EXCLUDED_FROM_DOC):
-            exclude[fname] = True
+        exclude: dict = {
+            fname: True for fname in cls.fields_with(FieldTrait.EXCLUDED_FROM_DOC)
+        }
         for fname in cls.fields_reaching(FieldTrait.EXCLUDED_FROM_DOC):
             field_type = cls._field_specs[fname].field_type
             if safe_issubclass(field_type, AtomicRedisModel):
@@ -1153,11 +1158,7 @@ class AtomicRedisModel(BaseModel):
 
         # Not-in-document fields manage their own storage; ForeignKey still writes inline.
         spec = self.__class__._field_specs.get(name)
-        if (
-            spec is not None
-            and spec.external is not None
-            and spec.external.field_type.traits() & FieldTrait.EXCLUDED_FROM_DOC
-        ):
+        if spec is not None and spec.has(FieldTrait.EXCLUDED_FROM_DOC):
             return
 
         pipeline = _context_pipe.get()
@@ -1208,7 +1209,6 @@ class AtomicRedisModel(BaseModel):
         cls,
         requires: FieldTrait,
         *,
-        hop_roots: bool = False,
         path: tuple[str, ...] = (),
         _seen: frozenset = frozenset(),
     ) -> Iterator[tuple[FieldSpec, tuple[str, ...]]]:
@@ -1217,16 +1217,12 @@ class AtomicRedisModel(BaseModel):
             return
         _seen |= {cls}  # path-local: rebound per frame, never merged upward
         for name, spec in cls._field_specs.items():
-            if (
-                spec.external is not None
-                and requires & spec.external.field_type.traits()
-            ):
+            if spec.has(requires):
                 yield spec, (*path, name)
-            if requires & spec.reaches and safe_issubclass(
-                spec.field_type, AtomicRedisModel
-            ):
+            is_nested_model = safe_issubclass(spec.field_type, AtomicRedisModel)
+            if requires & spec.reaches and is_nested_model:
                 yield from spec.field_type.walk(
-                    requires, hop_roots=hop_roots, path=(*path, name), _seen=_seen
+                    requires, path=(*path, name), _seen=_seen
                 )
 
     @functools.cached_property
@@ -1240,7 +1236,7 @@ class AtomicRedisModel(BaseModel):
     def _owned_key_paths(cls) -> tuple[tuple[type, str], ...]:
         return tuple(
             (spec.field_type, ".".join(path))
-            for spec, path in cls.walk(FieldTrait.OWNS_KEYS, hop_roots=False)
+            for spec, path in cls.walk(FieldTrait.OWNS_KEYS)
         )
 
     # Real Redis resolves these keys in the Lua cascade function; delete has no server-side

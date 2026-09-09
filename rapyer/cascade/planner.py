@@ -28,11 +28,7 @@ def _field_cascade_spec(model_cls: Any, field_name: str) -> CascadeSpec | None:
     if field_info.metadata:
         annotation = Annotated[(annotation, *field_info.metadata)]
     spec = model_cls._field_specs.get(field_name)
-    is_relational = (
-        spec is not None
-        and spec.external is not None
-        and spec.external.field_type.traits() & FieldTrait.REFERENCES_ROOT
-    )
+    is_relational = spec is not None and spec.has(FieldTrait.REFERENCES_ROOT)
     field_type = spec.external.field_type if is_relational else ForeignKey
     return field_type.extract_config(annotation)
 
@@ -110,10 +106,7 @@ def _static_walk_fk_edges(
     from rapyer.base import AtomicRedisModel
 
     for field_name, spec in model_cls._field_specs.items():
-        if not (
-            spec.external is not None
-            and spec.external.field_type.traits() & FieldTrait.REFERENCES_ROOT
-        ):
+        if not spec.has(FieldTrait.REFERENCES_ROOT):
             continue
         edge = _classify_edge(model_cls, field_name)
         if not edge.enabled:
@@ -210,15 +203,12 @@ def _static_walk_special_suffixes(model_cls: Any, parent_path: str = "") -> list
     # Lazy import breaks the rapyer.base -> rapyer.cascade module cycle.
     from rapyer.base import AtomicRedisModel
 
-    suffixes: list[str] = []
-    for field_name, spec in model_cls._field_specs.items():
-        if not (
-            spec.external is not None
-            and spec.external.field_type.traits() & FieldTrait.OWNS_KEYS
-        ):
-            continue
-        field_path = f"{parent_path}.{field_name}"
-        suffixes.append(field_path.lstrip("."))
+    # Declaration order, not fields_with's frozenset: this list feeds the plan hash (A3).
+    suffixes: list[str] = [
+        f"{parent_path}.{field_name}".lstrip(".")
+        for field_name, spec in model_cls._field_specs.items()
+        if spec.has(FieldTrait.OWNS_KEYS)
+    ]
     for field_name, spec in model_cls._field_specs.items():
         if not spec.reaches & FieldTrait.OWNS_KEYS:
             continue

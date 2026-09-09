@@ -52,17 +52,13 @@ class BaseRedisType(ABC):
         install_marked_action_methods(cls, meta)
 
     @classmethod
-    def traits(cls) -> "FieldTrait":
+    def traits(cls) -> FieldTrait:
         """What this type itself contributes to a walk."""
-        from rapyer.types.traits import FieldTrait
-
         return FieldTrait(0)
 
     @classmethod
-    def reachable_fields_w_traits(cls) -> "FieldTrait":
+    def reachable_fields_w_traits(cls) -> FieldTrait:
         """What is reachable strictly inside this type, never including its own."""
-        from rapyer.types.traits import FieldTrait
-
         return FieldTrait(0)
 
     @classmethod

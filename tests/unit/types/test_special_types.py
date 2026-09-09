@@ -64,25 +64,29 @@ def test_overridden_special_field_not_special():
     expected_keys = ["X:1"]
     expected_field = "tasks"
 
-    # Act / Assert
-    assert expected_field not in OverriddenSpecialFieldModel.fields_with(
+    # Act
+    own_owns_keys = OverriddenSpecialFieldModel.fields_with(FieldTrait.OWNS_KEYS)
+    reaching_owns_keys = OverriddenSpecialFieldModel.fields_reaching(
         FieldTrait.OWNS_KEYS
     )
-    assert expected_field not in OverriddenSpecialFieldModel.fields_reaching(
-        FieldTrait.OWNS_KEYS
-    )
+    keys = OverriddenSpecialFieldModel._all_keys_for_key("X:1")
+
+    # Assert
+    assert expected_field not in own_owns_keys
+    assert expected_field not in reaching_owns_keys
     # _all_keys_for_key no longer crashes on the stale name
-    assert OverriddenSpecialFieldModel._all_keys_for_key("X:1") == expected_keys
+    assert keys == expected_keys
 
 
 def test_inherited_special_field_still_special():
     # Arrange - guards against an over-eager fix that prunes inherited fields
     expected_special = "tasks"
 
-    # Act / Assert
-    assert expected_special in SubSubPriorityQueueModel.fields_with(
-        FieldTrait.OWNS_KEYS
-    )
+    # Act
+    inherited_owns_keys = SubSubPriorityQueueModel.fields_with(FieldTrait.OWNS_KEYS)
+
+    # Assert
+    assert expected_special in inherited_owns_keys
 
 
 def test_mixed_redis_dump_excludes_special_fields():

@@ -68,19 +68,6 @@ def test_walk_visits_both_siblings_sharing_a_nested_class():
     assert paths == expected_paths
 
 
-def test_walk_accepts_hop_roots_without_changing_owns_keys_result():
-    # Arrange / Act
-    paths_no_hop = {
-        path for _, path in WalkTwinParent.walk(FieldTrait.OWNS_KEYS, hop_roots=False)
-    }
-    paths_hop = {
-        path for _, path in WalkTwinParent.walk(FieldTrait.OWNS_KEYS, hop_roots=True)
-    }
-
-    # Assert
-    assert paths_no_hop == paths_hop
-
-
 def test_walk_requires_gate_prunes_subtree_lacking_the_trait():
     # Arrange
     expected_pipeline_load_hits = []
