@@ -663,6 +663,8 @@ class AtomicRedisModel(BaseModel):
     def all_keys(self) -> list[str]:
         return self._all_keys_for_key(self.key)
 
+    # Traverses the class tree in Python. Where the answer is a key set, that work belongs
+    # in Lua next to the TTL cascade function; see _all_keys_for_key.
     @classmethod
     def walk(
         cls,
@@ -689,6 +691,8 @@ class AtomicRedisModel(BaseModel):
                     requires, hop_roots=hop_roots, path=(*path, name), _seen=_seen
                 )
 
+    # Client-side key discovery, which should be a fakeredis fallback only: the TTL cascade
+    # function already resolves these keys in Lua, but delete has no server-side equivalent.
     @classmethod
     def _all_keys_for_key(cls, key: str, parent_path: str = "") -> list[str]:
         keys = [key] if not parent_path else []
