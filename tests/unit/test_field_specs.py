@@ -6,10 +6,11 @@ from pydantic_core import core_schema
 from rapyer.base import AtomicRedisModel, FieldSpec, RedisConfig
 from rapyer.cascade import CascadeTTL
 from rapyer.fields.safe_load import SafeLoad
-from rapyer.types.external import ExternalFieldType, FieldTrait
+from rapyer.types.external import ExternalFieldType
 from rapyer.types.foreign_key import ForeignKey
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.redis_set import RedisSet
+from rapyer.types.traits import FieldTrait
 from tests.models.cascade_types import CascadeBookDirect
 
 

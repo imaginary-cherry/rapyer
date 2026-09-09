@@ -5,8 +5,8 @@ from pydantic_core import core_schema
 
 from rapyer.cascade.spec import CascadeSpec
 from rapyer.errors import NotResolvedError
-from rapyer.types.external import FieldTrait
 from rapyer.types.relational import RelationalFieldType
+from rapyer.types.traits import FieldTrait
 
 if TYPE_CHECKING:
     from rapyer.base import AtomicRedisModel

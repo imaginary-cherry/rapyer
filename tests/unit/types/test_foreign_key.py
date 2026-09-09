@@ -7,9 +7,9 @@ from pydantic import TypeAdapter
 from rapyer.base import AtomicRedisModel
 from rapyer.errors import NotResolvedError
 from rapyer.types import Reference
-from rapyer.types.external import FieldTrait
 from rapyer.types.foreign_key import ForeignKey
 from rapyer.types.relational import RelationalFieldType
+from rapyer.types.traits import FieldTrait
 from rapyer.utils.pythonic import resolve_generic_args
 from tests.models.foreign_key_types import FkAuthor, FkBook
 

@@ -7,8 +7,8 @@ from pydantic_core import core_schema
 
 from rapyer.actions import ActionGroup, mark_actions
 from rapyer.types.base import REDIS_DUMP_FLAG_NAME
-from rapyer.types.external import FieldTrait
 from rapyer.types.special import SpecialFieldType
+from rapyer.types.traits import FieldTrait
 from rapyer.utils.pythonic import resolve_generic_args
 
 T = TypeVar("T")

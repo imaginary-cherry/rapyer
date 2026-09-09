@@ -1,6 +1,6 @@
 from rapyer.cascade import CascadeTTL
 from rapyer.cascade.planner import _field_cascade_spec
-from rapyer.types.external import FieldTrait
+from rapyer.types.traits import FieldTrait
 from tests.models.cascade_types import (
     CascadeAuthor,
     CascadeBookCollection,

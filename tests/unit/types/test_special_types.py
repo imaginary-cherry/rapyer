@@ -3,9 +3,9 @@ from pydantic import TypeAdapter
 
 from rapyer.errors import RapyerSerializationError, UpdateAtomicModelError
 from rapyer.types.base import BaseRedisType
-from rapyer.types.external import FieldTrait
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.special import SPECIAL_FIELD_KEY_PREFIX, SpecialFieldType
+from rapyer.types.traits import FieldTrait
 from tests.models.special_types import (
     GenericPriorityQueueModel,
     ListOfSetsModel,

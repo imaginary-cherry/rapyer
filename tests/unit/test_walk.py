@@ -3,8 +3,8 @@ from typing import ClassVar
 from pydantic import Field
 
 from rapyer.base import MAX_WALK_DEPTH, AtomicRedisModel, RedisConfig
-from rapyer.types.external import FieldTrait
 from rapyer.types.priority_queue import RedisPriorityQueue
+from rapyer.types.traits import FieldTrait
 
 
 class WalkPQOnlyChild(AtomicRedisModel):

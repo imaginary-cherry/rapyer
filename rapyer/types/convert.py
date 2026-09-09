@@ -1,10 +1,11 @@
 import types as _python_types
-from typing import TYPE_CHECKING, Optional, get_origin
+from typing import TYPE_CHECKING, Any, Optional, get_origin
 
 from pydantic import BaseModel, TypeAdapter
 
 from rapyer.fields.key import RapyerKey
 from rapyer.types.base import BaseRedisType
+from rapyer.types.relational import RelationalFieldType
 from rapyer.utils.annotation import DYNAMIC_CLASS_DOC, TypeConverter
 from rapyer.utils.pythonic import safe_issubclass
 
@@ -51,6 +52,12 @@ class RedisConverter(TypeConverter):
         from rapyer.base import AtomicRedisModel
 
         return safe_issubclass(origin, AtomicRedisModel)
+
+    def keeps_annotation(self, annotation: Any) -> bool:
+        # A relational field is never dynamically subclassed; it stays a plain field.
+        return safe_issubclass(
+            get_origin(annotation) or annotation, RelationalFieldType
+        )
 
     def is_type_support(self, type_to_check: type) -> bool:
         if safe_issubclass(type_to_check, BaseModel):

@@ -9,7 +9,7 @@ from rapyer.cascade.planner import (
     validate_cascade_ttl_targets,
 )
 from rapyer.errors import CascadeTargetTtlMissingError
-from rapyer.types.external import FieldTrait
+from rapyer.types.traits import FieldTrait
 from tests.models.cascade_types import (
     CascadeAuthor,
     CascadeBlanketRoot,

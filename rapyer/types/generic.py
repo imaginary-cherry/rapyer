@@ -9,7 +9,7 @@ from pydantic_core.core_schema import CoreSchema, SerializationInfo, ValidationI
 
 from rapyer.errors import CantSerializeRedisValueError
 from rapyer.types.base import BaseRedisType, RedisType
-from rapyer.types.external import FieldTrait
+from rapyer.types.traits import FieldTrait
 from rapyer.utils.pythonic import resolve_generic_args, safe_issubclass
 
 logger = logging.getLogger("rapyer")

@@ -11,6 +11,7 @@ from redis.commands.search.field import TextField
 # Imported here to avoid circular import issues; actions imports context, not types.base
 from rapyer.actions import ActionGroup, install_marked_action_methods, mark_actions
 from rapyer.context import _context_pipe, get_pipe_json
+from rapyer.types.traits import FieldTrait
 from rapyer.typing_support import Self
 
 if TYPE_CHECKING:
@@ -53,14 +54,14 @@ class BaseRedisType(ABC):
     @classmethod
     def traits(cls) -> "FieldTrait":
         """What this type itself contributes to a walk."""
-        from rapyer.types.external import FieldTrait
+        from rapyer.types.traits import FieldTrait
 
         return FieldTrait(0)
 
     @classmethod
     def reachable_fields_w_traits(cls) -> "FieldTrait":
         """What is reachable strictly inside this type, never including its own."""
-        from rapyer.types.external import FieldTrait
+        from rapyer.types.traits import FieldTrait
 
         return FieldTrait(0)
 

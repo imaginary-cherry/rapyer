@@ -10,7 +10,9 @@ from typing import (
     get_origin,
 )
 
-from rapyer.types.external import ExternalFieldType, FieldTrait
+from rapyer.types.external import ExternalFieldType
+from rapyer.types.traits import FieldTrait
+from rapyer.utils.annotation import strip_optional
 from rapyer.utils.pythonic import resolve_generic_args, safe_issubclass
 
 if TYPE_CHECKING:
@@ -66,9 +68,6 @@ class RelationalFieldType(ExternalFieldType[ConfigT], abc.ABC):
         Every model class an annotation of this type can point to, empty if
         the annotation is not FK-shaped anywhere within it.
         """
-        # Lazy import: rapyer.utils.annotation imports RelationalFieldType at module level.
-        from rapyer.utils.annotation import strip_optional
-
         stripped = strip_optional(annotation)
         origin = get_origin(stripped) or stripped
         if safe_issubclass(origin, RelationalFieldType):

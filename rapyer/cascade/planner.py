@@ -10,9 +10,9 @@ from rapyer.errors.cascade import (
     CascadeTargetTtlMissingError,
 )
 from rapyer.scripts.constants import CASCADE_FUNCTION_PREFIX, CASCADE_LIBRARY_PREFIX
-from rapyer.types.external import FieldTrait
 from rapyer.types.foreign_key import ForeignKey
 from rapyer.types.relational import RelationalFieldType
+from rapyer.types.traits import FieldTrait
 from rapyer.utils.pythonic import safe_issubclass
 
 if TYPE_CHECKING:

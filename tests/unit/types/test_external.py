@@ -1,7 +1,8 @@
-from rapyer.types.external import ExternalFieldType, FieldTrait
+from rapyer.types.external import ExternalFieldType
 from rapyer.types.foreign_key import ForeignKey
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.redis_set import RedisSet
+from rapyer.types.traits import FieldTrait
 
 
 def test_redis_set_pipeline_load_matches_has_lua_load_output():

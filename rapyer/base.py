@@ -82,12 +82,13 @@ from rapyer.types.base import (
     is_redis_field_value,
 )
 from rapyer.types.convert import RedisConverter
-from rapyer.types.external import ExternalFieldSpec, ExternalFieldType, FieldTrait
+from rapyer.types.external import ExternalFieldSpec, ExternalFieldType
 from rapyer.types.generic import GenericRedisType
 from rapyer.types.special import (
     SPECIAL_FIELD_KEY_PREFIX,
     SpecialFieldType,
 )
+from rapyer.types.traits import FieldTrait
 from rapyer.typing_support import Self, Unpack
 from rapyer.utils.annotation import (
     DYNAMIC_CLASS_DOC,
