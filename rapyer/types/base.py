@@ -10,6 +10,7 @@ from redis.commands.search.field import TextField
 
 # Imported here to avoid circular import issues; actions imports context, not types.base
 from rapyer.actions import ActionGroup, install_marked_action_methods, mark_actions
+from rapyer.capabilities import ParentLinked
 from rapyer.context import _context_pipe, get_pipe_json
 from rapyer.types.traits import FieldTrait
 from rapyer.typing_support import Self
@@ -21,7 +22,7 @@ REDIS_DUMP_FLAG_NAME = "__rapyer_dumped__"
 FAILED_FIELDS_KEY = "__rapyer_failed_fields__"
 
 
-class BaseRedisType(ABC):
+class BaseRedisType(ParentLinked, ABC):
     """Common base for all Redis-aware field types (inline and special)."""
 
     _adapter: TypeAdapter = None
@@ -110,10 +111,13 @@ class BaseRedisType(ABC):
         self._redis_updated = False
         self.field_name = ""
 
+    def link_to_parent(self, parent: ParentLinked, path_segment: str):
+        self._base_model_link = parent
+        self.field_name = path_segment
+
     def init_redis_field(self, key, val):
-        if hasattr(val, "_base_model_link"):
-            val._base_model_link = self
-            val.field_name = key
+        if isinstance(val, ParentLinked):
+            val.link_to_parent(self, key)
 
     def sub_field_path(self, key: str):
         return f"{self.field_path}.{key}"

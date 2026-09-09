@@ -3,6 +3,7 @@ from typing import Callable
 import rapyer
 from rapyer import find_redis_models, init_rapyer, teardown_rapyer
 from rapyer.base import AtomicRedisModel
+from rapyer.capabilities import ParentLinked
 from rapyer.types import RedisSet
 from rapyer.types.base import BaseRedisType, RedisType
 from rapyer.types.byte import RedisBytes
@@ -85,6 +86,8 @@ PRIVATE_METHODS = _group(
 # PRIVATE_INHERITED_METHODS — MRO-aware: inheritors and overriders are filtered too, so this is
 # the home for internal helpers whose contract is shared across the type hierarchy.
 PRIVATE_INHERITED_METHODS = _group(
+    # Pure in-memory parent wiring: sets the link and the path segment, no Redis.
+    ParentLinked.link_to_parent,
     BaseRedisType.sub_field_path,
     RedisType.redis_schema,
     RedisType.clone,

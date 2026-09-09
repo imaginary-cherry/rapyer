@@ -36,6 +36,7 @@ from rapyer.actions import (
     register_action_target,
     should_refresh_for_action,
 )
+from rapyer.capabilities import ParentLinked
 from rapyer.config import RedisConfig
 from rapyer.context import (
     _context_pipe,
@@ -194,7 +195,7 @@ class FieldSpec:
 MAX_WALK_DEPTH = 32
 
 
-class AtomicRedisModel(BaseModel):
+class AtomicRedisModel(ParentLinked, BaseModel):
     _pk: str | None = PrivateAttr(default=None)
     _base_model_link: Self | BaseRedisType = PrivateAttr(default=None)
     _failed_fields: set[str] = PrivateAttr(default_factory=set)
@@ -232,6 +233,10 @@ class AtomicRedisModel(BaseModel):
     @field_name.setter
     def field_name(self, value: str):
         self._field_name = value
+
+    def link_to_parent(self, parent: ParentLinked, path_segment: str):
+        self._base_model_link = parent
+        self._field_name = path_segment
 
     @property
     def field_path(self):
@@ -447,7 +452,7 @@ class AtomicRedisModel(BaseModel):
                 if safe_issubclass(origin, ExternalFieldType)
                 else FieldTrait(0)
             )
-            is_link = safe_issubclass(origin, (BaseRedisType, AtomicRedisModel))
+            is_link = safe_issubclass(origin, ParentLinked)
 
             spec = FieldSpec(
                 name=field_name,
@@ -1148,9 +1153,8 @@ class AtomicRedisModel(BaseModel):
 
         if value is not None:
             attr = getattr(self, name)
-            if isinstance(attr, (BaseRedisType, AtomicRedisModel)):
-                attr._base_model_link = self
-                attr.field_name = f".{name}"
+            if isinstance(attr, ParentLinked):
+                attr.link_to_parent(self, f".{name}")
 
         if skip_redis_set:
             return
@@ -1195,9 +1199,8 @@ class AtomicRedisModel(BaseModel):
         instance_dict = self.__dict__
         for name in link_fields:
             attr = instance_dict.get(name)
-            if isinstance(attr, (BaseRedisType, AtomicRedisModel)):
-                attr._base_model_link = self
-                attr.field_name = f".{name}"
+            if isinstance(attr, ParentLinked):
+                attr.link_to_parent(self, f".{name}")
 
     # --- Client-side key discovery: a fakeredis fallback ---
 
