@@ -2,7 +2,15 @@ import abc
 import base64
 import pickle
 from abc import ABC
-from typing import TYPE_CHECKING, Any, ClassVar, Optional
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    ClassVar,
+    Optional,
+    get_args,
+    get_origin,
+)
 
 from pydantic import GetCoreSchemaHandler, TypeAdapter
 from pydantic_core import core_schema
@@ -10,8 +18,13 @@ from redis.commands.search.field import TextField
 
 # Imported here to avoid circular import issues; actions imports context, not types.base
 from rapyer.actions import ActionGroup, install_marked_action_methods, mark_actions
+from rapyer.capabilities import ParentLinked
 from rapyer.context import _context_pipe, get_pipe_json
+from rapyer.errors.base import AmbiguousFieldConfigError
+from rapyer.types.traits import FieldTrait
 from rapyer.typing_support import Self
+from rapyer.utils.annotation import annotation_origin
+from rapyer.utils.pythonic import resolve_generic_args, safe_issubclass
 
 if TYPE_CHECKING:
     from rapyer.config import RedisConfig
@@ -20,7 +33,7 @@ REDIS_DUMP_FLAG_NAME = "__rapyer_dumped__"
 FAILED_FIELDS_KEY = "__rapyer_failed_fields__"
 
 
-class BaseRedisType(ABC):
+class BaseRedisType(ParentLinked, ABC):
     """Common base for all Redis-aware field types (inline and special)."""
 
     _adapter: TypeAdapter = None
@@ -51,14 +64,87 @@ class BaseRedisType(ABC):
         install_marked_action_methods(cls, meta)
 
     @classmethod
-    def contains_sf_field(cls) -> bool:
-        """Check if this type contains special field (in generic value - like list[RedisSet]"""
-        return False
+    def element_annotations(cls, annotation) -> tuple:
+        """This type's generic arguments, each keeping its own ``Annotated`` metadata."""
+        inner = annotation
+        while get_origin(inner) is Annotated:
+            inner = get_args(inner)[0]
+        # A bare class falls back to __orig_bases__, which is where a per-field
+        # subclass keeps the arguments its annotation was built from.
+        return resolve_generic_args(inner)
 
     @classmethod
-    def contains_fk_field(cls) -> bool:
-        """Check if this type contains a foreign-key field (e.g. list[ForeignKey])."""
-        return False
+    def config_readers(cls, annotation) -> tuple:
+        """Every type at or under this annotation that declares a config class."""
+        found: list = []
+        for arg in cls.element_annotations(annotation):
+            element = annotation_origin(arg)
+            if safe_issubclass(element, BaseRedisType):
+                found.extend(element.config_readers(arg))
+        return tuple(found)
+
+    @classmethod
+    def resolve_configs(cls, annotation) -> tuple:
+        """Every config declared at or under this annotation, in declaration order."""
+        found: list = []
+        for arg in cls.element_annotations(annotation):
+            element = annotation_origin(arg)
+            if safe_issubclass(element, BaseRedisType):
+                found.extend(element.resolve_configs(arg))
+        return tuple(found)
+
+    @classmethod
+    def field_configs(cls, annotation) -> tuple:
+        """
+        Every config that applies to a field of this type.
+        """
+        # The outer form is only consulted when nothing claimed a config of its own,
+        # so a marker is never counted twice.
+        return cls.resolve_configs(annotation) or cls._configs_claimed_from_outside(
+            annotation
+        )
+
+    @classmethod
+    def _configs_claimed_from_outside(cls, annotation) -> tuple:
+        """
+        Resolve a config written on the field for a type nested inside it.
+        """
+        by_config: dict = {}
+        for reader in cls.config_readers(annotation):
+            by_config.setdefault(reader.config_type(), []).append(reader)
+        claimed: list = []
+        for config_type, readers in by_config.items():
+            # Readers sharing a config class filter the same metadata, so one answers for all.
+            value = readers[0].extract_config(annotation)
+            if value is None:
+                continue
+            if len(readers) > 1:
+                # Per-field subclasses share a __name__, so report the count separately.
+                names = sorted({reader.__name__ for reader in readers})
+                raise AmbiguousFieldConfigError(
+                    config_type.__name__,
+                    names,
+                    f"{config_type.__name__} is written on this field but "
+                    f"{len(readers)} types inside it read one ({', '.join(names)}). "
+                    "Move it onto the type it configures.",
+                )
+            claimed.append(value)
+        return tuple(claimed)
+
+    @classmethod
+    def container_kind(cls) -> Optional[str]:
+        """The Redis structure this type keeps its elements in, outside the parent JSON."""
+        return None
+
+    @classmethod
+    def traits(cls) -> FieldTrait:
+        """What this type itself contributes to a walk."""
+        return FieldTrait(0)
+
+    @classmethod
+    def reachable_fields_w_traits(cls) -> FieldTrait:
+        """What is reachable strictly inside this type, never including its own."""
+        return FieldTrait(0)
 
     @classmethod
     def queue_special_loads_in_pipeline(
@@ -109,10 +195,13 @@ class BaseRedisType(ABC):
         self._redis_updated = False
         self.field_name = ""
 
+    def link_to_parent(self, parent: ParentLinked, path_segment: str):
+        self._base_model_link = parent
+        self.field_name = path_segment
+
     def init_redis_field(self, key, val):
-        if hasattr(val, "_base_model_link"):
-            val._base_model_link = self
-            val.field_name = key
+        if isinstance(val, ParentLinked):
+            val.link_to_parent(self, key)
 
     def sub_field_path(self, key: str):
         return f"{self.field_path}.{key}"

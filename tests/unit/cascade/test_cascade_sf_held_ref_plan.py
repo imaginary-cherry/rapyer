@@ -9,6 +9,7 @@ from rapyer.cascade.planner import (
     validate_cascade_ttl_targets,
 )
 from rapyer.errors import CascadeTargetTtlMissingError
+from rapyer.types.traits import FieldTrait
 from tests.models.cascade_types import (
     CascadeAuthor,
     CascadeBlanketRoot,
@@ -144,23 +145,42 @@ def test_positive_control_all_ttl_present_does_not_raise():
     validate_cascade_ttl_targets(plan)
 
 
-def test_sf_of_fk_field_lands_in_both_contain_fk_and_special_field_names():
+def test_sf_of_fk_field_lands_in_both_contain_fk_and_special_fields():
     """
     Unified detection (reverses D-02): an SF-of-FK field is both a traversal edge
-    source (_contain_fk) and a refresh-suffix source (_special_field_names).
+    source (reaches REFERENCES_ROOT) and a refresh-suffix source (own OWNS_KEYS).
     """
-    assert CascadeSetRefParent.contains_fk_field() is True
-    assert CascadePQRefParent.contains_fk_field() is True
-    assert "refs" in CascadeSetRefParent._contain_fk
-    assert "refs" in CascadeSetRefParent._special_field_names
-    assert "queue" in CascadePQRefParent._contain_fk
-    assert "queue" in CascadePQRefParent._special_field_names
+    # Arrange
+    expected_set_field, expected_queue_field = "refs", "queue"
+    set_spec = CascadeSetRefParent._field_specs[expected_set_field]
+    queue_spec = CascadePQRefParent._field_specs[expected_queue_field]
+
+    # Act / Assert
+    assert (
+        bool(
+            CascadeSetRefParent.reachable_fields_w_traits() & FieldTrait.REFERENCES_ROOT
+        )
+        is True
+    )
+    assert (
+        bool(
+            CascadePQRefParent.reachable_fields_w_traits() & FieldTrait.REFERENCES_ROOT
+        )
+        is True
+    )
+    assert set_spec.reaches & FieldTrait.REFERENCES_ROOT
+    assert expected_set_field in CascadeSetRefParent.fields_with(FieldTrait.OWNS_KEYS)
+    assert queue_spec.reaches & FieldTrait.REFERENCES_ROOT
+    assert expected_queue_field in CascadePQRefParent.fields_with(FieldTrait.OWNS_KEYS)
 
 
 def test_plain_sf_container_is_not_an_fk_edge_but_needs_the_cascade_script():
-    # Not an FK edge, but its special key still routes through the cascade script.
-    assert "tags" not in CascadeSpecialChild._contain_fk
-    assert "scores" not in CascadeSpecialChild._contain_fk
+    # Arrange - not an FK edge, but its special key still routes through the script.
+    specs = CascadeSpecialChild._field_specs
+
+    # Act / Assert
+    assert not specs["tags"].reaches & FieldTrait.REFERENCES_ROOT
+    assert not specs["scores"].reaches & FieldTrait.REFERENCES_ROOT
     assert CascadeSpecialChild._needs_cascade_script() is True
 
 

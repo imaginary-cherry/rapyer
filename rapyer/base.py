@@ -1,5 +1,6 @@
 import base64
 import contextlib
+import dataclasses
 import functools
 import json
 import logging
@@ -7,7 +8,7 @@ import pickle
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from contextlib import AbstractAsyncContextManager
-from typing import Annotated, Any, ClassVar, Optional, get_args, get_origin
+from typing import Any, ClassVar, Optional, get_origin
 
 from pydantic import (
     BaseModel,
@@ -35,6 +36,7 @@ from rapyer.actions import (
     register_action_target,
     should_refresh_for_action,
 )
+from rapyer.capabilities import ParentLinked
 from rapyer.config import RedisConfig
 from rapyer.context import (
     _context_pipe,
@@ -62,6 +64,7 @@ from rapyer.fields.index import IndexAnnotation
 from rapyer.fields.key import KeyAnnotation, RapyerKey
 from rapyer.fields.safe_load import SafeLoadAnnotation
 from rapyer.links import ATOMIC_MODEL_API_REF_LINK, REDIS_SUPPORTED_LINK
+from rapyer.model_registry import REDIS_MODELS
 from rapyer.result import (
     CascadeResult,
     DeleteResult,
@@ -81,12 +84,13 @@ from rapyer.types.base import (
     is_redis_field_value,
 )
 from rapyer.types.convert import RedisConverter
+from rapyer.types.external import ExternalFieldType
 from rapyer.types.generic import GenericRedisType
-from rapyer.types.relational import RelationalFieldType
 from rapyer.types.special import (
     SPECIAL_FIELD_KEY_PREFIX,
     SpecialFieldType,
 )
+from rapyer.types.traits import FieldTrait
 from rapyer.typing_support import Self, Unpack
 from rapyer.utils.annotation import (
     DYNAMIC_CLASS_DOC,
@@ -94,7 +98,6 @@ from rapyer.utils.annotation import (
     field_with_flag,
     has_annotation,
     replace_to_redis_types_in_annotation,
-    strip_optional,
 )
 from rapyer.utils.fields import (
     get_all_pydantic_annotation,
@@ -159,19 +162,58 @@ def make_pickle_field_serializer(
     return pickle_field_serializer, pickle_field_validator
 
 
-class AtomicRedisModel(BaseModel):
+@dataclasses.dataclass(frozen=True)
+class FieldSpec:
+    """
+    How one field is classified, written once per field in __init_subclass__.
+    """
+
+    field_type: type
+    # What this field's own type contributes; non-zero exactly when the type is external.
+    own_traits: FieldTrait = FieldTrait(0)
+    # Union of traits reachable anywhere in this field's subtree.
+    reaches: FieldTrait = FieldTrait(0)
+    # Every config the field's annotation declares, at any depth of its type tree.
+    configs: tuple = ()
+    is_redis_link: bool = False
+    # A model stored inline in this document: recursing into it stays on the same Redis key.
+    is_nested_model: bool = False
+    safe_load: bool = False
+
+    def has(self, trait: FieldTrait) -> bool:
+        """Whether this field's own type contributes ``trait``."""
+        return bool(self.own_traits & trait)
+
+    def is_external(self) -> bool:
+        """Whether the field's own type stores its data outside the parent document."""
+        return bool(self.own_traits)
+
+    def config(self, config_type: type):
+        """The single config of ``config_type`` this field declares, or None."""
+        for config in self.configs:
+            if isinstance(config, config_type):
+                return config
+        return None
+
+    def is_classified(self) -> bool:
+        return bool(
+            self.own_traits or self.reaches or self.is_redis_link or self.safe_load
+        )
+
+
+# A cycle-safety backstop for walk(), not a cascade depth budget.
+MAX_WALK_DEPTH = 32
+
+
+class AtomicRedisModel(ParentLinked, BaseModel):
     _pk: str | None = PrivateAttr(default=None)
     _base_model_link: Self | BaseRedisType = PrivateAttr(default=None)
     _failed_fields: set[str] = PrivateAttr(default_factory=set)
 
     Meta: ClassVar[RedisConfig] = RedisConfig()
     _key_field_name: ClassVar[str | None] = None
-    _safe_load_fields: ClassVar[set[str]] = set()
-    _special_field_names: ClassVar[set[str]] = set()
-    _relational_field_names: ClassVar[set[str]] = set()
-    _redis_link_field_names: ClassVar[set[str]] = set()
-    _contain_sf: ClassVar[set[str]] = set()
-    _contain_fk: ClassVar[set[str]] = set()
+    # Written once per field in __init_subclass__; every view below derives from it.
+    _field_specs: ClassVar[dict[str, FieldSpec]] = {}
     _field_name: str = PrivateAttr(default="")
     model_config = ConfigDict(validate_assignment=True, validate_default=True)
 
@@ -201,6 +243,10 @@ class AtomicRedisModel(BaseModel):
     @field_name.setter
     def field_name(self, value: str):
         self._field_name = value
+
+    def link_to_parent(self, parent: ParentLinked, path_segment: str):
+        self._base_model_link = parent
+        self._field_name = path_segment
 
     @property
     def field_path(self):
@@ -246,14 +292,11 @@ class AtomicRedisModel(BaseModel):
         return None
 
     @classmethod
+    @functools.cache
     def _needs_cascade_script(cls) -> bool:
         # Any FK edge or special-field key needs the script; plain scalars use EXPIRE.
-        return bool(
-            cls._relational_field_names
-            or cls._contain_fk
-            or cls._special_field_names
-            or cls._contain_sf
-        )
+        trait = FieldTrait.OWNS_KEYS | FieldTrait.REFERENCES_ROOT
+        return bool(cls.reachable_fields_w_traits() & trait)
 
     async def refresh_ttl(self, can_use_pipeline: bool = False):
         """Refresh TTL unconditionally."""
@@ -301,7 +344,6 @@ class AtomicRedisModel(BaseModel):
 
             full_redis_name = f"{redis_name}.{field_name}" if redis_name else field_name
             if issubclass(real_type, AtomicRedisModel):
-                real_type: type[AtomicRedisModel]
                 sub_fields = real_type.redis_schema(full_redis_name)
                 fields.extend(sub_fields)
             elif not field_with_flag(field_info, IndexAnnotation):
@@ -364,12 +406,12 @@ class AtomicRedisModel(BaseModel):
 
     def __init_subclass__(cls, **kwargs):
         # Find fields with KeyAnnotation and SafeLoadAnnotation
-        cls._safe_load_fields = set()
+        safe_load_field_names: set[str] = set()
         for field_name, annotation in cls.__annotations__.items():
             if has_annotation(annotation, KeyAnnotation):
                 cls._key_field_name = field_name
             if has_annotation(annotation, SafeLoadAnnotation):
-                cls._safe_load_fields.add(field_name)
+                safe_load_field_names.add(field_name)
 
         # Redefine annotations to use redis types
         pydantic_annotation = get_all_pydantic_annotation(cls, AtomicRedisModel)
@@ -395,7 +437,7 @@ class AtomicRedisModel(BaseModel):
                 RedisConverter(
                     cls.Meta.redis_type,
                     f".{field_name}",
-                    safe_load=field_name in cls._safe_load_fields
+                    safe_load=field_name in safe_load_field_names
                     or cls.Meta.safe_load_all,
                     owner_meta=cls.Meta,
                 ),
@@ -408,46 +450,40 @@ class AtomicRedisModel(BaseModel):
         for field_name, field in pydantic_annotation.items():
             setattr(cls, field_name, field)
 
-        # Detect special field types
-        cls._special_field_names = set(getattr(cls, "_special_field_names", set()))
-        cls._relational_field_names = set(
-            getattr(cls, "_relational_field_names", set())
-        )
-        cls._redis_link_field_names = set(
-            getattr(cls, "_redis_link_field_names", set())
-        )
-        cls._contain_sf = set(getattr(cls, "_contain_sf", set()))
-        cls._contain_fk = set(getattr(cls, "_contain_fk", set()))
+        # One spec per field, written here; every classification view below derives from it.
+        cls._field_specs = dict(getattr(cls, "_field_specs", {}))
         for field_name, annotation in cls.__annotations__.items():
-            # If the field was redfined, we remove it from list
-            cls._redis_link_field_names.discard(field_name)
-            cls._special_field_names.discard(field_name)
-            cls._contain_sf.discard(field_name)
-            cls._relational_field_names.discard(field_name)
-            cls._contain_fk.discard(field_name)
+            # A redefined field drops its inherited spec, clearing every axis at once.
+            cls._field_specs.pop(field_name, None)
 
-            unwrapped = annotation
-            while get_origin(unwrapped) is Annotated:
-                unwrapped = get_args(unwrapped)[0]
-            origin = get_origin(unwrapped) or unwrapped
-            if safe_issubclass(origin, SpecialFieldType):
-                cls._special_field_names.add(field_name)
+            origin = annotation_origin(annotation)  # ONE peel
+            traits = (
+                origin.traits()
+                if safe_issubclass(origin, ExternalFieldType)
+                else FieldTrait(0)
+            )
+            is_link = safe_issubclass(origin, ParentLinked)
+            is_nested = safe_issubclass(origin, AtomicRedisModel)
 
-            # Foreign keys: Check if field is a foreign key or has a FK
-            fk_origin = strip_optional(unwrapped)
-            fk_origin = get_origin(fk_origin) or fk_origin
-            if safe_issubclass(fk_origin, RelationalFieldType):
-                cls._relational_field_names.add(field_name)
-            elif (
-                safe_issubclass(fk_origin, (BaseRedisType, AtomicRedisModel))
-                and fk_origin.contains_fk_field()
-            ):
-                cls._contain_fk.add(field_name)
-            if safe_issubclass(origin, (BaseRedisType, AtomicRedisModel)):
-                origin: BaseRedisType | AtomicRedisModel
-                cls._redis_link_field_names.add(field_name)
-                if origin.contains_sf_field():
-                    cls._contain_sf.add(field_name)
+            spec = FieldSpec(
+                field_type=origin,
+                own_traits=traits,
+                reaches=(
+                    origin.reachable_fields_w_traits() if is_link else FieldTrait(0)
+                ),
+                # Narrower than is_link: a nested model is ParentLinked but reads no config.
+                configs=(
+                    origin.field_configs(annotation)
+                    if safe_issubclass(origin, BaseRedisType)
+                    else ()
+                ),
+                is_redis_link=is_link,
+                is_nested_model=is_nested,
+                safe_load=field_name in safe_load_field_names,
+            )
+            # Fields on no axis are plain values; skip them so views below stay pre-filtered.
+            if spec.is_classified():
+                cls._field_specs[field_name] = spec
 
         super().__init_subclass__(**kwargs)
 
@@ -457,19 +493,18 @@ class AtomicRedisModel(BaseModel):
                 continue
             if safe_issubclass(attr_type, RapyerKey):
                 continue
-            # Skip special fields — they handle their own serialization
-            if attr_name in cls._special_field_names:
-                continue
-            # ForeignKey stays unconverted and serializes itself to a key string.
-            if attr_name in cls._relational_field_names:
-                continue
+            # External fields own their serialization — skip pickle setup
+            attr_spec = cls._field_specs.get(attr_name)
+            if attr_spec is not None and attr_spec.is_external():
+                if attr_spec.field_type.owns_serialization():
+                    continue
             if original_annotations[attr_name] == attr_type:
                 default_value = cls.__dict__.get(attr_name, None)
                 can_json = is_type_json_serializable(attr_type, default_value)
                 should_json_serialize = can_json and cls.Meta.prefer_normal_json_dump
 
                 if not should_json_serialize:
-                    is_field_marked_safe = attr_name in cls._safe_load_fields
+                    is_field_marked_safe = attr_spec is not None and attr_spec.safe_load
                     is_safe_load = is_field_marked_safe or cls.Meta.safe_load_all
                     serializer, validator = make_pickle_field_serializer(
                         attr_name, safe_load=is_safe_load, can_json=can_json
@@ -574,7 +609,9 @@ class AtomicRedisModel(BaseModel):
     @mark_actions(ActionGroup.UPDATE)
     async def aupdate(self, **kwargs):
         # Special fields own separate Redis keys and cannot be written as JSON path updates.
-        special_in_kwargs = self._special_field_names & set(kwargs.keys())
+        field_names = set(kwargs.keys())
+        field_not_in_doc = self.fields_with(FieldTrait.EXCLUDED_FROM_DOC)
+        special_in_kwargs = field_not_in_doc & field_names
         if special_in_kwargs:
             raise UpdateAtomicModelError(
                 f"Cannot update special fields via aupdate: {special_in_kwargs}. "
@@ -587,7 +624,7 @@ class AtomicRedisModel(BaseModel):
         serialized_fields = self.model_dump(
             mode="json",
             context={REDIS_DUMP_FLAG_NAME: True},
-            include=set(kwargs.keys()),
+            include=field_names,
         )
         json_path_kwargs = {
             f"{self.json_path}.{field_name}": serialized_fields[field_name]
@@ -645,23 +682,6 @@ class AtomicRedisModel(BaseModel):
             mismatched_class=mismatched_class,
         )
 
-    @functools.cached_property
-    def all_keys(self) -> list[str]:
-        return self._all_keys_for_key(self.key)
-
-    @classmethod
-    def _all_keys_for_key(cls, key: str, parent_path: str = "") -> list[str]:
-        keys = [key] if not parent_path else []
-        for fname in cls._special_field_names:
-            field_cls = cls.model_fields[fname].annotation
-            field_path = f"{parent_path}.{fname}"
-            keys.append(field_cls.special_field_key(key, field_path))
-        for fname in cls._contain_sf:
-            field_cls = cls.model_fields[fname].annotation
-            nested_path = f"{parent_path}.{fname}"
-            keys.extend(field_cls._all_keys_for_key(key, nested_path))
-        return keys
-
     @classmethod
     def _resolve_key(cls, key: str | Self) -> str:
         if isinstance(key, AtomicRedisModel):
@@ -676,7 +696,7 @@ class AtomicRedisModel(BaseModel):
         key = cls._resolve_key(key)
         plan = []
         sf_raw = []
-        if not cls.contains_sf_field():
+        if not cls.reachable_fields_w_traits() & FieldTrait.OWNS_KEYS:
             model_dump = await cls.Meta.redis_json.get(key, "$")  # type: ignore[misc]
         else:
             models_dump, plans_per_key, sf_raw = await execute_load_pipeline(
@@ -699,7 +719,7 @@ class AtomicRedisModel(BaseModel):
         cls = self.__class__
         plan: list[list[str]] = []
         sf_raw = []
-        if not cls.contains_sf_field():
+        if not cls.reachable_fields_w_traits() & FieldTrait.OWNS_KEYS:
             model_dump = await self.Meta.redis_json.get(self.key, self.json_path)  # type: ignore[misc]
             if not model_dump:
                 raise KeyNotFound(f"{self.key} is missing in redis")
@@ -723,26 +743,72 @@ class AtomicRedisModel(BaseModel):
         return instance
 
     @classmethod
-    def contains_sf_field(cls) -> bool:
-        return bool(cls._contain_sf) or bool(cls._special_field_names)
+    @functools.cache
+    def redis_link_fields(cls) -> frozenset[str]:
+        """
+        Fields that are themselves a Redis type, a strict superset of the rest.
+        """
+        return frozenset(
+            name for name, spec in cls._field_specs.items() if spec.is_redis_link
+        )
 
     @classmethod
-    def contains_fk_field(cls) -> bool:
-        return bool(cls._contain_fk) or bool(cls._relational_field_names)
+    @functools.cache
+    def fields_with(cls, trait: FieldTrait) -> frozenset[str]:
+        """Field names whose own external traits include ``trait``."""
+        return frozenset(
+            name for name, spec in cls._field_specs.items() if spec.has(trait)
+        )
+
+    @classmethod
+    @functools.cache
+    def fields_reaching(cls, trait: FieldTrait) -> frozenset[str]:
+        """Field names whose subtree reaches ``trait`` without providing it themselves."""
+        return frozenset(
+            name for name, spec in cls._field_specs.items() if spec.reaches & trait
+        )
+
+    @classmethod
+    @functools.cache
+    def reachable_fields_w_traits(cls) -> FieldTrait:
+        """Per-bit union of every trait reachable in this class's own field tree."""
+        mask = FieldTrait(0)
+        for spec in cls._field_specs.values():
+            mask |= spec.own_traits
+            mask |= spec.reaches
+        return mask
+
+    # The one recursive traversal: every trait-driven view over the field tree derives from it.
+    @classmethod
+    def walk(
+        cls,
+        requires: FieldTrait,
+        *,
+        path: tuple[str, ...] = (),
+        _seen: frozenset = frozenset(),
+    ) -> Iterator[tuple[FieldSpec, tuple[str, ...]]]:
+        """Yield (spec, path) for every field reachable under the required trait."""
+        if cls in _seen or len(path) > MAX_WALK_DEPTH:
+            return
+        _seen |= {cls}  # path-local: rebound per frame, never merged upward
+        for name, spec in cls._field_specs.items():
+            if spec.has(requires):
+                yield spec, (*path, name)
+            if requires & spec.reaches and spec.is_nested_model:
+                yield from spec.field_type.walk(
+                    requires, path=(*path, name), _seen=_seen
+                )
 
     @classmethod
     @functools.cache
     def build_redis_dump_exclude(cls) -> dict:
+        # model_dump wants the paths nested, so each walk path grows a branch of dicts.
         exclude: dict = {}
-        for fname in cls._special_field_names:
-            exclude[fname] = True
-        for fname in cls._contain_sf:
-            annotation = cls.model_fields[fname].annotation
-            inner = get_origin(annotation) or annotation
-            if isinstance(inner, type) and issubclass(inner, AtomicRedisModel):
-                nested = inner.build_redis_dump_exclude()
-                if nested:
-                    exclude[fname] = nested
+        for _, path in cls.walk(FieldTrait.EXCLUDED_FROM_DOC):
+            branch = exclude
+            for segment in path[:-1]:
+                branch = branch.setdefault(segment, {})
+            branch[path[-1]] = True
         return exclude
 
     @classmethod
@@ -750,16 +816,16 @@ class AtomicRedisModel(BaseModel):
         cls, pipe, key: str, plan: list, parent_path: str = "", field_name: str = ""
     ):
         """Queue load ops for every SF reachable from this model. both directly and nested (in a list or container model)"""
-        for fname in cls._special_field_names:
-            field_cls = cls.model_fields[fname].annotation
-            field_cls.queue_special_loads_in_pipeline(
+        for fname in cls.fields_with(FieldTrait.LOADS_WITH_DOC):
+            field_type = cls._field_specs[fname].field_type
+            field_type.queue_special_loads_in_pipeline(
                 pipe, key, plan, parent_path, field_name=f".{fname}"
             )
-        for fname in cls._contain_sf:
-            field_cls = cls.model_fields[fname].annotation
+        for fname in cls.fields_reaching(FieldTrait.LOADS_WITH_DOC):
+            field_type = cls._field_specs[fname].field_type
             nested_path = f"{parent_path}.{fname}"
             max_before_queueing = len(plan)
-            field_cls.queue_special_loads_in_pipeline(pipe, key, plan, nested_path)
+            field_type.queue_special_loads_in_pipeline(pipe, key, plan, nested_path)
             for i in range(max_before_queueing, len(plan)):
                 plan[i].insert(0, fname)
 
@@ -856,30 +922,22 @@ class AtomicRedisModel(BaseModel):
             return models
 
     def _iter_special_fields(
-        self, prefix: tuple[str, ...] = ()
+        self,
     ) -> Iterator[tuple["SpecialFieldType", tuple[str, ...]]]:
         """
         Yield ``(sf_instance, path_segments)`` for every special field
         reachable from this model — both directly declared and nested inside
         child models — depth-first.
         """
-        for fname in self._special_field_names:
-            field = getattr(self, fname)
-            yield field, (*prefix, fname)
-        for fname in self._contain_sf:
-            child = getattr(self, fname)
-            if isinstance(child, AtomicRedisModel):
-                yield from child._iter_special_fields((*prefix, fname))
-
-    def _ttl_keys(self) -> list[str]:
-        """
-        Every Redis key whose TTL tracks this model: the main key plus each
-        special-field key (direct and nested).
-        """
-        return [
-            self.key,
-            *(field.special_key for field, _ in self._iter_special_fields()),
-        ]
+        for _, path in self.__class__.walk(FieldTrait.HOLDS_LIVE_STATE):
+            value: Any = self
+            # A1 knock-on: an unset Optional anywhere on the path leaves no live SF to visit.
+            for segment in path:
+                value = getattr(value, segment, None)
+                if value is None:
+                    break
+            else:
+                yield value, path
 
     @classmethod
     @mark_actions(
@@ -1122,15 +1180,15 @@ class AtomicRedisModel(BaseModel):
 
         if value is not None:
             attr = getattr(self, name)
-            if isinstance(attr, (BaseRedisType, AtomicRedisModel)):
-                attr._base_model_link = self
-                attr.field_name = f".{name}"
+            if isinstance(attr, ParentLinked):
+                attr.link_to_parent(self, f".{name}")
 
         if skip_redis_set:
             return
 
-        # Special fields manage their own Redis storage
-        if name in self.__class__._special_field_names:
+        # Not-in-document fields manage their own storage; ForeignKey still writes inline.
+        spec = self.__class__._field_specs.get(name)
+        if spec is not None and spec.has(FieldTrait.EXCLUDED_FROM_DOC):
             return
 
         pipeline = _context_pipe.get()
@@ -1162,18 +1220,41 @@ class AtomicRedisModel(BaseModel):
     def model_post_init(self, __context: Any) -> None:
         # Wire child redis types / nested models back to this model once, after full validation.
         # validate_assignment skips this hook, so __setattr__ re-links single fields instead.
-        link_fields = self.__class__._redis_link_field_names
+        link_fields = self.__class__.redis_link_fields()
         if not link_fields:
             return
         instance_dict = self.__dict__
         for name in link_fields:
             attr = instance_dict.get(name)
-            if isinstance(attr, (BaseRedisType, AtomicRedisModel)):
-                attr._base_model_link = self
-                attr.field_name = f".{name}"
+            if isinstance(attr, ParentLinked):
+                attr.link_to_parent(self, f".{name}")
 
+    # --- Client-side key discovery: a fakeredis fallback ---
 
-REDIS_MODELS: list[type[AtomicRedisModel]] = []
+    @functools.cached_property
+    def all_keys(self) -> list[str]:
+        return self._all_keys_for_key(self.key)
+
+    # adelete_many walks this per key, so the traversal is resolved once per class and the
+    # dotted paths are pre-joined; only owned_redis_keys() runs per call.
+    @classmethod
+    @functools.cache
+    def _owned_key_paths(cls) -> tuple[tuple[type, str], ...]:
+        return tuple(
+            (spec.field_type, ".".join(path))
+            for spec, path in cls.walk(FieldTrait.OWNS_KEYS)
+        )
+
+    # Real Redis resolves these keys in the Lua cascade function; delete has no server-side
+    # equivalent yet, so it is the one real-Redis caller still walking the tree in Python.
+    @classmethod
+    def _all_keys_for_key(cls, key: str) -> list[str]:
+        keys = [key]
+        for field_type, dotted in cls._owned_key_paths():
+            keys.extend(field_type.owned_redis_keys(key, f".{dotted}"))
+        return keys
+
+    # --- END ---
 
 
 def categorize_delete_args(

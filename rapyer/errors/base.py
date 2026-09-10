@@ -40,6 +40,15 @@ class InvalidRefreshTtlError(RapyerError):
     """Raised when refresh_ttl contains ActionGroup.DELETE, which is never refreshable."""
 
 
+class AmbiguousFieldConfigError(RapyerError):
+    """Raised when a config written on a field could belong to more than one type inside it."""
+
+    def __init__(self, config_name: str, candidates: list[str], *args):
+        super().__init__(*args)
+        self.config_name = config_name
+        self.candidates = candidates
+
+
 class DuplicateModelNameError(RapyerError):
     """Raised when two registered models share the same class name."""
 

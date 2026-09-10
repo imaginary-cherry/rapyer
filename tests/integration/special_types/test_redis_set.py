@@ -2,6 +2,7 @@ import pytest
 import pytest_asyncio
 
 from rapyer.types.redis_set import RedisSet
+from rapyer.types.traits import FieldTrait
 from tests.models.special_types import (
     AutoMappedSetModel,
     GenericRedisSetModel,
@@ -310,9 +311,12 @@ async def test_clone_returns_independent_local_copy(real_redis_client):
 
 @pytest.mark.asyncio
 async def test_list_of_bare_redis_sets_is_detected_as_special(real_redis_client):
-    # Arrange / Assert - a plain list[RedisSet] is the only construct with an SF inner element.
+    # Arrange - a plain list[RedisSet] is the only construct with an SF inner element.
     annotation = ListOfSetsModel.model_fields["buckets"].annotation
-    assert annotation.contains_sf_field() is True
+    list_reaches_owned_keys = bool(
+        annotation.reachable_fields_w_traits() & FieldTrait.OWNS_KEYS
+    )
+    expected_buckets = []
 
     # Act
     model = ListOfSetsModel()
@@ -320,4 +324,27 @@ async def test_list_of_bare_redis_sets_is_detected_as_special(real_redis_client)
     loaded = await ListOfSetsModel.aget(model.key)
 
     # Assert
-    assert loaded.buckets == []
+    assert list_reaches_owned_keys is True
+    assert loaded.buckets == expected_buckets
+
+
+@pytest.mark.asyncio
+async def test_optional_redis_set_gets_its_own_key_excluded_from_the_dump(
+    real_redis_client,
+):
+    # Arrange - A1 regression: Optional[RedisSet[str]] classifies like RedisSet[str],
+    # and members are JSON-encoded.
+    expected_field, expected_members = "tags", {'"alpha"'}
+    model = OptionalRedisSetModel()
+    model.tags = RedisSet()
+    await model.tags.aadd("alpha")
+    await model.asave()
+
+    # Act
+    dump = model.redis_dump()
+    special_key = RedisSet.special_field_key(model.key, ".tags")
+    members = await real_redis_client.smembers(special_key)
+
+    # Assert
+    assert expected_field not in dump
+    assert members == expected_members

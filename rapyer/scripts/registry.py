@@ -23,7 +23,9 @@ from rapyer.scripts.constants import (
     STR_APPEND_SCRIPT_NAME,
     STR_MUL_SCRIPT_NAME,
 )
-from rapyer.scripts.loader import build_cascade_library, load_script
+from rapyer.scripts.loader import build_cascade_library
+from rapyer.scripts.templates import load_script
+from rapyer.types.special import SpecialFieldType
 
 if TYPE_CHECKING:
     from rapyer.config import RedisConfig
@@ -86,10 +88,6 @@ def _inject_sf_dispatch(template: str, sf_base) -> str:
 
 
 def build_script_texts(is_fakeredis: bool = False) -> dict[str, str]:
-    # rapyer.types depends on this module via the SCRIPT_REGISTRY constants, so import at call
-    # time. That also lets __subclasses__() see every SF type loaded before init_rapyer() ran.
-    from rapyer.types.special import SpecialFieldType
-
     variant = FAKEREDIS_VARIANT if is_fakeredis else REDIS_VARIANT
     scripts = _build_scripts(variant)
     # Templates opt into SF dispatch via the placeholder; the rest pass through unchanged.

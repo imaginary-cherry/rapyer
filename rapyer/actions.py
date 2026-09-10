@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import contextvars
-import enum
 import functools
 import inspect
 from dataclasses import dataclass
+from enum import Enum, Flag, auto
 from typing import TYPE_CHECKING, Awaitable, Callable, Iterable, Optional
 
 from rapyer.context import _context_pipe, ensure_pipeline
@@ -28,7 +28,7 @@ class MarkActionParams:
     ignore_refresh: bool
 
 
-class ActionGroup(enum.Flag):
+class ActionGroup(Flag):
     """
     Categories of operations that can trigger TTL refresh.
 
@@ -42,14 +42,14 @@ class ActionGroup(enum.Flag):
     - ``ARITHMETIC``: in-place numeric operations.
     """
 
-    READ = enum.auto()
-    FETCH = enum.auto()
-    CREATE = enum.auto()
-    UPDATE = enum.auto()
-    APPEND = enum.auto()
-    DELETE = enum.auto()
-    ERASE = enum.auto()
-    ARITHMETIC = enum.auto()
+    READ = auto()
+    FETCH = auto()
+    CREATE = auto()
+    UPDATE = auto()
+    APPEND = auto()
+    DELETE = auto()
+    ERASE = auto()
+    ARITHMETIC = auto()
 
     @classmethod
     def all(cls, *, for_ttl: bool = False) -> "ActionGroup":
@@ -61,12 +61,12 @@ class ActionGroup(enum.Flag):
         return result
 
 
-class MarkVersion(enum.Enum):
+class MarkVersion(Enum):
     V1 = "v1"
     V2 = "v2"
 
 
-class TargetSource(enum.Enum):
+class TargetSource(Enum):
     """
     How the ``mark_actions`` decorator discovers the model(s) to refresh.
 

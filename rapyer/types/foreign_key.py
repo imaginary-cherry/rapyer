@@ -3,8 +3,10 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
 
+from rapyer.cascade.spec import CascadeSpec
 from rapyer.errors import NotResolvedError
 from rapyer.types.relational import RelationalFieldType
+from rapyer.types.traits import FieldTrait
 
 if TYPE_CHECKING:
     from rapyer.base import AtomicRedisModel
@@ -12,7 +14,7 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="AtomicRedisModel")
 
 
-class ForeignKey(RelationalFieldType, Generic[T]):
+class ForeignKey(RelationalFieldType[CascadeSpec], Generic[T]):
     """
     Typed, lazy reference to another ``AtomicRedisModel``.
 
@@ -30,6 +32,10 @@ class ForeignKey(RelationalFieldType, Generic[T]):
             # Anything else is assumed to be the target AtomicRedisModel.
             self._value = ref
             self._target_key = ref.key
+
+    @classmethod
+    def traits(cls) -> FieldTrait:
+        return FieldTrait.REFERENCES_ROOT
 
     @property
     def target_key(self) -> str | None:
@@ -102,10 +108,12 @@ class ForeignKey(RelationalFieldType, Generic[T]):
     def __get_pydantic_core_schema__(
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
-        # We validate with the Foriegn key with generic
-        def _validate(value: Any) -> "ForeignKey":
-            from rapyer.base import AtomicRedisModel
+        # We import here so it will happen only once, when we create the _validate function
+        from rapyer.base import AtomicRedisModel
 
+        # We validate with the Foriegn key with generic
+
+        def _validate(value: Any) -> "ForeignKey":
             if isinstance(value, ForeignKey):
                 return value
             if isinstance(value, (AtomicRedisModel, str)):

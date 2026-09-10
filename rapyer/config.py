@@ -18,13 +18,12 @@ from redis.commands.json import JSON
 from rapyer.actions import ActionGroup
 from rapyer.cascade import CascadeTTL
 from rapyer.errors import InvalidRefreshTtlError, MetaFrozenError
+from rapyer.types.init import ALL_TYPES
 
 DEFAULT_CONNECTION = "redis://localhost:6379/0"
 
 
 def create_all_types():
-    from rapyer.types.init import ALL_TYPES
-
     return ALL_TYPES
 
 

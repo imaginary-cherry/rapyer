@@ -1,6 +1,8 @@
 import dataclasses
 from typing import TYPE_CHECKING, Annotated, Any, Generic, TypeAlias, TypeVar
 
+from pydantic_core import core_schema
+
 
 @dataclasses.dataclass(frozen=True)
 class KeyAnnotation:
@@ -30,8 +32,6 @@ if TYPE_CHECKING:
 class RapyerKey(str):
     @classmethod
     def __get_pydantic_core_schema__(cls, source_type, handler):
-        from pydantic_core import core_schema
-
         return core_schema.no_info_after_validator_function(
             cls,
             core_schema.str_schema(),
