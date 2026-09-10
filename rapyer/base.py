@@ -64,6 +64,7 @@ from rapyer.fields.index import IndexAnnotation
 from rapyer.fields.key import KeyAnnotation, RapyerKey
 from rapyer.fields.safe_load import SafeLoadAnnotation
 from rapyer.links import ATOMIC_MODEL_API_REF_LINK, REDIS_SUPPORTED_LINK
+from rapyer.model_registry import REDIS_MODELS
 from rapyer.result import (
     CascadeResult,
     DeleteResult,
@@ -1254,9 +1255,6 @@ class AtomicRedisModel(ParentLinked, BaseModel):
         return keys
 
     # --- END ---
-
-
-REDIS_MODELS: list[type[AtomicRedisModel]] = []
 
 
 def categorize_delete_args(

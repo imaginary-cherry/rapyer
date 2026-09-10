@@ -10,6 +10,7 @@ from typing import (
     get_origin,
 )
 
+from rapyer.model_registry import REDIS_MODELS
 from rapyer.types.external import ExternalFieldType
 from rapyer.types.traits import FieldTrait
 from rapyer.utils.annotation import strip_optional
@@ -105,9 +106,6 @@ def _resolve_forward_ref(
     forward_ref: ForwardRef, models: "list[type[AtomicRedisModel]]" = ()
 ) -> Any | None:
     """Resolve a forward-ref FK target to its model class, or None."""
-    # Lazy import avoids a cycle back into rapyer.base.
-    from rapyer.base import REDIS_MODELS
-
     name = forward_ref.__forward_arg__
     # The caller's collection wins: it may hold a target the global registry skipped,
     # such as a generic origin or a model opting out with Meta.init_with_rapyer=False.

@@ -4,7 +4,6 @@ import redis.asyncio as redis_async
 from redis import ResponseError
 from redis.asyncio.client import Redis
 
-from rapyer.base import REDIS_MODELS
 from rapyer.cascade import CascadeTTL
 from rapyer.cascade.planner import (
     build_cascade_plan,
@@ -12,6 +11,7 @@ from rapyer.cascade.planner import (
     validate_cascade_key_initials,
     validate_cascade_ttl_targets,
 )
+from rapyer.model_registry import REDIS_MODELS
 from rapyer.result import resolve_forward_refs
 from rapyer.scripts import register_cascade_function, register_scripts
 from rapyer.types.relational import resolve_relational_targets
