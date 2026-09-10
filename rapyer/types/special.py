@@ -1,12 +1,10 @@
 import abc
-from typing import ClassVar, Optional, TypeVar
+from typing import ClassVar, Optional
 
 from rapyer.scripts.templates import load_sf_load_snippet, load_sf_save_snippet
-from rapyer.types.external import ExternalFieldType
+from rapyer.types.external import ConfigT, ExternalFieldType
 
 SPECIAL_FIELD_KEY_PREFIX = "__rapyer_special__"
-
-ConfigT = TypeVar("ConfigT")
 
 
 class SpecialFieldType(ExternalFieldType[ConfigT], abc.ABC):

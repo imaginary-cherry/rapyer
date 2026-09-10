@@ -28,14 +28,10 @@ class ExternalFieldType(BaseRedisType, ABC, Generic[ConfigT]):
     @classmethod
     def config_type(cls) -> Optional[type]:
         """The config annotation this type reads, from its generic parameter."""
-        # Lazy import: a module-level import here would cycle (both subclass this module).
-        from rapyer.types.relational import RelationalFieldType
-        from rapyer.types.special import SpecialFieldType
-
-        config_bases = (ExternalFieldType, SpecialFieldType, RelationalFieldType)
         for klass in cls.__mro__:
             for base in klass.__dict__.get("__orig_bases__", ()):
-                if get_origin(base) not in config_bases:
+                # Only a level that re-declares ConfigT carries the config in args[0].
+                if getattr(get_origin(base), "__parameters__", ())[:1] != (ConfigT,):
                     continue
                 args = get_args(base)
                 if args and not isinstance(args[0], TypeVar):

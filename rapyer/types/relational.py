@@ -4,22 +4,19 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ForwardRef,
-    TypeVar,
     Union,
     get_args,
     get_origin,
 )
 
 from rapyer.model_registry import REDIS_MODELS
-from rapyer.types.external import ExternalFieldType
+from rapyer.types.external import ConfigT, ExternalFieldType
 from rapyer.types.traits import FieldTrait
 from rapyer.utils.annotation import strip_optional
 from rapyer.utils.pythonic import resolve_generic_args, safe_issubclass
 
 if TYPE_CHECKING:
     from rapyer.base import AtomicRedisModel
-
-ConfigT = TypeVar("ConfigT")
 
 
 class RelationalFieldType(ExternalFieldType[ConfigT], abc.ABC):
