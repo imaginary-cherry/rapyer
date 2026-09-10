@@ -164,8 +164,8 @@ def test_relational_trait_and_reaches_references_root_are_mutually_exclusive():
 
 def test_an_unclassified_spec_is_not_kept():
     # Arrange
-    plain = FieldSpec(name="x", field_type=str)
-    classified = FieldSpec(name="x", field_type=str, reaches=FieldTrait.OWNS_KEYS)
+    plain = FieldSpec(field_type=str)
+    classified = FieldSpec(field_type=str, reaches=FieldTrait.OWNS_KEYS)
 
     # Act / Assert
     assert plain.is_classified() is False

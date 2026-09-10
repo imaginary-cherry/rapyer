@@ -168,7 +168,6 @@ class FieldSpec:
     How one field is classified, written once per field in __init_subclass__.
     """
 
-    name: str
     field_type: type
     external: Optional[ExternalFieldSpec[Any]] = None
     # Union of traits reachable anywhere in this field's subtree.
@@ -459,12 +458,9 @@ class AtomicRedisModel(ParentLinked, BaseModel):
             is_nested = safe_issubclass(origin, AtomicRedisModel)
 
             spec = FieldSpec(
-                name=field_name,
                 field_type=origin,
                 external=(
-                    ExternalFieldSpec(
-                        field_name, origin, origin.extract_config(annotation)
-                    )
+                    ExternalFieldSpec(origin, origin.extract_config(annotation))
                     if traits
                     else None
                 ),
@@ -1243,10 +1239,10 @@ class AtomicRedisModel(ParentLinked, BaseModel):
     # Real Redis resolves these keys in the Lua cascade function; delete has no server-side
     # equivalent yet, so it is the one real-Redis caller still walking the tree in Python.
     @classmethod
-    def _all_keys_for_key(cls, key: str, parent_path: str = "") -> list[str]:
-        keys = [key] if not parent_path else []
+    def _all_keys_for_key(cls, key: str) -> list[str]:
+        keys = [key]
         for field_type, dotted in cls._owned_key_paths():
-            keys.extend(field_type.owned_redis_keys(key, f"{parent_path}.{dotted}"))
+            keys.extend(field_type.owned_redis_keys(key, f".{dotted}"))
         return keys
 
     # --- END ---

@@ -15,7 +15,6 @@ class ExternalFieldSpec(Generic[ConfigT]):
     One external field's class-level facts, resolved at class-build time.
     """
 
-    name: str
     field_type: type["ExternalFieldType[ConfigT]"]
     config: Optional[ConfigT] = None
 
