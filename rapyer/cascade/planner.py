@@ -193,26 +193,6 @@ def _static_walk_fk_edges(
         )
 
 
-def _static_walk_special_suffixes(model_cls: Any, parent_path: str = "") -> list[str]:
-    """Dotted-path special-field suffixes for model_cls, recursing into nested sub-models."""
-    # Declaration order, not fields_with's frozenset: this list feeds the plan hash (A3).
-    suffixes: list[str] = [
-        f"{parent_path}.{field_name}".lstrip(".")
-        for field_name, spec in model_cls._field_specs.items()
-        if spec.has(FieldTrait.OWNS_KEYS)
-    ]
-    for field_name, spec in model_cls._field_specs.items():
-        if not spec.reaches & FieldTrait.OWNS_KEYS:
-            continue
-        field_cls = spec.field_type
-        # Only nested models have a per-class suffix set; container-of-SF (list[RedisSet]) don't.
-        if not spec.is_nested_model:
-            continue
-        nested_path = f"{parent_path}.{field_name}"
-        suffixes.extend(_static_walk_special_suffixes(field_cls, nested_path))
-    return suffixes
-
-
 def build_cascade_plan(
     models: list[type["AtomicRedisModel"]],
 ) -> dict[str, CascadePlanEntry]:
@@ -223,7 +203,10 @@ def build_cascade_plan(
         _static_walk_fk_edges(model_cls, "$", fks, models)
         plan[model_cls.__name__] = CascadePlanEntry(
             ttl=model_cls.Meta.ttl,
-            special_suffixes=_static_walk_special_suffixes(model_cls),
+            # walk yields in declaration order, which the plan hash depends on (A3).
+            special_suffixes=[
+                ".".join(path) for _, path in model_cls.walk(FieldTrait.OWNS_KEYS)
+            ],
             fks=fks,
         )
     return plan

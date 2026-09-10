@@ -773,18 +773,37 @@ class AtomicRedisModel(ParentLinked, BaseModel):
             mask |= spec.reaches
         return mask
 
+    # The one recursive traversal: every trait-driven view over the field tree derives from it.
+    @classmethod
+    def walk(
+        cls,
+        requires: FieldTrait,
+        *,
+        path: tuple[str, ...] = (),
+        _seen: frozenset = frozenset(),
+    ) -> Iterator[tuple[FieldSpec, tuple[str, ...]]]:
+        """Yield (spec, path) for every field reachable under the required trait."""
+        if cls in _seen or len(path) > MAX_WALK_DEPTH:
+            return
+        _seen |= {cls}  # path-local: rebound per frame, never merged upward
+        for name, spec in cls._field_specs.items():
+            if spec.has(requires):
+                yield spec, (*path, name)
+            if requires & spec.reaches and spec.is_nested_model:
+                yield from spec.field_type.walk(
+                    requires, path=(*path, name), _seen=_seen
+                )
+
     @classmethod
     @functools.cache
     def build_redis_dump_exclude(cls) -> dict:
-        exclude: dict = {
-            fname: True for fname in cls.fields_with(FieldTrait.EXCLUDED_FROM_DOC)
-        }
-        for fname in cls.fields_reaching(FieldTrait.EXCLUDED_FROM_DOC):
-            spec = cls._field_specs[fname]
-            if spec.is_nested_model:
-                nested = spec.field_type.build_redis_dump_exclude()
-                if nested:
-                    exclude[fname] = nested
+        # model_dump wants the paths nested, so each walk path grows a branch of dicts.
+        exclude: dict = {}
+        for _, path in cls.walk(FieldTrait.EXCLUDED_FROM_DOC):
+            branch = exclude
+            for segment in path[:-1]:
+                branch = branch.setdefault(segment, {})
+            branch[path[-1]] = True
         return exclude
 
     @classmethod
@@ -898,24 +917,22 @@ class AtomicRedisModel(ParentLinked, BaseModel):
             return models
 
     def _iter_special_fields(
-        self, prefix: tuple[str, ...] = ()
+        self,
     ) -> Iterator[tuple["SpecialFieldType", tuple[str, ...]]]:
         """
         Yield ``(sf_instance, path_segments)`` for every special field
         reachable from this model — both directly declared and nested inside
         child models — depth-first.
         """
-        cls = self.__class__
-        for fname in cls.fields_with(FieldTrait.HOLDS_LIVE_STATE):
-            field = getattr(self, fname)
-            # A1 knock-on: Optional[SF] = None is a legitimate unset value, not a stale spec.
-            if field is None:
-                continue
-            yield field, (*prefix, fname)
-        for fname in cls.fields_reaching(FieldTrait.HOLDS_LIVE_STATE):
-            child = getattr(self, fname)
-            if isinstance(child, AtomicRedisModel):
-                yield from child._iter_special_fields((*prefix, fname))
+        for _, path in self.__class__.walk(FieldTrait.HOLDS_LIVE_STATE):
+            value: Any = self
+            # A1 knock-on: an unset Optional anywhere on the path leaves no live SF to visit.
+            for segment in path:
+                value = getattr(value, segment, None)
+                if value is None:
+                    break
+            else:
+                yield value, path
 
     @classmethod
     @mark_actions(
@@ -1208,28 +1225,6 @@ class AtomicRedisModel(ParentLinked, BaseModel):
                 attr.link_to_parent(self, f".{name}")
 
     # --- Client-side key discovery: a fakeredis fallback ---
-
-    # The generic traversal, kept here because key discovery is its only caller so far.
-    # Five more walks are meant to move onto it; see capability-walks-design step 4.
-    @classmethod
-    def walk(
-        cls,
-        requires: FieldTrait,
-        *,
-        path: tuple[str, ...] = (),
-        _seen: frozenset = frozenset(),
-    ) -> Iterator[tuple[FieldSpec, tuple[str, ...]]]:
-        """Yield (spec, path) for every field reachable under the required trait."""
-        if cls in _seen or len(path) > MAX_WALK_DEPTH:
-            return
-        _seen |= {cls}  # path-local: rebound per frame, never merged upward
-        for name, spec in cls._field_specs.items():
-            if spec.has(requires):
-                yield spec, (*path, name)
-            if requires & spec.reaches and spec.is_nested_model:
-                yield from spec.field_type.walk(
-                    requires, path=(*path, name), _seen=_seen
-                )
 
     @functools.cached_property
     def all_keys(self) -> list[str]:
