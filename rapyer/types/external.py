@@ -1,5 +1,5 @@
-import abc
 import dataclasses
+from abc import ABC
 from typing import Annotated, Any, Generic, Optional, TypeVar, get_args, get_origin
 
 from rapyer.types.base import BaseRedisType
@@ -20,7 +20,7 @@ class ExternalFieldSpec(Generic[ConfigT]):
     config: Optional[ConfigT] = None
 
 
-class ExternalFieldType(BaseRedisType, abc.ABC, Generic[ConfigT]):
+class ExternalFieldType(BaseRedisType, ABC, Generic[ConfigT]):
     """
     Base for field types whose data lives outside the parent's JSON document.
     """
