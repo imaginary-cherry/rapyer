@@ -1,7 +1,7 @@
 import dataclasses
 import hashlib
 import json
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Any
 
 from rapyer.cascade.spec import CascadeSpec
 from rapyer.errors.cascade import (
@@ -10,7 +10,6 @@ from rapyer.errors.cascade import (
     CascadeTargetTtlMissingError,
 )
 from rapyer.scripts.constants import CASCADE_FUNCTION_PREFIX, CASCADE_LIBRARY_PREFIX
-from rapyer.types.foreign_key import ForeignKey
 from rapyer.types.relational import RelationalFieldType
 from rapyer.types.traits import FieldTrait
 
@@ -19,17 +18,10 @@ if TYPE_CHECKING:
 
 
 def _field_cascade_spec(model_cls: Any, field_name: str) -> CascadeSpec | None:
-    """Return the per-field cascade config from the field's Annotated metadata."""
-    field_info = model_cls.model_fields.get(field_name)
-    if field_info is None:
-        return None
-    annotation = field_info.annotation
-    if field_info.metadata:
-        annotation = Annotated[(annotation, *field_info.metadata)]
+    """Return the per-field cascade config."""
     spec = model_cls._field_specs.get(field_name)
-    is_relational = spec is not None and spec.has(FieldTrait.REFERENCES_ROOT)
-    field_type = spec.field_type if is_relational else ForeignKey
-    return field_type.extract_config(annotation)
+    # resolve_configs already looked through containers, so a collection of FKs answers too.
+    return spec.config(CascadeSpec) if spec is not None else None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -101,88 +93,44 @@ def _static_walk_fk_edges(
     top_level: bool = True,
 ):
     """Append every enabled FK edge reachable from model_cls's own fields."""
+    # A field IS the reference, or it holds them; either way one edge covers the field.
     for field_name, spec in model_cls._field_specs.items():
-        if not spec.has(FieldTrait.REFERENCES_ROOT):
+        is_own_reference = spec.has(FieldTrait.REFERENCES_ROOT)
+        if not is_own_reference and not spec.reaches & FieldTrait.REFERENCES_ROOT:
             continue
-        edge = _classify_edge(model_cls, field_name)
-        if not edge.enabled:
-            continue
-        cands = _resolve_target_cls(model_cls, field_name, models)
-        if not cands:
-            continue
-        # A per-field spec resets the child's budget to this depth; a global edge decrements it.
-        fks.append(
-            CascadeEdge(
-                path=f"{parent_path}.{field_name}",
-                target=cands[0].__name__,
-                is_collection=False,
-                recurse_into_target=True,
-                refresh_target_ttl=True,
-                refresh_target_special_keys=True,
-                resets_depth_budget=edge.override,
-                depth=edge.depth,
-                candidates=([c.__name__ for c in cands] if len(cands) > 1 else None),
-            )
-        )
 
-    for field_name, spec in model_cls._field_specs.items():
-        if not spec.reaches & FieldTrait.REFERENCES_ROOT:
-            continue
-        field_cls = spec.field_type
         if spec.is_nested_model:
             # Same RedisJSON document, so this is zero-hop recursion.
             nested_path = f"{parent_path}.{field_name}"
-            _static_walk_fk_edges(field_cls, nested_path, fks, models, top_level=False)
+            _static_walk_fk_edges(spec.field_type, nested_path, fks, models, False)
             continue
 
         # Only a type holding its elements outside the JSON answers; the rest return None.
-        sf_container = field_cls.container_kind()
-        if sf_container is not None:
-            # Nested SF-held-ref traversal is deferred; direct fields only.
-            if not top_level:
-                continue
-            edge = _classify_edge(model_cls, field_name)
-            if not edge.enabled:
-                continue
-            annotation = model_cls.model_fields[field_name].annotation
-            cands = RelationalFieldType.relational_targets(annotation, models)
-            if not cands:
-                continue
-            fks.append(
-                CascadeEdge(
-                    path=field_name,
-                    target=cands[0].__name__,
-                    is_collection=True,
-                    recurse_into_target=True,
-                    refresh_target_ttl=True,
-                    refresh_target_special_keys=True,
-                    resets_depth_budget=edge.override,
-                    depth=edge.depth,
-                    sf_container=sf_container,
-                    candidates=(
-                        [c.__name__ for c in cands] if len(cands) > 1 else None
-                    ),
-                )
-            )
+        sf_container = None if is_own_reference else spec.field_type.container_kind()
+        # Nested SF-held-ref traversal is deferred; direct fields only.
+        if sf_container is not None and not top_level:
             continue
 
-        # Collection of FK: one edge covers every element.
         edge = _classify_edge(model_cls, field_name)
         if not edge.enabled:
             continue
         cands = _resolve_target_cls(model_cls, field_name, models)
         if not cands:
             continue
+        # An SF container addresses its own Redis key by suffix, not by a path in the doc.
+        path = field_name if sf_container else f"{parent_path}.{field_name}"
+        # A per-field spec resets the child's budget to this depth; a global edge decrements it.
         fks.append(
             CascadeEdge(
-                path=f"{parent_path}.{field_name}",
+                path=path,
                 target=cands[0].__name__,
-                is_collection=True,
+                is_collection=not is_own_reference,
                 recurse_into_target=True,
                 refresh_target_ttl=True,
                 refresh_target_special_keys=True,
                 resets_depth_budget=edge.override,
                 depth=edge.depth,
+                sf_container=sf_container,
                 candidates=([c.__name__ for c in cands] if len(cands) > 1 else None),
             )
         )
