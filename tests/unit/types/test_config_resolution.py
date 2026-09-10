@@ -146,13 +146,6 @@ class OuterPlacement(AtomicRedisModel):
     Meta: ClassVar[RedisConfig] = RedisConfig(ttl=60)
 
 
-class TwoReaderField(AtomicRedisModel):
-    both: Annotated[
-        dict[ForeignKey[ConfigTarget], ForeignKey[ConfigTarget]], CascadeTTL()
-    ] = Field(default_factory=dict)
-    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=60)
-
-
 def test_a_config_written_on_the_field_reaches_the_unique_reader_inside():
     # Arrange
     expected = (
@@ -186,12 +179,18 @@ def test_the_outer_form_is_not_counted_twice_for_a_direct_field():
 
 
 def test_a_config_with_two_possible_readers_inside_is_rejected():
-    # Arrange
-    spec = TwoReaderField._field_specs["both"]
+    # Arrange - both the key and the value read a CascadeSpec, so the marker is unplaceable.
     expected_candidates = ["ForeignKey"]
 
     # Act / Assert
     with pytest.raises(AmbiguousFieldConfigError) as exc:
-        spec.field_type.field_configs(TwoReaderField.__annotations__["both"])
+
+        class TwoReaderField(AtomicRedisModel):
+            both: Annotated[
+                dict[ForeignKey[ConfigTarget], ForeignKey[ConfigTarget]], CascadeTTL()
+            ] = Field(default_factory=dict)
+            Meta: ClassVar[RedisConfig] = RedisConfig(ttl=60)
+
     assert exc.value.candidates == expected_candidates
     assert exc.value.config_name == CascadeSpec.__name__
+    assert "2 types inside it" in str(exc.value)

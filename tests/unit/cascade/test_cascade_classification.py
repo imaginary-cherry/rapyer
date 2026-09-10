@@ -51,9 +51,7 @@ def test_plain_fk_field_classification_is_unaffected():
     # Act
     specs = CascadeBookPlain._field_specs
     is_relational = {
-        n
-        for n, s in specs.items()
-        if s.external and s.external.field_type.traits() & FieldTrait.REFERENCES_ROOT
+        n for n, s in specs.items() if s.own_traits & FieldTrait.REFERENCES_ROOT
     }
 
     # Assert
@@ -76,9 +74,7 @@ def test_existing_fk_book_classification_remains_byte_identical():
     # Act
     specs = FkBook._field_specs
     is_relational = {
-        n
-        for n, s in specs.items()
-        if s.external and s.external.field_type.traits() & FieldTrait.REFERENCES_ROOT
+        n for n, s in specs.items() if s.own_traits & FieldTrait.REFERENCES_ROOT
     }
     contains_fk = {
         n for n, s in specs.items() if s.reaches & FieldTrait.REFERENCES_ROOT

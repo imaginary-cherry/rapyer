@@ -84,7 +84,7 @@ from rapyer.types.base import (
     is_redis_field_value,
 )
 from rapyer.types.convert import RedisConverter
-from rapyer.types.external import ExternalFieldSpec, ExternalFieldType
+from rapyer.types.external import ExternalFieldType
 from rapyer.types.generic import GenericRedisType
 from rapyer.types.special import (
     SPECIAL_FIELD_KEY_PREFIX,
@@ -169,9 +169,12 @@ class FieldSpec:
     """
 
     field_type: type
-    external: Optional[ExternalFieldSpec[Any]] = None
+    # What this field's own type contributes; non-zero exactly when the type is external.
+    own_traits: FieldTrait = FieldTrait(0)
     # Union of traits reachable anywhere in this field's subtree.
     reaches: FieldTrait = FieldTrait(0)
+    # Every config the field's annotation declares, at any depth of its type tree.
+    configs: tuple = ()
     is_redis_link: bool = False
     # A model stored inline in this document: recursing into it stays on the same Redis key.
     is_nested_model: bool = False
@@ -179,17 +182,22 @@ class FieldSpec:
 
     def has(self, trait: FieldTrait) -> bool:
         """Whether this field's own type contributes ``trait``."""
-        own_traits = (
-            self.external.field_type.traits() if self.external else FieldTrait(0)
-        )
-        return bool(own_traits & trait)
+        return bool(self.own_traits & trait)
+
+    def is_external(self) -> bool:
+        """Whether the field's own type stores its data outside the parent document."""
+        return bool(self.own_traits)
+
+    def config(self, config_type: type):
+        """The single config of ``config_type`` this field declares, or None."""
+        for config in self.configs:
+            if isinstance(config, config_type):
+                return config
+        return None
 
     def is_classified(self) -> bool:
         return bool(
-            self.external is not None
-            or self.reaches
-            or self.is_redis_link
-            or self.safe_load
+            self.own_traits or self.reaches or self.is_redis_link or self.safe_load
         )
 
 
@@ -459,13 +467,15 @@ class AtomicRedisModel(ParentLinked, BaseModel):
 
             spec = FieldSpec(
                 field_type=origin,
-                external=(
-                    ExternalFieldSpec(origin, origin.extract_config(annotation))
-                    if traits
-                    else None
-                ),
+                own_traits=traits,
                 reaches=(
                     origin.reachable_fields_w_traits() if is_link else FieldTrait(0)
+                ),
+                # Narrower than is_link: a nested model is ParentLinked but reads no config.
+                configs=(
+                    origin.field_configs(annotation)
+                    if safe_issubclass(origin, BaseRedisType)
+                    else ()
                 ),
                 is_redis_link=is_link,
                 is_nested_model=is_nested,
@@ -485,9 +495,9 @@ class AtomicRedisModel(ParentLinked, BaseModel):
                 continue
             # External fields own their serialization — skip pickle setup
             attr_spec = cls._field_specs.get(attr_name)
-            external = attr_spec.external if attr_spec is not None else None
-            if external is not None and external.field_type.owns_serialization():
-                continue
+            if attr_spec is not None and attr_spec.is_external():
+                if attr_spec.field_type.owns_serialization():
+                    continue
             if original_annotations[attr_name] == attr_type:
                 default_value = cls.__dict__.get(attr_name, None)
                 can_json = is_type_json_serializable(attr_type, default_value)
@@ -764,8 +774,7 @@ class AtomicRedisModel(ParentLinked, BaseModel):
         """Per-bit union of every trait reachable in this class's own field tree."""
         mask = FieldTrait(0)
         for spec in cls._field_specs.values():
-            if spec.external is not None:
-                mask |= spec.external.field_type.traits()
+            mask |= spec.own_traits
             mask |= spec.reaches
         return mask
 

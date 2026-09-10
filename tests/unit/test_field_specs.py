@@ -5,6 +5,7 @@ from pydantic_core import core_schema
 
 from rapyer.base import AtomicRedisModel, FieldSpec, RedisConfig
 from rapyer.cascade import CascadeTTL
+from rapyer.cascade.spec import CascadeSpec
 from rapyer.fields.safe_load import SafeLoad
 from rapyer.types.external import ExternalFieldType
 from rapyer.types.foreign_key import ForeignKey
@@ -44,15 +45,11 @@ class PQOnlyParent(AtomicRedisModel):
 
 
 def _owns_keys(spec: FieldSpec) -> bool:
-    return bool(
-        spec.external and spec.external.field_type.traits() & FieldTrait.OWNS_KEYS
-    )
+    return bool(spec.own_traits & FieldTrait.OWNS_KEYS)
 
 
 def _references_root(spec: FieldSpec) -> bool:
-    return bool(
-        spec.external and spec.external.field_type.traits() & FieldTrait.REFERENCES_ROOT
-    )
+    return bool(spec.own_traits & FieldTrait.REFERENCES_ROOT)
 
 
 def test_fields_with_and_fields_reaching_match_a_manual_axis_scan():
@@ -237,11 +234,11 @@ def test_relational_config_is_extracted_at_class_build():
     expected_config = CascadeTTL(enabled=False)
 
     # Act
-    external = CascadeBookDirect._field_specs["author"].external
+    spec = CascadeBookDirect._field_specs["author"]
 
     # Assert
-    assert external.config == expected_config
-    assert external.field_type is ForeignKey
+    assert spec.config(CascadeSpec) == expected_config
+    assert spec.field_type is ForeignKey
 
 
 def test_a_novel_external_field_type_classifies_with_zero_base_py_changes():
@@ -275,7 +272,7 @@ def test_a_novel_external_field_type_classifies_with_zero_base_py_changes():
     fields_with_trait = NovelFieldModel.fields_with(expected_trait)
 
     # Assert
-    assert spec.external is not None
-    assert issubclass(spec.external.field_type, NovelFieldType)
-    assert spec.external.field_type.traits() == expected_trait
+    assert spec.is_external()
+    assert issubclass(spec.field_type, NovelFieldType)
+    assert spec.own_traits == expected_trait
     assert expected_field in fields_with_trait

@@ -1,4 +1,3 @@
-import dataclasses
 from abc import ABC
 from typing import Annotated, Any, Generic, Optional, TypeVar, get_args, get_origin
 
@@ -7,16 +6,6 @@ from rapyer.types.traits import FieldTrait
 from rapyer.utils.pythonic import resolve_generic_args, safe_issubclass
 
 ConfigT = TypeVar("ConfigT")
-
-
-@dataclasses.dataclass(frozen=True)
-class ExternalFieldSpec(Generic[ConfigT]):
-    """
-    One external field's class-level facts, resolved at class-build time.
-    """
-
-    field_type: type["ExternalFieldType[ConfigT]"]
-    config: Optional[ConfigT] = None
 
 
 class ExternalFieldType(BaseRedisType, ABC, Generic[ConfigT]):

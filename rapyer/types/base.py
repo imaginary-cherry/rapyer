@@ -119,12 +119,13 @@ class BaseRedisType(ParentLinked, ABC):
             if value is None:
                 continue
             if len(readers) > 1:
+                # Per-field subclasses share a __name__, so report the count separately.
                 names = sorted({reader.__name__ for reader in readers})
                 raise AmbiguousFieldConfigError(
                     config_type.__name__,
                     names,
                     f"{config_type.__name__} is written on this field but "
-                    f"{len(names)} types inside it read one ({', '.join(names)}). "
+                    f"{len(readers)} types inside it read one ({', '.join(names)}). "
                     "Move it onto the type it configures.",
                 )
             claimed.append(value)

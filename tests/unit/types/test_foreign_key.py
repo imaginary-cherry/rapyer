@@ -24,9 +24,7 @@ def test_book_class_classifies_relational_fields():
     # Act
     specs = FkBook._field_specs
     is_relational = {
-        n
-        for n, s in specs.items()
-        if s.external and s.external.field_type.traits() & FieldTrait.REFERENCES_ROOT
+        n for n, s in specs.items() if s.own_traits & FieldTrait.REFERENCES_ROOT
     }
     contains_fk = {
         n for n, s in specs.items() if s.reaches & FieldTrait.REFERENCES_ROOT

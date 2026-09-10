@@ -28,7 +28,7 @@ def _field_cascade_spec(model_cls: Any, field_name: str) -> CascadeSpec | None:
         annotation = Annotated[(annotation, *field_info.metadata)]
     spec = model_cls._field_specs.get(field_name)
     is_relational = spec is not None and spec.has(FieldTrait.REFERENCES_ROOT)
-    field_type = spec.external.field_type if is_relational else ForeignKey
+    field_type = spec.field_type if is_relational else ForeignKey
     return field_type.extract_config(annotation)
 
 
