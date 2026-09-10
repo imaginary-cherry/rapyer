@@ -108,10 +108,11 @@ class ForeignKey(RelationalFieldType[CascadeSpec], Generic[T]):
     def __get_pydantic_core_schema__(
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
+        # We import here so it will happen only once, when we create the _validate function
+        from rapyer.base import AtomicRedisModel
         # We validate with the Foriegn key with generic
-        def _validate(value: Any) -> "ForeignKey":
-            from rapyer.base import AtomicRedisModel
 
+        def _validate(value: Any) -> "ForeignKey":
             if isinstance(value, ForeignKey):
                 return value
             if isinstance(value, (AtomicRedisModel, str)):
