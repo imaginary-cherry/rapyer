@@ -27,7 +27,7 @@ class RedisSet(set, SpecialFieldType[None], Generic[T]):
         SpecialFieldType.__init__(self)
 
     @classmethod
-    def cascade_container_kind(cls) -> Optional[str]:
+    def container_kind(cls) -> Optional[str]:
         return "set"
 
     @classmethod

@@ -12,9 +12,7 @@ from rapyer.errors.cascade import (
 from rapyer.scripts.constants import CASCADE_FUNCTION_PREFIX, CASCADE_LIBRARY_PREFIX
 from rapyer.types.foreign_key import ForeignKey
 from rapyer.types.relational import RelationalFieldType
-from rapyer.types.special import SpecialFieldType
 from rapyer.types.traits import FieldTrait
-from rapyer.utils.pythonic import safe_issubclass
 
 if TYPE_CHECKING:
     from rapyer.base import AtomicRedisModel
@@ -137,11 +135,8 @@ def _static_walk_fk_edges(
             _static_walk_fk_edges(field_cls, nested_path, fks, models, top_level=False)
             continue
 
-        sf_container = (
-            field_cls.cascade_container_kind()
-            if safe_issubclass(field_cls, SpecialFieldType)
-            else None
-        )
+        # Only a type holding its elements outside the JSON answers; the rest return None.
+        sf_container = field_cls.container_kind()
         if sf_container is not None:
             # Nested SF-held-ref traversal is deferred; direct fields only.
             if not top_level:

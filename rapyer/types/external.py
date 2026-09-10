@@ -50,6 +50,13 @@ class ExternalFieldType(BaseRedisType, ABC, Generic[ConfigT]):
         return None
 
     @classmethod
+    def resolve_configs(cls, annotation) -> tuple:
+        """This type's own config, then whatever its elements declare."""
+        own = cls.extract_config(annotation)
+        mine = (own,) if own is not None else ()
+        return mine + super().resolve_configs(annotation)
+
+    @classmethod
     def owns_serialization(cls) -> bool:
         """Whether the type serializes itself, so no pickle serializer is installed."""
         return True

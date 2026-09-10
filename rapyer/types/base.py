@@ -2,7 +2,15 @@ import abc
 import base64
 import pickle
 from abc import ABC
-from typing import TYPE_CHECKING, Any, ClassVar, Optional
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    ClassVar,
+    Optional,
+    get_args,
+    get_origin,
+)
 
 from pydantic import GetCoreSchemaHandler, TypeAdapter
 from pydantic_core import core_schema
@@ -14,6 +22,8 @@ from rapyer.capabilities import ParentLinked
 from rapyer.context import _context_pipe, get_pipe_json
 from rapyer.types.traits import FieldTrait
 from rapyer.typing_support import Self
+from rapyer.utils.annotation import annotation_origin
+from rapyer.utils.pythonic import resolve_generic_args, safe_issubclass
 
 if TYPE_CHECKING:
     from rapyer.config import RedisConfig
@@ -51,6 +61,31 @@ class BaseRedisType(ParentLinked, ABC):
         this directly via the test-side ``recursive_build_redis_model`` helper.
         """
         install_marked_action_methods(cls, meta)
+
+    @classmethod
+    def element_annotations(cls, annotation) -> tuple:
+        """This type's generic arguments, each keeping its own ``Annotated`` metadata."""
+        inner = annotation
+        while get_origin(inner) is Annotated:
+            inner = get_args(inner)[0]
+        # A bare class falls back to __orig_bases__, which is where a per-field
+        # subclass keeps the arguments its annotation was built from.
+        return resolve_generic_args(inner)
+
+    @classmethod
+    def resolve_configs(cls, annotation) -> tuple:
+        """Every config declared at or under this annotation, in declaration order."""
+        found: list = []
+        for arg in cls.element_annotations(annotation):
+            element = annotation_origin(arg)
+            if safe_issubclass(element, BaseRedisType):
+                found.extend(element.resolve_configs(arg))
+        return tuple(found)
+
+    @classmethod
+    def container_kind(cls) -> Optional[str]:
+        """The Redis structure this type keeps its elements in, outside the parent JSON."""
+        return None
 
     @classmethod
     def traits(cls) -> FieldTrait:

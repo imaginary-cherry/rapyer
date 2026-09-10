@@ -29,7 +29,7 @@ class RedisPriorityQueue(SpecialFieldType[None], Generic[T]):
     LUA_SNIPPET_DIR = "redis_priority_queue"
 
     @classmethod
-    def cascade_container_kind(cls) -> Optional[str]:
+    def container_kind(cls) -> Optional[str]:
         return "zset"
 
     @classmethod
