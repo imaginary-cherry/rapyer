@@ -1,9 +1,12 @@
 from typing import Annotated, ClassVar
 
+import pytest
 from pydantic import Field
 
 from rapyer.base import AtomicRedisModel, RedisConfig
 from rapyer.cascade import CascadeTTL
+from rapyer.cascade.spec import CascadeSpec
+from rapyer.errors import AmbiguousFieldConfigError
 from rapyer.types.foreign_key import ForeignKey
 from rapyer.types.priority_queue import RedisPriorityQueue
 from rapyer.types.redis_set import RedisSet
@@ -128,3 +131,67 @@ def test_container_kind_names_the_structure_holding_the_elements():
 
     # Assert
     assert kinds == expected_kinds
+
+
+class OuterPlacement(AtomicRedisModel):
+    on_set: Annotated[RedisSet[ForeignKey[ConfigTarget]], CascadeTTL(enabled=False)] = (
+        Field(default_factory=RedisSet, exclude=True)
+    )
+    on_list: Annotated[list[ForeignKey[ConfigTarget]], CascadeTTL(depth=4)] = Field(
+        default_factory=list
+    )
+    on_dict: Annotated[dict[str, ForeignKey[ConfigTarget]], CascadeTTL(depth=6)] = (
+        Field(default_factory=dict)
+    )
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=60)
+
+
+class TwoReaderField(AtomicRedisModel):
+    both: Annotated[
+        dict[ForeignKey[ConfigTarget], ForeignKey[ConfigTarget]], CascadeTTL()
+    ] = Field(default_factory=dict)
+    Meta: ClassVar[RedisConfig] = RedisConfig(ttl=60)
+
+
+def test_a_config_written_on_the_field_reaches_the_unique_reader_inside():
+    # Arrange
+    expected = (
+        (CascadeTTL(enabled=False),),
+        (CascadeTTL(depth=4),),
+        (CascadeTTL(depth=6),),
+    )
+
+    # Act
+    resolved = tuple(
+        OuterPlacement._field_specs[name].field_type.field_configs(
+            OuterPlacement.__annotations__[name]
+        )
+        for name in ("on_set", "on_list", "on_dict")
+    )
+
+    # Assert
+    assert resolved == expected
+
+
+def test_the_outer_form_is_not_counted_twice_for_a_direct_field():
+    # Arrange
+    expected_configs = (CascadeTTL(depth=9),)
+
+    # Act
+    spec = InnerPlacement._field_specs["direct"]
+    configs = spec.field_type.field_configs(InnerPlacement.__annotations__["direct"])
+
+    # Assert
+    assert configs == expected_configs
+
+
+def test_a_config_with_two_possible_readers_inside_is_rejected():
+    # Arrange
+    spec = TwoReaderField._field_specs["both"]
+    expected_candidates = ["ForeignKey"]
+
+    # Act / Assert
+    with pytest.raises(AmbiguousFieldConfigError) as exc:
+        spec.field_type.field_configs(TwoReaderField.__annotations__["both"])
+    assert exc.value.candidates == expected_candidates
+    assert exc.value.config_name == CascadeSpec.__name__

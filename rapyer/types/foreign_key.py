@@ -110,6 +110,7 @@ class ForeignKey(RelationalFieldType[CascadeSpec], Generic[T]):
     ) -> core_schema.CoreSchema:
         # We import here so it will happen only once, when we create the _validate function
         from rapyer.base import AtomicRedisModel
+
         # We validate with the Foriegn key with generic
 
         def _validate(value: Any) -> "ForeignKey":

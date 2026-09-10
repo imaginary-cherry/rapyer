@@ -50,6 +50,12 @@ class ExternalFieldType(BaseRedisType, ABC, Generic[ConfigT]):
         return None
 
     @classmethod
+    def config_readers(cls, annotation) -> tuple:
+        """This type if it declares a config class, plus whatever its elements declare."""
+        mine = (cls,) if cls.config_type() is not None else ()
+        return mine + super().config_readers(annotation)
+
+    @classmethod
     def resolve_configs(cls, annotation) -> tuple:
         """This type's own config, then whatever its elements declare."""
         own = cls.extract_config(annotation)

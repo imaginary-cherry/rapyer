@@ -1,6 +1,7 @@
 import warnings
 
 from rapyer.errors.base import (
+    AmbiguousFieldConfigError,
     CorruptedModelError,
     DuplicateModelNameError,
     InvalidRefreshTtlError,
@@ -51,6 +52,7 @@ __all__ = [
     "CascadeKeyInitialsError",
     "CascadeLuaLiteralError",
     "CascadeTargetTtlMissingError",
+    "AmbiguousFieldConfigError",
     "CorruptedModelError",
     "DuplicateModelNameError",
     "FindError",

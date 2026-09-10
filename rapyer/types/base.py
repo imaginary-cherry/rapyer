@@ -20,6 +20,7 @@ from redis.commands.search.field import TextField
 from rapyer.actions import ActionGroup, install_marked_action_methods, mark_actions
 from rapyer.capabilities import ParentLinked
 from rapyer.context import _context_pipe, get_pipe_json
+from rapyer.errors.base import AmbiguousFieldConfigError
 from rapyer.types.traits import FieldTrait
 from rapyer.typing_support import Self
 from rapyer.utils.annotation import annotation_origin
@@ -73,6 +74,16 @@ class BaseRedisType(ParentLinked, ABC):
         return resolve_generic_args(inner)
 
     @classmethod
+    def config_readers(cls, annotation) -> tuple:
+        """Every type at or under this annotation that declares a config class."""
+        found: list = []
+        for arg in cls.element_annotations(annotation):
+            element = annotation_origin(arg)
+            if safe_issubclass(element, BaseRedisType):
+                found.extend(element.config_readers(arg))
+        return tuple(found)
+
+    @classmethod
     def resolve_configs(cls, annotation) -> tuple:
         """Every config declared at or under this annotation, in declaration order."""
         found: list = []
@@ -81,6 +92,43 @@ class BaseRedisType(ParentLinked, ABC):
             if safe_issubclass(element, BaseRedisType):
                 found.extend(element.resolve_configs(arg))
         return tuple(found)
+
+    @classmethod
+    def field_configs(cls, annotation) -> tuple:
+        """
+        Every config that applies to a field of this type.
+        """
+        # The outer form is only consulted when nothing claimed a config of its own,
+        # so a marker is never counted twice.
+        return cls.resolve_configs(annotation) or cls._configs_claimed_from_outside(
+            annotation
+        )
+
+    @classmethod
+    def _configs_claimed_from_outside(cls, annotation) -> tuple:
+        """
+        Resolve a config written on the field for a type nested inside it.
+        """
+        by_config: dict = {}
+        for reader in cls.config_readers(annotation):
+            by_config.setdefault(reader.config_type(), []).append(reader)
+        claimed: list = []
+        for config_type, readers in by_config.items():
+            # Readers sharing a config class filter the same metadata, so one answers for all.
+            value = readers[0].extract_config(annotation)
+            if value is None:
+                continue
+            if len(readers) > 1:
+                names = sorted({reader.__name__ for reader in readers})
+                raise AmbiguousFieldConfigError(
+                    config_type.__name__,
+                    names,
+                    f"{config_type.__name__} is written on this field but "
+                    f"{len(names)} types inside it read one ({', '.join(names)}). "
+                    "Move it onto the type it configures.",
+                )
+            claimed.append(value)
+        return tuple(claimed)
 
     @classmethod
     def container_kind(cls) -> Optional[str]:
