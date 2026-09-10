@@ -1,5 +1,5 @@
-import abc
 import dataclasses
+from abc import ABC
 from enum import Enum
 
 from rapyer.errors.cascade import InvalidCascadeDepthError
@@ -17,7 +17,7 @@ class TTLCascadeMode(Enum):
 
 
 @dataclasses.dataclass(frozen=True)
-class CascadeSpec(abc.ABC):
+class CascadeSpec(ABC):
     """
     Shared data contract for every cascade strategy (extension seam).
 
